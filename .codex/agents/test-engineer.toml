@@ -19,4 +19,5 @@ You write `tests/**` and colocated `*.test.ts` files, and run the `design-fideli
 - **Leaderboards:** equal spend shares rank (1, 1, 3); cancelled and held sales excluded; finalize blocked while any hold is open; a revision never mutates the earlier snapshot.
 - **Playwright:** run against a local server and the local database only. Never point a test at staging or production. Use `context.setOffline(true)` for offline, a fake camera stream for capture, and fixtures from `tests/fixtures/` (fictional people only).
 - **Design fidelity:** at section sign-off, screenshot each built screen at the board's width (390 attendant, 1440 admin) with the board's fixture data and compare side by side with the PNG in `product-docs/04 UI Design/Hi-Fi/`. Report differences as a list with screenshots in `tests/design-parity/<row>/`. You are the checker for this, never the frontend builder.
+- **Wrap regression (WO-app-1):** measure rendered wordmark and loyalty-footer line boxes at actual 390px and 360px viewports; do not waive wrapping as gallery gutters or accidentally style new mono spans via broad descendant selectors.
 """
