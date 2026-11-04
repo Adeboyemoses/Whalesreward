@@ -1,25 +1,22 @@
 # lane:core
-WO-core-1c (WHR-44) Auto-mode Git permissions hotfix: READY since 2026-11-04
+WO-core-1b (WHR-41) Evidence survives staging updates: READY since 2026-11-04
 
 ## In flight
-- [PR #14](https://github.com/Adeboyemoses/Whalesreward/pull/14) merged into staging at de05d2d; all five required CI checks passed.
-- Exact local rules copy preserved. Global-option guard bypass fixed; code/security/integrity PASS in round 2 at d03fa0c. EM typecheck, lint, unit 18, build, Bash 3.2 guard 94 and review self-tests 37 passed.
-- No product invariant or board row changed; coverage map unchanged.
+- [PR #17](https://github.com/Adeboyemoses/Whalesreward/pull/17) merged into staging at 746ede4; all five required CI checks passed.
+- Code/security/integrity PASS in round 1 at f14d6b6; evidence .review/core__wo-1b-evidence.md. EM typecheck, lint, unit 18, build, Bash 3.2 review 39 and guard 94 passed.
+- Unrelated staging merge passes; merge changing a PR file and later commit fail. Ancestor and unchanged-plan protections preserved.
+- WHR-3 and WHR-44 ACCEPTED and closed (Done); acceptance documentation merged in #17.
+- Final READY records in core/wo-1b-ready; no product invariant or board row changed by WHR-41. WHR-3 foundation coverage accepted, full feature coverage pending.
 
 ## Next
-- Earl runs `git checkout -- .codex/rules/default.rules` then `git pull` in the main checkout, as WHR-44 prescribes. The local hotfix remains untouched by this session.
-- Await Earl's hotfix verification/acceptance; no next work order started.
-- WHR-4 attendant sign-in approved and queued for a separate core session. WHR-46 M3 contracts approved for lane:spec.
-- WHR-41 unfinished: plan eafac6d and uncommitted regression tests preserved in .worktrees/core-1b-evidence after Earl's earlier redirect.
+- Await Earl’s verification of WHR-41. Stop at READY; no next work order started.
+- WHR-4 remains approved for a separate core session.
 
 ## Earl's gos
-- 2026-11-04: "approve WHR-44, WHR-4, WHR-46"
-- 2026-11-04: "WHR-44: commit the git-permissions fix you applied by hand."
+- 2026-11-04: "Earl accepted WO-core-2 (WHR-3) and WHR-44; close both. Resume WO-core-1b (WHR-41) from .worktrees/core-1b-evidence and take it to READY. Then stop and report."
 
 ## Risks
-- Ambiguous qualified config commands, including quoted paths, are conservatively blocked; use a standalone command in the worktree for reads.
-- Literal CLI bash-wrapper policy probe is unmatched; separate cd/git probes allow. No blanket shell permission added.
-- WO-core-2 (WHR-3) remains READY pending acceptance; PR #10 dispatch flag 10 > 8, no open findings.
-- Requested Session model: gpt-6.1-sol, reasoning high. Runtime model ID is not exposed; metric follows the actual-runtime rule.
+- Review enforcement must still reject changes to PR files, including conflict resolutions.
+- Runtime model ID unavailable; requested model is gpt-6.1-sol, reasoning high.
 
-dispatches=9 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable

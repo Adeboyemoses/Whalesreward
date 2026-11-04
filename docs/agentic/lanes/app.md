@@ -15,6 +15,7 @@ WO-app-1 (WHR-2) FIX: READY upon reviewed findings PR merge, 2026-11-04
 - 2026-11-04: fix both wrap findings from Rook’s WHR-2 comment in one PR, re-run fidelity at 390px/360px, then READY.
 
 ## Risks
+- Dispatch flag: nine calls exceed the high-tier threshold of eight; the second review checks merged staging documentation and coverage-map conflict resolution.
 - Quantity precision remains WHR-45; this fix changes no formatting or business rules.
 
-dispatches=6 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=9 prs=1 rounds_max=2 escalations=0 model=unknown

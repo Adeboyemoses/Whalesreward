@@ -11,23 +11,27 @@ Updated: 2026-11-04
 - Linear team WhalesReward (WHR) created by Earl.
 - WO-core-1 (WHR-1) Repository scaffold merged to staging in PR #3; strict Next.js scaffold, pinned tooling, local services and all five required CI checks passed. ACCEPTED by Earl: "Accepted. Scaffold verified." No product features implemented.
 
-- WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
+- WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; ACCEPTED by Earl on 4 November; closed in PR #17. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
-- WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. READY; all five CI checks and three independent reviews passed. Earl performs the prescribed main-checkout reconciliation and verifies.
+- WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. ACCEPTED by Earl on 4 November; all five CI checks and three independent reviews passed. Closed in PR #17.
+
+- WO-core-1b (WHR-41): READY; review-gate fix merged into staging in PR #17 (746ede4). Independent code/security/integrity PASS; all five CI checks green. EM Bash 3.2 review 39/39, guard 94/94, typecheck, lint, unit 18/18 and build passed. Ancestor and unchanged-plan checks preserved. No product flow changed.
 
 ## In progress
+- WO-spec-3 (WHR-46): M3 contracts (38 endpoints), model additions and documentation coverage prepared; READY takes effect on the reviewed staging merge with green CI. Independent verdicts and final PR recorded on WHR-46. No product implementation or screen parity claimed.
 - Earl's one-time setup (docs/agentic/setup.md).
-- WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
+
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- M3 policy gates: WHR-38/39 (trusted capture/other card retirement), WHR-47–50 (correction evidence, final manager recovery, OTP/device recovery policy, independent meter reconciliation). Specs preserve data and deny unsupported acceptance/mutations pending policy.
 - M2 policy tracking: WHR-42 (D06 token/delivery configuration), WHR-43 (proposed role preset activation). Defaults preserve reference values while production policy remains explicitly configured; no new provider or cloud resource is authorized.
 - Client kickoff and contract: not yet confirmed.
 - Client DigitalOcean account for staging and production (needed by M4/M5).
 - Launch date versus the December campaign start.
 
 ## Next up
-- Await Earl’s acceptance/findings for WO-core-2 and WHR-44. WHR-4 attendant sign-in is approved for the next separate core session; WHR-46 M3 contracts is approved for lane:spec. Resume WHR-41 only when assigned.
+- Await Earl’s verification of WO-core-1b after READY. WHR-3 and WHR-44 are accepted; both issues are Done following PR #17. WHR-4 attendant sign-in remains approved for a separate core session; WHR-46 M3 contracts belongs to lane:spec.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
