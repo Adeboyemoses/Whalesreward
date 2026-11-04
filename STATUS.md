@@ -22,12 +22,16 @@ Updated: 2026-11-05
 
 - WO-core-15 (WHR-28): source deployment preparation merged in PR #22; READY for Earl to provision after final records merge. Includes App Platform spec, pinned multi-stage Dockerfile, TLS-safe migration/seed jobs, health endpoint, staging banner/noindex/gallery isolation and no-op email. Independent code/security/integrity PASS; EM unit 27, integration 49, typecheck/lint/build, amd64 Docker and actual image runtime checks passed. All five required CI checks passed, including full browser tests. No doctl or cloud actions run. Runbook: docs/ops/staging.md; cloud validation and deployed URL/redeploy proof remain pending Earl.
 
+- WO-core-3 (WHR-4): READY on reviewed green staging merge of [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30). Better Auth username sign-in, revocable database sessions, immutable capture contexts, strict M1 wrappers, durable replay/throttling and safe fixture seeding. EM typecheck/lint/unit 77/build, fresh PostgreSQL integration 65, time 3 per timezone and real HTTP Playwright 1 passed; full browser CI required before merge because local Chromium startup is sandbox-blocked. Independent verdicts are in `.review/core__wo-3-attendant-auth.md`. Runbook: `docs/qa/smoke-2026-11-05-attendant-auth.md`. Stop at READY; Earl's acceptance and real-phone checks remain pending.
+
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
 
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- WO-core-15 / WHR-28 stays READY until Earl reports staging checks. Authentication work did not provision cloud resources or change staging data.
+- WHR-57: nonblocking P2 authentication rate-bucket storage growth; separate follow-up, not part of WHR-4's accepted scope.
 - M4 policy gates: WHR-54 (reconciliation/complete-upload proof), WHR-55 (launch/start and timing changes), WHR-56 (stored photos/retention removal). Client dates/grace/duration stay unset; no finalization without approved policy, no automatic deletion. These do not prevent the specification handoff.
 - M3 policy gates: WHR-39 (other card retirement); WHR-38 build default approved in P-18, client Q-528 pending, WHR-47–50 (correction evidence, final manager recovery, OTP/device recovery policy, independent meter reconciliation). Specs preserve data and deny unsupported acceptance/mutations pending policy.
 - M2 policy tracking: WHR-42 (D06 token/delivery configuration), WHR-43 (proposed role preset activation). Defaults preserve reference values while production policy remains explicitly configured; no new provider or cloud resource is authorized.
