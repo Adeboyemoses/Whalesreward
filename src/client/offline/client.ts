@@ -113,7 +113,6 @@ export class AttendantClient {
     }
   }
   private async readAccess(): Promise<ClientState> {
-    const now = this.clock();
     const result = await this.db.transaction(
       "rw",
       this.db.meta,
@@ -133,6 +132,7 @@ export class AttendantClient {
             access: "signed_out" as const,
             logoutPending: row?.logoutPending ?? false,
           };
+        const now = this.clock();
         const next = advanceWindow(
           row,
           now,
@@ -161,9 +161,13 @@ export class AttendantClient {
     const meta = await this.installation();
     if (!meta.logoutPending) return;
     await this.api.signOut(meta.logoutOperationId ?? uuidv7());
-    await this.db.meta.update("installation", {
-      logoutPending: false,
-      logoutOperationId: null,
+    await this.db.transaction("rw", this.db.meta, async () => {
+      const current = await this.db.meta.get("installation");
+      if (current?.logoutOperationId === meta.logoutOperationId)
+        await this.db.meta.update("installation", {
+          logoutPending: false,
+          logoutOperationId: null,
+        });
     });
   }
   async signIn(username: string, password: string): Promise<ClientState> {
@@ -444,6 +448,10 @@ export class AttendantClient {
         "medium_required",
         "Choose what the fuel was bought into.",
       );
+    // Revalidate online at save as well: reconnecting must not promote an offline cache hint.
+    const customer = this.online()
+      ? await this.lookup(code)
+      : input.customerCache;
     const p = draft.session.price;
     const rate = parseKobo(p.rateKobo);
     const amount =
@@ -516,9 +524,7 @@ export class AttendantClient {
         pumpCode: draft.session.pump.code,
         product: draft.session.product.code,
       },
-      customerCache: input.customerCache
-        ? structuredClone(input.customerCache)
-        : null,
+      customerCache: customer ? structuredClone(customer) : null,
       photoBlob: photo.blob,
       photoDigest: digest,
       state: "saved",
@@ -536,7 +542,6 @@ export class AttendantClient {
     };
     // Recheck after hashing and inside the same atomic transaction as photo + original.
     await this.checkAccess();
-    const now = this.clock();
     try {
       const saved = await this.db.transaction(
         "rw",
@@ -546,6 +551,7 @@ export class AttendantClient {
         async () => {
           const meta = await this.db.meta.get("installation");
           const window = await this.db.windows.get(session.account.id);
+          const now = this.clock();
           if (
             meta?.activeAccountId !== session.account.id ||
             meta.logoutPending ||

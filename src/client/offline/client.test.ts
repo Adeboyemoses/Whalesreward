@@ -236,6 +236,21 @@ describe("durable account partition", () => {
     resolve(result);
     await expect(pending).rejects.toMatchObject({ code: "account_changed" });
   });
+  it("a delayed sign-in after signout cannot restore a window or leave a usable cookie", async () => {
+    let resolve!: (value: ReturnType<typeof sessionFixture>) => void;
+    const fresh = { ...api.current, captureContextId: uuidv7() };
+    api.signIn = () =>
+      new Promise((r) => {
+        resolve = r;
+      });
+    const pending = client.signIn("grace", "fictional");
+    await new Promise((r) => setTimeout(r, 5));
+    await client.signOut();
+    resolve(fresh);
+    await expect(pending).rejects.toMatchObject({ code: "account_changed" });
+    expect(client.getState().access).toBe("signed_out");
+    expect((await db.meta.get("installation"))?.activeAccountId).toBeNull();
+  });
   it("wrong photo digest cannot be saved", async () => {
     const form = await input();
     await expect(
