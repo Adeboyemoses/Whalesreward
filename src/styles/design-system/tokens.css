@@ -1,0 +1,73 @@
+/* vendored from product-docs/04 UI Design/Design System/tokens.css, 2026-11-04 */
+/* Whales Rewards — generated from tokens.json */
+:root, [data-theme="light"] {
+  --surface-000: #ffffff;
+  --surface-050: #f5f7fa;
+  --surface-100: #ebeff3;
+  --surface-200: #dde3ea;
+  --surface-inverse: #0b1f33;
+  --ink-900: #0b1f33;
+  --ink-700: #334155;
+  --ink-500: #5b6775;
+  --on-inverse: #ffffff;
+  --on-inverse-muted: #c3ccd6;
+  --whale-700: #0b3a63;
+  --whale-600: #0f4c81;
+  --whale-100: #d7e7f5;
+  --whale-050: #edf4fa;
+  --flare-700: #7a4e00;
+  --flare-500: #f2a900;
+  --flare-400: #f7be3c;
+  --flare-100: #fdf0cc;
+  --success-700: #0f6e63;
+  --success-600: #11857a;
+  --success-100: #d9f0ec;
+  --danger-700: #a3261b;
+  --danger-600: #b42318;
+  --danger-100: #fbe3e0;
+  --line-100: #e3e8ee;
+  --line-300: #7a8798;
+  --focus: #0f4c81;
+  --shadow-sm: 0 1px 2px rgba(11, 31, 51, 0.08);
+  --shadow-md: 0 8px 24px rgba(11, 31, 51, 0.14);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  --control-h: 48px;
+  --control-h-desktop: 40px;
+  --cta-h: 56px;
+  --phone-w: 390px;
+  --sidebar-w: 248px;
+  --icon: 24px;
+  --font-display: "Manrope", "IBM Plex Sans", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+.display-lg { font-family: var(--font-display); font-size: 32px; line-height: 38px; font-weight: 800; letter-spacing: -0.02em; }
+.display-md { font-family: var(--font-display); font-size: 24px; line-height: 30px; font-weight: 800; letter-spacing: -0.01em; }
+.display-sm { font-family: var(--font-display); font-size: 20px; line-height: 26px; font-weight: 700; }
+.title { font-family: var(--font-sans); font-size: 18px; line-height: 24px; font-weight: 600; }
+.body { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 400; }
+.body-strong { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 600; }
+.label { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 500; }
+.caption { font-family: var(--font-sans); font-size: 13px; line-height: 18px; font-weight: 400; }
+.overline { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.08em; }
+.amount-xl { font-family: var(--font-sans); font-size: 40px; line-height: 44px; font-weight: 700; letter-spacing: -0.02em; }
+.amount-lg { font-family: var(--font-sans); font-size: 28px; line-height: 32px; font-weight: 700; letter-spacing: -0.01em; }
+.amount-md { font-family: var(--font-sans); font-size: 18px; line-height: 24px; font-weight: 700; }
+.code-lg { font-family: var(--font-mono); font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: 0.06em; }
+.code { font-family: var(--font-mono); font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: 0.04em; }
+.code-sm { font-family: var(--font-mono); font-size: 13px; line-height: 18px; font-weight: 500; letter-spacing: 0.04em; }

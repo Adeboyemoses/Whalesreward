@@ -33,3 +33,7 @@ Updated: 2026-11-04
 - Verification provider, token expiries and role matrix not decided (D06).
 
 WO-app-0 findings (2026-11-04): draft runbooks split by capture/local-save versus server confirmation; row 02 checks expiry and omits the M2 registration link in M1. Ready after findings PR merge for Earl’s re-read; phone execution remains pending implementation.
+
+WO-app-1 (WHR-2): design assets, 16 typed wrappers, dev-only gallery and responsive shells prepared for staging. Independent gallery10/10 and production browser4/4 checks passed; report docs/qa/design-system-fidelity.md. Earl’s phone smoke remains pending.
+
+WO-app-1 PR #12: implementation and fidelity checks pass. Earl approved one additional synchronized-head review round (“proceed”, 4 November 2026); READY after final review, evidence and green CI permit the staging merge. Phone smoke acceptance remains pending.

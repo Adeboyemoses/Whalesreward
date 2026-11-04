@@ -117,3 +117,7 @@ Database constraints and pure helpers support the following invariants; they do 
 | Admin 16 · Roles and permissions | H05 H06 H10 H08 H07 | WO-app-4 | | todo |
 
 D03-AttendantProfile's **Reset password** and **Disable account** buttons are placeholders, not scope, until a work order covers them.
+
+## WO-app-1 design-system foundation (WHR-2)
+
+The 16 UI wrappers and development-only gallery are verified by `tests/design-parity/design-system/gallery.spec.ts` and `tests/e2e/gallery-production.spec.ts`; see [fidelity report](../qa/design-system-fidelity.md) for all component comparisons and 19 captures. Gallery checks10/10 and production checks4/4 passed before review. Status: prepared for staging merge; Earl’s phone smoke remains pending. These component checks do not establish built-screen parity for any complete board row or implement business invariants; those statuses above remain unchanged.
