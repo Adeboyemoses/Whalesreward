@@ -1,12 +1,13 @@
 # lane:app
-WO-app-0 (WHR-33) M0/M1 implementation briefs and smoke runbooks: BUILD since 2026-11-04
+WO-app-0 (WHR-33) M0/M1 implementation briefs and smoke runbooks: READY upon staging merge; prepared 2026-11-04
 
 ## In flight
 - `app/wo-0-briefs`: six implementation briefs and three draft phone smoke runbooks; no app code.
-- Frontend builder drafts from all 16 board PNGs/HTML; EM source checks and independent review before staging PR.
+- Six briefs / three runbooks checked against all 16 PNGs, routes and decision notes. Independent review complete before merge.
+- Review gate: 37 passed; guard: 63 passed. App gates unavailable (no scaffold); phone runbooks unexecuted drafts.
 
 ## Next
-- Merge docs PR, then Earl reads row 02 and one runbook for acceptance.
+- Earl reads `docs/briefs/attendant-row-02-record-a-sale-online.md` and `docs/qa/smoke-draft-wo-app-2.md` for acceptance after merge.
 - WO-app-1 after scaffold lands; WO-spec-1 supplies final M1 contract names.
 
 ## Earl's gos
