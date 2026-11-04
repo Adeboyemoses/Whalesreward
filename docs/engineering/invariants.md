@@ -55,7 +55,7 @@ Every invariant here needs at least one automated test that fails when the rule 
 
 ## Corrections, duplicates and audit (F06, F07)
 
-- I-37 An attendant's own correction received by the server before midnight (Africa/Lagos) on the sale date applies automatically. At or after midnight it needs admin review, and the prior accepted revision keeps counting.
+- I-37 An attendant's own correction received by the server before midnight (Africa/Lagos) on the sale date applies automatically. At or after midnight it needs admin review, and the prior accepted revision keeps counting. Amended by WO-spec-3a, 4 Nov 2026: P-19 recovered unverified corrections always need independent sales AND corrections review, excluding executor and grant authorizer; never automatic treatment.
 - I-38 An original sale arriving after midnight does not reopen editing. An offline correction is never merged into its original to dodge late review.
 - I-39 Optimistic version checks reject a correction based on an outdated revision.
 - I-40 Retries never duplicate credit. Separately entered suspected duplicates are **flagged** for an admin, who may cancel with a reason or clear the flag and keep both. A flagged, uncancelled sale follows the ordinary automatic-credit rule: there is no pre-approval queue. The original stays in the audit record. (F&R F07)
@@ -67,7 +67,7 @@ Every invariant here needs at least one automated test that fails when the rule 
 - I-43 Rank by exact qualifying spend. Equal spend shares a rank. Transaction counts and quantities are shown, never used to break ties. The displayed numbering (competition ranking 1, 1, 3 via SQL `RANK()`) is a proposal pending the client; keep it in one place.
 - I-44 All-time totals are kept separate from campaign-qualifying totals. Litres and kilograms are never summed together.
 - I-45 Purchase cutoff, upload grace period and photo retention are configurable, versioned and audited, apply only after launch, and the UI shows the effective cutoff, deadline and timezone. Unset retention means no deletion. Unset campaign values block finalization.
-- I-45a **Which clock decides what.** Server receipt decides the midnight correction rule (I-37) and the upload deadline. Whether a purchase falls **inside the purchase period** is decided by when it was made: trusted capture evidence or an admin-verified sale date, never receipt time. Grace allows late delivery of eligible purchases, not new purchases after the cutoff. The trusted within-day capture-time rule is still open (D02, D05): raise it as `needs:human` before building campaign eligibility. (F&R F11)
+- I-45a **Which clock decides what.** Server receipt decides the midnight correction rule (I-37) and the upload deadline. Whether a purchase falls **inside the purchase period** is decided by when it was made: trusted capture evidence or an admin-verified sale date, never receipt time. Grace allows late delivery of eligible purchases, not new purchases after the cutoff. Amended by WO-spec-3a, 4 Nov 2026: P-18/WHR-38 permits the bounded capturing-sign-in to first-receipt interval to establish uniform eligibility answers; varying answers remain held. Client confirmation is pending Q-528. (F&R F11)
 - I-46 Finalization happens only after cutoff and grace have passed and all holds and reconciliation are resolved. It saves a numbered, frozen snapshot. Later accepted changes produce an audited new revision linked to its predecessor. Earlier snapshots are never mutated.
 - I-47 Prize distribution stays manual. No prize inventory or fulfilment.
 

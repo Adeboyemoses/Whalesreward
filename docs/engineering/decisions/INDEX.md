@@ -24,6 +24,9 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 | P-16 | All 106 hi-fi boards are the design scope, including every "added" board and Duplicate review's "Clear the flag · keep both" (not feature-flagged); board D03-AttendantProfile's Reset password and Disable account buttons are placeholders, left out | Earl, 4 Nov 2026 (Q-520) |
 | P-17 | Spelling is "litres" and "kilograms" (design standard; client confirmation pending) | Design system README (Q-517) |
 
+| P-18 | WHR-38 build default: evaluate [capturing sign-in, first durable receipt] across price, assignment and campaign history; uniform answers allow normal validation, varying answers hold zero credit. Refines P-07; client Q-528 pending; one server module | Earl, 4 Nov 2026; WHR-38 and WHR-52 |
+| P-19 | Recovered unverified corrections require ordinary late review by sales AND corrections admin distinct from executor and grant authorizer; only that decision clears proposal block, never automatic treatment. Refines P-11 | Earl, 4 Nov 2026; WHR-46 and WHR-52 |
+
 ## Technical (this repo)
 
 | ID | Decision | Since |
@@ -44,4 +47,4 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 ## Open product decisions that touch code
 
-D02 (meter settings, halfway rounding, capture-start trust), D05 (other retirement cases), D06 (role matrix, token expiries, providers, loss-of-email process), D07 (photo originals, backups, restore objectives), D08 (field validation), D09 (campaign dates, grace, retention values). See `product-docs/06 Delivery and Handoffs/Design Handoff Readiness.md`. Build them behind configuration or adapters; never invent the client's policy.
+D02 (meter settings, halfway rounding; bounded capture build default P-18 awaits Q-528 client confirmation), D05 (other retirement cases), D06 (role matrix, token expiries, providers, loss-of-email process), D07 (photo originals, backups, restore objectives), D08 (field validation), D09 (campaign dates, grace, retention values). See `product-docs/06 Delivery and Handoffs/Design Handoff Readiness.md`. Build them behind configuration or adapters; never invent the client's policy.
