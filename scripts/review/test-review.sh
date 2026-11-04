@@ -23,6 +23,9 @@ expect_reviewers() {
 expect_tier docs docs/engineering/roadmap.md README.md
 expect_tier docs docs/agentic/lanes/core.md
 expect_tier high docs/agentic/work-orders.md
+expect_tier high docs/engineering/contracts/m1.md
+expect_tier high docs/engineering/data-model.md
+expect_tier docs docs/engineering/architecture.md
 expect_tier high docs/engineering/invariants.md
 expect_tier medium docs/engineering/decisions/INDEX.md
 expect_tier high .do/app.production.yaml
@@ -39,6 +42,8 @@ expect_tier low src/ui/StatusPill.tsx
 expect_tier low tests/e2e/sale.spec.ts
 expect_tier medium some/unknown/file.ts
 expect_tier high src/ui/Button.tsx src/server/modules/auth/session.ts
+expect_reviewers "code-reviewer security-reviewer integrity-reviewer" docs/engineering/contracts/m1.md
+expect_reviewers "code-reviewer security-reviewer integrity-reviewer" docs/engineering/data-model.md
 expect_reviewers "code-reviewer" src/ui/Button.tsx
 expect_reviewers "code-reviewer integrity-reviewer" src/server/modules/leaderboards/query.ts
 expect_reviewers "code-reviewer security-reviewer" src/server/modules/customers/service.ts
