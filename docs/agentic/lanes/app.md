@@ -1,21 +1,21 @@
 # lane:app
-WO-app-1 (WHR-2) FIX: READY upon reviewed findings PR merge, 2026-11-04
+WO-app-1 (WHR-2) Design system and app shells: ACCEPTED since 2026-11-04
+WO-app-2 (WHR-5) Offline capture: BUILD since 2026-11-04
 
 ## In flight
-- `app/wo-1-wrap-fix`: AppHeader wordmark stays one line; subordinate surface label yields first. Narrow LoyaltyCard footer stacks cleanly with mono customer ID.
-- Four rendered-line regressions reproduced the original failures at actual 390px and 360px before the source fix.
-- Independent fidelity report: `docs/qa/design-system-wrap-fidelity.md`; final gates and high-tier review precede merge.
-- High tier comes from the escape-to-test gotcha in test-engineer instructions; no auth, persistence or credit changes.
+- Closing accepted WO-app-1. Foundation PR #12 and wrap FIX PR #20 merged; component/phone-width parity reports in docs/qa/.
+- WO-app-2: precommitted high-tier plan and smoke runbook; offline and frontend builders own isolated worktrees. Real endpoints belong to WO-core-3.
 
 ## Next
-- Earl reads revised 390px/360px captures and sends acceptance or findings.
-- Real phone/TalkBack can wait for staging URL (WHR-28); no USB setup required now.
+- WO-app-2 automated offline restart/account-isolation tests, independent fidelity and code/security/integrity review, then green staging merge and READY.
+- Stop at READY; Earl’s phone smoke waits for WO-core-3 merge.
 
 ## Earl's gos
-- 2026-11-04: fix both wrap findings from Rook’s WHR-2 comment in one PR, re-run fidelity at 390px/360px, then READY.
+- 2026-11-04: “Earl accepted WO-app-1 (WHR-2); close it.”
+- 2026-11-04: “Work order: WO-app-2 (WHR-5), offline capture.” Build against M1 typed client adapter with a contract-shaped fake for tests; “Take it to READY with Playwright green, then stop”.
 
 ## Risks
-- Dispatch flag: twelve calls exceed the high-tier threshold of eight; final reviews check merged staging documentation and coverage-map conflict resolution.
-- Quantity precision remains WHR-45; this fix changes no formatting or business rules.
+- WO-app-2 is not yet verified; phone acceptance is deferred, not implied by browser tests.
+- WHR-45 remains separately tracked; no new scope added.
 
-dispatches=12 prs=1 rounds_max=3 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=0 escalations=0 model=unknown

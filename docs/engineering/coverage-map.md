@@ -128,7 +128,7 @@ D03-AttendantProfile's **Reset password** and **Disable account** buttons are pl
 
 ## WO-app-1 design-system foundation (WHR-2)
 
-The 16 UI wrappers and development-only gallery are verified by `tests/design-parity/design-system/gallery.spec.ts` and `tests/e2e/gallery-production.spec.ts`; see [fidelity report](../qa/design-system-fidelity.md) for all component comparisons and 19 captures. Gallery checks10/10 and production checks4/4 passed before review. Status: prepared for staging merge; Earl’s phone smoke remains pending. These component checks do not establish built-screen parity for any complete board row or implement business invariants; those statuses above remain unchanged.
+The 16 UI wrappers and development-only gallery are verified by `tests/design-parity/design-system/gallery.spec.ts` and `tests/e2e/gallery-production.spec.ts`; see [fidelity report](../qa/design-system-fidelity.md) for all component comparisons and 19 captures. Gallery checks10/10 and production checks4/4 passed before review. Status: accepted by Earl on 4 November 2026; foundation PR #12 and wrap fix PR #20 are merged into staging. Acceptance is recorded from Earl’s explicit close instruction. These component checks do not establish built-screen parity for any complete board row or implement business invariants; those statuses above remain unchanged.
 
 WO-app-1 wrap FIX (WHR-2): four actual-viewport line-box regressions cover AppHeader and LoyaltyCard at 390px/360px; see `docs/qa/design-system-wrap-fidelity.md`. Component fidelity only, with no completed screen or business invariant claim.
 
