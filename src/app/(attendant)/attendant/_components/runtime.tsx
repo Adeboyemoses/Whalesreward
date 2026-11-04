@@ -12,7 +12,9 @@ import {
   getAttendantClient,
   type ClientState,
   type Session,
+  type OutboxRow,
 } from "@/client/offline/client";
+import { needsUpload } from "@/client/offline/sync-status";
 import { registerAttendantWorker } from "@/client/sw/register";
 import { AppHeader, BottomNav, Notice, Button } from "@/ui";
 import type { NavLabel } from "@/ui/navigation";
@@ -66,6 +68,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
         });
     };
     const unsubscribe = client.subscribe(update);
+    const stopSync = client.startForegroundSync();
     void (async () => {
       await client.initialize();
       // An already-online launch is not an online event. Validate its session
@@ -97,6 +100,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
       unsubscribe();
+      stopSync();
       clearInterval(timer);
       window.removeEventListener("online", network);
       window.removeEventListener("offline", network);
@@ -193,6 +197,7 @@ export function Frame({
   signIn?: boolean;
 }) {
   const { online } = useAttendant();
+  const pending = useOwnCount();
   return (
     <div
       className={`wr-root wr-phone wr-attendant-shell wr-capture-shell${noNav ? " wr-without-nav" : ""}${signIn ? " wr-sign-in" : ""}`}
@@ -209,9 +214,11 @@ export function Frame({
         <BottomNav
           items={[
             { label: "Sale", href: "/attendant/sale" },
+            { label: "Uploads", href: "/attendant/uploads" },
             { label: "Account", href: "/attendant/account" },
           ]}
           active={active}
+          pending={pending ?? 0}
         />
       )}
     </div>
@@ -248,33 +255,51 @@ export function AccessGate({
     </div>
   );
 }
-export function useOwnCount() {
+export function useOwnSales() {
   const { client, state } = useAttendant();
-  const [count, setCount] = useState<number | null>(null);
   const accountId = state?.session?.account.id;
   const contextId = state?.session?.captureContextId;
   const access = state?.access;
+  const [result, setResult] = useState<{
+    accountId?: string;
+    rows: OutboxRow[] | null;
+    error: string | null;
+  }>({ rows: null, error: null });
   useEffect(() => {
-    let current = true;
-    if (client && accountId && access !== "signed_out")
+    let live = true;
+    let request = 0;
+    if (!client || !accountId || access === "signed_out") return;
+    const read = () => {
+      const current = ++request;
       void client.ownSales().then(
         (rows) => {
-          if (current)
-            setCount(
-              rows.filter(
-                (row) => !["credited", "held", "cancelled"].includes(row.state),
-              ).length,
-            );
+          if (
+            live &&
+            current === request &&
+            client.getState().session?.account.id === accountId
+          )
+            setResult({ accountId, rows, error: null });
         },
-        () => {
-          if (current) setCount(null);
+        (error) => {
+          if (live && current === request)
+            setResult({ accountId, rows: null, error: message(error) });
         },
       );
+    };
+    const unsubscribe = client.subscribeSales(read);
+    read();
     return () => {
-      current = false;
+      live = false;
+      unsubscribe();
     };
   }, [client, accountId, contextId, access]);
-  return count;
+  if (!accountId || access === "signed_out" || result.accountId !== accountId)
+    return { rows: null, error: null };
+  return { rows: result.rows, error: result.error };
+}
+export function useOwnCount() {
+  const { rows } = useOwnSales();
+  return rows ? rows.filter(needsUpload).length : null;
 }
 export function WindowNotice() {
   return (
