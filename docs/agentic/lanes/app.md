@@ -14,7 +14,8 @@ WO-app-1 (WHR-2) Design system and app shells: READY upon reviewed staging merge
 - 2026-11-04: approved WO-app-1 in Linear; current session names lane:app, WHR-2 and gallery brief.
 
 ## Risks
+- Dispatch flag: this medium-tier PR uses 7 dispatches (builder, QA twice, two reviewers twice), above the 4-dispatch reporting threshold; within the 2-round review cap.
 - Actual phone/TalkBack smoke remains Earl’s check; desktop emulation does not establish it.
 - Brand values remain tokens/swappable assets pending sign-off.
 
-dispatches=4 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=7 prs=1 rounds_max=2 escalations=0 model=unknown

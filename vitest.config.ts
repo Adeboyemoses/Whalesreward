@@ -20,7 +20,7 @@ export default defineConfig({
           exclude,
         },
       },
-      // No domain time rules exist yet; this becomes mandatory once the time helper lands.
+      // Calendar rules must pass in both configured timezones.
       {
         test: {
           name: "time",
