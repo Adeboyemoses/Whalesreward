@@ -8,6 +8,8 @@ Data-model PR #4 is merged on staging with independent security and integrity PA
 
 ## Invariants
 
+WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting model additions. Scope: I-01/I-02, I-04/I-05/I-05a, I-07–I-20, I-29/I-31/I-32, I-41/I-49/I-50; F08/I-21/I-21a are preservation boundaries, not recovery implementation. Board inputs: attendant rows 4/7; admin rows 1–3, 6 (C01/B05/S08 reads only), 7–10 and 15–16 (H07 permission projection only). Specification closeout takes effect when the spec/wo-2-m2-contracts PR merges into staging with green CI; independent committed-head review and the merged PR are recorded on WHR-40. This is documentation coverage only; all implementation test and board-parity statuses below remain unchanged.
+
 | ID | Rule (short) | Work order | Test | Status |
 |---|---|---|---|---|
 | I-01 | Each attendant has a personal account: name, unique username, password and a permanent sys… | | | todo |
@@ -78,11 +80,11 @@ Database constraints and pure helpers support the following invariants; they do 
 
 | Foundation | Invariants supported | Named tests | Status |
 |---|---|---|---|
-| Exact kobo and captured-precision quantity arithmetic | I-29 | src/shared/money.test.ts; src/shared/quantity.test.ts | building |
-| Explicit Lagos receipt/midnight helper | I-37, I-38 | tests/time/lagos.time.test.ts (UTC and America/New_York) | building |
-| Unit-separated quantities | I-44 | src/shared/quantity.test.ts | building |
-| Entity storage, normalized-phone uniqueness, fixed categories and product units | I-14, I-15, I-29, I-30 | tests/integration/schema-contract.test.ts | building |
-| Immutable originals, append-only audit and operation uniqueness | I-22, I-28, I-41 | tests/integration/core-schema.test.ts | building |
+| Exact kobo and captured-precision quantity arithmetic | I-29 | src/shared/money.test.ts; src/shared/quantity.test.ts | on-staging |
+| Explicit Lagos receipt/midnight helper | I-37, I-38 | tests/time/lagos.time.test.ts (UTC and America/New_York) | on-staging |
+| Unit-separated quantities | I-44 | src/shared/quantity.test.ts | on-staging |
+| Entity storage, normalized-phone uniqueness, fixed categories and product units | I-14, I-15, I-29, I-30 | tests/integration/schema-contract.test.ts | on-staging |
+| Immutable originals, append-only audit and operation uniqueness | I-22, I-28, I-41 | tests/integration/core-schema.test.ts | on-staging |
 
 ## Hi-fi boards (106, in canvas row order)
 
