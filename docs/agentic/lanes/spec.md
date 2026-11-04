@@ -1,22 +1,20 @@
 # lane:spec
-WO-spec-3 (WHR-46) M3 contracts: READY upon reviewed staging merge since 2026-11-04
+WO-spec-3 (WHR-46) M3 contracts: ACCEPTED since 2026-11-04
 
 ## In flight
-- spec/wo-3-m3-contracts: M3 endpoint contracts and model additions, documentation coverage and closeout. READY takes effect only after reviewed staging merge with green CI; final PR and independent verdicts will be linked on WHR-46.
-- Docs only. No app code, migration, product-docs edit, implemented invariant or screen parity claimed.
-- EM runs typecheck, lint, test and build; independent code/security/integrity review required. High tier chosen for contract risk despite docs-only routing.
+- None after this acceptance closeout merges. M3 contracts (38 endpoints), model additions and documentation coverage merged in [PR #16](https://github.com/Adeboyemoses/Whalesreward/pull/16), staging commit 323b1c5.
+- Independent code/security/integrity PASS verdicts and all five green CI checks are recorded on WHR-46 and PR #16. EM typecheck, lint, 18 unit tests and build passed.
+- This closeout records Earl's acceptance; WHR-46 moves to Done after its green staging merge. No product implementation or board parity claimed.
 
 ## Next
-- Merge when review and CI pass; post READY and stop at the work order's staging-merge condition. No next work order selected.
+- Session closed after acceptance closeout merge. No next work order selected.
 
 ## Earl's gos
-- WHR-46 has Earl's 4 November approval line and was Todo at session start. Session instruction assigns WO-spec-3, lane:spec. No main/production go.
+- 2026-11-04: “Accept and close this session” — acceptance and closure of WO-spec-3. No main/production action authorized.
 
 ## Risks
-- WHR-38/39 remain open; uncertain time/authorization/retirement stays zero-credit.
-- WHR-47 correction evidence, WHR-48 final manager recovery, WHR-49 OTP/device recovery policy and WHR-50 meter reconciliation remain implementation gates. No policy inferred from fixtures.
-- Round one found recovered-correction authorship and contract shape/concurrency gaps; fixed before round two. Final evidence/WHR-46 records verdicts and checks.
-- Dispatch flag: 15 exceeds high-tier 8; nine reviews across three rounds, then six unchanged-contract confirmations across concurrent core updates (PRs #15, #17 and #18). No additional fix round or escalation.
+- WHR-38/39 and WHR-47–50 remain separate downstream implementation policy gates; acceptance of these specifications does not settle them.
+- PR #16 dispatch flag: 15 exceeded high-tier 8 (nine reviews across three rounds plus six unchanged-contract confirmations after concurrent core updates); no additional fix round or escalation. One independent docs closeout review brings cumulative dispatches to 16.
 - Runtime full model ID unavailable.
 
-dispatches=15 prs=1 rounds_max=3 escalations=0 model=unavailable
+dispatches=16 prs=2 rounds_max=3 escalations=0 model=unavailable
