@@ -62,3 +62,5 @@ pnpm test:e2e --config tests/design-parity/offline/playwright.config.ts
 ```
 
 Screenshots and the comparison report are under `tests/design-parity/offline/screenshots/` and `docs/qa/offline-capture-fidelity.md`. Browser checks do not establish daylight readability, camera focus, real endpoint authentication, TalkBack behavior or phone storage durability.
+
+The root layout emits a generic runtime staging banner. Workbox discovers versioned attendant assets from build manifests and caches fixed generic route URLs at installation; it does not require build-time HTML. This preserves the banner without server-rendered account data.

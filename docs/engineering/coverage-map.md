@@ -138,7 +138,7 @@ No product invariant or board row changed. `scripts/review/test-review.sh` cover
 
 ## WO-app-2 offline capture (WHR-5)
 
-Client implementation reaches READY on the reviewed green staging merge of `app/wo-2-offline`. EM verification: typecheck, lint, 43 unit tests, production build, 30 Playwright tests, and three timezone tests in each of UTC and America/New_York. The rows above map its named tests; phone acceptance remains pending. The test transport follows M1; real sign-in/session endpoints remain WO-core-3. Uploads/credit remain WO-app-3/WO-core-4. These tests do not establish server authorization, registration or upload-first completion.
+Client implementation reaches READY on the reviewed green staging merge of `app/wo-2-offline`. EM verification: typecheck, lint, 74 unit tests, production build, 32 Playwright tests, and three timezone tests in each of UTC and America/New_York. The rows above map its named tests; phone acceptance remains pending. The test transport follows M1; real sign-in/session endpoints remain WO-core-3. Uploads/credit remain WO-app-3/WO-core-4. These tests do not establish server authorization, registration or upload-first completion.
 
 Required board subset: A01/A26/A12/A13, A02/A24/A03, A27/A05, A15 and A18. Independent parity report: `docs/qa/offline-capture-fidelity.md` (11 boards at 390 px and 360 px). Remaining boards in those shared rows retain their future work-order scope. Phone runbook: `docs/qa/smoke-2026-11-04-offline-capture.md`; Earl runs it only after WO-core-3 merges.
 
