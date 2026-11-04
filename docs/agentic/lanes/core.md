@@ -18,6 +18,6 @@ WO-core-3 (WHR-4) Attendant authentication and sessions: READY on reviewed green
 ## Risks
 - Client D06 policy remains open; runtime defaults are centralized. No admin auth, recovery, sync/credit or real-phone acceptance claimed.
 - A26 admin-unlock lockout wording conflicts with M1 temporary throttling; M1 governs. Staging fixture credentials require a separately supplied secret; no public default is installed.
-- Runtime model ID unavailable. Review round 2 covers staging documentation integration and READY records; authentication implementation unchanged from round 1.
+- Runtime model ID unavailable. Review rounds 2–3 cover staging documentation integration and READY records; authentication implementation unchanged from round 1. Dispatch flag: PR #30 exceeds 8 calls because all three reviewers rechecked these final documentation updates.
 
-dispatches=7 prs=1 rounds_max=2 escalations=0 model=unavailable
+dispatches=10 prs=1 rounds_max=3 escalations=0 model=unavailable

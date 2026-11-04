@@ -40,7 +40,7 @@ Updated: 2026-11-05
 - Launch date versus the December campaign start.
 
 ## Next up
-- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in remains approved for a separate core session; WO-spec-4 (WHR-51) is accepted; lane:spec stops after its documentation closeout, with no new work order.
+- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in stops at READY after PR #30 merges with green CI; Earl reads verification and runs the phone checks; WO-spec-4 (WHR-51) is accepted; lane:spec stops after its documentation closeout, with no new work order.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
