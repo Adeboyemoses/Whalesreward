@@ -1,5 +1,5 @@
 # lane:spec
-WO-spec-3 (WHR-46) M3 contracts: BUILD since 2026-11-04
+WO-spec-3 (WHR-46) M3 contracts: READY upon reviewed staging merge since 2026-11-04
 
 ## In flight
 - spec/wo-3-m3-contracts: M3 endpoint contracts and model additions, documentation coverage and closeout. READY takes effect only after reviewed staging merge with green CI; final PR and independent verdicts will be linked on WHR-46.
@@ -15,6 +15,7 @@ WO-spec-3 (WHR-46) M3 contracts: BUILD since 2026-11-04
 ## Risks
 - WHR-38/39 remain open; uncertain time/authorization/retirement stays zero-credit.
 - WHR-47 correction evidence, WHR-48 final manager recovery, WHR-49 OTP/device recovery policy and WHR-50 meter reconciliation remain implementation gates. No policy inferred from fixtures.
+- Round one found recovered-correction authorship and contract shape/concurrency gaps; fixed before round two. Final evidence/WHR-46 records verdicts and checks.
 - Runtime full model ID unavailable.
 
-dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
