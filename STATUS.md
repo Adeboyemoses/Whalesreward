@@ -16,7 +16,9 @@ Updated: 2026-11-04
 
 - WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. ACCEPTED by Earl on 4 November; all five CI checks and three independent reviews passed. Closed in PR #17.
 
-- WO-core-1b (WHR-41): ACCEPTED by Earl on 4 November ("Accepted. lets close this session"); review-gate fix merged into staging in PR #17 (746ede4). Independent code/security/integrity PASS; all five CI checks green. EM Bash 3.2 review 39/39, guard 94/94, typecheck, lint, unit 18/18 and build passed. Ancestor and unchanged-plan checks preserved. No product flow changed.
+- WO-core-1b (WHR-41): ACCEPTED by Earl on 4 November ("Accepted. lets close this session"); review-gate fix merged into staging in PR #17 (746ede4). Independent code/security/integrity PASS; all five CI checks green. EM Bash 3.2 review 39/39, guard 94/94, typecheck, lint, unit 18/18 and build passed. Ancestor and unchanged-plan checks preserved. No product flow changed. Accepted close-out PR #19 merged with all five checks green; WHR-41 is Done.
+
+- WO-core-15 (WHR-28): source deployment preparation merged in PR #22; READY for Earl to provision after final records merge. Includes App Platform spec, pinned multi-stage Dockerfile, TLS-safe migration/seed jobs, health endpoint, staging banner/noindex/gallery isolation and no-op email. Independent code/security/integrity PASS; EM unit 27, integration 49, typecheck/lint/build, amd64 Docker and actual image runtime checks passed. All five required CI checks passed, including full browser tests. No doctl or cloud actions run. Runbook: docs/ops/staging.md; cloud validation and deployed URL/redeploy proof remain pending Earl.
 
 ## In progress
 - WO-spec-3a (WHR-52): bounded capture and independent recovered-correction review amendment; READY after reviewed green staging merge, linked from WHR-52. P-18/P-19 are recorded; Q-528 client confirmation remains pending. WO-spec-4 (WHR-51) is next, unstarted.
@@ -29,11 +31,11 @@ Updated: 2026-11-04
 - M3 policy gates: WHR-39 (other card retirement); WHR-38 build default approved in P-18, client Q-528 pending, WHR-47–50 (correction evidence, final manager recovery, OTP/device recovery policy, independent meter reconciliation). Specs preserve data and deny unsupported acceptance/mutations pending policy.
 - M2 policy tracking: WHR-42 (D06 token/delivery configuration), WHR-43 (proposed role preset activation). Defaults preserve reference values while production policy remains explicitly configured; no new provider or cloud resource is authorized.
 - Client kickoff and contract: not yet confirmed.
-- Client DigitalOcean account for staging and production (needed by M4/M5).
+- Earl provisions temporary staging in Cloudrock’s existing account using docs/ops/staging.md. Client-owned production and account handover remain pending.
 - Launch date versus the December campaign start.
 
 ## Next up
-- WO-core-1b is accepted; session closed after the acceptance documentation PR merges. WHR-3 and WHR-44 are accepted; both issues are Done following PR #17. WHR-4 attendant sign-in remains approved for a separate core session; WO-spec-4 (WHR-51) follows WHR-52 READY in a new session; not started.
+- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in remains approved for a separate core session; WO-spec-4 (WHR-51) follows WHR-52 READY in a new session; not started.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
