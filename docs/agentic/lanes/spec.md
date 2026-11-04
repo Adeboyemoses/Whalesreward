@@ -18,6 +18,7 @@ WO-spec-4 (WHR-51) M4 contracts: READY on reviewed green staging merge
 - WHR-54: final reconciliation and trusted complete-upload policy; finalization blocked until configured.
 - WHR-55: launch/start and timing-change policy; client dates/grace unset. WHR-56: stored copies/removal policy; deletion disabled.
 - P-18/Q-528 and WHR-39/47/50 remain prior eligibility gates. No settled decision reopened.
+- Round 1 found two P1 contract gaps: unchanged-result reconciliation and versioned audit fields; both corrected for round 2.
 - Metrics below cover M4. Accepted WHR-52 closeout used one reviewer dispatch and one PR. Runtime full model ID unavailable.
 
-dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
