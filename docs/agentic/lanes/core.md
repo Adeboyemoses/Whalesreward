@@ -17,4 +17,4 @@ WO-core-1 (WHR-1) Repository scaffold: READY since 2026-11-04
 - Time suite explicitly has no tests; maintenance jobs and seed are no-ops. Product invariants and hi-fi coverage remain unchanged.
 - Session model ID is not exposed by this surface; metric records unavailable.
 
-dispatches=11 prs=2 rounds_max=3 escalations=0 model=unavailable
+dispatches=12 prs=2 rounds_max=3 escalations=0 model=unavailable
