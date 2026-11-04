@@ -339,3 +339,75 @@ test("I-25 rejected immutable photo stays available for support without replacem
   expect(fake.sync.records.size).toBe(1);
   expect([...fake.sync.records.values()][0]!.credits).toBe(0);
 });
+
+for (const leave of ["Stay signed in", "Account navigation"] as const) {
+  test(`I-06 ${leave} cancels pending upload-first sign-out intent`, async ({
+    page,
+    context,
+  }) => {
+    const fake = await installAttendantFake(context, { sync: true });
+    fake.sync.setPutPaused(true);
+    await savedOffline(page, fake);
+    await page.goto("/attendant/account/hand-over");
+    await reconnect(page, fake);
+    await page
+      .getByRole("button", { name: "Upload, then sign out", exact: true })
+      .click();
+    await expect
+      .poll(
+        () =>
+          fake.sync.calls.filter((c) => c.path.startsWith("/storage/")).length,
+      )
+      .toBeGreaterThan(0);
+    if (leave === "Stay signed in")
+      await page
+        .getByRole("button", { name: "Stay signed in", exact: true })
+        .click();
+    else await page.getByRole("link", { name: "Account", exact: true }).click();
+    await expect(page).toHaveURL(/\/attendant\/account$/);
+    fake.sync.setPutPaused(false);
+    await expect
+      .poll(() => [...fake.sync.records.values()][0]?.status.credited, {
+        timeout: 20000,
+      })
+      .toBe(true);
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(/\/attendant\/account$/);
+    expect(fake.activeSession()?.account.id).toBe(ids.grace);
+    expect(fake.calls.filter((c) => c.path.endsWith("/sign-out"))).toHaveLength(
+      0,
+    );
+  });
+}
+
+test("I-25 expired storage PUT permission preserves the signed-in account and resumes safely", async ({
+  page,
+  context,
+}) => {
+  const fake = await installAttendantFake(context, { sync: true });
+  fake.sync.setPutForbidden(true);
+  const original = await savedOffline(page, fake);
+  await reconnect(page, fake);
+  await expect
+    .poll(
+      () =>
+        fake.sync.calls.filter((c) => c.path.startsWith("/storage/")).length,
+    )
+    .toBeGreaterThan(0);
+  await page.goto("/attendant/uploads");
+  await expect(
+    page.getByRole("heading", { name: "Pending uploads", exact: true }),
+  ).toBeVisible();
+  expect(fake.activeSession()?.account.id).toBe(ids.grace);
+  expect((await rows(page))[0]!.photoBlob).toEqual(original.photoBlob);
+  fake.sync.setPutForbidden(false);
+  fake.sync.expireNextPermission();
+  await page
+    .getByRole("button", { name: "Retry uploads", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "All uploads complete", exact: true }),
+  ).toBeVisible({ timeout: 20000 });
+  expect(fake.sync.records.size).toBe(1);
+  expect([...fake.sync.records.values()][0]!.credits).toBe(1);
+});

@@ -46,6 +46,9 @@ export async function installSyncFake(
   let loseSubmit = false;
   let loseFinalize = false;
   let failPut = false;
+  let forbiddenPut = false;
+  let pausePut = false;
+  let releasePut: (() => void) | null = null;
   let expirePermission = false;
   let throttleSeconds = 0;
   let invalidPhoto = false;
@@ -98,6 +101,16 @@ export async function installSyncFake(
     );
     expect(permission).toBeDefined();
     if (failPut) return route.abort("failed");
+    if (forbiddenPut)
+      return route.fulfill({
+        status: 403,
+        headers: { "access-control-allow-origin": "*" },
+        body: "Expired upload permission",
+      });
+    if (pausePut)
+      await new Promise<void>((resolve) => {
+        releasePut = resolve;
+      });
     const record = [...records.values()].find(
       (r) => r.status.purchaseId === permission!.purchaseId,
     )!;
@@ -330,6 +343,16 @@ export async function installSyncFake(
     },
     setPutFailure(value: boolean) {
       failPut = value;
+    },
+    setPutForbidden(value: boolean) {
+      forbiddenPut = value;
+    },
+    setPutPaused(value: boolean) {
+      pausePut = value;
+      if (!value) {
+        releasePut?.();
+        releasePut = null;
+      }
     },
     expireNextPermission() {
       expirePermission = true;
