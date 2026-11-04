@@ -16,7 +16,7 @@ M1/M3 and model amendments specify P-18 bounded capture and P-19 independent rec
 
 ## WO-spec-4 documentation status (WHR-51)
 
-[M4 contracts](contracts/m4.md) define 26 endpoint interfaces and model additions for overall/category ranking, frozen giveaway review/results/revisions, daily/product/attendant/pump reports and PDF/Excel exports, overview KPIs/attention, and reviewed timing/retention intent. Specification status: READY on reviewed green staging merge; PR and code/security/integrity verdicts are linked from WHR-51. WHR-52 is accepted and closed through PR #26. No implementation test or board parity is claimed.
+[M4 contracts](contracts/m4.md) define 26 endpoint interfaces and model additions for overall/category ranking, frozen giveaway review/results/revisions, daily/product/attendant/pump reports and PDF/Excel exports, overview KPIs/attention, and reviewed timing/retention intent. Specification status: ACCEPTED by Earl on 5 November 2026. PR #27 merged at 71f3e68 with code/security/integrity PASS and all five CI checks green; WHR-51 moves to Done after this reviewed documentation closeout merges. WHR-52 is accepted and closed through PR #26. No implementation test or board parity is claimed.
 
 WHR-54/55/56 track reconciliation/upload proof, launch/start/timing changes and photo removal. Null client values, blocked unsupported finalization and disabled deletion preserve data. P-18/Q-528 and M3 gates remain in force. Required downstream tests are listed in M4; actual test names and parity reports belong to implementation work orders.
 
