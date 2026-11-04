@@ -46,7 +46,7 @@ test("I-23 offline save survives app restart with the same immutable original an
         basis: "amount",
         enteredAmountKobo: "2000001",
         amountKobo: "2000001",
-        quantity: "20.000",
+        quantity: "20",
       },
     },
   });
@@ -114,7 +114,7 @@ test("I-29 I-30 gas quantity capture preserves exact values and fixes Cylinder w
 }) => {
   await installAttendantFake(context);
   await signIn(page, "favour.james");
-  await expect(page.getByText("Cylinder", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Bought into", { exact: true })).toHaveValue("Cylinder");
   await expect(
     page.getByRole("button", { name: "Vehicle", exact: true }),
   ).toHaveCount(0);
@@ -278,7 +278,9 @@ test("I-17 QR and typed code resolve the same customer without following URLs", 
   });
   await signIn(page);
   await page.getByRole("button", { name: "Scan QR card", exact: true }).click();
+  await page.getByRole("button", { name: "Read QR card", exact: true }).click();
   await expect(page.getByText("Amina Bello", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Change", exact: true }).click();
   await page
     .getByLabel("Or enter the card number", { exact: true })
     .fill(" a7k3m9q ");
@@ -306,9 +308,7 @@ test("I-24 denied camera keeps the form and cannot claim a saved photo or sale",
   });
   await signIn(page);
   await page.getByLabel("Amount in naira", { exact: true }).fill("20000.01");
-  await page
-    .getByRole("button", { name: "Take meter photo", exact: true })
-    .click();
+  await page.getByRole("button", { name: /^Take meter photo/ }).click();
   await expect(
     page
       .getByText(

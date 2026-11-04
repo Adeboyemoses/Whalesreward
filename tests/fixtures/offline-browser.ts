@@ -42,9 +42,7 @@ export async function fillSale(
       { exact: true },
     )
     .fill(options.value ?? "20000.01");
-  await page
-    .getByRole("button", { name: "Take meter photo", exact: true })
-    .click();
+  await page.getByRole("button", { name: /^Take meter photo/ }).click();
   await page.getByRole("button", { name: "Take photo", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Retake", exact: true }),
