@@ -4,7 +4,7 @@ Where each requirement stands. The EM updates the rows its work order touched at
 
 ## WO-spec-1 documentation status (WHR-32)
 
-Data-model PR #4 is merged on staging with independent security and integrity PASS verdicts. M1 contracts PR #5 and lane setup PR #1 remain open. These are specification changes only: no invariant implementation or built-screen parity is claimed; test and board statuses remain unchanged.
+Data-model PR #4 is merged on staging with independent security and integrity PASS verdicts. M1 contracts PR #5 is merged with independent security and integrity PASS verdicts; lane setup and closeout complete when PR #1 merges. These are specification changes only: no invariant implementation or built-screen parity is claimed; test and board statuses remain unchanged.
 
 ## Invariants
 

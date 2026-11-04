@@ -3,14 +3,15 @@ branch: spec/WHR-34-lane
 linear: WHR-34
 tier: high
 reviewed_head: c38fd73a51b911b0edba8118945f119bead151fd
-rounds: 3
+rounds: 4
 builder: engineering-manager
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 9
+dispatches: 12
+escalation: Earl said "p roceed" on 2026-11-04 in response to the explicit request for one additional review round.
 invariants: []
 p1: []
 tickets: []
