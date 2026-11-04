@@ -16,6 +16,7 @@ WO-spec-3 (WHR-46) M3 contracts: READY upon reviewed staging merge since 2026-11
 - WHR-38/39 remain open; uncertain time/authorization/retirement stays zero-credit.
 - WHR-47 correction evidence, WHR-48 final manager recovery, WHR-49 OTP/device recovery policy and WHR-50 meter reconciliation remain implementation gates. No policy inferred from fixtures.
 - Round one found recovered-correction authorship and contract shape/concurrency gaps; fixed before round two. Final evidence/WHR-46 records verdicts and checks.
+- Dispatch flag: 9 exceeds high-tier 8; three reviewers across two fix rounds, including final canonical retry clarification. Review cap remains 3, no escalation.
 - Runtime full model ID unavailable.
 
-dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
+dispatches=9 prs=1 rounds_max=3 escalations=0 model=unavailable

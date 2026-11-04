@@ -14,7 +14,7 @@ Updated: 2026-11-04
 - WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
 ## In progress
-- WO-spec-3 (WHR-46): M3 contracts and model additions prepared for independent review and staging merge. Documentation only; READY after green reviewed merge, with PR/verdicts recorded on WHR-46.
+- WO-spec-3 (WHR-46): M3 contracts (38 endpoints), model additions and documentation coverage prepared; READY takes effect on the reviewed staging merge with green CI. Independent verdicts and final PR recorded on WHR-46. No product implementation or screen parity claimed.
 - Earl's one-time setup (docs/agentic/setup.md).
 - WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
