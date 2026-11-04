@@ -266,3 +266,133 @@ body {
     justify-content: center;
   }
 }
+
+/* Attendant capture layouts reuse board spacing, type and colour tokens. */
+.wr-capture-shell .wr-nav {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wr-capture-shell.wr-without-nav .wr-actionbar {
+  bottom: 0;
+}
+.wr-capture-shell .wr-screen {
+  gap: var(--space-4);
+}
+.wr-capture-shell .wr-section + .wr-section {
+  margin-top: var(--space-2);
+}
+.wr-capture-shell .wr-label {
+  font-size: 16px;
+}
+.wr-capture-shell .wr-username {
+  text-transform: none;
+}
+.wr-sign-in .wr-header {
+  padding-top: var(--space-8);
+  border-bottom: 0;
+  background: transparent;
+}
+.wr-sign-in .wr-header .wr-page-title {
+  display: none;
+}
+.wr-sign-in .wr-screen {
+  padding-top: var(--space-6);
+  gap: var(--space-5);
+}
+.wr-sign-in-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.wr-sign-in .wr-secondary {
+  margin-top: var(--space-1);
+}
+.wr-centered,
+.wr-sign-in-footer {
+  text-align: center;
+}
+.wr-sign-in-footer {
+  margin-top: auto;
+  padding-top: var(--space-8);
+}
+.wr-person {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wr-person-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  color: var(--on-inverse);
+  background: var(--whale-600);
+}
+.wr-person-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 800;
+}
+.wr-person .wr-secondary {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.wr-customer-card {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.wr-customer-copy {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wr-customer-copy .wr-caption {
+  color: var(--ink-700);
+}
+.wr-calculated {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  flex-wrap: wrap;
+}
+.wr-calculated .wr-amount-md {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.wr-camera-dialog {
+  width: min(calc(100% - var(--space-8)), var(--phone-w));
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-lg);
+  background: var(--surface-050);
+  color: var(--ink-900);
+  font-family: var(--font-sans);
+}
+.wr-camera-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.wr-camera-dialog::backdrop {
+  background: var(--ink-900);
+  opacity: 0.7;
+}
+.wr-camera-dialog video {
+  width: 100%;
+  max-height: 50dvh;
+  object-fit: contain;
+  background: var(--surface-200);
+  border-radius: var(--radius-md);
+}
+.wr-capture-shell .wr-kv-row dd {
+  min-width: 0;
+}
