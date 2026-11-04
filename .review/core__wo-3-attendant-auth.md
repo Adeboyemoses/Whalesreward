@@ -2,6 +2,18 @@
 branch: core/wo-3-attendant-auth
 linear: WHR-4
 tier: high
+reviewed_head: 93f3f87100800306273831c1cc3f6e389a15be10
+rounds: 1
+builder: backend-engineer
+reviewers:
+  code-reviewer: PASS
+  security-reviewer: PASS
+  integrity-reviewer: PASS
+blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
+dispatches: 4
+invariants: [I-01, I-02, I-03, I-04, I-05, I-05a, I-06, I-09]
+p1: []
+tickets: [WHR-57]
 plan:
   goal: Implement M1 attendant username sign-in, database sessions and revocation against m1.md including WO-spec-3a.
   files: prisma/**, src/server/auth.ts, src/server/lib/**, src/server/modules/auth/**, src/app/api/attendant/**, src/shared/contracts/**, tests/**, package.json, pnpm-lock.yaml, docs/engineering/**, docs/qa/**
@@ -19,3 +31,11 @@ plan:
 6. EM independently runs typecheck, lint, unit, build, integration and applicable browser gates. Three diff-scoped reviewers run in parallel; fix within three rounds, commit evidence, merge only after all CI checks pass. Post READY and stop; WHR-28 remains READY.
 
 Engineering configuration defaults remain centralized and documented, not client policy. Admin roles, recovery execution, sync/credit and the phone's offline machinery are outside this slice.
+
+## Verification and review
+- Round 1: code/security/integrity PASS at 93f3f87; reviewer worktree/head checks unchanged. No blockers or P1s. Security P2 bucket-cardinality growth tracked in WHR-57; not expanded into this scope.
+- EM independently ran typecheck, lint, unit 77/77, production build, fresh-database migrations, integration 65/65 and time 3/3 in UTC plus America/New_York: PASS.
+- EM real HTTP Playwright auth flow: 1/1 PASS, exercising actual Next routing, secure cookie jar, signup denial and logout revocation.
+- Full local browser command attempted; macOS sandbox blocks Chromium MachPort startup before assertions. Full browser CI, including the real login/account/logout test, is required before merge.
+- Better Auth 1.7.17 is MIT; a narrow transaction-bound adapter preserves existing identity/session tables. No public signup or admin authentication implemented.
+- A26 lockout/admin-unlock wording differs from normative M1 temporary rate limiting; M1 governs. No new board parity, cloud operation or full offline/sync acceptance claimed.
