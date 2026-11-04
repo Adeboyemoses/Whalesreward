@@ -2,15 +2,15 @@
 branch: spec/WHR-34-lane
 linear: WHR-34
 tier: high
-reviewed_head: ccb57bb2f072eae0e565a1205756a5513a7e35c2
-rounds: 2
+reviewed_head: c38fd73a51b911b0edba8118945f119bead151fd
+rounds: 3
 builder: engineering-manager
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 6
+dispatches: 9
 invariants: []
 p1: []
 tickets: []
@@ -22,6 +22,6 @@ plan:
   risks: ownership ambiguity or weakened review requirements
 ---
 
-All reviewers passed round 2. Fixed the lane-table blank line found in round 1.
+All reviewers passed round 3 after integrating the concurrent staging update. Fixed the lane-table blank line found in round 1.
 AGENTS.md remains below 10 KB; diff whitespace check passed.
 Application gates cannot run: package.json and lockfile are absent at this base.
