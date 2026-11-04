@@ -223,3 +223,9 @@ body {
   cursor: not-allowed;
   opacity: 0.65;
 }
+
+/* Amount cells retain regular-weight product/quantity metadata, as in the preview. */
+.wr-table .wr-amount .wr-sub {
+  font-weight: 400;
+  font-family: var(--font-sans);
+}
