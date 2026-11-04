@@ -1,6 +1,6 @@
 # Attendant row 03: Offline sale and uploads
 
-Boards: A27-SaleOffline, A05-SaleSavedOnPhone, A08-PendingUploads, A23-PendingUploadsEmpty, A14-PriceReview  
+Boards: A27-SaleOffline, A05-SaleSavedOnPhone, A08-PendingUploads, A23-PendingUploadsEmpty, A14-PriceReview
 Feature: F04–F05 · Invariants: I-03, I-06, I-22–I-28, I-31, I-33–I-35, I-49–I-50 · Work order: WO-app-0 (WHR-33)
 
 Decision note: `product-docs/04 UI Design/Attendant Mobile/Attendant Sale Screen Decisions.md` (including Hi-fi flow — 4 November 2026); also `Attendant Connected Flow Notes.md` and F&R named feature sections. HTML and PNG for every named board inspected 4 November 2026. Repository brief contains build requirements, not copied source documents.

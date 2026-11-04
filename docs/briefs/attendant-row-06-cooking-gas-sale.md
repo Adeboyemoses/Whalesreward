@@ -1,6 +1,6 @@
 # Attendant row 06: Cooking gas sale
 
-Boards: A15-GasSale, A16-GasSynced  
+Boards: A15-GasSale, A16-GasSynced
 Feature: F04–F05 · Invariants: I-04, I-14, I-22–I-30 · Work order: WO-app-0 (WHR-33)
 
 Decision note: `product-docs/04 UI Design/Attendant Mobile/Attendant Connected Flow Notes.md` (including Hi-fi flow — 4 November 2026); also `Attendant Connected Flow Notes.md` and F&R named feature sections. HTML and PNG for every named board inspected 4 November 2026. Repository brief contains build requirements, not copied source documents.

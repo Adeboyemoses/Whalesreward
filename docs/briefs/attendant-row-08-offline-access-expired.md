@@ -1,6 +1,6 @@
 # Attendant row 08: Offline access expired
 
-Boards: A18-OfflineExpired  
+Boards: A18-OfflineExpired
 Feature: F01/F05 · Invariants: I-02–I-03, I-06 · Work order: WO-app-0 (WHR-33)
 
 Decision note: `product-docs/04 UI Design/Attendant Mobile/Sign In and Handover Screen Decisions.md` (including Hi-fi flow — 4 November 2026); also `Attendant Connected Flow Notes.md` and F&R named feature sections. HTML and PNG for every named board inspected 4 November 2026. Repository brief contains build requirements, not copied source documents.

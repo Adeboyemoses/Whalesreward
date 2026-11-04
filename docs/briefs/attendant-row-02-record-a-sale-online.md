@@ -1,6 +1,6 @@
 # Attendant row 02: Record a sale online
 
-Boards: A02-Sale, A24-SaleCustomerNotFound, A03-SaleFilled, A04-SaleSynced  
+Boards: A02-Sale, A24-SaleCustomerNotFound, A03-SaleFilled, A04-SaleSynced
 Feature: F03–F05 · Invariants: I-04, I-16–I-17, I-22–I-30 · Work order: WO-app-0 (WHR-33)
 
 Decision note: `product-docs/04 UI Design/Attendant Mobile/Attendant Sale Screen Decisions.md` (including Hi-fi flow — 4 November 2026); also `Attendant Connected Flow Notes.md` and F&R named feature sections. HTML and PNG for every named board inspected 4 November 2026. Repository brief contains build requirements, not copied source documents.
