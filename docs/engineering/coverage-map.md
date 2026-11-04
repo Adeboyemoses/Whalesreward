@@ -8,7 +8,11 @@ Data-model PR #4 is merged on staging with independent security and integrity PA
 
 ## WO-spec-3 documentation status (WHR-46)
 
-[M3 contracts](contracts/m3.md) and model additions specify corrections/midnight, independent holds and duplicate decisions, customer identity changes, scoped queue recovery and audit. Invariants addressed: I-03/I-05a/I-06–I-11, I-15–I-17/I-19/I-21/I-21a, I-22–I-41, I-42/I-44/I-45a/I-46/I-48–I-51. Board inputs: A09–A11/A14/A19–A22, B03/B04, C02–C05, G01–G05, S01–S04/S06/S07/S09. Specification merged in [PR #16](https://github.com/Adeboyemoses/Whalesreward/pull/16) with green CI and independent code/security/integrity PASS verdicts; Earl accepted it on 4 November 2026 (“Accept and close this session”). Documentation status: accepted. WHR-46 records the verification and closeout. WHR-38/39 and WHR-47–50 remain explicit implementation policy gates. No implemented invariant, test result or screen parity is claimed; the rows below keep their current statuses.
+[M3 contracts](contracts/m3.md) and model additions specify corrections/midnight, independent holds and duplicate decisions, customer identity changes, scoped queue recovery and audit. Invariants addressed: I-03/I-05a/I-06–I-11, I-15–I-17/I-19/I-21/I-21a, I-22–I-41, I-42/I-44/I-45a/I-46/I-48–I-51. Board inputs: A09–A11/A14/A19–A22, B03/B04, C02–C05, G01–G05, S01–S04/S06/S07/S09. Specification merged in PR #16 with green CI and independent code/security/integrity PASS. Earl accepted it on 4 November 2026. Documentation status: accepted; closeout PR #21. WHR-39 and WHR-47–50 remain explicit implementation policy gates. WHR-38 has the P-18 build default, pending Q-528 client confirmation. No implemented invariant, test result or screen parity is claimed; the rows below keep their current statuses.
+
+## WO-spec-3a documentation status (WHR-52)
+
+M1/M3 and model amendments specify P-18 bounded capture and P-19 independent recovered-correction review. Documentation is READY only on green staging merge. Independent code/security/integrity verdicts and merged PR are recorded on WHR-52. No implementation or board parity is claimed. WHR-46 acceptance closeout is PR #21; WHR-51 is next and unstarted.
 
 ## Invariants
 
@@ -21,7 +25,7 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | | | todo |
 | I-04 | An account writes only for its authorized station and pump | | | todo |
 | I-05 | Pump reassignment is done by an authorized admin | | | todo |
-| I-05a | A queued record from before a reassignment is validated against that account's assignment … | | | todo |
+| I-05a | A queued record from before a reassignment is validated against that account's assignment … | WO-spec-3a (spec only) | Not implemented | todo |
 | I-06 | Logout offers upload-first when connected | | | todo |
 | I-07 | Admin users, roles and permissions are separate from attendant accounts | | | todo |
 | I-08 | At least one active Owner always exists | | | todo |
@@ -43,27 +47,27 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-23 | The sale and its photo blob are saved atomically in IndexedDB before the phone shows "Save… | | | todo |
 | I-24 | Photos come from the live in-app camera only | | | todo |
 | I-25 | Uploads go to a unique staging path through a short-lived signed permission scoped to that… | | | todo |
-| I-26 | Credit needs: resolved customer, complete details, validated photo, price checks and eligi… | | | todo |
+| I-26 | Credit needs: resolved customer, complete details, validated photo, price checks and eligi… | WO-spec-3a (spec only) | Not implemented | todo |
 | I-27 | A definitive "customer not found" cancels the record with a reason | | | todo |
-| I-28 | Store app capture time and server receipt time separately | | | todo |
+| I-28 | Store app capture time and server receipt time separately | WO-spec-3a (spec only) | Not implemented | todo |
 | I-29 | Amount entry is the default; Quantity entry is available | | | todo |
 | I-30 | Liquids offer Bought into: Vehicle, Keg, Three-wheeler, Bike | | | todo |
-| I-31 | A sale is held for price review, with zero credit, only when its captured rate is an unres… | | | todo |
+| I-31 | A sale is held for price review, with zero credit, only when its captured rate is an unres… | WO-spec-3a (spec only) | Not implemented | todo |
 | I-32 | Price activation is immediate on server confirmation, one price per product for the statio… | | | todo |
 | I-33 | A sale uploaded against a card replaced before upload is held for card-eligibility review … | | | todo |
-| I-34 | A sale with an unreliable capture date is held until an admin records an evidence-supporte… | | | todo |
-| I-35 | Each hold (price, card, date) clears only itself | | | todo |
-| I-36 | Admin-assisted recovery of a stranded queue happens on the original phone, with online adm… | | | todo |
-| I-37 | An attendant's own correction received by the server before midnight (Africa/Lagos) on the… | | | todo |
-| I-38 | An original sale arriving after midnight does not reopen editing | | | todo |
-| I-39 | Optimistic version checks reject a correction based on an outdated revision | | | todo |
+| I-34 | A sale with an unreliable capture date is held until an admin records an evidence-supporte… | WO-spec-3a (spec only) | Not implemented | todo |
+| I-35 | Each hold (price, card, date) clears only itself | WO-spec-3a (spec only) | Not implemented | todo |
+| I-36 | Admin-assisted recovery of a stranded queue happens on the original phone, with online adm… | WO-spec-3a (spec only) | Not implemented | todo |
+| I-37 | An attendant's own correction received by the server before midnight (Africa/Lagos) on the… | WO-spec-3a (spec only) | Not implemented | todo |
+| I-38 | An original sale arriving after midnight does not reopen editing | WO-spec-3a (spec only) | Not implemented | todo |
+| I-39 | Optimistic version checks reject a correction based on an outdated revision | WO-spec-3a (spec only) | Not implemented | todo |
 | I-40 | Retries never duplicate credit | | | todo |
-| I-41 | Sensitive changes write an audit event with actor, target, previous and new values, reason… | | | todo |
+| I-41 | Sensitive changes write an audit event with actor, target, previous and new values, reason… | WO-spec-3a (spec only) | Not implemented | todo |
 | I-42 | Qualifying totals come from each purchase's current accepted revision, excluding cancelled… | | | todo |
 | I-43 | Rank by exact qualifying spend | | | todo |
 | I-44 | All-time totals are kept separate from campaign-qualifying totals | | | todo |
 | I-45 | Purchase cutoff, upload grace period and photo retention are configurable, versioned and a… | | | todo |
-| I-45a | Which clock decides what | | | todo |
+| I-45a | Which clock decides what | WO-spec-3a (spec only) | Not implemented | todo |
 | I-46 | Finalization happens only after cutoff and grace have passed and all holds and reconciliat… | | | todo |
 | I-47 | Prize distribution stays manual | | | todo |
 | I-48 | Photos live in private Spaces buckets per environment, under random paths with no names or… | | | todo |

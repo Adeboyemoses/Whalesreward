@@ -1,20 +1,21 @@
 # lane:spec
-WO-spec-3 (WHR-46) M3 contracts: ACCEPTED since 2026-11-04
+WO-spec-3a (WHR-52) capture and recovered corrections: READY on green staging merge
 
 ## In flight
-- None after this acceptance closeout merges. M3 contracts (38 endpoints), model additions and documentation coverage merged in [PR #16](https://github.com/Adeboyemoses/Whalesreward/pull/16), staging commit 323b1c5.
-- Independent code/security/integrity PASS verdicts and all five green CI checks are recorded on WHR-46 and PR #16. EM typecheck, lint, 18 unit tests and build passed.
-- This closeout records Earl's acceptance; WHR-46 moves to Done after its green staging merge. No product implementation or board parity claimed.
+- Amendment PR and independent code/security/integrity verdicts are linked from WHR-52. M1/M3/model, P-18/P-19 and documentation coverage only; no code or board parity claimed.
+- WO-spec-3 (WHR-46) accepted by Earl; closeout PR #21 must merge green before marking Done.
+- EM typecheck, lint, unit and build plus paragraph/readability checks required on final head.
 
 ## Next
-- Session closed after acceptance closeout merge. No next work order selected.
+- WO-spec-4 (WHR-51), not started. Stop at WHR-52 READY.
 
 ## Earl's gos
-- 2026-11-04: “Accept and close this session” — acceptance and closure of WO-spec-3. No main/production action authorized.
+- 2026-11-04: “Earl accepted WO-spec-3 (WHR-46); close it.”
+- “Take it to READY, then stop.” applies to WO-spec-3a; no main or production action authorized.
 
 ## Risks
-- WHR-38/39 and WHR-47–50 remain separate downstream implementation policy gates; acceptance of these specifications does not settle them.
-- PR #16 dispatch flag: 15 exceeded high-tier 8 (nine reviews across three rounds plus six unchanged-contract confirmations after concurrent core updates); no additional fix round or escalation. One docs closeout review and one unchanged-acceptance confirmation after the concurrent app merge bring cumulative dispatches to 17.
+- P-18 is Earl's build default; client Q-528 remains pending. Rook should carry P-18/P-19 into product docs.
+- WHR-39 and WHR-47–50 remain separate implementation gates.
 - Runtime full model ID unavailable.
 
-dispatches=17 prs=2 rounds_max=3 escalations=0 model=unavailable
+dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
