@@ -165,6 +165,15 @@ export class SaleSynchronizer {
         );
       const status = parsed.data;
       const terminal = ["credited", "held", "cancelled"].includes(status.state);
+      const previous = row.serverStatus;
+      // A status read can succeed while the same upload/finalize keeps failing.
+      // Reset backoff only for actual forward progress, never just a newer version.
+      const progressed =
+        !previous ||
+        (!previous.customer && !!status.customer) ||
+        (!previous.photoValidated && status.photoValidated) ||
+        (previous.state === "received" && status.state !== "received") ||
+        (previous.state === "photo_pending" && status.state === "finalizing");
       // The immutable finalize body is deliberately never derived from this mutable version again.
       await patch({
         serverStatus: status,
@@ -172,7 +181,7 @@ export class SaleSynchronizer {
         serverVersion: status.version,
         state: status.state === "received" ? "submitting" : status.state,
         lastErrorCode: null,
-        attempts: 0,
+        attempts: terminal || progressed ? 0 : row.attempts,
         nextAttemptAt: terminal
           ? status.state === "held"
             ? new Date(this.d.now() + 30000).toISOString()
@@ -363,14 +372,18 @@ export class SaleSynchronizer {
               "invalid_response",
               "Could not verify the service response.",
             );
+      // Storage authenticates a signed upload permission, not the attendant session.
+      // A rejected PUT must renew/retry its permission rather than lock the account.
+      const storageFailure = failure.code === "photo_upload_failed";
       if (
-        failure.status === 401 ||
-        failure.status === 403 ||
-        [
-          "unauthenticated",
-          "permission_denied",
-          "online_sign_in_required",
-        ].includes(failure.code)
+        !storageFailure &&
+        (failure.status === 401 ||
+          failure.status === 403 ||
+          [
+            "unauthenticated",
+            "permission_denied",
+            "online_sign_in_required",
+          ].includes(failure.code))
       ) {
         await this.d.lock(session);
         return;
@@ -387,19 +400,20 @@ export class SaleSynchronizer {
         return;
       try {
         const permanent =
-          failure.status === 422 ||
-          (failure.status === 409 &&
-            ![
-              "upload_permission_expired",
-              "stale_version",
-              "sale_not_uploadable",
-            ].includes(failure.code)) ||
-          [
-            "operation_conflict",
-            "photo_invalid",
-            "photo_metadata_invalid",
-            "policy_review_required",
-          ].includes(failure.code);
+          !storageFailure &&
+          (failure.status === 422 ||
+            (failure.status === 409 &&
+              ![
+                "upload_permission_expired",
+                "stale_version",
+                "sale_not_uploadable",
+              ].includes(failure.code)) ||
+            [
+              "operation_conflict",
+              "photo_invalid",
+              "photo_metadata_invalid",
+              "policy_review_required",
+            ].includes(failure.code));
         const attempts = row.attempts + 1;
         const backoff =
           Math.min(60000, 1000 * 2 ** Math.min(attempts - 1, 6)) *

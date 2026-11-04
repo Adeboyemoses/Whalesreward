@@ -1,9 +1,10 @@
 import "fake-indexeddb/auto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { v7 as uuidv7 } from "uuid";
 import { AttendantClient } from "./client";
 import { CaptureDatabase } from "./db";
 import { ClientError } from "../types";
+import { HttpAttendantApi } from "../api";
 import { sessionFixture } from "../../../tests/fixtures/attendant-client-fake";
 import { SyncClientFake } from "../../../tests/fixtures/sync-client-fake";
 let client: AttendantClient,
@@ -30,6 +31,7 @@ beforeEach(async () => {
   await client.signIn("grace.okon", "fictional");
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
   for (const c of clients) c.close();
   clients.length = 0;
   await db.delete();
@@ -253,4 +255,81 @@ describe("durable sync", () => {
     expect(stored.lastErrorCode).toBe("invalid_response");
     expect(api.calls).not.toContain("permission");
   });
+  it("keeps capture access after signed PUT 403 and renews only an expired permission", async () => {
+    const original = await save();
+    const http = new HttpAttendantApi(
+      async () => new Response(null, { status: 403 }),
+    );
+    const upload = api.uploadPhoto.bind(api);
+    api.uploadPhoto = http.uploadPhoto.bind(http);
+    await client.retryUploads();
+    expect(client.getState().access).toBe("active");
+    await expect(client.beginCapture()).resolves.toHaveProperty("operationId");
+    const failed = (await client.ownSale(original.operationId))!;
+    expect(failed.lastErrorCode).toBe("photo_upload_failed");
+    expect(failed.photoBlob.size).toBe(original.photoBlob.size);
+    expect(failed.state).toBe("uploading");
+    api.uploadPhoto = upload;
+    api.expirePermission = true;
+    advance();
+    await client.retryUploads();
+    expect(api.permissionKeys[1]).toBe(api.permissionKeys[0]);
+    advance();
+    await client.retryUploads();
+    expect(api.permissionKeys[2]).not.toBe(api.permissionKeys[1]);
+    const complete = (await client.ownSale(original.operationId))!;
+    expect(complete.state).toBe("credited");
+    expect(complete.original).toEqual(original.original);
+  });
+  it.each(["PUT", "finalize"] as const)(
+    "retains exponential backoff across unchanged status reconciliation after %s failures",
+    async (stage) => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const original = await save();
+      let retryAfterMs: number | null = null;
+      if (stage === "PUT") {
+        api.uploadPhoto = async () => {
+          throw new ClientError(
+            "photo_upload_failed",
+            "Failed",
+            503,
+            retryAfterMs,
+            true,
+          );
+        };
+      } else {
+        api.finalizeSale = async () => {
+          throw new ClientError(
+            "storage_unavailable",
+            "Failed",
+            503,
+            retryAfterMs,
+            true,
+          );
+        };
+      }
+      const delays: number[] = [];
+      for (let attempt = 1; attempt <= 8; attempt++) {
+        await client.retryUploads();
+        const row = (await client.ownSale(original.operationId))!;
+        expect(row.attempts).toBe(attempt);
+        const delay = Date.parse(row.nextAttemptAt!) - now;
+        delays.push(delay);
+        advance(delay);
+      }
+      expect(delays).toEqual([
+        6000, 6000, 6000, 8000, 16000, 32000, 60000, 60000,
+      ]);
+      retryAfterMs = 90000;
+      await client.retryUploads();
+      expect(
+        Date.parse(
+          (await client.ownSale(original.operationId))!.nextAttemptAt!,
+        ) - now,
+      ).toBe(90000);
+      expect((await client.ownSale(original.operationId))!.photoBlob.size).toBe(
+        original.photoBlob.size,
+      );
+    },
+  );
 });
