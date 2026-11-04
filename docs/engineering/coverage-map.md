@@ -8,7 +8,7 @@ Data-model PR #4 is merged on staging with independent security and integrity PA
 
 ## WO-spec-3 documentation status (WHR-46)
 
-[M3 contracts](contracts/m3.md) and model additions specify corrections/midnight, independent holds and duplicate decisions, customer identity changes, scoped queue recovery and audit. Invariants addressed: I-03/I-05a/I-06–I-11, I-15–I-17/I-19/I-21/I-21a, I-22–I-41, I-42/I-44/I-45a/I-46/I-48–I-51. Board inputs: A09–A11/A14/A19–A22, B03/B04, C02–C05, G01–G05, S01–S04/S06/S07/S09. Specification is ready only after the reviewed PR merges with green CI; WHR-46 records the PR and verdicts. WHR-38/39 and WHR-47–50 remain explicit implementation policy gates. No implemented invariant, test result or screen parity is claimed; the rows below keep their current statuses.
+[M3 contracts](contracts/m3.md) and model additions specify corrections/midnight, independent holds and duplicate decisions, customer identity changes, scoped queue recovery and audit. Invariants addressed: I-03/I-05a/I-06–I-11, I-15–I-17/I-19/I-21/I-21a, I-22–I-41, I-42/I-44/I-45a/I-46/I-48–I-51. Board inputs: A09–A11/A14/A19–A22, B03/B04, C02–C05, G01–G05, S01–S04/S06/S07/S09. Specification merged in [PR #16](https://github.com/Adeboyemoses/Whalesreward/pull/16) with green CI and independent code/security/integrity PASS verdicts; Earl accepted it on 4 November 2026 (“Accept and close this session”). Documentation status: accepted. WHR-46 records the verification and closeout. WHR-38/39 and WHR-47–50 remain explicit implementation policy gates. No implemented invariant, test result or screen parity is claimed; the rows below keep their current statuses.
 
 ## Invariants
 
