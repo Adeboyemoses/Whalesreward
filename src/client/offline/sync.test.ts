@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { v7 as uuidv7 } from "uuid";
 import { AttendantClient } from "./client";
 import { CaptureDatabase } from "./db";
+import { ClientError } from "../types";
 import { sessionFixture } from "../../../tests/fixtures/attendant-client-fake";
 import { SyncClientFake } from "../../../tests/fixtures/sync-client-fake";
 let client: AttendantClient,
@@ -193,5 +194,63 @@ describe("durable sync", () => {
     await client.retryUploads();
     expect(api.calls).toEqual([]);
     expect((await client.ownSales())[0]!.photoBlob.size).toBe(4);
+  });
+  it("cannot finalize or overwrite a lease claimed by another worker during a slow PUT", async () => {
+    const row = await save();
+    const gate = deferred();
+    api.beforePut = () => gate.promise;
+    const running = client.retryUploads();
+    while (!api.calls.includes("put"))
+      await new Promise((r) => setTimeout(r, 1));
+    const successor = {
+      owner: uuidv7(),
+      expiresAt: new Date(now + 60000).toISOString(),
+    };
+    await db.outbox.update([row.originatingAccountId, row.operationId], {
+      syncLease: successor,
+    });
+    gate.resolve();
+    await running;
+    expect(api.calls).not.toContain("finalize");
+    const stored = await db.outbox.get([
+      row.originatingAccountId,
+      row.operationId,
+    ]);
+    expect(stored?.syncLease).toEqual(successor);
+    expect(stored?.serverStatus?.credited).toBe(false);
+  });
+  it("replays the immutable finalize body after an unknown result despite a newer mutable version", async () => {
+    const row = await save();
+    const finalize = api.finalizeSale.bind(api);
+    api.finalizeSale = async (purchaseId, body) => {
+      void purchaseId;
+      api.finalizeBodies.push(structuredClone(body));
+      api.statuses.get(row.operationId)!.version = 2;
+      throw new ClientError("network_unavailable", "Lost before response");
+    };
+    await client.retryUploads();
+    const saved = (await client.ownSale(row.operationId))!;
+    api.finalizeSale = finalize;
+    advance();
+    await client.retryUploads();
+    expect(api.finalizeBodies).toEqual([
+      saved.finalizeRequest,
+      saved.finalizeRequest,
+    ]);
+    expect(saved.finalizeRequest?.expectedVersion).toBe(1);
+    expect((await client.ownSale(row.operationId))?.state).toBe("credited");
+  });
+  it("rejects a valid-looking server receipt belonging to another operation", async () => {
+    const row = await save();
+    const submit = api.submitSale.bind(api);
+    api.submitSale = async (original) => {
+      const result = await submit(original);
+      return { ...result, status: { ...result.status, operationId: uuidv7() } };
+    };
+    await client.retryUploads();
+    const stored = (await client.ownSale(row.operationId))!;
+    expect(stored.serverStatus).toBeNull();
+    expect(stored.lastErrorCode).toBe("invalid_response");
+    expect(api.calls).not.toContain("permission");
   });
 });

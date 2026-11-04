@@ -98,9 +98,10 @@ export class HttpAttendantApi implements AttendantApi {
           }),
         })
         .safeParse(json);
-      const code = parsed.success
-        ? parsed.data.error.code
-        : "temporarily_unavailable";
+      const code =
+        parsed.success && ERROR_CODES.has(parsed.data.error.code)
+          ? parsed.data.error.code
+          : "temporarily_unavailable";
       const messages: Record<string, string> = {
         invalid_credentials: "The username or password is not correct.",
         unauthenticated: "Sign in online again to continue.",
@@ -254,3 +255,31 @@ function readRetryAfter(response: Response): number | null {
     ? Math.min(seconds * 1000, 2147483647)
     : null;
 }
+
+const ERROR_CODES = new Set([
+  "invalid_credentials",
+  "unauthenticated",
+  "assignment_unavailable",
+  "customer_not_found",
+  "card_unavailable",
+  "rate_limited",
+  "permission_denied",
+  "origin_rejected",
+  "invalid_request",
+  "temporarily_unavailable",
+  "online_sign_in_required",
+  "operation_conflict",
+  "capture_context_invalid",
+  "calculation_invalid",
+  "medium_invalid",
+  "photo_metadata_invalid",
+  "policy_review_required",
+  "sale_not_found",
+  "sale_not_uploadable",
+  "upload_permission_expired",
+  "stale_version",
+  "upload_not_found",
+  "photo_invalid",
+  "storage_unavailable",
+  "sign_in_retry_expired",
+]);

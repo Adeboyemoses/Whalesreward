@@ -119,4 +119,22 @@ describe("M1 sync transport", () => {
       code: "invalid_response",
     });
   });
+  it("never persists arbitrary server error codes as queue diagnostics", async () => {
+    const api = new HttpAttendantApi(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "private-customer@example.com",
+              message: "private",
+              retryable: true,
+            },
+          }),
+          { status: 503 },
+        ),
+    );
+    await expect(api.saleStatus(status.operationId)).rejects.toMatchObject({
+      code: "temporarily_unavailable",
+    });
+  });
 });
