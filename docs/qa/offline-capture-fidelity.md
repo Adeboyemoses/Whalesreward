@@ -2,7 +2,7 @@
 
 Independent test-engineer check, 4 November 2026. Checked the five reconciled attendant briefs (rows 01, 02, 03, 06 and 08) against all eleven original hi-fi PNGs and the built screens at 390 px and 360 px, device scale factor 2. Final capture includes frontend fixes through `a464e1f` and session refresh fix `8e99408`.
 
-No new blocking fidelity finding. The existing quantity display follow-up WHR-45 remains visible; it does not alter stored kobo or scaled quantity. EM acceptance of that separately tracked difference is required for sign-off. This report does not claim pixel equality or real-server authentication.
+No new blocking fidelity finding. The existing quantity display follow-up WHR-45 remains visible; it does not alter stored kobo or scaled quantity. EM accepts that separately tracked presentation difference for WO-app-2: the shared formatter is unchanged, exact stored values are tested, and WHR-45 remains the follow-up. This report does not claim pixel equality or real-server authentication.
 
 | Board | Match | Differences | Severity |
 |---|---|---|---|
