@@ -13,7 +13,7 @@ Engineering defaults live in `src/server/modules/auth/config.ts`: database sessi
 
 ## Local fixtures and staging
 
-`pnpm db:seed` creates fictional station, assignment and staff fixtures. Local development can provision the documented fictional credential in `prisma/seed-auth.ts`. For staging, credential provisioning requires a separately supplied `WHR_SEED_ATTENDANT_PASSWORD`; there is no public default staging password. Seed inserts missing credentials and never resets an existing password. No admin login is provisioned by this work order.
+`pnpm db:seed` creates fictional station, assignment and staff fixtures. Local development can provision the documented fictional credential in `prisma/seed-auth.mjs`. For staging, credential provisioning requires a separately supplied `WHR_SEED_ATTENDANT_PASSWORD`; there is no public default staging password. Seed inserts missing credentials and never resets an existing password. No admin login is provisioned by this work order.
 
 Staging provisioning and data changes remain Earl-authorized operations under the existing staging runbook. This work order performs neither. Production rejects fictional credential seeding. Never reuse a local fixture password for a deployed service.
 
