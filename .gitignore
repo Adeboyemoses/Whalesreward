@@ -1,0 +1,28 @@
+# Product docs: symlink to the client's folder on Earl's machine. Never commit it.
+/product-docs
+
+# Worktrees for builders
+/.worktrees/
+
+# Dependencies and builds
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment and secrets: never commit. Use .env.example for names.
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json

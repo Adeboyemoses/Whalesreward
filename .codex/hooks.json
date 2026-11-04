@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell|exec_command|local_shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/earlsworkstation/DevApps/WhalesReward/.codex/hooks/guard.sh'",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

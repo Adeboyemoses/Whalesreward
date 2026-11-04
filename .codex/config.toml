@@ -1,0 +1,27 @@
+# Project-scoped Codex config for Whales Rewards.
+# Codex loads this file, .codex/agents/ and .codex/hooks.json only after you trust the project
+# (Codex asks on first open; or set projects."/Users/earlsworkstation/DevApps/WhalesReward".trust_level = "trusted"
+# in ~/.codex/config.toml). Model choice is left to Earl per session; agents set only reasoning effort.
+# Changing this file is high tier (docs/agentic/review.md).
+
+# Edit inside the repo, run local commands, ask before anything outside that boundary.
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+# pnpm installs, gh, Docker image pulls and the Linear MCP need the network.
+network_access = true
+
+# Commands see only core variables (PATH, HOME, ...), not every secret in Earl's shell profile.
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+# Production runs in UTC. Code must compute Africa/Lagos dates explicitly, never from the process
+# timezone, so local commands run in UTC too (tests also run under a second TZ, see docs/engineering/testing.md).
+TZ = "UTC"
+NEXT_TELEMETRY_DISABLED = "1"
+
+# Subagents: builders and reviewers in .codex/agents/. Three at a time, matching Earl's Cowork rule.
+[agents]
+max_concurrent_threads_per_session = 3
