@@ -18,4 +18,4 @@ WO-app-0 (WHR-33) M0/M1 implementation briefs and smoke runbooks: READY upon sta
 - Runbooks are drafts; no scaffold or phone execution yet.
 - Brand sign-off pending (Q-516).
 
-dispatches=2 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=3 prs=1 rounds_max=2 escalations=0 model=unknown
