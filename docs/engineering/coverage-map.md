@@ -68,6 +68,18 @@ Earl’s 4 November findings: app-2/app-3 runbooks now split at local durable sa
 
 Rows 1, 2, 3, 6 and 8 have implementation briefs and draft phone runbooks prepared against their board PNGs and decision notes. This is documentation preparation only: it implements no invariant and establishes no built-screen parity. Tests and board statuses below remain todo until the respective implementation work orders verify them. Proposed M1 contract names remain TODO-CONTRACT pending WO-spec-1.
 
+## WO-core-2 foundation coverage (WHR-3)
+
+Database constraints and pure helpers support the following invariants; they do not establish complete feature coverage. Their existing invariant rows remain todo until the relevant services and client flows are implemented and verified. No board parity is claimed.
+
+| Foundation | Invariants supported | Named tests | Status |
+|---|---|---|---|
+| Exact kobo and captured-precision quantity arithmetic | I-29 | src/shared/money.test.ts; src/shared/quantity.test.ts | building |
+| Explicit Lagos receipt/midnight helper | I-37, I-38 | tests/time/lagos.time.test.ts (UTC and America/New_York) | building |
+| Unit-separated quantities | I-44 | src/shared/quantity.test.ts | building |
+| Entity storage, normalized-phone uniqueness, fixed categories and product units | I-14, I-15, I-29, I-30 | tests/integration/schema-contract.test.ts | building |
+| Immutable originals, append-only audit and operation uniqueness | I-22, I-28, I-41 | tests/integration/core-schema.test.ts | building |
+
 ## Hi-fi boards (106, in canvas row order)
 
 | Row | Boards | Work order | Parity check | Status |
