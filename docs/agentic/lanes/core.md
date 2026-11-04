@@ -14,7 +14,7 @@ WO-core-15 (WHR-28) staging console-alignment FIX: READY on reviewed green stagi
 - 2026-11-05: “Take it to READY. Then WO-core-1d (WHR-53) to READY. Then stop. No cloud operations.”
 
 ## Risks
-- No cloud operations or staging data changes performed. No phone acceptance or complete photo-storage invariant claimed. WHR-57 remains separate.
+- WHR-58 tracks provider overwrite confirmation; trusted IP remains empty until confirmed. No cloud operations or staging data changes performed. No phone acceptance or complete photo-storage invariant claimed. WHR-57 remains separate.
 - Runtime model ID unavailable.
 
 dispatches=4 prs=1 rounds_max=1 escalations=0 model=unavailable
