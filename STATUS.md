@@ -12,6 +12,8 @@ Updated: 2026-11-04
 
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
+- WO-core-2 (WHR-3): core schema and exact money, quantity and Lagos time helpers; data-model PR #4 merged, builders dispatched, high-tier review pending.
+- WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
@@ -20,7 +22,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- Start approved WO-core-1b (WHR-41), evidence validation after staging updates; WO-core-2's data-model dependency is cleared. WO-app-1 follows its own approval.
+- Finish WO-core-2 verification and review; resume WHR-41 only when assigned. WO-app-1 follows its own approval.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
