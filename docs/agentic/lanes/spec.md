@@ -1,23 +1,23 @@
 # lane:spec
-WO-spec-1 (WHR-32) Spec lane, M1 data model and contracts: closeout effective when PR #1 merges
+WO-spec-2 (WHR-40) M2 contracts: BUILD since 2026-11-04
 
 ## In flight
-- PR #4 merged at 7d92cb6: data model, independent security/integrity PASS, all five CI checks green. Earl notified; WO-core-2 dependency cleared.
-- PR #5 merged at 76ddc6a: M1 contracts, independent security/integrity PASS, all five CI checks green.
-- PR #1 completes lane ownership and this closeout; merge requires round-4 code/security/integrity PASS and all CI checks green. EM reruns typecheck, lint, unit and build on the final head.
-- Priority child WHR-37 already merged in PR #6.
+- Local working draft: .worktrees/spec-2-m2, branch spec/wo-2-m2-contracts, base 474456fcd583b842db7ca6ac6c07fa34e9045fb7. Five documentation files; no application code.
+- M2 specifies 53 endpoints, all 28 permissions, station/prices/assignment, registration/customer reads, batch lifecycle/exports and model additions.
+- Independent code/security/integrity reviews cover the working draft in two rounds; exact verdicts and hashes recorded on WHR-40. Round 1 fixes: current/proposed target-role delegation, creation audit reasons matching boards, nullable bootstrap email.
+- Local typecheck, lint, 14 unit tests and build pass. No committed-head CI or PR exists.
 
 ## Next
-- After PR #1 merges, mark WHR-32 Done and stop, as Earl requested. No next work order started.
+- Publish the reviewed local changes from an authorized terminal/session; recheck the committed diff, final-head gates and independent evidence, open a staging PR, merge only with green CI, then READY and stop.
+- No next work order is authorized. Do not mark WHR-40 READY before staging merge.
 
 ## Earl's gos
-- "Then close WO-spec-1 and stop."
-- 2026-11-04: "p roceed" authorized the explicitly requested fourth review round for PR #1. No review gate bypass.
+- Session instruction names lane:spec and WO-spec-2 (WHR-40), M2 contracts, following AGENTS.md. Approval line verified.
+- No production or main-promotion go.
 
 ## Risks
-- PR #1 has 18 review dispatches across four rounds (>8 flag); fourth round expressly authorized.
-- WHR-38 trusted capture evidence and WHR-39 nonreplacement retirement remain policy gates for implementation.
-- Specification review establishes no implemented invariant or screen parity. Runtime model ID unavailable.
-- Metrics describe this resumption: nine review dispatches (snapshot, committed-head and concurrent-base confirmations); no new PRs; fourth cumulative round on PR #1.
+- Publication blocked: git add/commit cannot write .git/worktrees/spec-2-m2/index.lock. Automatic approval review rejected even the GitHub CLI lookup: “Administrative and cloud actions stay with Earl in his own terminal.” No bypass attempted.
+- Six review dispatches exceed the low/docs flag (>4); two rounds, no cap escalation. Working-draft verdicts are not committed-head approval.
+- WHR-42/43 track D06 configuration/presets; D08 phone/printing, D02 meters and WHR-38/39 remain open. No implementation or screen parity claimed. Runtime model ID unavailable.
 
-dispatches=9 prs=0 rounds_max=4 escalations=1 model=unavailable
+dispatches=6 prs=0 rounds_max=2 escalations=0 model=unavailable

@@ -13,11 +13,13 @@ Updated: 2026-11-04
 - WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
 ## In progress
+- WO-spec-2 (WHR-40): M2 contract/model draft in .worktrees/spec-2-m2; two independent review rounds and verdicts tracked on WHR-40. Local typecheck, lint, 14 unit tests and build pass. Publication blocked: Git index writes denied, and automatic review requires GitHub actions in Earl’s terminal. No commit, PR, merge, M2 code or board parity claimed.
 - Earl's one-time setup (docs/agentic/setup.md).
 - WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- M2 policy tracking: WHR-42 (D06 token/delivery configuration), WHR-43 (proposed role preset activation). Defaults preserve reference values while production policy remains explicitly configured; no new provider or cloud resource is authorized.
 - Client kickoff and contract: not yet confirmed.
 - Client DigitalOcean account for staging and production (needed by M4/M5).
 - Launch date versus the December campaign start.
