@@ -4,7 +4,7 @@
 
 ## What a work order is
 
-- A Linear issue in team `WHR`, labelled `work-order` and its lane label (`lane:core` or `lane:app`), titled `WO-<lane>-<n>: <name>` (for example `WO-core-1: Repository scaffold`).
+- A Linear issue in team `WHR`, labelled `work-order` and its lane label (`lane:core`, `lane:app` or `lane:spec`), titled `WO-<lane>-<n>: <name>` (for example `WO-core-1: Repository scaffold`).
 - Its child issues are the only issues the session may touch. A work order with no children is a single scope item. A child added after approval is out of scope until Earl approves it.
 - Size guide: one flow row of boards, or at most six child issues, or about two working days.
 
@@ -19,8 +19,9 @@
 ## Template
 
 ```
-Lane:          lane:<core|app>
+Lane:          lane:<core|app|spec>
 Milestone:     M<n> (docs/engineering/roadmap.md)
+Session model: <model>, reasoning <effort>
 Goal:          <one sentence>
 Scope:         <child issues only>
 Inputs:        <board IDs, decision notes, F&R and TRD sections, invariant IDs, decision IDs>
@@ -30,6 +31,8 @@ Verification:  user-facing: smoke runbook docs/qa/smoke-<date>-<slug>.md, writte
 Out of scope:  <explicit list>
 Stop when:     <condition>
 ```
+
+The EM records the model actually used in the lane-file metric line. The requested session model is not evidence of the runtime model.
 
 ## Flow
 
