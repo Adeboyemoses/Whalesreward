@@ -13,6 +13,8 @@ Updated: 2026-11-04
 
 - WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
+- WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. READY; all five CI checks and three independent reviews passed. Earl performs the prescribed main-checkout reconciliation and verifies.
+
 ## In progress
 - WO-spec-3 (WHR-46): M3 contracts (38 endpoints), model additions and documentation coverage prepared; READY takes effect on the reviewed staging merge with green CI. Independent verdicts and final PR recorded on WHR-46. No product implementation or screen parity claimed.
 - Earl's one-time setup (docs/agentic/setup.md).
@@ -27,7 +29,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- Await Earl’s acceptance/findings for WO-core-2; resume WHR-41 only when assigned. WO-app-1 follows its own approval.
+- Await Earl’s acceptance/findings for WO-core-2 and WHR-44. WHR-4 attendant sign-in is approved for the next separate core session; WHR-46 M3 contracts is approved for lane:spec. Resume WHR-41 only when assigned.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
