@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { randomBytes } from "node:crypto";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -14,6 +15,10 @@ export default defineConfig({
     { name: "attendant", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
+    env: {
+      BETTER_AUTH_URL: "http://127.0.0.1:3000",
+      BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+    },
     command: "pnpm build && pnpm start --hostname 127.0.0.1",
     url: "http://127.0.0.1:3000",
     reuseExistingServer: false,
