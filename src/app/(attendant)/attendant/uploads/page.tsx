@@ -188,6 +188,7 @@ function Uploads() {
                       )}
                       status={presentation.label}
                       tone={presentation.tone}
+                      description={presentation.description}
                       href={`/attendant/uploads/${encodeURIComponent(row.operationId)}`}
                     />
                   );

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CloudUpload, UserRound } from "lucide-react";
 import { needsUpload } from "@/client/offline/sync-status";
@@ -24,12 +24,31 @@ function Handover() {
   const [error, setError] = useState<string | null>(null);
   const flight = useRef(false);
   const session = state!.session!;
+  const mounted = useRef(false);
+  const logoutIntent = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      logoutIntent.current += 1;
+    };
+  }, []);
+  function staySignedIn() {
+    logoutIntent.current += 1;
+    setUploading(false);
+    go(router, "/attendant/account");
+  }
   async function signOut() {
     if (!client || flight.current) return;
     flight.current = true;
+    uploadFlight.current = false;
+    setUploading(false);
+    const intent = ++logoutIntent.current;
+    const stillHere = () => mounted.current && logoutIntent.current === intent;
     const accountId = session.account.id;
     const contextId = session.captureContextId;
     const current = () =>
+      stillHere() &&
       client.getState().session?.account.id === accountId &&
       client.getState().session?.captureContextId === contextId;
     setBusy(true);
@@ -43,25 +62,29 @@ function Handover() {
         );
         return;
       }
+      if (!current()) return;
       await client.signOut();
-      go(router, "/attendant/sign-in", true);
+      if (stillHere()) go(router, "/attendant/sign-in", true);
     } catch (e) {
-      if (client.getState().access === "signed_out")
+      if (stillHere() && client.getState().access === "signed_out")
         go(router, "/attendant/sign-in", true);
       else if (current()) setError(message(e));
     } finally {
       if (current()) setBusy(false);
-      flight.current = false;
+      if (stillHere()) flight.current = false;
     }
   }
   async function uploadFirst() {
     if (!client || uploadFlight.current || flight.current || !online) return;
     uploadFlight.current = true;
+    const intent = ++logoutIntent.current;
+    const stillHere = () => mounted.current && logoutIntent.current === intent;
     setUploading(true);
     setError(null);
     const accountId = session.account.id;
     const contextId = session.captureContextId;
     const current = () =>
+      stillHere() &&
       client.getState().access === "active" &&
       client.getState().session?.account.id === accountId &&
       client.getState().session?.captureContextId === contextId;
@@ -76,12 +99,13 @@ function Handover() {
         );
         return;
       }
+      if (!current()) return;
       await client.signOut();
-      go(router, "/attendant/sign-in", true);
+      if (stillHere()) go(router, "/attendant/sign-in", true);
     } catch (e) {
       if (current()) setError(message(e));
     } finally {
-      uploadFlight.current = false;
+      if (stillHere()) uploadFlight.current = false;
       if (current()) setUploading(false);
     }
   }
@@ -123,11 +147,7 @@ function Handover() {
                 ? "Sign out"
                 : "Sign out with pending sales"}
           </Button>
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => go(router, "/attendant/account")}
-          >
+          <Button variant="ghost" disabled={busy} onClick={staySignedIn}>
             Stay signed in
           </Button>
         </>
