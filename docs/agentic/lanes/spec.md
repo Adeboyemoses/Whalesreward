@@ -1,23 +1,22 @@
 # lane:spec
-WO-spec-2 (WHR-40) M2 contracts: BUILD since 2026-11-04
+WO-spec-2 (WHR-40) M2 contracts: ACCEPTED; closeout effective on this PR’s green staging merge
 
 ## In flight
-- Local working draft: .worktrees/spec-2-m2, branch spec/wo-2-m2-contracts, base 474456fcd583b842db7ca6ac6c07fa34e9045fb7. Five documentation files; no application code.
-- M2 specifies 53 endpoints, all 28 permissions, station/prices/assignment, registration/customer reads, batch lifecycle/exports and model additions.
-- Independent code/security/integrity reviews cover the working draft in two rounds; exact verdicts and hashes recorded on WHR-40. Round 1 fixes: current/proposed target-role delegation, creation audit reasons matching boards, nullable bootstrap email.
-- Local typecheck, lint, 14 unit tests and build pass. No committed-head CI or PR exists.
+- spec/wo-2-m2-contracts delivers 53 endpoint contracts, all 28 permissions, model additions and documentation coverage. Final PR, review verdicts and merge verification are linked from WHR-40.
+- Contract/model content matches the previously reviewed handoff byte for byte. Three reviewers confirm the committed head after the clean rebase onto staging’s core closeout.
+- Local typecheck, lint, 14 unit tests and build must pass on final head; all CI checks must be green before merge. No application code, migration or screen parity claimed.
+- This closeout is conditional on that merge; it does not itself claim an unperformed merge. After merge, mark WHR-40 Done and stop as Earl instructed.
 
 ## Next
-- Publish the reviewed local changes from an authorized terminal/session; recheck the committed diff, final-head gates and independent evidence, open a staging PR, merge only with green CI, then READY and stop.
-- No next work order is authorized. Do not mark WHR-40 READY before staging merge.
+- No further work under WO-spec-2 after closure. Start no next work order without assignment.
 
-## Earl's gos
-- Session instruction names lane:spec and WO-spec-2 (WHR-40), M2 contracts, following AGENTS.md. Approval line verified.
-- No production or main-promotion go.
+## Earl’s gos
+- 2026-11-04: “Rules fixed. Publish WHR-40 from .worktrees/spec-2-m2 using your handoff package: commit, push, PR, merge when green, then close WO-spec-2.”
+- This authorizes staging publication and closure, not main promotion or production changes.
 
 ## Risks
-- Publication blocked: git add/commit cannot write .git/worktrees/spec-2-m2/index.lock. Automatic approval review rejected even the GitHub CLI lookup: “Administrative and cloud actions stay with Earl in his own terminal.” No bypass attempted.
-- Six review dispatches exceed the low/docs flag (>4); two rounds, no cap escalation. Working-draft verdicts are not committed-head approval.
-- WHR-42/43 track D06 configuration/presets; D08 phone/printing, D02 meters and WHR-38/39 remain open. No implementation or screen parity claimed. Runtime model ID unavailable.
+- WHR-42/43 retain D06 token/delivery and role-preset decisions. D08 phone/printing, D02 meter settings and WHR-38/39 remain downstream gates.
+- Nine cumulative dispatches exceed the low/docs flag (>4): six draft reviews in two fix rounds plus three unchanged-content committed-head confirmations. No further fix round or cap escalation.
+- Initial sandbox/publication blocker resolved in this resumption. Runtime model ID unavailable.
 
-dispatches=6 prs=0 rounds_max=2 escalations=0 model=unavailable
+dispatches=9 prs=1 rounds_max=2 escalations=0 model=unavailable

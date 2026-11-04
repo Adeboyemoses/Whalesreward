@@ -4,6 +4,7 @@ Updated: 2026-11-04
 ## Milestone: M0 Foundation (docs/engineering/roadmap.md); target: end of week 1 after kickoff
 
 ## Done this week
+- WO-spec-2 (WHR-40): M2 contracts and model additions; closeout effective when the spec/wo-2-m2-contracts PR merges into staging with green CI. Includes 53 endpoints, all 28 permissions and independent code/security/integrity review. Earl authorized publication and closure on 4 November; final PR and verdicts are linked from WHR-40. No M2 code or screen parity claimed.
 - WO-spec-1 (WHR-32): data model (#4, 7d92cb6) and M1 contracts (#5, 76ddc6a) merged with independent security/integrity PASS and all five checks green; PR #1 completes lane setup and closeout on merge. Priority child WHR-37 merged in #6. Earl instructed closure after these merges.
 - Codex operating model, agents, skills, review gate and engineering guidelines written (Rook, 4 Nov 2026).
 - product-docs symlink to the Fuel Station Loyalty folder created.
@@ -13,7 +14,6 @@ Updated: 2026-11-04
 - WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
 ## In progress
-- WO-spec-2 (WHR-40): M2 contract/model draft in .worktrees/spec-2-m2; two independent review rounds and verdicts tracked on WHR-40. Local typecheck, lint, 14 unit tests and build pass. Publication blocked: Git index writes denied, and automatic review requires GitHub actions in Earl’s terminal. No commit, PR, merge, M2 code or board parity claimed.
 - Earl's one-time setup (docs/agentic/setup.md).
 - WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
