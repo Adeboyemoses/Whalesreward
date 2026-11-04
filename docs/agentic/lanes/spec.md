@@ -14,7 +14,7 @@ WO-spec-3 (WHR-46) M3 contracts: ACCEPTED since 2026-11-04
 
 ## Risks
 - WHR-38/39 and WHR-47–50 remain separate downstream implementation policy gates; acceptance of these specifications does not settle them.
-- PR #16 dispatch flag: 15 exceeded high-tier 8 (nine reviews across three rounds plus six unchanged-contract confirmations after concurrent core updates); no additional fix round or escalation. One independent docs closeout review brings cumulative dispatches to 16.
+- PR #16 dispatch flag: 15 exceeded high-tier 8 (nine reviews across three rounds plus six unchanged-contract confirmations after concurrent core updates); no additional fix round or escalation. One docs closeout review and one unchanged-acceptance confirmation after the concurrent app merge bring cumulative dispatches to 17.
 - Runtime full model ID unavailable.
 
-dispatches=16 prs=2 rounds_max=3 escalations=0 model=unavailable
+dispatches=17 prs=2 rounds_max=3 escalations=0 model=unavailable
