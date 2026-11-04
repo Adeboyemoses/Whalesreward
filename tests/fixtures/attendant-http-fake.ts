@@ -81,6 +81,7 @@ export async function installAttendantFake(
   let offline = false;
   let lookupFailure: "none" | "missing" | "unavailable" = "none";
   let signOutFailure = false;
+  let revoked = false;
   const calls: Array<{ path: string; method: string; source?: string }> = [];
   const signIns = new Map<string, FixtureSession>();
   const now = () => options.now ?? Date.now();
@@ -164,6 +165,7 @@ export async function installAttendantFake(
     }
     if (!active) return failure(route, 401, "unauthenticated");
     if (path === "/api/attendant/session") {
+      if (revoked) return failure(route, 401, "unauthenticated");
       expect(method).toBe("GET");
       return success(route, {
         ...active,
@@ -214,6 +216,9 @@ export async function installAttendantFake(
     },
     setSignOutFailure(value: boolean) {
       signOutFailure = value;
+    },
+    revoke() {
+      revoked = true;
     },
     activeSession() {
       return active;

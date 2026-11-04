@@ -32,3 +32,33 @@ WO-app-2 ends at durable Saved on phone. Server confirmation, synced receipts an
 ## Result record
 
 For each step record PASS / FAIL / BLOCKED, actual result and screenshot reference. Record unresolved fixture/service-worker setup as BLOCKED, never PASS. Phone execution waits for WO-core-3. Automated coverage and exact fixture commands will be recorded below after implementation; never mark unexecuted phone steps PASS.
+
+## Automated reproduction and fixture boundary
+
+Run these from the WO-app-2 worktree with Node/pnpm versions pinned by the repository. Keep port 3000 free. `pnpm test:e2e` builds production and starts a local server itself; use the standalone command rather than chaining it with shell edits.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test
+pnpm test:e2e
+```
+
+To run only the capture suite on the phone-sized Chromium project:
+
+```sh
+pnpm test:e2e --project=attendant --workers=1 tests/e2e/offline-capture.spec.ts
+```
+
+The test transport is `tests/fixtures/attendant-http-fake.ts`. It returns the exact M1 envelope and Session/Lookup fields for fictional Grace Okon (Pump 02, PMS, ₦1,000.00/litre, precision 3) and Favour James (Pump 05, cooking gas, ₦1,500.00/kg, precision 2). Card A7K3M9Q resolves to fictional Amina Bello, Car owner. It intercepts local browser requests only; the production client has no fake account or testing switch. These credentials are not real-server login instructions. Any call to an upload endpoint fails the capture test.
+
+`offline-capture.spec.ts` exercises real IndexedDB, the built Workbox worker, a live browser media stream supplied by Chromium's fake-camera flag, and `context.setOffline(true)`. It includes direct offline receipt navigation, closing and reopening a persistent browser profile, same/different-account handover, cross-tab isolation, exact 24-hour and rollback locks, online session revalidation, exact gas arithmetic, and cache inspection. Native QR decoding is replaced by a test decoder returning the printed code; actual QR readability and meter-photo readability remain phone checks.
+
+The quota and controlled-time steps above have automated fault injection in disposable browser contexts. No manual production injector is supplied. Until WO-core-3 provides real fixture accounts and the session endpoint, phone steps remain deferred; after that merge use its documented account setup. Record unavailable phone fault injection as BLOCKED and link the corresponding automated test, never manufacture a phone PASS.
+
+For independent design capture, after `pnpm build`, keep port 3102 free and run:
+
+```sh
+pnpm test:e2e --config tests/design-parity/offline/playwright.config.ts
+```
+
+Screenshots and the comparison report are under `tests/design-parity/offline/screenshots/` and `docs/qa/offline-capture-fidelity.md`. Browser checks do not establish daylight readability, camera focus, real endpoint authentication, TalkBack behavior or phone storage durability.

@@ -53,7 +53,9 @@ for (const width of [390, 360]) {
       .getByLabel("Or enter the card number", { exact: true })
       .fill("A7K3M9X");
     await page.getByRole("button", { name: "Find", exact: true }).click();
-    await expect(page.getByText(/No customer has card/)).toBeVisible();
+    await expect(
+      page.getByText(/No customer has (?:this )?card/),
+    ).toBeVisible();
     await capture(page, "A24-SaleCustomerNotFound", width);
     fake.setLookupFailure("none");
     await fillSale(page, { value: "20000.00" });

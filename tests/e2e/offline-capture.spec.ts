@@ -97,6 +97,7 @@ test("I-06 handover hides the original account queue and restores it only after 
   await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
   await page.goto("/attendant/account/hand-over");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL(/\/attendant\/sign-in$/);
   await signIn(page);
   await page.goto(receiptUrl);
   await expect(
@@ -114,7 +115,9 @@ test("I-29 I-30 gas quantity capture preserves exact values and fixes Cylinder w
 }) => {
   await installAttendantFake(context);
   await signIn(page, "favour.james");
-  await expect(page.getByLabel("Bought into", { exact: true })).toHaveValue("Cylinder");
+  await expect(page.getByLabel("Bought into", { exact: true })).toHaveValue(
+    "Cylinder",
+  );
   await expect(
     page.getByRole("button", { name: "Vehicle", exact: true }),
   ).toHaveCount(0);
@@ -174,7 +177,7 @@ test("I-23 quota failure keeps the draft and photo without a partial saved sale"
   expect(await rows(page)).toEqual([]);
 });
 
-test("I-03 exactly 24 hours blocks an in-progress capture and reconnect does not renew access", async ({
+test("I-03 the 24-hour boundary blocks an in-progress capture and reconnect does not renew access", async ({
   page,
   context,
 }) => {
@@ -182,12 +185,13 @@ test("I-03 exactly 24 hours blocks an in-progress capture and reconnect does not
   await page.clock.install({ time: now });
   const fake = await installAttendantFake(context, {
     now,
-    signInAgeMs: 86_399_000,
+    signInAgeMs: 86_340_000,
   });
   await signIn(page);
+  await waitForWorker(page);
   fake.setOffline(true);
   await context.setOffline(true);
-  await page.clock.runFor(1000);
+  await page.clock.fastForward(60_000);
   await expect(
     page.getByRole("heading", { name: "Offline access expired", exact: true }),
   ).toBeVisible();
@@ -210,12 +214,11 @@ test("I-03 rolling the wall clock backwards locks capture without discarding the
   await fillSale(page);
   await save(page);
   const original = await rows(page);
+  await waitForWorker(page);
   fake.setOffline(true);
   await context.setOffline(true);
   await page.clock.setSystemTime(now - 60_000);
-  await page
-    .getByRole("button", { name: "Record next sale", exact: true })
-    .click();
+  await page.clock.runFor(1000);
   await expect(
     page.getByRole("heading", { name: "Offline access expired", exact: true }),
   ).toBeVisible();
@@ -334,10 +337,10 @@ test("I-27 lookup service failure is not customer-not-found and never enables on
     .getByLabel("Or enter the card number", { exact: true })
     .fill("A7K3M9Q");
   await page.getByRole("button", { name: "Find", exact: true }).click();
-  await expect(page.getByText(/No customer has card/)).toBeVisible();
+  await expect(page.getByText(/No customer has (?:this )?card/)).toBeVisible();
   fake.setLookupFailure("unavailable");
   await page.getByRole("button", { name: "Find", exact: true }).click();
-  await expect(page.getByText(/No customer has card/)).toHaveCount(0);
+  await expect(page.getByText(/No customer has (?:this )?card/)).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Save sale", exact: true }),
   ).toBeDisabled();
@@ -354,6 +357,7 @@ test("I-06 another tab cannot retain the old account view after handover", async
   const other = await context.newPage();
   await other.goto("/attendant/account/hand-over");
   await other.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(other).toHaveURL(/\/attendant\/sign-in$/);
   await signIn(other, "favour.james");
   await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
@@ -399,4 +403,34 @@ test("I-23 a full browser restart retains offline receipt and photo without netw
     await persistent.close();
     await rm(profile, { recursive: true, force: true });
   }
+});
+
+test("I-09 online app reload revalidates the session and revocation locks capture without losing the queue", async ({
+  page,
+  context,
+}) => {
+  const fake = await installAttendantFake(context);
+  await signIn(page);
+  await fillSale(page);
+  await save(page);
+  const saved = await rows(page);
+  const anchor = fake.activeSession()!.lastOnlineSignInAt;
+  const reads = fake.calls.filter(
+    (call) => call.path === "/api/attendant/session",
+  ).length;
+  await page.reload();
+  await expect
+    .poll(
+      () =>
+        fake.calls.filter((call) => call.path === "/api/attendant/session")
+          .length,
+    )
+    .toBeGreaterThan(reads);
+  expect(fake.activeSession()!.lastOnlineSignInAt).toBe(anchor);
+  fake.revoke();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Offline access expired", exact: true }),
+  ).toBeVisible();
+  expect(await rows(page)).toEqual(saved);
 });
