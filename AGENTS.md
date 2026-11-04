@@ -45,6 +45,9 @@ Each session is the **engineering manager (EM)** ([role](docs/agentic/README.md#
 |---|---|---|
 | `lane:core` | `prisma/**` (holds `lock:schema`), `src/server/**`, `src/app/api/**`, `src/shared/**` (contracts, money, quantity), `jobs/**`, `scripts/**`, `.github/**`, `.do/**`, `docker-compose.yml`, root tooling config | backend-engineer, platform-engineer, test-engineer |
 | `lane:app` | `src/app/(attendant)/**`, `src/app/(admin)/**`, `src/client/**` (incl. `api.ts`), `src/ui/**`, `src/styles/**`, `public/**`, the web manifest, `docs/briefs/**` | frontend-engineer, offline-engineer, test-engineer |
+| `lane:spec` | `docs/engineering/data-model.md`, `docs/engineering/contracts/**`, `docs/engineering/coverage-map.md`, `docs/engineering/decisions/**`, `docs/agentic/lanes/spec.md`; triages `needs:human` | EM writes docs; no builders |
+
+Code lanes change a contract only through a `lane:spec` child issue or a PR that updates the contract doc in the same change. The spec lane never writes app code; independent reviewers still review its specs.
 
 Tests live with the lane of the code they test. `lane:app` may propose a `src/shared/**` change; `lane:core` reviews and merges it.
 

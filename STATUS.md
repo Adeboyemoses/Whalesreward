@@ -4,6 +4,7 @@ Updated: 2026-11-04
 ## Milestone: M0 Foundation (docs/engineering/roadmap.md); target: end of week 1 after kickoff
 
 ## Done this week
+- WO-spec-1 (WHR-32): data model (#4, 7d92cb6) and M1 contracts (#5, 76ddc6a) merged with independent security/integrity PASS and all five checks green; PR #1 completes lane setup and closeout on merge. Priority child WHR-37 merged in #6. Earl instructed closure after these merges.
 - Codex operating model, agents, skills, review gate and engineering guidelines written (Rook, 4 Nov 2026).
 - product-docs symlink to the Fuel Station Loyalty folder created.
 - Linear team WhalesReward (WHR) created by Earl.
