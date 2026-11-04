@@ -14,11 +14,13 @@ Updated: 2026-11-04
 - WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
 ## In progress
+- WO-spec-3 (WHR-46): M3 contracts and model additions prepared for independent review and staging merge. Documentation only; READY after green reviewed merge, with PR/verdicts recorded on WHR-46.
 - Earl's one-time setup (docs/agentic/setup.md).
 - WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- M3 policy gates: WHR-38/39 (trusted capture/other card retirement), WHR-47–50 (correction evidence, final manager recovery, OTP/device recovery policy, independent meter reconciliation). Specs preserve data and deny unsupported acceptance/mutations pending policy.
 - M2 policy tracking: WHR-42 (D06 token/delivery configuration), WHR-43 (proposed role preset activation). Defaults preserve reference values while production policy remains explicitly configured; no new provider or cloud resource is authorized.
 - Client kickoff and contract: not yet confirmed.
 - Client DigitalOcean account for staging and production (needed by M4/M5).

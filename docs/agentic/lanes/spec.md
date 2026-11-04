@@ -1,22 +1,20 @@
 # lane:spec
-WO-spec-2 (WHR-40) M2 contracts: ACCEPTED; closeout effective on this PR’s green staging merge
+WO-spec-3 (WHR-46) M3 contracts: BUILD since 2026-11-04
 
 ## In flight
-- spec/wo-2-m2-contracts delivers 53 endpoint contracts, all 28 permissions, model additions and documentation coverage. Final PR, review verdicts and merge verification are linked from WHR-40.
-- Contract/model content matches the previously reviewed handoff byte for byte. Three reviewers confirm the committed head after the clean rebase onto staging’s core closeout.
-- Local typecheck, lint, 14 unit tests and build must pass on final head; all CI checks must be green before merge. No application code, migration or screen parity claimed.
-- This closeout is conditional on that merge; it does not itself claim an unperformed merge. After merge, mark WHR-40 Done and stop as Earl instructed.
+- spec/wo-3-m3-contracts: M3 endpoint contracts and model additions, documentation coverage and closeout. READY takes effect only after reviewed staging merge with green CI; final PR and independent verdicts will be linked on WHR-46.
+- Docs only. No app code, migration, product-docs edit, implemented invariant or screen parity claimed.
+- EM runs typecheck, lint, test and build; independent code/security/integrity review required. High tier chosen for contract risk despite docs-only routing.
 
 ## Next
-- No further work under WO-spec-2 after closure. Start no next work order without assignment.
+- Merge when review and CI pass; post READY and stop at the work order's staging-merge condition. No next work order selected.
 
-## Earl’s gos
-- 2026-11-04: “Rules fixed. Publish WHR-40 from .worktrees/spec-2-m2 using your handoff package: commit, push, PR, merge when green, then close WO-spec-2.”
-- This authorizes staging publication and closure, not main promotion or production changes.
+## Earl's gos
+- WHR-46 has Earl's 4 November approval line and was Todo at session start. Session instruction assigns WO-spec-3, lane:spec. No main/production go.
 
 ## Risks
-- WHR-42/43 retain D06 token/delivery and role-preset decisions. D08 phone/printing, D02 meter settings and WHR-38/39 remain downstream gates.
-- Nine cumulative dispatches exceed the low/docs flag (>4): six draft reviews in two fix rounds plus three unchanged-content committed-head confirmations. No further fix round or cap escalation.
-- Initial sandbox/publication blocker resolved in this resumption. Runtime model ID unavailable.
+- WHR-38/39 remain open; uncertain time/authorization/retirement stays zero-credit.
+- WHR-47 correction evidence, WHR-48 final manager recovery, WHR-49 OTP/device recovery policy and WHR-50 meter reconciliation remain implementation gates. No policy inferred from fixtures.
+- Runtime full model ID unavailable.
 
-dispatches=9 prs=1 rounds_max=2 escalations=0 model=unavailable
+dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
