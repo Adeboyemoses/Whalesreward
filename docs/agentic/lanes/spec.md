@@ -18,4 +18,4 @@ WO-spec-3a (WHR-52) capture and recovered corrections: READY on green staging me
 - WHR-39 and WHR-47–50 remain separate implementation gates.
 - Runtime full model ID unavailable.
 
-dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
