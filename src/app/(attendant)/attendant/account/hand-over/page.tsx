@@ -15,7 +15,9 @@ import {
 } from "../../_components/runtime";
 function Handover() {
   const { client, state, online } = useAttendant();
-  const count = useOwnCount();
+  const observedCount = useOwnCount();
+  const [confirmedCount, setConfirmedCount] = useState<number | null>(null);
+  const count = confirmedCount ?? observedCount;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +29,16 @@ function Handover() {
     setBusy(true);
     setError(null);
     try {
+      const pending = (await client.ownSales()).filter(
+        (row) => !["credited", "held", "cancelled"].includes(row.state),
+      ).length;
+      if (pending !== count) {
+        setConfirmedCount(pending);
+        setError(
+          "The pending count changed. Check the sales still on this phone, then confirm sign-out again.",
+        );
+        return;
+      }
       await client.signOut();
       go(router, "/attendant/sign-in", true);
     } catch (e) {
