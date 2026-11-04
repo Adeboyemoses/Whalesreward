@@ -3,7 +3,7 @@ WO-app-2 (WHR-5) Offline capture: READY on reviewed green staging merge, 2026-11
 
 ## In flight
 - `app/wo-2-offline`: typed M1 HTTP adapter/test fake, Dexie v1 atomic account partitions, 24-hour/rollback lock, live camera/QR, static attendant screens and Workbox shell cache.
-- EM: typecheck/lint/build, 39 unit tests, 30 Playwright checks and 3 time tests per timezone pass. Independent fidelity: 11 boards at 390/360 px in `docs/qa/offline-capture-fidelity.md`.
+- EM: typecheck/lint/build, 43 unit tests, 30 Playwright checks and 3 time tests per timezone pass. Independent fidelity: 11 boards at 390/360 px in `docs/qa/offline-capture-fidelity.md`.
 - WO-app-1 accepted and closed: PR #24 merged, WHR-2 Done; implementation #12 and wrapping #20.
 
 ## Next
