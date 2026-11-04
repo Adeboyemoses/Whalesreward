@@ -29,3 +29,17 @@ it("fails closed without leaking malformed connection information", () => {
     }),
   ).toThrow("Staging database configuration is invalid");
 });
+
+it("gives the Prisma migration engine its own strict TLS dialect without mutating pg settings", async () => {
+  const { prismaDatabaseUrl } =
+    await import("../../scripts/deploy/entrypoint.mjs");
+  const pgUrl =
+    "postgresql://fictional:fictional@database.example.com/whr?sslmode=verify-full&sslrootcert=/tmp/whr-db-ca.pem";
+  const prismaUrl = new URL(prismaDatabaseUrl(pgUrl, true));
+  expect(prismaUrl.searchParams.get("sslmode")).toBe("require");
+  expect(prismaUrl.searchParams.get("sslaccept")).toBe("strict");
+  expect(prismaUrl.searchParams.get("sslcert")).toBe("/tmp/whr-db-ca.pem");
+  expect(prismaUrl.searchParams.has("sslrootcert")).toBe(false);
+  expect(new URL(pgUrl).searchParams.get("sslmode")).toBe("verify-full");
+  expect(prismaDatabaseUrl(pgUrl, false)).toBe(pgUrl);
+});

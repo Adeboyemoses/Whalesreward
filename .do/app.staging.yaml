@@ -85,7 +85,7 @@ jobs:
     dockerfile_path: Dockerfile
     instance_size_slug: apps-s-1vcpu-1gb
     instance_count: 1
-    run_command: pnpm db:migrate:deploy
+    run_command: node scripts/deploy/entrypoint.mjs pnpm db:migrate:deploy
   - name: seed
     kind: POST_DEPLOY
     github:
@@ -96,7 +96,7 @@ jobs:
     dockerfile_path: Dockerfile
     instance_size_slug: apps-s-1vcpu-1gb
     instance_count: 1
-    run_command: pnpm db:seed
+    run_command: node scripts/deploy/entrypoint.mjs pnpm db:seed
 
 databases:
   - name: db

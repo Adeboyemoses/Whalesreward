@@ -21,6 +21,21 @@ export function databaseEnvironment(env) {
   }
 }
 
+/** Prisma Migrate's schema engine uses its own TLS URL dialect, unlike pg. */
+export function prismaDatabaseUrl(connectionString, staging) {
+  if (!staging) return connectionString;
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.set("sslmode", "require");
+    url.searchParams.set("sslaccept", "strict");
+    url.searchParams.set("sslcert", "/tmp/whr-db-ca.pem");
+    url.searchParams.delete("sslrootcert");
+    return url.toString();
+  } catch {
+    throw new Error("Staging database configuration is invalid");
+  }
+}
+
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
