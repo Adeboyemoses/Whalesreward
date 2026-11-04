@@ -13,7 +13,12 @@ import {
   type CaptureInput,
 } from "../types";
 import { CaptureDatabase, type Installation } from "./db";
-import { advanceWindow, type ClockSample } from "./window";
+import {
+  advanceWindow,
+  requestDuration,
+  type ClockSample,
+  type MonotonicBaseline,
+} from "./window";
 import { parseNaira, parseKobo } from "../../shared/money";
 import {
   amountToQuantity,
@@ -40,7 +45,7 @@ export class AttendantClient {
   };
   private listeners = new Set<() => void>();
   private runtimeId = uuidv7();
-  private previousMono = new Map<string, number>();
+  private baselines = new Map<string, MonotonicBaseline>();
   private channel: BroadcastChannel | null = null;
   private checking: Promise<ClientState> | null = null;
   private authEpoch = 0;
@@ -140,12 +145,7 @@ export class AttendantClient {
             logoutPending: row?.logoutPending ?? false,
           };
         const now = this.clock();
-        const next = advanceWindow(
-          row,
-          now,
-          this.previousMono.get(row.originatingAccountId) ?? now.mono,
-        );
-        this.previousMono.set(row.originatingAccountId, now.mono);
+        const next = this.advance(row, now);
         await this.db.windows.put(next);
         return {
           session: next.session,
@@ -156,6 +156,20 @@ export class AttendantClient {
     );
     this.publish(result);
     return result;
+  }
+  private advance(row: OfflineWindow, now: ClockSample): OfflineWindow {
+    const next = advanceWindow(
+      row,
+      now,
+      this.baselines.get(row.originatingAccountId),
+    );
+    this.baselines.set(row.originatingAccountId, {
+      captureContextId: row.captureContextId,
+      runtimeId: now.runtimeId,
+      mono: now.mono,
+      elapsedMs: next.elapsedAtCheckpointMs,
+    });
+    return next;
   }
   private requireOnline() {
     if (!this.online())
@@ -194,6 +208,7 @@ export class AttendantClient {
     )
       throw this.accountChanged();
     // Explicit sign-in is the only operation that creates or unlocks an offline window.
+    const requestStarted = this.clock();
     const session = sessionSchema.parse(
       await this.api.signIn(
         { username: username.trim(), password, deviceId: meta.deviceId },
@@ -201,8 +216,11 @@ export class AttendantClient {
       ),
     );
     const now = this.clock();
+    const transit = requestDuration(requestStarted, now);
     const elapsed =
-      Date.parse(session.serverTime) - Date.parse(session.lastOnlineSignInAt);
+      Date.parse(session.serverTime) -
+      Date.parse(session.lastOnlineSignInAt) +
+      (transit ?? 0);
     const row: OfflineWindow = {
       schemaVersion: 1,
       originatingAccountId: session.account.id,
@@ -214,7 +232,7 @@ export class AttendantClient {
       elapsedAtCheckpointMs: elapsed,
       wallTimeAtCheckpoint: new Date(now.wall).toISOString(),
       runtimeId: now.runtimeId,
-      locked: elapsed >= 86400000,
+      locked: transit === null || elapsed >= 86400000,
       logoutPending: false,
       session,
     };
@@ -258,7 +276,12 @@ export class AttendantClient {
         await this.signOut();
       throw error;
     }
-    this.previousMono.set(session.account.id, now.mono);
+    this.baselines.set(session.account.id, {
+      captureContextId: session.captureContextId,
+      runtimeId: now.runtimeId,
+      mono: now.mono,
+      elapsedMs: elapsed,
+    });
     await this.requestPersistence();
     this.signal();
     return this.checkAccess();
@@ -304,10 +327,11 @@ export class AttendantClient {
     if (!before.session || !this.online()) return before;
     const account = before.session.account.id;
     const context = before.session.captureContextId;
+    const requestStarted = this.clock();
     try {
       const fresh = sessionSchema.parse(await this.api.session());
       if (fresh.account.id !== account || fresh.captureContextId !== context) {
-        await this.lockCurrent();
+        await this.lockContext(before.session);
         return this.checkAccess();
       }
       await this.db.transaction(
@@ -332,15 +356,24 @@ export class AttendantClient {
             await this.db.windows.update(account, { locked: true });
             return;
           }
-          // A trusted read may advance elapsed time, but can never replace the sign-in anchor or unlock a lock.
-          await this.db.windows.update(account, {
+          // Reconcile at this transaction's clock sample. Neither a slow response
+          // nor another tab's checkpoint can move the existing anchor or elapsed time back.
+          const now = this.clock();
+          const transit = requestDuration(requestStarted, now);
+          const advanced = this.advance(row, now);
+          const next = {
+            ...advanced,
             session: fresh,
             lastTrustedServerTime: fresh.serverTime,
             elapsedAtCheckpointMs: Math.max(
-              row.elapsedAtCheckpointMs,
-              Date.parse(fresh.serverTime) - Date.parse(row.lastOnlineSignInAt),
+              advanced.elapsedAtCheckpointMs,
+              Date.parse(fresh.serverTime) -
+                Date.parse(row.lastOnlineSignInAt) +
+                (transit ?? 0),
             ),
-          });
+            locked: advanced.locked || transit === null,
+          };
+          await this.db.windows.put(this.advance(next, now));
         },
       );
     } catch (error) {
@@ -352,17 +385,23 @@ export class AttendantClient {
           "assignment_unavailable",
         ].includes(error.code)
       )
-        await this.lockCurrent();
+        await this.lockContext(before.session);
     }
     return this.checkAccess();
   }
-  private async lockCurrent() {
+  private async lockContext(session: Session) {
     await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
       const meta = await this.db.meta.get("installation");
-      if (meta?.activeAccountId)
-        await this.db.windows.update(meta.activeAccountId, { locked: true });
+      const row = await this.db.windows.get(session.account.id);
+      // An old response can revoke only the context that issued its request.
+      if (
+        meta?.activeAccountId === session.account.id &&
+        row?.captureContextId === session.captureContextId
+      )
+        await this.db.windows.update(session.account.id, { locked: true });
     });
     this.signal();
+    await this.checkAccess();
   }
   private async active(): Promise<Session> {
     const state = await this.checkAccess();
@@ -400,9 +439,23 @@ export class AttendantClient {
         },
       );
     }
-    const found = await this.api.lookup(
-      source === "qr" ? { source: "qr", qr: code } : { source: "code", code },
-    );
+    let found: Lookup;
+    try {
+      found = await this.api.lookup(
+        source === "qr" ? { source: "qr", qr: code } : { source: "code", code },
+      );
+    } catch (error) {
+      if (
+        error instanceof ClientError &&
+        [
+          "unauthenticated",
+          "permission_denied",
+          "assignment_unavailable",
+        ].includes(error.code)
+      )
+        await this.lockContext(session);
+      throw error;
+    }
     if (found.cardCode !== code)
       throw new ClientError(
         "invalid_response",
@@ -585,11 +638,7 @@ export class AttendantClient {
             meta.logoutPending ||
             !window ||
             window.captureContextId !== draft.session.captureContextId ||
-            advanceWindow(
-              window,
-              now,
-              this.previousMono.get(session.account.id) ?? now.mono,
-            ).locked
+            this.advance(window, now).locked
           )
             throw new ClientError(
               "access_expired",

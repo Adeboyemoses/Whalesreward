@@ -7,7 +7,7 @@ import {
   FakeAttendantApi,
   sessionFixture,
 } from "../../../tests/fixtures/attendant-client-fake";
-import type { CapturedPhoto, CaptureInput } from "../types";
+import { ClientError, type CapturedPhoto, type CaptureInput } from "../types";
 let now: number,
   mono: number,
   online: boolean,
@@ -339,6 +339,192 @@ describe("durable account partition", () => {
       expect((await db.meta.get("installation"))?.activeAccountId).toBeNull();
     },
   );
+  it.each(["unauthenticated", "permission_denied"])(
+    "lookup %s locks capture before propagating and retains saved evidence",
+    async (code) => {
+      const form = await input();
+      const saved = await client.saveCapture(await client.beginCapture(), form);
+      const draft = await client.beginCapture();
+      api.lookup = async () => {
+        throw new ClientError(code, "Access denied");
+      };
+      await expect(client.lookup("A7K3M9X")).rejects.toMatchObject({ code });
+      online = false;
+      expect((await client.checkAccess()).access).toBe("expired");
+      await expect(client.saveCapture(draft, form)).rejects.toMatchObject({
+        code: "access_expired",
+      });
+      expect((await client.ownSale(saved.operationId))?.photoDigest).toBe(
+        form.photo.sha256,
+      );
+    },
+  );
+  it.each([
+    ["unauthenticated", false],
+    ["permission_denied", false],
+    ["mismatch", false],
+    ["unauthenticated", true],
+    ["permission_denied", true],
+    ["mismatch", true],
+  ] as const)(
+    "old refresh %s cannot lock a new sign-in context (different account: %s)",
+    async (code, differentAccount) => {
+      const entered = deferred<void>();
+      const release = deferred<void>();
+      const old = structuredClone(api.current);
+      api.session = async () => {
+        entered.resolve();
+        await release.promise;
+        if (code === "mismatch") return sessionFixture(now);
+        throw new ClientError(code, "Access denied");
+      };
+      const pending = client.refresh();
+      await entered.promise;
+      if (differentAccount) await client.signOut();
+      api.current = differentAccount
+        ? sessionFixture(now)
+        : { ...old, captureContextId: uuidv7() };
+      await client.signIn("current", "fictional");
+      release.resolve();
+      await pending;
+      const state = await client.checkAccess();
+      expect(state.access).toBe("active");
+      expect(state.session?.captureContextId).toBe(
+        api.current.captureContextId,
+      );
+      expect(state.session?.account.id).toBe(api.current.account.id);
+    },
+  );
+  it.each([
+    ["unauthenticated", false],
+    ["permission_denied", false],
+    ["unauthenticated", true],
+    ["permission_denied", true],
+  ] as const)(
+    "old lookup %s cannot lock a new sign-in context (different account: %s)",
+    async (code, differentAccount) => {
+      const entered = deferred<void>();
+      const release = deferred<void>();
+      const old = structuredClone(api.current);
+      api.lookup = async () => {
+        entered.resolve();
+        await release.promise;
+        throw new ClientError(code, "Access denied");
+      };
+      const pending = client.lookup("A7K3M9X");
+      const rejected = expect(pending).rejects.toMatchObject({ code });
+      await entered.promise;
+      if (differentAccount) await client.signOut();
+      api.current = differentAccount
+        ? sessionFixture(now)
+        : { ...old, captureContextId: uuidv7() };
+      await client.signIn("current", "fictional");
+      release.resolve();
+      await rejected;
+      expect((await client.checkAccess()).access).toBe("active");
+    },
+  );
+  it("alternating live tabs preserve monotonic expiry when the wall clock is frozen", async () => {
+    const second = await handoverClient(true);
+    mono = 3600000;
+    await client.checkAccess();
+    await second.checkAccess();
+    mono = 86400000;
+    expect((await client.checkAccess()).access).toBe("expired");
+    expect((await second.checkAccess()).access).toBe("expired");
+  });
+  it("two tabs reconcile the same elapsed interval without counting it twice", async () => {
+    const second = await handoverClient(true);
+    mono = 3600000;
+    await client.checkAccess();
+    await second.checkAccess();
+    await client.checkAccess();
+    expect(
+      (await db.windows.get(api.current.account.id))?.elapsedAtCheckpointMs,
+    ).toBe(3600000);
+    expect(client.getState().access).toBe("active");
+  });
+  it("another tab resets its monotonic baseline when the capture context changes", async () => {
+    const second = await handoverClient(true);
+    now += 43200000;
+    mono += 43200000;
+    await second.checkAccess();
+    await client.checkAccess();
+    api.current = sessionFixture(now, api.current.account.id);
+    await client.signIn("grace", "fictional");
+    await second.checkAccess();
+    expect(
+      (await db.windows.get(api.current.account.id))?.elapsedAtCheckpointMs,
+    ).toBe(0);
+    expect(second.getState().access).toBe("active");
+  });
+  it("a delayed sign-in response expires at the original server deadline", async () => {
+    await client.signOut();
+    const entered = deferred<void>();
+    const response = deferred<ReturnType<typeof sessionFixture>>();
+    api.current = sessionFixture(now);
+    const signedAt = now;
+    api.signIn = () => {
+      entered.resolve();
+      return response.promise;
+    };
+    const pending = client.signIn("grace", "fictional");
+    await entered.promise;
+    now += 60000;
+    mono += 60000;
+    response.resolve(api.current);
+    await pending;
+    expect(
+      (await db.windows.get(api.current.account.id))?.elapsedAtCheckpointMs,
+    ).toBe(60000);
+    now = signedAt + 86400000;
+    mono = 86400000;
+    expect((await client.checkAccess()).access).toBe("expired");
+  });
+  it("a slow refresh advances trusted age through receipt and never renews the sign-in anchor", async () => {
+    const originalAnchor = api.current.lastOnlineSignInAt;
+    const entered = deferred<void>();
+    const response = deferred<ReturnType<typeof sessionFixture>>();
+    const snapshot = {
+      ...api.current,
+      serverTime: new Date(now + 86340000).toISOString(),
+    };
+    api.session = () => {
+      entered.resolve();
+      return response.promise;
+    };
+    const pending = client.refresh();
+    await entered.promise;
+    // A frozen wall clock must not discard the response's 60-second transit time.
+    mono += 60000;
+    response.resolve(snapshot);
+    await pending;
+    const row = await db.windows.get(api.current.account.id);
+    expect(row?.lastOnlineSignInAt).toBe(originalAnchor);
+    expect(row?.elapsedAtCheckpointMs).toBe(86400000);
+    expect((await client.checkAccess()).access).toBe("expired");
+  });
+  it("a response obtained across clock rollback locks the new window", async () => {
+    await client.signOut();
+    api.current = sessionFixture(now);
+    const entered = deferred<void>();
+    const response = deferred<ReturnType<typeof sessionFixture>>();
+    api.signIn = () => {
+      entered.resolve();
+      return response.promise;
+    };
+    const pending = client.signIn("grace", "fictional");
+    await entered.promise;
+    now -= 1000;
+    mono += 1000;
+    response.resolve(api.current);
+    await pending;
+    expect((await client.checkAccess()).access).toBe("expired");
+  });
+  it("an authoritative mismatch still locks the context that made the request", async () => {
+    api.session = async () => sessionFixture(now);
+    expect((await client.refresh()).access).toBe("expired");
+  });
   it("wrong photo digest cannot be saved", async () => {
     const form = await input();
     await expect(
