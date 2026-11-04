@@ -62,6 +62,38 @@ allow 'git worktree add .worktrees/accept -b core/WHR-21-accept origin/staging'
 allow 'pnpm dev'
 allow 'git checkout -- src/a.ts'
 
+# WHR-44: Git global options must not bypass the existing hygiene checks.
+# These are synthetic hook events; no command below is executed.
+deny  'git -C x add -A'
+deny  'git -Cx add .'
+deny  'git -C "path with spaces" add --all'
+deny  "git -C 'path with spaces' add -u"
+deny  'git -C x -C y add *'
+deny  'git --git-dir=x --work-tree=y add :/'
+deny  'git --no-pager -C x commit -am "x"'
+deny  'git -C x push --force origin feature'
+deny  'git -C x push origin main'
+deny  'git -C x -c core.quotePath=false push origin main'
+deny  'git --literal-pathspecs -C x config user.email someone@example.com'
+deny  'git -C x config --global user.name test'
+deny  'git -C x commit -m "x" -m "Co-Authored-By: bot"'
+allow 'git -C x add src/server/lib/time.ts'
+allow 'git -C "path with spaces" add -- src/server/lib/time.ts'
+allow 'git -C x -C y --no-pager diff --stat'
+allow 'git --git-dir=x --work-tree=y status'
+allow 'git -C x config --get user.name'
+deny  'git -C "path with spaces" config --get user.name'
+allow 'git -C x push origin feature'
+allow 'git -C x push --force-with-lease origin feature'
+allow "WHR_MAIN_GO=$today git -C x push origin main"
+deny  'WHR_MAIN_GO=2020-01-01 git -C x push origin main'
+allow 'git -C x config --list'
+allow 'git -C x config --show-origin --get user.name'
+allow 'git config --show-scope --list'
+deny  'git -C "config --get user.name" config user.email someone@example.com'
+deny  'git -C x config user.email someone@example.com && git -C x config --get user.name'
+deny  'git -C "path;with separator" add -A'
+
 # Merges
 deny  'gh pr merge 12 --auto --squash'
 deny  'gh pr merge 12 --squash'
@@ -86,6 +118,8 @@ inrepo() { ( cd "$1" && printf '{"tool_input":{"command":%s}}' "$(json "$2")" | 
 [ "$(inrepo "$tmp/main" 'git stash')" = 2 ] && pass=$((pass+1)) || { failn=$((failn+1)); echo "should BLOCK stash in main checkout"; }
 [ "$(inrepo "$tmp/main" 'git reset --hard HEAD~1')" = 2 ] && pass=$((pass+1)) || { failn=$((failn+1)); echo "should BLOCK reset --hard in main checkout"; }
 [ "$(inrepo "$tmp/wt" 'git checkout other')" = 0 ] && pass=$((pass+1)) || { failn=$((failn+1)); echo "should ALLOW checkout in a worktree"; }
+[ "$(inrepo "$tmp/main" 'git --no-pager -C x switch other')" = 2 ] && pass=$((pass+1)) || { failn=$((failn+1)); echo "should BLOCK qualified switch in main checkout"; }
+[ "$(inrepo "$tmp/main" 'git -C "path with spaces" stash')" = 2 ] && pass=$((pass+1)) || { failn=$((failn+1)); echo "should BLOCK quoted qualified stash in main checkout"; }
 [ "$(inrepo "$tmp/main" 'git status')" = 0 ] && pass=$((pass+1)) || { failn=$((failn+1)); echo "should ALLOW git status in main checkout"; }
 
 echo "guard self-test: $pass passed, $failn failed"

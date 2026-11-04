@@ -40,26 +40,38 @@ if has "${B}(cp|rsync|install)${W}[^;&|]*${W}(product-docs/[^[:space:];&|\"]*|(\
 fi
 
 # 3. Git hygiene.
-if has "${B}git${W}+add(${W}[^;&|]*)?${W}(-A|--all|\.|\*|:/|-u)${E}"; then
+# Qualified Git uses the same checks as plain Git. Conservatively accept the
+# complete leading global-option span rather than evaluating shell words. This
+# can block ambiguous quoted data containing protected subcommand text.
+G="git${W}+(-.*${W}+)?"
+# The config read-only exception is narrower: only known, unquoted global
+# options may precede config, so text inside a quoted -C path cannot excuse a
+# real config mutation. Unknown/ambiguous qualified config fails closed.
+V='[A-Za-z0-9_./:=@,+%-]+'
+GO="(-[Cc]${W}+${V}|-[Cc]${V}|--(git-dir|work-tree|namespace|config-env|super-prefix)=${V}|--(git-dir|work-tree|namespace|config-env|super-prefix)${W}+${V}|--(no-pager|paginate|bare|no-replace-objects|literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs|no-optional-locks|no-lazy-fetch|no-advice)|-p)"
+if has "${B}${G}add(${W}[^;&|]*)?${W}(-A|--all|\.|\*|:/|-u)${E}"; then
   block "stage explicit paths; never git add -A / --all / . / * / -u (worktree symlinks and node_modules leak)."
 fi
-if has "${B}git${W}+commit${W}+([^;&|]*${W})?-[A-Za-z]*a[A-Za-z]*${E}"; then
+if has "${B}${G}commit${W}+([^;&|]*${W})?-[A-Za-z]*a[A-Za-z]*${E}"; then
   block "no git commit -a / -am; stage explicit paths first."
 fi
-if has "${B}git${W}+push[^;&|]*(--force${E}|${W}-f${E}|${W}\+[A-Za-z0-9_./-])"; then
+if has "${B}${G}push[^;&|]*(--force${E}|${W}-f${E}|${W}\+[A-Za-z0-9_./-])"; then
   block "no force pushes. Use --force-with-lease on your own branch only."
 fi
-if has "${B}git${W}+push[^;&|]*(${W}|:|refs/heads/)main${E}" && ! has "WHR_MAIN_GO=$today"; then
+if has "${B}${G}push[^;&|]*(${W}|:|refs/heads/)main${E}" && ! has "WHR_MAIN_GO=$today"; then
   block "pushing to main needs Earl's go in this session (WHR_MAIN_GO=$today)."
 fi
-if has "${B}git${W}+config${W}" && ! has "git${W}+config${W}+(--get|--get-all|--list|-l|--show-origin|--show-scope)"; then
-  block "never change git config; commit as the configured repo user."
+# Remove individual unambiguous read-only config commands before checking for
+# mutations; a second read-only command must not mask a qualified mutation.
+config_event="$(printf '%s' "$event" | sed -E "s/${B}git${W}+(${GO}${W}+)*config${W}+((--show-origin|--show-scope|--global|--local|--system|--includes|--no-includes)${W}+)*(--get|--get-all|--list|-l)${E}[^;&|\"()]*//g")"
+if printf '%s' "$config_event" | grep -Eq -- "${B}${G}config${W}"; then
+  block "never change git config; commit as the configured repo user (ambiguous qualified config commands are blocked)."
 fi
-if has "${B}git${W}+commit" && has 'Co-Authored-By:'; then
+if has "${B}${G}commit" && has 'Co-Authored-By:'; then
   block "no Co-Authored-By trailers in commits."
 fi
 # Branch switching, hard resets and stashes in the MAIN checkout (judged from the hook's working directory).
-if has "${B}git${W}+(-C${W}+[^[:space:]]+${W}+)?(switch|stash|reset${W}+--hard|checkout${W}+(-b${W}|-B${W}|[A-Za-z0-9_./-]+${E}))" \
+if has "${B}${G}(switch|stash|reset${W}+--hard|checkout${W}+(-b${W}|-B${W}|[A-Za-z0-9_./-]+${E}))" \
    && ! has "git${W}+checkout${W}+--${W}"; then
   common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
   own="$(git rev-parse --git-dir 2>/dev/null || true)"
