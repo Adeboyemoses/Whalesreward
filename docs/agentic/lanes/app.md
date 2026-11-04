@@ -1,16 +1,21 @@
 # lane:app
-No work order yet. The first is WO-app-1 Design system and app shells (docs/engineering/roadmap.md, M0); it starts after WO-core-1 has merged the scaffold.
+WO-app-0 (WHR-33) M0/M1 implementation briefs and smoke runbooks: READY upon staging merge; prepared 2026-11-04
 
 ## In flight
-- none
+- `app/wo-0-briefs`: six implementation briefs and three draft phone smoke runbooks; no app code.
+- Six briefs / three runbooks checked against all 16 PNGs, routes and decision notes. Independent review complete before merge.
+- Review gate: 37 passed; guard: 63 passed. App gates unavailable (no scaffold); phone runbooks unexecuted drafts.
 
 ## Next
-- WO-app-1 Design system and app shells
+- Earl reads `docs/briefs/attendant-row-02-record-a-sale-online.md` and `docs/qa/smoke-draft-wo-app-2.md` for acceptance after merge.
+- WO-app-1 after scaffold lands; WO-spec-1 supplies final M1 contract names.
 
 ## Earl's gos
-- none
+- Approved WO-app-0 in Linear, 4 Nov 2026; current session names WO-app-0 / WHR-33.
 
 ## Risks
-- Brand sign-off by Whales Empire is pending (Q-516); keep brand values in tokens.
+- Contract names remain TODO-CONTRACT until WO-spec-1 merges.
+- Runbooks are drafts; no scaffold or phone execution yet.
+- Brand sign-off pending (Q-516).
 
-dispatches=0 prs=0 rounds_max=0 escalations=0 model=none
+dispatches=3 prs=1 rounds_max=2 escalations=0 model=unknown

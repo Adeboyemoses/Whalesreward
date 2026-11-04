@@ -62,6 +62,10 @@ Where each requirement stands. The EM updates the rows its work order touched at
 | I-51 | Retention deletion runs only under an approved policy, skips pending evidence and active h… | | | todo |
 | I-52 | Scheduled jobs are idempotent, bounded, leased and restartable | | | todo |
 
+## WO-app-0 documentation preparation (WHR-33)
+
+Rows 1, 2, 3, 6 and 8 have implementation briefs and draft phone runbooks prepared against their board PNGs and decision notes. This is documentation preparation only: it implements no invariant and establishes no built-screen parity. Tests and board statuses below remain todo until the respective implementation work orders verify them. Proposed M1 contract names remain TODO-CONTRACT pending WO-spec-1.
+
 ## Hi-fi boards (106, in canvas row order)
 
 | Row | Boards | Work order | Parity check | Status |

@@ -9,7 +9,9 @@ Updated: 2026-11-04
 - Linear team WhalesReward (WHR) created by Earl.
 
 ## In progress
-- WO-core-1 (WHR-1) Repository scaffold: approved, In Progress; platform builder working in an isolated worktree. High-tier review and all local/CI gates required before staging merge.
+- WO-core-1 (WHR-1) Repository scaffold: local gates and two review rounds passed; PR #3 awaits current-base review and CI before staging merge.
+- Earl's one-time setup (docs/agentic/setup.md).
+- WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
 - Client kickoff and contract: not yet confirmed.
