@@ -12,7 +12,7 @@ Data-model PR #4 is merged on staging with independent security and integrity PA
 
 ## WO-spec-3a documentation status (WHR-52)
 
-M1/M3 and model amendments specify P-18 bounded capture and P-19 independent recovered-correction review. Documentation is READY only on green staging merge. Independent code/security/integrity verdicts and merged PR are recorded on WHR-52. No implementation or board parity is claimed. WHR-46 acceptance closeout is PR #21; WHR-51 is next and unstarted.
+M1/M3 and model amendments specify P-18 bounded capture and P-19 independent recovered-correction review. PR #23 merged at 6663001 with green CI and independent code/security/integrity PASS. Earl accepted WO-spec-3a on 4 November 2026. Documentation status: accepted; this closeout takes effect on green staging merge. No implementation or board parity is claimed. WHR-51 follows this closeout.
 
 ## Invariants
 
