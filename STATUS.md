@@ -7,6 +7,7 @@ Updated: 2026-11-04
 - Codex operating model, agents, skills, review gate and engineering guidelines written (Rook, 4 Nov 2026).
 - product-docs symlink to the Fuel Station Loyalty folder created.
 - Linear team WhalesReward (WHR) created by Earl.
+- WO-core-1 (WHR-1) Repository scaffold merged to staging in PR #3; strict Next.js scaffold, pinned tooling, local services and all five required CI checks passed. ACCEPTED by Earl: "Accepted. Scaffold verified." No product features implemented.
 
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
@@ -18,7 +19,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- WO-core-1 Repository scaffold, then WO-app-1 Design system and app shells, then WO-core-2 Core schema and shared maths.
+- Start approved WO-core-1b (WHR-41), evidence validation after staging updates; WO-core-2 waits for the data-model merge. WO-app-1 follows its own approval.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
