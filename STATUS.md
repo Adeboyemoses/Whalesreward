@@ -9,6 +9,7 @@ Updated: 2026-11-04
 - Linear team WhalesReward (WHR) created by Earl.
 
 ## In progress
+- WO-core-1 (WHR-1) Repository scaffold: local gates and two review rounds passed; PR #3 awaits current-base review and CI before staging merge.
 - Earl's one-time setup (docs/agentic/setup.md).
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
@@ -18,7 +19,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- WO-core-1 Repository scaffold, then WO-app-1 Design system and app shells, then WO-core-2 Core schema and shared maths.
+- Finish WO-core-1 Repository scaffold, then await approved WO-app-1 Design system and app shells and WO-core-2 Core schema and shared maths.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
