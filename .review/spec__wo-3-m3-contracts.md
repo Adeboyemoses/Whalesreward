@@ -2,7 +2,7 @@
 branch: spec/wo-3-m3-contracts
 linear: WHR-46
 tier: high
-reviewed_head: b21bd05bad9c694df42831cb98908b7601bc6d8a
+reviewed_head: 335fbdbf2ae8db912d17263e1da61e53ffbc1808
 rounds: 3
 builder: spec-em
 reviewers:
@@ -10,7 +10,7 @@ reviewers:
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 12
+dispatches: 15
 plan:
   goal: specify M3 corrections, exception reviews, customer changes, recovery and audit
   files: docs/engineering/contracts/m3.md, docs/engineering/data-model.md, coverage-map.md, lane spec and STATUS.md
@@ -30,5 +30,5 @@ Round 1 also fixed card guard acquisition, scoped recovery base reads, strict at
 Round 2 clarified canonical correction identity excludes changing recovery wrapper/grant/session identity; final round passed.
 EM typecheck, lint, 18 unit tests and production build pass. No code/schema/flow changed, so integration/e2e not applicable.
 Existing WHR-38/39 and new WHR-47–50 remain explicit implementation gates, not approved policies.
-12 dispatches exceeds high-tier flag 8; nine reviews across three rounds plus three unchanged-contract synchronized-head confirmations, no additional fix round or cap escalation.
-The concurrent core closeout was merged from staging to meet branch freshness; contract/model/coverage blobs are identical to the previously reviewed head.
+15 dispatches exceeds high-tier flag 8; nine reviews across three rounds plus six unchanged-contract confirmations across concurrent base updates, no additional fix round or cap escalation.
+Concurrent core PRs #15/#17/#18 were merged to meet branch freshness; contract/model blobs and the M3 coverage paragraph are unchanged, and upstream core coverage updates are preserved.
