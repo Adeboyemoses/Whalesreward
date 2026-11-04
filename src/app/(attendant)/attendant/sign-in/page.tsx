@@ -54,7 +54,7 @@ export default function SignInPage() {
           label="Username"
           autoComplete="username"
           autoCapitalize="none"
-          className="wr-username"
+          className={error ? "wr-username wr-invalid" : "wr-username"}
           mono
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -62,9 +62,11 @@ export default function SignInPage() {
           required
           disabled={busy}
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "attendant-password-error" : undefined}
         />
         <TextField
           label="Password"
+          id="attendant-password"
           type={visible ? "text" : "password"}
           autoComplete="current-password"
           value={password}
@@ -88,10 +90,12 @@ export default function SignInPage() {
             {initialError}
           </Notice>
         )}
-        <Notice>
-          Internet is required to sign in or switch accounts. Offline recording
-          lasts <b>24 hours</b> after an online sign-in.
-        </Notice>
+        {!error && online && (
+          <Notice>
+            Internet is required to sign in or switch accounts. Offline
+            recording lasts <b>24 hours</b> after an online sign-in.
+          </Notice>
+        )}
         <Button
           type="submit"
           cta

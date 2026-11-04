@@ -320,15 +320,12 @@ body {
   gap: var(--space-3);
 }
 .wr-person-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--control-h);
-  height: var(--control-h);
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
   color: var(--on-inverse);
   background: var(--whale-600);
+}
+.wr-person-icon svg {
+  width: var(--space-5);
+  height: var(--space-5);
 }
 .wr-person-title {
   font-family: var(--font-display);
@@ -337,7 +334,8 @@ body {
   font-weight: 800;
 }
 .wr-person .wr-secondary {
-  font-size: 16px;
+  /* Identity metadata follows the board caption; body copy remains 16px. */
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 .wr-customer-card {

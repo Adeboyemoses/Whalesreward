@@ -24,7 +24,7 @@ function Account() {
       active="Account"
     >
       <div className="wr-card wr-quiet wr-person">
-        <span className="wr-person-icon">
+        <span className="wr-avatar wr-person-icon">
           <UserRound aria-hidden />
         </span>
         <div>
