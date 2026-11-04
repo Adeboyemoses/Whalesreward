@@ -125,12 +125,15 @@ if [ "$ev_tier" = "high" ]; then
   [ "$(printf '%s\n' "$pl" | grep -c .)" -le 15 ] || err "plan is longer than 15 entries"
 fi
 
-# reviewed_head: an ancestor of head, and only evidence files changed after it.
+# reviewed_head: an ancestor of head; only the PR's own paths need re-review.
 if [ -n "$rh" ] && git cat-file -e "$rh^{commit}" 2>/dev/null; then
   if ! git merge-base --is-ancestor "$rh" "$head" 2>/dev/null; then
     err "reviewed_head $rh is not an ancestor of $head"
   else
-    after="$(git diff --name-only "$rh" "$head" | grep -v '^\.review/[^/]*\.md$' || true)"
+    after="$(comm -12 \
+      <(git diff --name-only "$rh" "$head" | sort) \
+      <(git diff --name-only "$base...$head" | sort) \
+      | grep -v '^\.review/[^/]*\.md$' || true)"
     [ -z "$after" ] || err "files changed after review (re-review needed): $(echo $after)"
     if [ "$ev_tier" = "high" ]; then
       then_body="$(git show "$rh:$path" 2>/dev/null || true)"
