@@ -25,7 +25,7 @@ Updated: 2026-11-05
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
 
-- WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
+- WO-app-0 (WHR-33): ACCEPTED by Earl on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Six briefs and three draft phone runbooks merged in PRs #2 and #9; documentation closeout takes effect on green staging merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
 - M4 policy gates: WHR-54 (reconciliation/complete-upload proof), WHR-55 (launch/start and timing changes), WHR-56 (stored photos/retention removal). Client dates/grace/duration stay unset; no finalization without approved policy, no automatic deletion. These do not prevent the specification handoff.
