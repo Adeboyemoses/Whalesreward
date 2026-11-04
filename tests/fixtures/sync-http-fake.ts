@@ -305,6 +305,22 @@ export async function installSyncFake(
     },
     setFinalizePending(value: boolean) {
       pauseFinalize = value;
+      if (!value) {
+        for (const record of records.values()) {
+          if (record.status.state !== "finalizing") continue;
+          record.status = {
+            ...record.status,
+            version: record.status.version + 1,
+            state: outcome === "held" ? "held" : "credited",
+            photoValidated: true,
+            credited: outcome !== "held",
+            currentRevisionId: outcome === "held" ? null : uuidv7(),
+            holds: outcome === "held" ? holds : [],
+            pendingReason: null,
+          };
+          if (record.status.credited) record.credits++;
+        }
+      }
     },
     loseNextSubmit() {
       loseSubmit = true;
