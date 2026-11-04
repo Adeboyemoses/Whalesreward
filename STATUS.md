@@ -42,8 +42,6 @@ Updated: 2026-11-04
 
 WO-app-0 findings (2026-11-04): draft runbooks split by capture/local-save versus server confirmation; row 02 checks expiry and omits the M2 registration link in M1. Ready after findings PR merge for Earl’s re-read; phone execution remains pending implementation.
 
-WO-app-1 (WHR-2): design assets, 16 typed wrappers, dev-only gallery and responsive shells prepared for staging. Independent gallery10/10 and production browser4/4 checks passed; report docs/qa/design-system-fidelity.md. Earl’s phone smoke remains pending.
+WO-app-1 (WHR-2): ACCEPTED by Earl on 4 November 2026: “Earl accepted WO-app-1 (WHR-2); close it.” Foundation PR #12 and wrap fixes PR #20 are merged into staging. Independent component and viewport checks are recorded in docs/qa/design-system-fidelity.md and design-system-wrap-fidelity.md. Closeout is documentation only. WHR-45 remains separately tracked.
 
-WO-app-1 PR #12: implementation and fidelity checks pass. Earl approved one additional synchronized-head review round (“proceed”, 4 November 2026); READY after final review, evidence and green CI permit the staging merge. Phone smoke acceptance remains pending.
-
-WO-app-1 FIX: wordmark and narrow LoyaltyCard footer findings addressed with actual 390px/360px regression/fidelity checks; READY after findings PR review, green CI and staging merge. Real phone/TalkBack may wait for staging URL; WHR-45 remains separate.
+WO-app-2 (WHR-5): BUILD under Earl’s explicit session go. Smoke runbook written before implementation; typed M1 client adapter and test-only contract fake precede real WO-core-3 endpoint integration. Stop at READY with Playwright green; Earl’s phone smoke waits until WO-core-3 merges.
