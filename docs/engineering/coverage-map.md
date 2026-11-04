@@ -26,16 +26,16 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 
 | ID | Rule (short) | Work order | Test | Status |
 |---|---|---|---|---|
-| I-01 | Each attendant has a personal account: name, unique username, password and a permanent sys… | | | todo |
-| I-02 | Sign-in, account switching and customer registration need connectivity | WO-app-2 (client) | tests/e2e/offline-capture.spec.ts (handover; client scope) | building |
-| I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | WO-app-2 (client) | src/client/offline/window.test.ts; offline-capture.spec.ts (24h, rollback, restart) | building |
-| I-04 | An account writes only for its authorized station and pump | | | todo |
-| I-05 | Pump reassignment is done by an authorized admin | | | todo |
-| I-05a | A queued record from before a reassignment is validated against that account's assignment … | WO-spec-3a (spec only) | Not implemented | todo |
-| I-06 | Logout offers upload-first when connected | WO-app-2 (client) | offline-capture.spec.ts (handover, cross-tab); client.test.ts (failed revocation) | building |
+| I-01 | Each attendant has a personal account: name, unique username, password and a permanent sys… | WO-core-3 (server) | attendant-auth.test.ts: personal credentials/context; attendant-auth.spec.ts: real sign-in | verified; READY on green staging merge |
+| I-02 | Sign-in, account switching and customer registration need connectivity | WO-app-2 (client); WO-core-3 (server) | tests/e2e/offline-capture.spec.ts (handover; client scope); see authentication coverage below | building |
+| I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | WO-app-2 (client); WO-core-3 (server) | src/client/offline/window.test.ts; offline-capture.spec.ts (24h, rollback, restart); see authentication coverage below | building |
+| I-04 | An account writes only for its authorized station and pump | WO-core-3 (server) | see authentication coverage below | todo |
+| I-05 | Pump reassignment is done by an authorized admin | WO-core-3 (server) | see authentication coverage below | todo |
+| I-05a | A queued record from before a reassignment is validated against that account's assignment … | WO-spec-3a (spec only); WO-core-3 (server) | Not implemented; see authentication coverage below | todo |
+| I-06 | Logout offers upload-first when connected | WO-app-2 (client); WO-core-3 (server) | offline-capture.spec.ts (handover, cross-tab); client.test.ts (failed revocation); see authentication coverage below | building |
 | I-07 | Admin users, roles and permissions are separate from attendant accounts | WO-spec-4 (spec only) | Not implemented | todo |
 | I-08 | At least one active Owner always exists | | | todo |
-| I-09 | Disabling an account or removing a permission revokes it on active sessions | WO-app-2 (client); WO-spec-4 (spec only) | offline-capture.spec.ts (online session revocation) | building |
+| I-09 | Disabling an account or removing a permission revokes it on active sessions | WO-app-2 (client); WO-spec-4 (spec only); WO-core-3 (server) | offline-capture.spec.ts (online session revocation); see authentication coverage below | building |
 | I-10 | A role administrator cannot grant more authority than they hold | | | todo |
 | I-11 | Five sensitive permissions default to Owner only and are granted separately: `queueRecover… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-12 | Admin password recovery uses a verified email only | | | todo |
@@ -87,6 +87,20 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 Earl’s 4 November findings: app-2/app-3 runbooks now split at local durable save versus server confirmation; row 02 includes I-03 capture/save guards and omits unavailable M2 registration navigation. These remain unexecuted drafts; coverage statuses below are unchanged.
 
 Rows 1, 2, 3, 6 and 8 have implementation briefs and draft phone runbooks prepared against their board PNGs and decision notes. This is documentation preparation only: it implements no invariant and establishes no built-screen parity. Tests and board statuses below remain todo until the respective implementation work orders verify them. Proposed M1 contract names remain TODO-CONTRACT pending WO-spec-1.
+
+## WO-core-3 authentication coverage (WHR-4)
+
+Backend scope becomes READY on reviewed green staging merge of [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30). `tests/integration/attendant-auth.test.ts` verifies actual Better Auth credentials and PostgreSQL sessions, and checks the real response against the existing client schema. `tests/e2e/attendant-auth.spec.ts` exercises the real sign-in/account/sign-out flow. This work claims no screen parity, browser queue implementation, purchase authorization/credit or admin permission enforcement.
+
+| Backend boundary | Invariants supported | Named integration tests | Status |
+|---|---|---|---|
+| Personal credentials and acknowledged assignment/product/price | I-01/I-02/I-04 | I-01/I-02 returns attendant identity and exact assignment/product/price with no credentials; missing assignment returns 422 without committing a session or context | verified; READY on green staging merge |
+| Immutable capturing sign-in and same-key replay | I-03/I-05a, WO-spec-3a lower bound | I-03 concurrent credential-validated replay creates one immutable anchor/context; expired retry tombstone cannot renew the anchor; I-03 session reads after the exact 24-hour boundary preserve the expired offline anchor | implemented; server boundary only |
+| Reassignment and fresh sign-in | I-05/I-05a | I-05/I-05a retains acknowledged assignment and context until fresh sign-in; price refresh changes future price only, leaving the capture context and sign-in anchor intact | implemented; historical sale validation remains WO-core-4 |
+| Session revocation and account isolation | I-06/I-09 | I-06/I-09 logout revokes immediately, preserves context and refuses replay; I-09 checks live enabled status and auth version on each request; I-09 refuses disabled, unknown, wrong-password and admin users identically | implemented; no admin permission coverage |
+| HTTP and throttling | I-01/I-09 | HTTP enforces origin, strict input, secure host-only cookie, no-store and generic errors; rate limits are durable and concurrent token consumption is atomic | verified; READY on green staging merge |
+
+Behavior inputs A01/A26/A12/A13 were inspected. A26's admin-unlock lockout text differs from the normative M1 temporary throttling contract; the backend follows M1. No new board-parity status is claimed.
 
 ## WO-core-2 foundation coverage (WHR-3)
 

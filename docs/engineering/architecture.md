@@ -104,10 +104,10 @@ The entity list is in the TRD ("Data model and integrity"). Non-obvious choices:
 - `audit_event` is append-only: the app's database role has no UPDATE or DELETE on it.
 - Settings and prices are versioned tables (`*_version`) with `effective_from` from server time; reads take the version in force at the relevant moment.
 
-## Two decisions the first work orders must settle
+## Foundational implementation decisions
 
 - **Offline shell (T-12).** Attendant routes are static client shells: no server-rendered personal data. Each page reads the session endpoint and Dexie on the client, so the service worker can precache the shell and launch it with no signal. Serwist or a custom Workbox build is picked in WO-app-2's plan.
-- **One auth model for two kinds of user (T-13, proposed).** One Better Auth `user` table with `kind` (`attendant` | `admin`); attendants sign in by username only; admins have username and a verified email; profile, role and assignment data live in separate tables. Admin-assisted queue recovery on an attendant's phone uses a separate short-lived, single-purpose recovery grant, never a full admin session on the phone. WO-core-3's high-tier plan confirms or replaces this before code.
+- **One auth model for two kinds of user (T-14, confirming T-13).** One Better Auth `user` table with `kind` (`attendant` | `admin`); attendants sign in by username only; admins have username and a verified email; profile, role and assignment data live in separate tables. Admin-assisted queue recovery on an attendant's phone uses a separate short-lived, single-purpose recovery grant, never a full admin session on the phone. WO-core-3's committed high-tier plan confirms this model; the authentication PR supplies its adapter and tests.
 
 ## Environments
 
