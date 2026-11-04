@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+import { v7 as uuidv7 } from "uuid";
+import type { OutboxRow } from "../../../src/client/types";
 import { installAttendantFake } from "../../fixtures/attendant-http-fake";
 import { fillSale, save, signIn } from "../../fixtures/offline-browser";
 
@@ -68,6 +70,67 @@ for (const width of [390, 360]) {
         await expect(
           page.getByText("Photo upload failed", { exact: true }),
         ).toBeVisible();
+        await page.evaluate(async (operationId) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const open = indexedDB.open("whales-capture-v1");
+            open.onsuccess = () => resolve(open.result);
+            open.onerror = () => reject(open.error);
+          });
+          await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction("outbox", "readwrite");
+            const store = tx.objectStore("outbox");
+            const request = store.getAll();
+            request.onsuccess = () => {
+              const first = request.result[0] as OutboxRow;
+              first.nextAttemptAt = new Date(
+                Date.now() + 3600000,
+              ).toISOString();
+              first.localSavedAt = "2026-11-04T09:42:00.000Z";
+              store.put(first);
+              const second = structuredClone(first);
+              second.operationId = operationId;
+              second.original = {
+                ...second.original,
+                operationId,
+                cardCode: "B7K3M9Q",
+                medium: "keg",
+                entry: {
+                  basis: "amount",
+                  enteredAmountKobo: "1000000",
+                  amountKobo: "1000000",
+                  quantity: "10",
+                },
+              };
+              second.customerCache = {
+                cardCode: "B7K3M9Q",
+                customer: {
+                  id: operationId,
+                  name: "Tunde Adebayo",
+                  category: "keg_buyer",
+                },
+                lookedUpAt: first.localSavedAt,
+              };
+              second.localSavedAt = "2026-11-04T09:45:00.000Z";
+              second.state = "saved";
+              second.serverStatus = null;
+              second.purchaseId = null;
+              second.serverVersion = null;
+              second.lastErrorCode = null;
+              second.uploadId = null;
+              second.uploadOperationId = null;
+              second.finalizeRequest = null;
+              second.syncLease = null;
+              store.put(second);
+            };
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+          db.close();
+        }, uuidv7());
+        await page.reload();
+        await expect(
+          page.getByText("2 sales waiting", { exact: true }),
+        ).toBeVisible();
         await capture(page, "A08-PendingUploads", width);
       } else {
         await expect(
@@ -76,6 +139,16 @@ for (const width of [390, 360]) {
             exact: true,
           }),
         ).toBeVisible({ timeout: 20000 });
+        if (state === "held") {
+          const operationId = page.url().split("/").at(-2)!;
+          await page.goto(`/attendant/uploads/${operationId}`);
+          await expect(
+            page.getByRole("heading", {
+              name: "Awaiting price review",
+              exact: true,
+            }),
+          ).toBeVisible();
+        }
         await capture(
           page,
           state === "held"

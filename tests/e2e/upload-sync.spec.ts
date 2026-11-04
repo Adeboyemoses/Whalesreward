@@ -261,7 +261,7 @@ test("I-06 leaving pending locks uploads and hides the original account from the
     fake.sync.calls.filter(
       (c) =>
         c.accountId === ids.favour &&
-        JSON.stringify(c.body).includes(String(original.operationId)),
+        (JSON.stringify(c.body) ?? "").includes(String(original.operationId)),
     ),
   ).toHaveLength(0);
   expect((await rows(page))[0]!.original).toEqual(original.original);
