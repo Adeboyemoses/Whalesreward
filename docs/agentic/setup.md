@@ -40,8 +40,20 @@ git commit -m "chore: Codex operating model and engineering guidelines"
    codex mcp login linear
    ```
 4. Check that subagents load: ask Codex "List the custom agents you can spawn". You should see the eight agents in `.codex/agents/`. If the VS Code extension doesn't offer them, run sessions from the Codex CLI or app in this folder, or use the fallback in AGENTS.md (one thread per role).
-5. Codex's sandbox may treat `.git` as read-only and ask before `git commit` or `git worktree add`. When it asks, approve that command for the session ("don't ask again") rather than switching to full access.
-6. Check product-docs access: ask Codex "Open product-docs/04 UI Design/Hi-Fi/Attendant/A02-Sale.png and describe it". If the sandbox refuses the read, approve it when prompted and tell Rook so the setup notes can be corrected.
+5. **Auto mode is the project default:** `.codex/config.toml` keeps `workspace-write`, enables network access and uses `approval_policy = "never"`. Existing pnpm, Playwright and shared development cache directories are writable. `.codex/rules/default.rules` allows only the listed git, `gh pr`, `gh run`, `gh auth status` and `docker compose` prefixes outside the sandbox without command approval prompts. The guard hook still checks allowed commands; review evidence and branch protection still apply. Anything refused by the sandbox, rules or guard fails visibly instead of asking for approval. **T2 actions stay yours, run in your own terminal.** The rules forbid `gh api`, `gh repo`, `gh secret`, `gh ruleset`, `doctl` and `terraform` in Codex.
+6. After this configuration merges, **pull staging in the main checkout and restart each terminal (`codex resume --last`)**. Project rules load at startup only for a trusted project. Initial project/hook trust and connector login remain setup steps; managed policies or launch overrides can take precedence over project defaults. This setting does not change an already running session.
+7. Check product-docs access: ask Codex "Open product-docs/04 UI Design/Hi-Fi/Attendant/A02-Sale.png and describe it". A denied read fails visibly; report it to Earl rather than disabling the sandbox.
+
+The rule syntax and startup behavior follow the [official Codex rules documentation](https://learn.chatgpt.com/docs/agent-configuration/rules). To verify the loaded file without executing the sample commands:
+
+```bash
+codex execpolicy check --pretty --rules .codex/rules/default.rules -- git commit -m test
+codex execpolicy check --pretty --rules .codex/rules/default.rules -- gh api x
+codex execpolicy check --pretty --rules .codex/rules/default.rules -- docker compose up
+bash .codex/hooks/test-guard.sh
+```
+
+Expected decisions are `allow`, `forbidden`, and `allow`, respectively. Policy checks evaluate command matching; they do not prove a command ran or that a hook is trusted in a restarted terminal.
 
 ## 4. Local services
 
