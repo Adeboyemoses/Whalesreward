@@ -10,9 +10,9 @@ Every entity has `id UUID PRIMARY KEY` generated as UUIDv7 and immutable `create
 
 Enums below are closed sets, implemented as PostgreSQL enums or CHECK constraints. Text identifiers and reasons must be nonempty; UI/input length limits belong to contracts. Cross-row rules require named transaction/service checks or deferred constraint triggers, not a misleading row CHECK. WO-core-2 supplies concurrency tests for those checks. Immutable fields are protected by restricted repository writes plus database update guards; audit/snapshot append-only permissions are enforced in SQL. App roles cannot bypass those guards.
 
-## Identity and authorization (T-13 provisional)
+## Identity and authorization (T-14 confirms T-13)
 
-These are logical auth fields, not a promise of exact Better Auth adapter column names. WO-core-3 must confirm adapter mappings, session-secret storage and credential handling before implementation; it may replace T-13 through the decision protocol. No migration should invent an email for an attendant or mark email verified without recipient proof.
+These are logical auth fields, not a promise of exact Better Auth adapter column names. WO-core-3 confirms the single-user model in T-14 and supplies a narrowly scoped Better Auth adapter over these tables. No migration should invent an email for an attendant or mark email verified without recipient proof. `Session.account.id` maps to `attendant.id`; auth-user IDs remain server-side, while capture contexts and the phone's account partition use the stable attendant identity.
 
 | Table | Columns beyond common id/created_at | Constraints and mutation rules |
 |---|---|---|

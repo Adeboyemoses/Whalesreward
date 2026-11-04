@@ -43,7 +43,7 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 | T-10 | Halfway rounding in quantity mode is half-up until D02 closes; kept in one constant | 2026-11-04 (proposed in TRD) |
 | T-11 | Routes follow `Hi-Fi/screens.json` route suggestions; attendant routes under `/attendant` (service-worker scope), admin under `/admin` | 2026-11-04 |
 | T-12 | Attendant pages are static client shells reading Dexie and the session endpoint; no server-rendered personal data | 2026-11-04 |
-| T-13 | Proposed: one Better Auth user table with `kind`, separate profile tables, short-lived recovery grant for queue recovery; WO-core-3 confirms | 2026-11-04 (proposed) |
+| T-14 | Confirm T-13: one Better Auth user with `kind`, separate profiles and revocable database sessions behind attendant wrappers; recovery grants remain separate and deferred. Supersedes T-13 proposal | 2026-11-05 (WO-core-3 plan) |
 
 ## Open product decisions that touch code
 

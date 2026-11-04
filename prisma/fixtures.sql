@@ -1,4 +1,4 @@
--- Fictional local/CI board fixtures only. No login credentials are provisioned.
+-- Fictional local/CI board fixtures only. Credential provisioning is separate in seed-auth.mjs.
 INSERT INTO role (id,name,is_owner,enabled,version) VALUES ('019a5000-0000-7000-8000-000000000001','Owner',true,true,1) ON CONFLICT DO NOTHING;
 INSERT INTO auth_user (id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES ('019a5000-0000-7000-8000-000000000002','admin','ada.williams','ada.williams','Ada Williams',true,1,true,'2026-11-04T10:00:00Z') ON CONFLICT DO NOTHING;
 INSERT INTO auth_user (id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES ('019a5000-0000-7000-8000-000000000003','attendant','grace.okon','grace.okon','Grace Okon',true,1,true,'2026-11-04T10:00:00Z') ON CONFLICT DO NOTHING;
