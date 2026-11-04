@@ -1,10 +1,10 @@
 # STATUS.md
 Updated: 2026-11-04
 
-## Milestone: M0 Foundation (docs/engineering/roadmap.md); target: end of week 1 after kickoff
+## Milestone: M0 foundation delivery; M4 specification handoff (docs/engineering/roadmap.md)
 
 ## Done this week
-- WO-spec-3a (WHR-52): ACCEPTED by Earl on 4 November 2026. Amendment PR #23 merged at 6663001 with three independent PASS verdicts and green CI. Documentation closeout takes effect on its green staging merge; then WHR-52 moves to Done. P-18/P-19 remain the build rules, with Q-528 client confirmation pending.
+- WO-spec-3a (WHR-52): ACCEPTED by Earl on 4 November 2026. Amendment PR #23 merged at 6663001 with three independent PASS verdicts and green CI. Accepted closeout PR #26 merged at b3debf0 with all five CI checks green; WHR-52 is Done. P-18/P-19 remain the build rules, with Q-528 client confirmation pending.
 - WO-spec-3 (WHR-46): accepted by Earl; M3 contracts merged in PR #16. Closeout PR #21 records acceptance; Done after its green staging merge.
 - WO-spec-2 (WHR-40): M2 contracts and model additions; closeout effective when the spec/wo-2-m2-contracts PR merges into staging with green CI. Includes 53 endpoints, all 28 permissions and independent code/security/integrity review. Earl authorized publication and closure on 4 November; final PR and verdicts are linked from WHR-40. No M2 code or screen parity claimed.
 - WO-spec-1 (WHR-32): data model (#4, 7d92cb6) and M1 contracts (#5, 76ddc6a) merged with independent security/integrity PASS and all five checks green; PR #1 completes lane setup and closeout on merge. Priority child WHR-37 merged in #6. Earl instructed closure after these merges.
@@ -22,13 +22,14 @@ Updated: 2026-11-04
 - WO-core-15 (WHR-28): source deployment preparation merged in PR #22; READY for Earl to provision after final records merge. Includes App Platform spec, pinned multi-stage Dockerfile, TLS-safe migration/seed jobs, health endpoint, staging banner/noindex/gallery isolation and no-op email. Independent code/security/integrity PASS; EM unit 27, integration 49, typecheck/lint/build, amd64 Docker and actual image runtime checks passed. All five required CI checks passed, including full browser tests. No doctl or cloud actions run. Runbook: docs/ops/staging.md; cloud validation and deployed URL/redeploy proof remain pending Earl.
 
 ## In progress
-- WO-spec-4 (WHR-51): assigned by Earl for M4 contracts; starts after the accepted WHR-52 closeout.
+- WO-spec-4 (WHR-51): 26 M4 endpoint contracts, model additions and documentation coverage prepared; READY takes effect on reviewed green staging merge. PR, three independent verdicts and EM verification linked from WHR-51. Stop for Earl’s acceptance; no product implementation or screen parity claimed.
 
 - Earl's one-time setup (docs/agentic/setup.md).
 
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- M4 policy gates: WHR-54 (reconciliation/complete-upload proof), WHR-55 (launch/start and timing changes), WHR-56 (stored photos/retention removal). Client dates/grace/duration stay unset; no finalization without approved policy, no automatic deletion. These do not prevent the specification handoff.
 - M3 policy gates: WHR-39 (other card retirement); WHR-38 build default approved in P-18, client Q-528 pending, WHR-47–50 (correction evidence, final manager recovery, OTP/device recovery policy, independent meter reconciliation). Specs preserve data and deny unsupported acceptance/mutations pending policy.
 - M2 policy tracking: WHR-42 (D06 token/delivery configuration), WHR-43 (proposed role preset activation). Defaults preserve reference values while production policy remains explicitly configured; no new provider or cloud resource is authorized.
 - Client kickoff and contract: not yet confirmed.
@@ -36,7 +37,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in remains approved for a separate core session; WO-spec-4 (WHR-51) is assigned for this spec session after WHR-52 closure.
+- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in remains approved for a separate core session; WO-spec-4 (WHR-51) stops at READY after its reviewed green staging merge; Earl reads the contracts next.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
