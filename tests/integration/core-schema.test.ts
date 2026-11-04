@@ -174,6 +174,87 @@ describe("schema integrity guards", () => {
       ).rejects.toMatchObject({ code: "23514" });
     });
   });
+  // These values stay inside BIGINT while their ratios straddle a half by one kobo.
+  // PostgreSQL numeric division can round the below-half ratio to the tie before round().
+  for (const [precision, below, tie, above, lower, upper] of [
+    [
+      0,
+      "8999999999999999999",
+      "9000000000000000000",
+      "9000000000000000001",
+      "1",
+      "2",
+    ],
+    [
+      6,
+      "8999999999999",
+      "9000000000000",
+      "9000000000001",
+      "0.000001",
+      "0.000002",
+    ],
+  ] as const) {
+    for (const table of ["purchase", "purchase_revision"] as const) {
+      for (const [label, amount, expected, wrong] of [
+        ["below", below, lower, upper],
+        ["tie", tie, upper, lower],
+        ["above", above, upper, lower],
+      ] as const) {
+        for (const accept of [true, false]) {
+          it(`I-29 ${table} uses exact half-up at precision ${precision} ${label} BIGINT boundary (${accept ? "accept correct" : "reject wrong"})`, async () => {
+            await rollbackCase(async (db) => {
+              const priceId = newId();
+              const rate = "6000000000000000000";
+              await db.query(
+                `INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,2,$4,'NGN',$5,'2026-11-04T10:00:00Z',$6,'fictional boundary test')`,
+                [priceId, id(8), id(9), rate, precision, id(5)],
+              );
+              const quantity = accept ? expected : wrong;
+              let statement;
+              if (table === "purchase") {
+                statement = purchaseSql(newId(), newId(), {
+                  price_version_id: priceId,
+                  entered_amount_kobo: amount,
+                  amount_kobo: amount,
+                  quantity,
+                  rate_kobo: rate,
+                  quantity_precision: precision,
+                });
+              } else {
+                const purchaseId = newId();
+                await db.query(purchaseSql(purchaseId));
+                statement = {
+                  text: `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,kind,state,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,rate_kobo,price_version_id,medium) VALUES($1,$2,1,$3,$4,'fictional-boundary','original','proposed','2026-11-04T10:00:01Z',$5,$6,'NGN','litre',$7,'amount',$5,$8,$9,'vehicle')`,
+                  values: [
+                    newId(),
+                    purchaseId,
+                    newId(),
+                    id(3),
+                    amount,
+                    quantity,
+                    precision,
+                    rate,
+                    priceId,
+                  ],
+                };
+              }
+              if (accept) {
+                expect((await db.query(statement)).rowCount).toBe(1);
+              } else {
+                await expect(db.query(statement)).rejects.toMatchObject({
+                  code: "23514",
+                  constraint:
+                    table === "purchase"
+                      ? "ck_purchase_entry_basis"
+                      : "ck_purchase_revision_entry_basis",
+                });
+              }
+            });
+          });
+        }
+      }
+    }
+  }
   it("I-29 rejects a captured configuration that differs from its price version", async () => {
     await rollbackCase(async (db) => {
       await expect(
