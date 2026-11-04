@@ -243,5 +243,7 @@ body {
   .wr-root a.wr-btn-link {
     display: inline-flex;
     align-items: center;
+    min-width: var(--control-h);
+    justify-content: center;
   }
 }
