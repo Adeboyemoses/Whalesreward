@@ -97,6 +97,8 @@ export async function waitForWorker(page: Page) {
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
+  if (!(await page.evaluate(() => navigator.serviceWorker.controller !== null)))
+    await page.reload();
   await expect
     .poll(() =>
       page.evaluate(() => navigator.serviceWorker.controller !== null),

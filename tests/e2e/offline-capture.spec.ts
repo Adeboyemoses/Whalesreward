@@ -1,4 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { chromium, expect, test } from "@playwright/test";
 import {
   signIn,
   fillSale,
@@ -339,4 +342,61 @@ test("I-27 lookup service failure is not customer-not-found and never enables on
     page.getByRole("button", { name: "Save sale", exact: true }),
   ).toBeDisabled();
   expect(await rows(page)).toEqual([]);
+});
+
+test("I-06 another tab cannot retain the old account view after handover", async ({
+  page,
+  context,
+}) => {
+  await installAttendantFake(context);
+  await signIn(page);
+  await fillSale(page);
+  const other = await context.newPage();
+  await other.goto("/attendant/account/hand-over");
+  await other.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signIn(other, "favour.james");
+  await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
+  expect(await rows(other)).toEqual([]);
+});
+
+test("I-23 a full browser restart retains offline receipt and photo without network", async ({
+  baseURL,
+}) => {
+  const profile = await mkdtemp(path.join(tmpdir(), "whales-offline-test-"));
+  const options = {
+    baseURL,
+    headless: true,
+    viewport: { width: 390, height: 844 },
+    permissions: ["camera"],
+    args: [
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream",
+    ],
+  };
+  let persistent = await chromium.launchPersistentContext(profile, options);
+  try {
+    const fake = await installAttendantFake(persistent);
+    const page = await persistent.newPage();
+    await signIn(page);
+    await waitForWorker(page);
+    fake.setOffline(true);
+    await persistent.setOffline(true);
+    await fillSale(page, { code: "B7K3M9Q" });
+    await save(page);
+    const original = await rows(page);
+    const url = page.url();
+    await persistent.close();
+    persistent = await chromium.launchPersistentContext(profile, options);
+    await persistent.setOffline(true);
+    const reopened = await persistent.newPage();
+    await reopened.goto(url);
+    await expect(
+      reopened.getByRole("heading", { name: "Saved on phone", exact: true }),
+    ).toBeVisible();
+    expect(await rows(reopened)).toEqual(original);
+  } finally {
+    await persistent.close();
+    await rm(profile, { recursive: true, force: true });
+  }
 });

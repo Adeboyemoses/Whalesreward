@@ -1,5 +1,8 @@
 import { expect, type BrowserContext, type Route } from "@playwright/test";
 
+import { v7 as uuidv7 } from "uuid";
+import type { Session } from "../../src/client/types";
+
 // Test transport only. Production always calls the real M1 HTTP adapter.
 export const ids = {
   grace: "019a5000-0000-7000-8000-000000000001",
@@ -18,7 +21,10 @@ export const ids = {
   context: "019a5000-0000-7000-8000-000000000014",
 };
 
-export function sessionFixture(username = "grace.okon", now = Date.now()) {
+export function sessionFixture(
+  username = "grace.okon",
+  now = Date.now(),
+): Session {
   const gas = username === "favour.james";
   const time = new Date(now).toISOString();
   return {
@@ -53,7 +59,7 @@ export function sessionFixture(username = "grace.okon", now = Date.now()) {
       effectiveFrom: "2026-01-01T00:00:00.000Z",
       fetchedAt: time,
     },
-    captureContextId: ids.context,
+    captureContextId: uuidv7(),
     lastOnlineSignInAt: time,
     offlineExpiresAt: new Date(now + 86_400_000).toISOString(),
     sessionExpiresAt: new Date(now + 86_400_000).toISOString(),
