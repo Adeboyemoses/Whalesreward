@@ -266,7 +266,8 @@ test("compact controls and admin navigation keep phone touch targets", async ({
   const sidebarLink = page
     .locator('[data-component="Sidebar"] .wr-navlist a')
     .first();
-  for (const control of [small, link, sidebarLink]) {
+  const tableLinks = await page.locator(".wr-table a.wr-btn-link").all();
+  for (const control of [small, link, sidebarLink, ...tableLinks]) {
     expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(48);
   }
 });

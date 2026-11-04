@@ -238,3 +238,10 @@ body {
     min-height: var(--control-h);
   }
 }
+
+@media (max-width: 900px) {
+  .wr-root a.wr-btn-link {
+    display: inline-flex;
+    align-items: center;
+  }
+}
