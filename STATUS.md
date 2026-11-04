@@ -10,6 +10,7 @@ Updated: 2026-11-04
 
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
+- WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; docs-only, awaiting review and staging merge.
 
 ## Blocked / decisions needed
 - Client kickoff and contract: not yet confirmed.
