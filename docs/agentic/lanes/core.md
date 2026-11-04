@@ -18,6 +18,6 @@ WO-core-2 (WHR-3) Core schema and exact helpers: READY since 2026-11-04
 - PR #10 dispatch flag: 10 > 8; one SQL rounding blocker fixed and verified in round 2; no open findings.
 - Schema guards and helpers do not implement feature services, auth wiring, endpoints or UI. Open policies remain unresolved; see prisma/README.md.
 - Runtime DB role must be restricted separately from the migration owner; cloud setup remains unprovisioned.
-- Model below is WHR-3's Session model (reasoning high).
+- Requested Session model: gpt-6-astra, reasoning high. Runtime model ID is not exposed by this surface; updated work-order rules require actual runtime identity in the metric.
 
-dispatches=11 prs=2 rounds_max=2 escalations=0 model=gpt-6-astra
+dispatches=12 prs=2 rounds_max=2 escalations=0 model=unavailable
