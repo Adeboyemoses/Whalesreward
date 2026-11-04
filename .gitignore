@@ -26,3 +26,6 @@ next-env.d.ts
 *.log
 .vscode/*
 !.vscode/extensions.json
+
+# Generated from the current production build; never commit stale precache manifests.
+/public/attendant/sw.js
