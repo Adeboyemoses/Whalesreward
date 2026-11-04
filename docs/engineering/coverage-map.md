@@ -131,17 +131,3 @@ WO-app-1 wrap FIX (WHR-2): four actual-viewport line-box regressions cover AppHe
 ## WO-core-1b review-gate maintenance (WHR-41)
 
 No product invariant or board row changed. `scripts/review/test-review.sh` covers an unrelated staging merge passing, a merge changing a PR file failing, and a later PR commit failing. Ancestor and unchanged-plan protections remain required. Gate maintenance is accepted by Earl on 4 November 2026 ("Accepted. lets close this session"), implemented on staging in PR #17 (746ede4), with independent code/security/integrity PASS and all five required CI checks green. EM Bash 3.2 review self-test: 39 passed, 0 failed; guard: 94 passed, 0 failed. WHR-44 is accepted by Earl; its guard self-tests remain operational coverage, not product coverage.
-
-## WO-core-15 deployment preparation (WHR-28)
-
-This work prepares source configuration for Earl to provision temporary Cloudrock staging. It does not establish a running cloud environment or complete I-48 photo-storage implementation. The private-bucket instructions and runtime-only staging credentials support I-48; its invariant row stays todo until authorized uploads/reads are implemented and tested. No complete hi-fi board row changes status.
-
-| Operational behavior | Named verification | Status |
-|---|---|---|
-| Runtime staging gate; production gallery stays closed with flag alone | `src/server/lib/environment.test.ts` | source verification; cloud pending |
-| Health success and generic credential-free failure | `src/server/modules/health/service.test.ts` | source verification; cloud pending |
-| Staging database certificate and hostname validation | `tests/unit/staging-entrypoint.test.ts` | source verification; cloud pending |
-| No-op email discards sensitive content without delivery/logging | `src/server/adapters/email.test.ts` | source verification; cloud pending |
-| Repeatable fictional deployment fixtures | `tests/integration/core-schema.test.ts` — fictional fixtures can be seeded twice without changing history | source verification; cloud pending |
-
-Earl executes [the provisioning runbook](../ops/staging.md) and [phone smoke steps](../qa/smoke-2026-11-04-staging.md). Provider spec validation, deployed HTTPS health/gallery, private Spaces permissions and next-merge automatic redeployment remain pending.
