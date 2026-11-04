@@ -25,7 +25,8 @@ export function Brand({ surface = "Attendant" }: { surface?: string }) {
     <span className="wr-brand">
       <Image src="/design-system/mark.svg" alt="" width={28} height={28} />
       <span className="wr-brand-name">
-        Whales Rewards<span>{surface}</span>
+        Whales Rewards
+        {surface && <span className="wr-brand-surface">{surface}</span>}
       </span>
     </span>
   );

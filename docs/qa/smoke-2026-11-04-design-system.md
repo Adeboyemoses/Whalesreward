@@ -23,3 +23,7 @@ Automated browser/fidelity report is supplied by test-engineer. Earl runs phone/
 ## Automated verification
 
 See [independent fidelity report](design-system-fidelity.md). Ten development gallery checks and four production browser checks passed, including production404. Table metadata font weight and compact phone target sizes were corrected before sign-off. These checks do not replace Earl’s real-phone/TalkBack acceptance.
+
+## WO-app-1 FIX: wordmark and loyalty footer
+
+At actual 390px and 360px gallery viewports, inspect AppHeader and AttendantShell: “Whales Rewards” stays one line; the Attendant label may hide/shrink before the wordmark wraps, and Online/Offline stays visible. Inspect LoyaltyCard: name, then “Car owner · CUST001” on one line with CUST001 mono, then “Whales Energy · Station 01” on a separate line. No overflow or clipped text. Compare A02 and A07. Independent desktop fidelity runs now; Earl’s real phone/TalkBack may wait for the staging URL (WHR-28), with no USB setup required for this fix verification. Quantity precision remains WHR-45.

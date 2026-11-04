@@ -1,5 +1,7 @@
 # WO-app-1 design-system fidelity check
 
+Update: the earlier AppHeader/gutter wrapping note and narrow LoyaltyCard footer acceptance below are superseded by [Earl’s wrap findings and recheck](design-system-wrap-fidelity.md), tested at actual 390px and 360px viewports.
+
 Checker: test-engineer, independent of the frontend builder. Build inspected: `a101f1de6c2b56794db3c07d4fccf5a39e11d917`. Scope: the 16 component previews and reusable surface shells from [the approved brief](../briefs/design-system-gallery.md); no real screen or workflow parity is claimed.
 
 **Result: PASS with documented presentation notes; no open blocking or fix differences.** The table metadata weight difference found during inspection was corrected in `cd95286` and verified with a failing-before/passing-after browser assertion. Compact phone targets, including actual table View anchors, were rechecked after `a101f1d`: both rendered dimensions are at least 48px on the phone.

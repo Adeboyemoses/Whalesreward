@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -267,7 +267,8 @@ test("compact controls and admin navigation keep phone touch targets", async ({
     .locator('[data-component="Sidebar"] .wr-navlist a')
     .first();
   const tableLinks = await page.locator(".wr-table a.wr-btn-link").all();
-  for (const link of tableLinks) expect((await link.boundingBox())?.width).toBeGreaterThanOrEqual(48);
+  for (const link of tableLinks)
+    expect((await link.boundingBox())?.width).toBeGreaterThanOrEqual(48);
   for (const control of [small, link, sidebarLink, ...tableLinks]) {
     expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(48);
   }
@@ -300,3 +301,133 @@ test("capture all component and surface examples for independent source comparis
       .screenshot({ path: path.join(output, `${name}-${width}.built.png`) });
   }
 });
+
+// Measure the actual glyph ranges, not white-space declarations or the wider capture frame.
+async function renderedText(locator: Locator, text: string) {
+  return locator.evaluate((element, phrase) => {
+    const nodes: Text[] = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    const content = nodes.map((node) => node.data).join("");
+    const start = content.indexOf(phrase);
+    if (start < 0) throw new Error(`Missing expected text: ${phrase}`);
+    let offset = 0;
+    const range = document.createRange();
+    let parent: Element | null = null;
+    for (const node of nodes) {
+      if (start >= offset && start < offset + node.length) {
+        range.setStart(node, start - offset);
+        parent = node.parentElement;
+      }
+      const end = start + phrase.length;
+      if (end > offset && end <= offset + node.length) {
+        range.setEnd(node, end - offset);
+        break;
+      }
+      offset += node.length;
+    }
+    const rects = Array.from(range.getClientRects()).filter(
+      (rect) => rect.width > 0 && rect.height > 0,
+    );
+    const box = range.getBoundingClientRect();
+    const style = getComputedStyle(parent ?? element);
+    return {
+      lines: new Set(rects.map((rect) => Math.round(rect.top))).size,
+      top: box.top,
+      bottom: box.bottom,
+      left: box.left,
+      right: box.right,
+      fontFamily: style.fontFamily,
+      fontWeight: style.fontWeight,
+    };
+  }, text);
+}
+
+for (const width of [390, 360]) {
+  test(`wordmark stays one line with visible connection at actual ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    for (const component of ["AppHeader", "AttendantShell"]) {
+      const header = page.locator(`[data-component="${component}"] .wr-header`);
+      const wordmark = await renderedText(
+        header.locator(".wr-brand"),
+        "Whales Rewards",
+      );
+      expect(wordmark.lines, `${component} wordmark must never wrap`).toBe(1);
+      expect(wordmark.fontFamily).toContain("Manrope");
+      expect(wordmark.fontWeight).toBe("800");
+      const pill = header.locator(".wr-pill").first();
+      await expect(pill).toBeVisible();
+      await expect(pill).toHaveText("Online");
+      const pillBox = await pill.boundingBox();
+      expect(wordmark.left).toBeGreaterThanOrEqual(0);
+      expect(wordmark.right).toBeLessThanOrEqual(pillBox!.x);
+      expect(pillBox!.x + pillBox!.width).toBeLessThanOrEqual(width);
+    }
+    const output = path.join(import.meta.dirname, "screenshots", "wrap-fix");
+    await mkdir(output, { recursive: true });
+    await page.addStyleTag({
+      content: "nextjs-portal { display: none !important; }",
+    });
+    for (const component of ["AppHeader", "AttendantShell"]) {
+      await page.locator(`[data-component="${component}"]`).screenshot({
+        path: path.join(output, `${component}-${width}.built.png`),
+      });
+    }
+    const example = page.locator('[data-component="AppHeader"]');
+    await example
+      .getByRole("button", { name: "Toggle connection preview" })
+      .click();
+    const offline = await example
+      .locator(".wr-header .wr-offline")
+      .boundingBox();
+    expect(offline).not.toBeNull();
+    expect(offline!.x + offline!.width).toBeLessThanOrEqual(width);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+
+  test(`loyalty footer stacks intact mono identity and station lines at actual ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const card = page.locator(
+      '[data-component="LoyaltyCard"] .wr-loyalty-card',
+    );
+    const name = await renderedText(card, "Amina Bello");
+    const identity = await renderedText(card, "Car owner · CUST001");
+    const station = await renderedText(card, "Whales Energy · Station 01");
+    const id = await renderedText(card, "CUST001");
+    expect(identity.lines, "category and customer ID must stay together").toBe(
+      1,
+    );
+    expect(station.lines, "station endorsement must stay together").toBe(1);
+    expect(identity.top).toBeGreaterThanOrEqual(name.bottom - 1);
+    expect(station.top).toBeGreaterThanOrEqual(identity.bottom - 1);
+    expect(id.fontFamily).toContain("IBM Plex Mono");
+    expect(Math.abs(identity.left - name.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(station.left - name.left)).toBeLessThanOrEqual(1);
+    const box = await card.boundingBox();
+    for (const line of [name, identity, station]) {
+      expect(line.left).toBeGreaterThanOrEqual(box!.x);
+      expect(line.right).toBeLessThanOrEqual(box!.x + box!.width);
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    const output = path.join(import.meta.dirname, "screenshots", "wrap-fix");
+    await mkdir(output, { recursive: true });
+    await page.addStyleTag({
+      content: "nextjs-portal { display: none !important; }",
+    });
+    await page.locator('[data-component="LoyaltyCard"]').screenshot({
+      path: path.join(output, `LoyaltyCard-${width}.built.png`),
+    });
+  });
+}
