@@ -4,7 +4,7 @@ import {
   cleanupOutdatedCaches,
 } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
-// Replaced at build time from generic static HTML and hashed build assets only.
+// Replaced at build time from fixed generic attendant routes and their asset manifests only.
 precacheAndRoute(self.__WB_MANIFEST, { ignoreURLParametersMatching: [] });
 cleanupOutdatedCaches();
 registerRoute(
