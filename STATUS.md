@@ -11,14 +11,14 @@ Updated: 2026-11-04
 - Linear team WhalesReward (WHR) created by Earl.
 - WO-core-1 (WHR-1) Repository scaffold merged to staging in PR #3; strict Next.js scaffold, pinned tooling, local services and all five required CI checks passed. ACCEPTED by Earl: "Accepted. Scaffold verified." No product features implemented.
 
-- WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
+- WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; ACCEPTED by Earl on 4 November; close-out is bundled with WO-core-1b. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
 
-- WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. READY; all five CI checks and three independent reviews passed. Earl performs the prescribed main-checkout reconciliation and verifies.
+- WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. ACCEPTED by Earl on 4 November; all five CI checks and three independent reviews passed. Close-out is bundled with WO-core-1b.
 
 ## In progress
 - WO-spec-3 (WHR-46): M3 contracts (38 endpoints), model additions and documentation coverage prepared; READY takes effect on the reviewed staging merge with green CI. Independent verdicts and final PR recorded on WHR-46. No product implementation or screen parity claimed.
 - Earl's one-time setup (docs/agentic/setup.md).
-- WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
+- WO-core-1b (WHR-41): resumed from the preserved checkout; reviewing the staging-merge evidence fix. READY when its PR merges with green CI; no product flow changed.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
@@ -29,7 +29,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- Await Earl’s acceptance/findings for WO-core-2 and WHR-44. WHR-4 attendant sign-in is approved for the next separate core session; WHR-46 M3 contracts is approved for lane:spec. Resume WHR-41 only when assigned.
+- Await Earl’s verification of WO-core-1b after READY. WHR-3 and WHR-44 are accepted; their issues close after this close-out merges. WHR-4 attendant sign-in remains approved for a separate core session; WHR-46 M3 contracts belongs to lane:spec.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.

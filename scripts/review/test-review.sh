@@ -159,6 +159,35 @@ sed -e "s/^reviewed_head: .*/reviewed_head: $sha/" -e "s/^rounds: 0/rounds: 2/" 
 git add .review && git commit -qm evidence
 if bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch core/WHR-21-accept >/dev/null 2>&1; then ok
 else bad "valid high evidence should pass: $(bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch core/WHR-21-accept 2>&1)"; fi
+# Updating from staging must ignore changes outside the PR's own diff.
+git branch high-plan-case
+git checkout -q staging
+echo updated-on-staging >> README.md
+git add README.md && git commit -qm unrelated-staging-change
+git checkout -q core/WHR-21-accept
+git merge -q --no-edit staging || exit 2
+out="$(bash scripts/review/validate-evidence.sh --base staging --head HEAD --branch core/WHR-21-accept 2>&1)"
+[ $? -eq 0 ] && ok || bad "unrelated staging merge should pass: $out"
+
+# A merge conflict resolved by changing a PR file still requires review.
+git checkout -q staging
+mkdir -p src/server/modules/purchases
+echo 'export const accept = 2' > src/server/modules/purchases/accept.ts
+git add src/server/modules/purchases/accept.ts && git commit -qm overlapping-staging-change
+git checkout -q core/WHR-21-accept
+if git merge -q --no-edit staging >/dev/null 2>&1; then
+  bad "overlapping add/add merge should conflict"
+else
+  git ls-files -u | grep -q 'src/server/modules/purchases/accept.ts' || exit 2
+fi
+echo 'export const accept = 3' > src/server/modules/purchases/accept.ts
+git add src/server/modules/purchases/accept.ts && git commit -qm resolve-PR-file
+out="$(bash scripts/review/validate-evidence.sh --base staging --head HEAD --branch core/WHR-21-accept 2>&1)"
+status=$?
+[ "$status" -eq 1 ] && printf '%s\n' "$out" | grep -q 'files changed after review.*src/server/modules/purchases/accept.ts' && ok || bad "merge changing a PR file should fail: $out"
+
+# Keep the plan regression independent of the changed-PR-file failure.
+git checkout -q high-plan-case
 # Edit the plan after review: fails.
 sed 's/^  risks: .*/  risks: changed later/' .review/core__WHR-21-accept.md > ev.tmp && mv ev.tmp .review/core__WHR-21-accept.md
 git add .review && git commit -qm replan
@@ -166,7 +195,7 @@ bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch co
 [ $? -eq 1 ] && ok || bad "plan edited after review should fail"
 
 # Docs-only needs no evidence.
-git checkout -q staging && git checkout -q -b docs/WHR-30-notes
+git checkout -q -b docs/WHR-30-notes base-ref
 mkdir -p docs && echo note > docs/x.md && git add docs && git commit -qm docs
 bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch docs/WHR-30-notes >/dev/null 2>&1
 [ $? -eq 0 ] && ok || bad "docs-only should pass without evidence"

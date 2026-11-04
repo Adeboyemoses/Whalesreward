@@ -41,7 +41,7 @@ tickets: [WHR-40]                     # batch issue for P2/MED/LOW
 - Every `blocking` count is `0`. High tier must include `INTEGRITY-P1-OPEN`.
 - `rounds` is within the cap, or `escalation:` records Earl's decision with a `YYYY-MM-DD` date.
 - High tier: `plan:` has `goal`, `files`, `approach`, `tests` and `risks`, and the plan block is identical at `reviewed_head` (commit it before dispatch; it can't be added after review).
-- `reviewed_head` is an ancestor of the PR head, and the commits after it touch only `.review/*.md`. Any other change after review means review again.
+- `reviewed_head` must remain an ancestor of the PR head; non-evidence paths changed between it and head require re-review only when also in the PR's own `base...head` diff, so unrelated base-branch merges are ignored while changed PR files (including conflict resolutions) still fail.
 
 ## Writing it
 
