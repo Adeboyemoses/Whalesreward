@@ -2,7 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testIgnore: ["**/.worktrees/**", "**/product-docs/**"],
+  testIgnore: [
+    `${import.meta.dirname}/.worktrees/**`,
+    `${import.meta.dirname}/product-docs/**`,
+  ],
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   use: { baseURL: "http://127.0.0.1:3000", trace: "retain-on-failure" },
