@@ -2,15 +2,15 @@
 branch: core/wo-3-attendant-auth
 linear: WHR-4
 tier: high
-reviewed_head: 93f3f87100800306273831c1cc3f6e389a15be10
-rounds: 1
+reviewed_head: f4e8e37131d99dddd5454301bac99bf7b50b28ab
+rounds: 3
 builder: backend-engineer
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 4
+dispatches: 10
 invariants: [I-01, I-02, I-03, I-04, I-05, I-05a, I-06, I-09]
 p1: []
 tickets: [WHR-57]
@@ -39,3 +39,5 @@ Engineering configuration defaults remain centralized and documented, not client
 - Full local browser command attempted; macOS sandbox blocks Chromium MachPort startup before assertions. Full browser CI, including the real login/account/logout test, is required before merge.
 - Better Auth 1.7.17 is MIT; a narrow transaction-bound adapter preserves existing identity/session tables. No public signup or admin authentication implemented.
 - A26 lockout/admin-unlock wording differs from normative M1 temporary rate limiting; M1 governs. No new board parity, cloud operation or full offline/sync acceptance claimed.
+- Rounds 2–3: all three reviewers PASS on final f4e8e37 after staging spec-doc integration and READY-record corrections. No code/schema/tests/dependencies changed from round 1. Dispatch flag recorded in lane file.
+- First PR CI run 41933451683 passed build/integration/gate tests; review-evidence also passed. Browser CI: 36 passed, 4 existing conditional skips. Final-head CI must also be green before merge.
