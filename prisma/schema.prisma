@@ -154,6 +154,7 @@ model AuthSession {
   @@index([capture_context_id])
   @@index([user_id, revoked_at, expires_at])
   @@map("auth_session")
+  back_attendant_sign_in_request AttendantSignInRequest[]
 }
 
 model VerificationChallenge {
@@ -795,4 +796,24 @@ model MaintenanceRun {
   @@unique([job, deduplication_key], map: "uq_maintenance_run_job_deduplication_key")
   @@index([status, next_attempt_at])
   @@map("maintenance_run")
+}
+
+model AttendantSignInRequest {
+  request_key String @id @db.Uuid
+  request_hmac String
+  session_id String @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  expires_at DateTime @db.Timestamptz(6)
+  tombstone_until DateTime @db.Timestamptz(6)
+  rel_session_id AuthSession @relation(fields: [session_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@index([tombstone_until], map: "attendant_sign_in_request_expiry")
+  @@map("attendant_sign_in_request")
+}
+
+model AuthRateBucket {
+  key_digest String @id
+  tokens Decimal @db.Decimal(30, 15)
+  updated_at DateTime @db.Timestamptz(6)
+  @@index([updated_at], map: "auth_rate_bucket_updated")
+  @@map("auth_rate_bucket")
 }
