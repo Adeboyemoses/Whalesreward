@@ -10,9 +10,9 @@ No real screens, business data, authentication, capture persistence or service w
 
 ## Tasks
 
-- [ ] Frontend builder: inspect every component README/preview; vendor tokens/bundle/fonts and asset provenance; integrate self-hosted font imports and Tailwind colours/spacing/radii/shadows from tokens, no default palette. Verify byte equality after CSS source header and font requests.
-- [ ] Frontend builder: typed wrappers for all 16 components in src/ui, reusable attendant/admin shells, and /dev/gallery. Match the component markup and appearance; use semantic buttons/links/labels/pressed/current/errors and real fixture image. Make preview state interactive where it demonstrates a control. No live workflows or broken production navigation.
-- [ ] Test engineer, separate worktree/thread: meaningful Playwright checks for production exclusion, label/error relationships, pressed state, disabled actions, local fonts, 360px overflow and admin responsive shell. Gallery screenshots versus each reference preview.html; report visual differences and commit report/screenshots. Use fixture-only gallery, no DB needed here.
+- [x] Frontend builder: inspect every component README/preview; vendor tokens/bundle/fonts and asset provenance; integrate self-hosted font imports and Tailwind colours/spacing/radii/shadows from tokens, no default palette. Verify byte equality after CSS source header and font requests.
+- [x] Frontend builder: typed wrappers for all 16 components in src/ui, reusable attendant/admin shells, and /dev/gallery. Match the component markup and appearance; use semantic buttons/links/labels/pressed/current/errors and real fixture image. Make preview state interactive where it demonstrates a control. No live workflows or broken production navigation.
+- [x] Test engineer, separate worktree/thread: meaningful Playwright checks for production exclusion, label/error relationships, pressed state, disabled actions, local fonts, 360px overflow and admin responsive shell. Gallery screenshots versus each reference preview.html; report visual differences and commit report/screenshots. Use fixture-only gallery, no DB needed here.
 - [ ] EM: rerun typecheck/lint/test/build and test:e2e on final head. Compare vendored files and runtime imports. Required diff-scoped code/integrity review, fixes within medium cap2, evidence validation, staging PR and merge only after green CI.
 - [ ] EM: update lane, STATUS and coverage without claiming real workflow invariants. READY with PR, smoke runbook and fidelity report; Earl accepts phone smoke.
 

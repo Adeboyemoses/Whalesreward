@@ -1,19 +1,20 @@
 # lane:app
-WO-app-0 (WHR-33): READY upon findings PR merge, 2026-11-04
+WO-app-1 (WHR-2) Design system and app shells: READY upon reviewed staging merge, 2026-11-04
 
 ## In flight
-- `app/wo-0-findings`: one docs PR addresses Earl’s three findings from PR #2.
-- App-2 stops at durable Saved on phone; app-3 verifies acceptance/credit and M1 phone exit including MinIO USB reverse.
-- Row 02 adds I-03 capture/save checks and connection state; M1 omits unavailable registration action (WO-app-6/M2).
-- Draft phone checks remain unexecuted; no implementation coverage claimed.
+- `app/wo-1-gallery`: 16 typed wrappers, unchanged vendored CSS/fonts, token-mapped Tailwind, dev-only gallery and both responsive shells.
+- Independent test-engineer: 10 gallery checks and 4 production browser checks pass; 19 captures, no blocking fidelity differences. Report: `docs/qa/design-system-fidelity.md`.
+- EM reruns final gates; code/integrity review and evidence precede staging merge.
 
 ## Next
-- Earl reviews revised row 02 and app-2/app-3 runbooks for acceptance.
+- Earl runs `docs/qa/smoke-2026-11-04-design-system.md` on the phone for acceptance.
+- Gallery: `pnpm dev`, `/dev/gallery`; production returns404. Real screens/data and service-worker caching remain later work orders.
 
 ## Earl's gos
-- 2026-11-04: Earl requested these findings fixed in one small docs PR, then READY again.
+- 2026-11-04: approved WO-app-1 in Linear; current session names lane:app, WHR-2 and gallery brief.
 
 ## Risks
-- TODO-CONTRACT reconciliation and implementation-specific fixtures/injectors remain prerequisites for executing the drafts.
+- Actual phone/TalkBack smoke remains Earl’s check; desktop emulation does not establish it.
+- Brand values remain tokens/swappable assets pending sign-off.
 
-dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
+dispatches=4 prs=1 rounds_max=1 escalations=0 model=unknown

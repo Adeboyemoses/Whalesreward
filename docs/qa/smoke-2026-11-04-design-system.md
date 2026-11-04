@@ -19,3 +19,7 @@ Enable USB debugging on the pilot Android phone, connect and authorize the compu
 ## Acceptance
 
 Automated browser/fidelity report is supplied by test-engineer. Earl runs phone/TalkBack checks and replies with findings or acceptance. Mark phone-only checks unexecuted until Earl runs them; do not infer their pass from desktop checks.
+
+## Automated verification
+
+See [independent fidelity report](design-system-fidelity.md). Ten development gallery checks and four production browser checks passed, including production404. Table metadata font weight and compact phone target sizes were corrected before sign-off. These checks do not replace Earl’s real-phone/TalkBack acceptance.
