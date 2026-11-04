@@ -1,23 +1,21 @@
 # lane:core
-WO-core-3 (WHR-4) Attendant authentication and sessions: READY on reviewed green staging merge, 2026-11-05
+WO-core-1d (WHR-53) contract/data-model review routing: READY on reviewed green staging merge, 2026-11-05
 
 ## In flight
-- [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30): Better Auth username sign-in, revocable database sessions, immutable capture contexts, credential-revalidated retries, persistent rate limits, secure cookies and safe fictional seeding. READY takes effect after all five CI checks pass and staging merge completes; final verdicts and commands are in .review/core__wo-3-attendant-auth.md and WHR-4.
-- EM independently passed typecheck/lint/unit 77/build, fresh-database migrations/integration 65, time 3 per timezone and real HTTP Playwright 1. Local Chromium MachPort startup is sandbox-blocked; full browser CI is required before merge.
-- T-14 confirms T-13's single auth-user model; Session.account.id is the attendant profile ID. WO-spec-3a's capturing sign-in lower bound stays immutable.
-- WO-core-15 (WHR-28) remains READY from PR #22. Earl's provisioning and deployed staging checks are still pending; no cloud operations or staging data changes ran here.
+- WHR-53 adds high-tier enforcement for docs/engineering/contracts/* and data-model.md; unrelated routing stays unchanged. Named review self-tests cover both paths and ordinary engineering docs. Independent code/security/integrity review and green CI required; final merged PR and EM self-test counts are linked on WHR-53.
+- WHR-28 FIX is READY: [PR #32](https://github.com/Adeboyemoses/Whalesreward/pull/32) merged at 1e69ff9 with all five CI checks green. Managed pg/bucket alignment, ~$32 estimate, CORS, live-secret warning, ingress trust and Earl-only credential steps documented. EM unit80/typecheck/lint/build PASS; three regressions fail on old config and pass fixed. Independent reviews PASS.
+- WHR-4 ACCEPTED and Done: authentication PR #30; accepted closeout #32 merged green. Existing backend verification remains on WHR-4 and coverage map.
 
 ## Next
-- STOP at READY. Earl reads backend verification on WHR-4 and can run docs/qa/smoke-2026-11-05-attendant-auth.md. WO-app-2's phone smoke is now unblocked by the authentication merge; upload/credit remain later work.
-- WHR-57 tracks the nonblocking P2 rate-bucket storage growth found in security review. No additional scope started.
+- STOP at READY; no further work order authorized.
+- Earl runs console/credential and phone banner steps in docs/ops/staging.md. WHR-58 requires provider assurance that do-connecting-ip overwrites client input before enabling trust; setting remains empty until then.
 
 ## Earl's gos
-- 2026-11-05: “WO-core-15 (WHR-28) stays READY until Earl reports the staging checks.”
-- 2026-11-05: “Work order: WO-core-3 (WHR-4), attendant authentication and sessions, against docs/engineering/contracts/m1.md including the WO-spec-3a amendment. Take it to READY, then stop.”
+- 2026-11-05: “Earl accepted WO-core-3 (WHR-4); close it.”
+- 2026-11-05: “Take it to READY. Then WO-core-1d (WHR-53) to READY. Then stop. No cloud operations.”
 
 ## Risks
-- Client D06 policy remains open; runtime defaults are centralized. No admin auth, recovery, sync/credit or real-phone acceptance claimed.
-- A26 admin-unlock lockout wording conflicts with M1 temporary throttling; M1 governs. Staging fixture credentials require a separately supplied secret; no public default is installed.
-- Runtime model ID unavailable. Review rounds 2–3 cover staging documentation integration and READY records; authentication implementation unchanged from round 1. Dispatch flag: PR #30 exceeds 8 calls because all three reviewers rechecked these final documentation updates.
+- No cloud or staging data operations performed. Header assurance pending WHR-58; shared unknown-IP bucket remains. No phone acceptance or complete photo-storage invariant claimed.
+- Runtime model ID unavailable. Metrics cover both authorized fixes; four dispatches per PR.
 
-dispatches=10 prs=1 rounds_max=3 escalations=0 model=unavailable
+dispatches=8 prs=2 rounds_max=1 escalations=0 model=unavailable

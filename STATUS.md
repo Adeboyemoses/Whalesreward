@@ -27,7 +27,7 @@ Updated: 2026-11-05
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
 
-- WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
+- WO-app-0 (WHR-33): ACCEPTED by Earl on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Six briefs and three draft phone runbooks merged in PRs #2 and #9; documentation closeout takes effect on green staging merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
 - WO-core-15 / WHR-28 stays READY until Earl reports staging checks. Authentication work did not provision cloud resources or change staging data.
@@ -52,3 +52,7 @@ WO-app-0 findings (2026-11-04): draft runbooks split by capture/local-save versu
 WO-app-1 (WHR-2): ACCEPTED by Earl on 4 November 2026: “Earl accepted WO-app-1 (WHR-2); close it.” Foundation PR #12 and wrap fixes PR #20 are merged into staging. Independent component and viewport checks are recorded in docs/qa/design-system-fidelity.md and design-system-wrap-fidelity.md. Closeout is documentation only. WHR-45 remains separately tracked.
 
 WO-app-2 (WHR-5): READY on reviewed green staging merge of app/wo-2-offline. Typed M1 adapter, static attendant screens, live photo/QR capture, account-partitioned Dexie queue, conservative 24-hour access and generic-only Workbox shell cache. EM checks: typecheck/lint/build, 74 unit tests, 32 Playwright checks and both timezone runs pass. Independent fidelity covers eleven boards at 390/360 px; report docs/qa/offline-capture-fidelity.md. Phone runbook docs/qa/smoke-2026-11-04-offline-capture.md was written first. STOP at READY: Earl’s phone smoke waits until WO-core-3 merges; upload/credit are later work. No real backend or device acceptance is claimed.
+
+Core session, 5 November 2026: Earl accepted WO-core-3 (WHR-4); PR #30 is merged with green CI. Accepted closeout is bundled with the WHR-28 FIX and takes effect when that PR merges. WHR-28 aligns source/runbook with the managed `pg` cluster, `whr-staging-evidences`, estimated $32/month, console-safe updates, trusted ingress and Earl's T2 staging credential step. Rook reported HTTPS and automatic redeployment verified; the phone banner and console steps remain Earl-run. WHR-53 follows this FIX under Earl's explicit sequence. No cloud operations authorized or performed. This supersedes earlier core next-up and cloud-pending notes.
+
+Core final handoff, 5 November 2026: WHR-4 is ACCEPTED/Done following green closeout PR #32 (1e69ff9). WHR-28 source/runbook FIX is READY through #32; WHR-58 records pending ingress overwrite assurance and the trusted header remains empty until confirmed. WHR-53 makes contracts and data-model documentation high tier while preserving unrelated routes; READY takes effect on its reviewed green staging merge, with merged PR and self-test counts posted on WHR-53. Both fixes receive independent code/security/integrity review. Stop after WHR-53; no next core work order. No cloud operations. This supersedes earlier core handoff notes.

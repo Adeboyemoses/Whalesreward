@@ -82,7 +82,9 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-51 | Retention deletion runs only under an approved policy, skips pending evidence and active h… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-52 | Scheduled jobs are idempotent, bounded, leased and restartable | WO-spec-4 (spec only) | Not implemented | todo |
 
-## WO-app-0 documentation preparation (WHR-33)
+## WO-app-0 accepted documentation (WHR-33)
+
+Earl accepted WO-app-0 on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Briefs and runbooks merged in PRs #2 and #9; closeout takes effect on green staging merge. Acceptance covers documentation only.
 
 Earl’s 4 November findings: app-2/app-3 runbooks now split at local durable save versus server confirmation; row 02 includes I-03 capture/save guards and omits unavailable M2 registration navigation. These remain unexecuted drafts; coverage statuses below are unchanged.
 
@@ -179,3 +181,15 @@ This work prepares source configuration for Earl to provision temporary Cloudroc
 Earl executes [the provisioning runbook](../ops/staging.md) and [phone smoke steps](../qa/smoke-2026-11-04-staging.md). Provider spec validation, deployed HTTPS health/gallery, private Spaces permissions and next-merge automatic redeployment remain pending.
 
 Local verification: unit 27, integration 49, typecheck/lint/build and actual amd64 image checks passed. Migration and repeated seed succeeded; both clients rejected wrong hostname and untrusted CA. Staging HTTP health/gallery/banner/noindex and production gallery isolation passed. PR #22 is merged with all five required CI checks green, including full browser tests; local Chromium startup is sandbox-blocked. No cloud coverage is claimed.
+
+## WO-core-3 accepted closeout (WHR-4), 5 November 2026
+
+Earl accepted WO-core-3 in this session. PR #30 merged at 944b234 with all five CI checks green and independent code/security/integrity PASS. Backend verification recorded on WHR-4: unit 77, integration 65, time 3 per timezone, actual HTTP Playwright 1; full browser CI 36 passed with 4 conditional skips. Acceptance covers the server authentication slice described above; outstanding client and sync rows retain their existing scope. Closeout takes effect on this documentation merge. WHR-57 remains separate.
+
+## WO-core-15 console-alignment FIX (WHR-28), 5 November 2026
+
+The FIX aligns the managed `pg` cluster and private bucket with Rook's console report, and documents trusted ingress configuration and Earl-only credential provisioning. `tests/unit/staging-spec.test.ts` has three regression cases for console alignment, disabled trust/empty secrets, and CORS/live-update safety. Rook reported deployed health/noindex and automatic redeployment verified on 5 November; Earl's phone banner check and console configuration/data steps remain pending. No cloud operations were run in this session and I-48 remains incomplete. READY takes effect on reviewed green staging merge.
+
+## WO-core-1d review-routing enforcement (WHR-53)
+
+`bash scripts/review/test-review.sh` verifies contract and data-model files route high and unrelated engineering documentation preserves its prior tier. `bash .codex/hooks/test-guard.sh` guards the existing command protections. Operational status: READY on reviewed green staging merge; final self-test counts and merged PR are recorded on WHR-53. No product invariant or board status changes: this work closes the documentation review-routing gap raised in Rook's WHR-46 comment.
