@@ -30,5 +30,5 @@ The fix scopes ignores to this repository root; discovery now finds desktop and 
 EM reran typecheck, lint, unit (1), build, integration (1), and both explicit empty time suites.
 EM reran review self-tests (37/0) and guard self-tests (63/0).
 EM reran production browser smoke (2 passed) and frozen-lockfile install; Chromium launch required sandbox escalation.
-Local MinIO source build verification is in progress; PostgreSQL and Mailpit are healthy.
+Local MinIO source build passed; EM verified live/ready HTTP 200 and PostgreSQL/Mailpit healthy.
 No product invariants, credit rules, authentication, or deletion logic are implemented.
