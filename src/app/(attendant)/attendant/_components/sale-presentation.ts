@@ -3,7 +3,7 @@ import {
   isCredited,
   needsUpload,
   authoritativeStatus,
-} from "@/client/offline/sync-status";
+} from "../../../../client/offline/sync-status";
 import type { Tone } from "@/ui/shared";
 
 export function salePresentation(row: OutboxRow): {
