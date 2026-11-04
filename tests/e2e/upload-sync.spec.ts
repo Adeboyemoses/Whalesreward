@@ -206,8 +206,12 @@ test("I-31 I-35 photo-complete mixed holds leave the upload count but never clai
   await expect(
     page.getByRole("heading", { name: "Awaiting price review", exact: true }),
   ).toBeVisible({ timeout: 20000 });
-  await expect(page.getByText(/card/i).first()).toBeVisible();
-  await expect(page.getByText(/date/i).first()).toBeVisible();
+  await expect(
+    page.getByText("Card eligibility review", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Sale date review", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Sale synced", exact: true }),
   ).toHaveCount(0);
@@ -296,31 +300,30 @@ test("I-06 upload-first signs out only after pending data is durably uploaded", 
   context,
 }) => {
   const fake = await installAttendantFake(context, { sync: true });
-  fake.sync.setPutFailure(true);
-  await savedOffline(page, fake);
-  await reconnect(page, fake);
+  fake.sync.setPutPaused(true);
+  const original = await savedOffline(page, fake);
   await page.goto("/attendant/account/hand-over");
+  await reconnect(page, fake);
   await page
     .getByRole("button", { name: "Upload, then sign out", exact: true })
     .click();
-  await expect(page).toHaveURL(/\/attendant\/account\/hand-over$/);
-  expect(fake.activeSession()).not.toBeNull();
-  fake.sync.setPutFailure(false);
   await expect
-    .poll(() => [...fake.sync.records.values()][0]?.status.photoValidated, {
-      timeout: 20000,
-    })
-    .toBe(true);
-  const button = page.getByRole("button", {
-    name: "Upload, then sign out",
-    exact: true,
-  });
-  if (await button.isVisible()) await button.click();
-  else
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page).toHaveURL(/\/attendant\/sign-in$/);
+    .poll(
+      () =>
+        fake.sync.calls.filter((c) => c.path.startsWith("/storage/")).length,
+    )
+    .toBeGreaterThan(0);
+  await expect(page).toHaveURL(/\/attendant\/account\/hand-over$/);
+  expect(fake.activeSession()?.account.id).toBe(ids.grace);
+  expect([...fake.sync.records.values()][0]!.credits).toBe(0);
+  expect((await rows(page))[0]!.photoBlob).toEqual(original.photoBlob);
+  fake.sync.setPutPaused(false);
+  await expect(page).toHaveURL(/\/attendant\/sign-in$/, { timeout: 20000 });
   expect(fake.activeSession()).toBeNull();
   expect([...fake.sync.records.values()][0]!.credits).toBe(1);
+  expect([...fake.sync.records.values()][0]!.original).toEqual(
+    original.original,
+  );
 });
 
 test("I-25 rejected immutable photo stays available for support without replacement sale", async ({
@@ -347,7 +350,7 @@ for (const leave of ["Stay signed in", "Account navigation"] as const) {
   }) => {
     const fake = await installAttendantFake(context, { sync: true });
     fake.sync.setPutPaused(true);
-    await savedOffline(page, fake);
+    const original = await savedOffline(page, fake);
     await page.goto("/attendant/account/hand-over");
     await reconnect(page, fake);
     await page
@@ -366,11 +369,21 @@ for (const leave of ["Stay signed in", "Account navigation"] as const) {
     else await page.getByRole("link", { name: "Account", exact: true }).click();
     await expect(page).toHaveURL(/\/attendant\/account$/);
     fake.sync.setPutPaused(false);
-    await expect
-      .poll(() => [...fake.sync.records.values()][0]?.status.credited, {
-        timeout: 20000,
-      })
-      .toBe(true);
+    if (leave === "Stay signed in") {
+      await expect
+        .poll(() => [...fake.sync.records.values()][0]?.status.credited, {
+          timeout: 20000,
+        })
+        .toBe(true);
+    } else {
+      // A full navigation abandons the old request and may retain its live lease.
+      // This regression checks logout intent; restart/lease recovery is separate.
+      await expect
+        .poll(() => [...fake.sync.permissions.values()].some((p) => p.uploaded))
+        .toBe(true);
+    }
+    expect((await rows(page))[0]!.original).toEqual(original.original);
+    expect((await rows(page))[0]!.photoBlob).toEqual(original.photoBlob);
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(/\/attendant\/account$/);
     expect(fake.activeSession()?.account.id).toBe(ids.grace);
