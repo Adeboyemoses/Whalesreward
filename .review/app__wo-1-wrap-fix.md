@@ -2,15 +2,15 @@
 branch: app/wo-1-wrap-fix
 linear: WHR-2
 tier: high
-reviewed_head: 4b8eae4181e61c773913aab9ea401a39f091aeab
-rounds: 1
+reviewed_head: d41785f247ff9888517fed995efc0f156293e8d3
+rounds: 2
 builder: frontend-engineer
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 6
+dispatches: 9
 invariants: []
 p1: []
 tickets: []
@@ -30,3 +30,5 @@ EM final gates PASS: typecheck, lint, 18 unit tests, build, 4 production browser
 The agent-file gotcha is required by the escape-to-test rule and does not expand authority.
 Quantity display remains WHR-45; no auth, persistence, credit or vendor CSS changes.
 Generated Next agent-file append and unrelated raster shifts excluded after testing; source worktree clean before evidence.
+Second round checked the synchronized staging head and preserved both coverage-map entries; no new findings.
+Review-gate self-tests 39/39 and guard self-tests 94/94 PASS; nine dispatches flagged in lane notes.
