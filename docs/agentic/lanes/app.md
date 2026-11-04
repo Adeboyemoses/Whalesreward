@@ -18,6 +18,6 @@ WO-app-2 (WHR-5) Offline capture: READY on reviewed green staging merge, 2026-11
 - Automated contract fixtures do not prove real authentication, Android camera readability, storage eviction or TalkBack behavior; phone acceptance pending.
 - WHR-45 quantity display drift remains separate. No upload-first completion in this capture-only order; UI explains pending sales.
 - Browser storage is not encrypted or a server backup; no automatic deletion implemented.
-- Dispatch flag: offline-capture PR exceeds 8 dispatches because final verification exposed a sign-in/sign-out race requiring another builder dispatch before review.
+- Dispatch flag: offline-capture PR exceeds 8 dispatches for deterministic handover fixes and the second review round covering scoped revocation and multi-tab time.
 
-dispatches=10 prs=2 rounds_max=1 escalations=0 model=unknown
+dispatches=14 prs=2 rounds_max=2 escalations=0 model=unknown
