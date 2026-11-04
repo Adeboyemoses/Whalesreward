@@ -27,6 +27,7 @@ Supporting runtime implementation includes src/proxy.ts and scripts/deploy/entry
 Round 1 P1 fixed: DigitalOcean job commands explicitly invoke the entrypoint because run_command replaces Docker ENTRYPOINT.
 Prisma CLI receives its strict TLS dialect separately from pg; both reject wrong hostnames and untrusted CAs in actual image checks.
 Round 2 passed at 0045c5b. Round 3 passed after staging PR #20 integration touched the shared coverage-map path; core source unchanged.
+After docs-only spec PR #21 merged, operational coverage was moved to the final READY docs PR. This implementation PR no longer changes the shared coverage file; every remaining non-evidence PR path is unchanged from reviewed_head.
 EM typecheck, lint, unit 27/27, integration 49/49 and production build passed on the final combined head.
 EM amd64 Docker build, non-root/excluded-root-path assertions and offline Prisma CLI passed.
 Actual overridden migration, seed twice, four TLS negative cases, staging HTTP health/gallery/banner/noindex and production gallery isolation passed independently.
