@@ -12,7 +12,7 @@ Data-model PR #4 is merged on staging with independent security and integrity PA
 
 ## WO-spec-3a documentation status (WHR-52)
 
-M1/M3 and model amendments specify P-18 bounded capture and P-19 independent recovered-correction review. Documentation is READY only on green staging merge. Independent code/security/integrity verdicts and merged PR are recorded on WHR-52. No implementation or board parity is claimed. WHR-46 acceptance closeout is PR #21; WHR-51 is next and unstarted.
+M1/M3 and model amendments specify P-18 bounded capture and P-19 independent recovered-correction review. PR #23 merged at 6663001 with green CI and independent code/security/integrity PASS. Earl accepted WO-spec-3a on 4 November 2026. Documentation status: accepted; this closeout takes effect on green staging merge. No implementation or board parity is claimed. WHR-51 follows this closeout.
 
 ## Invariants
 
@@ -143,3 +143,19 @@ Client implementation reaches READY on the reviewed green staging merge of `app/
 Required board subset: A01/A26/A12/A13, A02/A24/A03, A27/A05, A15 and A18. Independent parity report: `docs/qa/offline-capture-fidelity.md` (11 boards at 390 px and 360 px). Remaining boards in those shared rows retain their future work-order scope. Phone runbook: `docs/qa/smoke-2026-11-04-offline-capture.md`; Earl runs it only after WO-core-3 merges.
 
 Local-only invariants I-23, I-24, I-49 and I-50 and board A18 are implemented and tested; their on-staging status takes effect with this work order’s reviewed green staging merge. Broader rows remain building where server sign-in, registration, upload-first or server validation is still owed by another work order. The shared board rows also remain incomplete for A04/A08/A23/A14/A16; the report covers only the eleven WHR-5 boards above. Physical camera readability, storage eviction and Android/TalkBack behavior await the deferred phone smoke.
+
+## WO-core-15 deployment preparation (WHR-28)
+
+This work prepares source configuration for Earl to provision temporary Cloudrock staging. It does not establish a running cloud environment or complete I-48 photo-storage implementation. The private-bucket instructions and runtime-only staging credentials support I-48; its invariant row stays todo until authorized uploads/reads are implemented and tested. No complete hi-fi board row changes status.
+
+| Operational behavior | Named verification | Status |
+|---|---|---|
+| Runtime staging gate; production gallery stays closed with flag alone | `src/server/lib/environment.test.ts` | source verification; cloud pending |
+| Health success and generic credential-free failure | `src/server/modules/health/service.test.ts` | source verification; cloud pending |
+| Staging database certificate and hostname validation | `tests/unit/staging-entrypoint.test.ts` | source verification; cloud pending |
+| No-op email discards sensitive content without delivery/logging | `src/server/adapters/email.test.ts` | source verification; cloud pending |
+| Repeatable fictional deployment fixtures | `tests/integration/core-schema.test.ts` — fictional fixtures can be seeded twice without changing history | source verification; cloud pending |
+
+Earl executes [the provisioning runbook](../ops/staging.md) and [phone smoke steps](../qa/smoke-2026-11-04-staging.md). Provider spec validation, deployed HTTPS health/gallery, private Spaces permissions and next-merge automatic redeployment remain pending.
+
+Local verification: unit 27, integration 49, typecheck/lint/build and actual amd64 image checks passed. Migration and repeated seed succeeded; both clients rejected wrong hostname and untrusted CA. Staging HTTP health/gallery/banner/noindex and production gallery isolation passed. PR #22 is merged with all five required CI checks green, including full browser tests; local Chromium startup is sandbox-blocked. No cloud coverage is claimed.

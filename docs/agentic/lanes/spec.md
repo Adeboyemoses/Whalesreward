@@ -1,21 +1,19 @@
 # lane:spec
-WO-spec-3a (WHR-52) capture and recovered corrections: READY on green staging merge
+WO-spec-3a (WHR-52) capture and recovered corrections: ACCEPTED on 2026-11-04
 
 ## In flight
-- Amendment PR and independent code/security/integrity verdicts are linked from WHR-52. M1/M3/model, P-18/P-19 and documentation coverage only; no code or board parity claimed.
-- WO-spec-3 (WHR-46) accepted by Earl; closeout PR #21 must merge green before marking Done.
-- EM typecheck, lint, unit and build plus paragraph/readability checks required on final head.
+- PR #23 merged into staging at 6663001 with independent code/security/integrity PASS. Earl accepted it in this session. This documentation closeout takes effect on its green staging merge; then WHR-52 moves to Done.
+- No application code or board parity claimed. P-18/P-19 and M1/M3/model amendments are the accepted specification.
 
 ## Next
-- WO-spec-4 (WHR-51), not started. Stop at WHR-52 READY.
+- WO-spec-4 (WHR-51), assigned by Earl; begin after this closeout.
 
 ## Earl's gos
-- 2026-11-04: “Earl accepted WO-spec-3 (WHR-46); close it.”
-- “Take it to READY, then stop.” applies to WO-spec-3a; no main or production action authorized.
+- 2026-11-04: “Earl accepted WO-spec-3a (WHR-52); close it.”
+- “Work order: WO-spec-4 (WHR-51)”; “Take it to READY, then stop.” No main or production action authorized.
 
 ## Risks
-- P-18 is Earl's build default; client Q-528 remains pending. Rook should carry P-18/P-19 into product docs.
-- WHR-39 and WHR-47–50 remain separate implementation gates.
-- Runtime full model ID unavailable.
+- Client Q-528 confirmation remains pending. WHR-39 and WHR-47–50 remain separate implementation gates.
+- Runtime full model ID unavailable. Closeout metrics below; amendment metrics remain in PR #23.
 
-dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
+dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
