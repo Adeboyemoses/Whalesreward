@@ -19,3 +19,7 @@ Automated verification uses the contract-shaped fake through the typed adapter. 
 13. Record next sale. Expected: clear customer/value/photo, retain account/pump and Cylinder for gas. No history or corrections added.
 
 Record actual phone/browser, commit, outcomes and any failures here before acceptance. Real endpoint/phone acceptance is pending; automated results will be added before READY.
+
+## Automated preparation and execution
+
+Test-engineer prepared `tests/e2e/upload-sync.spec.ts` and `tests/design-parity/uploads/capture.spec.ts` with a contract-shaped HTTP fake. Typecheck and lint passed. The first Playwright attempt built the production app successfully but failed before executing the scenario: Chromium macOS process registration was denied by the sandbox (`Permission denied (1100)`, SIGTRAP). Result: 1 launch failure, 0 browser scenarios executed. Browser and fidelity verification remain pending; this is not a smoke pass.

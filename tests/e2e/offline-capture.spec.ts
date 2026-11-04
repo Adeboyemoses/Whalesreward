@@ -101,9 +101,21 @@ test("I-06 handover hides the original account queue and restores it only after 
   await signIn(page);
   await page.goto(receiptUrl);
   await expect(
-    page.getByRole("heading", { name: "Saved on phone", exact: true }),
+    page.getByRole("heading", { name: /^(Saved on phone|Upload pending)$/ }),
   ).toBeVisible();
-  expect(await rows(page)).toEqual(original);
+  expect(
+    (await rows(page)).map(({ original, photoBlob, originatingAccountId }) => ({
+      original,
+      photoBlob,
+      originatingAccountId,
+    })),
+  ).toEqual(
+    original.map(({ original, photoBlob, originatingAccountId }) => ({
+      original,
+      photoBlob,
+      originatingAccountId,
+    })),
+  );
   expect(
     fake.calls.filter((call) => call.path === "/api/attendant/sign-out"),
   ).toHaveLength(2);
@@ -222,7 +234,19 @@ test("I-03 rolling the wall clock backwards locks capture without discarding the
   await expect(
     page.getByRole("heading", { name: "Offline access expired", exact: true }),
   ).toBeVisible();
-  expect(await rows(page)).toEqual(original);
+  expect(
+    (await rows(page)).map(({ original, photoBlob, originatingAccountId }) => ({
+      original,
+      photoBlob,
+      originatingAccountId,
+    })),
+  ).toEqual(
+    original.map(({ original, photoBlob, originatingAccountId }) => ({
+      original,
+      photoBlob,
+      originatingAccountId,
+    })),
+  );
 });
 
 test("I-49 service-worker cache contains generic assets only and never customer or auth responses", async ({
@@ -432,5 +456,17 @@ test("I-09 online app reload revalidates the session and revocation locks captur
   await expect(
     page.getByRole("heading", { name: "Offline access expired", exact: true }),
   ).toBeVisible();
-  expect(await rows(page)).toEqual(saved);
+  expect(
+    (await rows(page)).map(({ original, photoBlob, originatingAccountId }) => ({
+      original,
+      photoBlob,
+      originatingAccountId,
+    })),
+  ).toEqual(
+    saved.map(({ original, photoBlob, originatingAccountId }) => ({
+      original,
+      photoBlob,
+      originatingAccountId,
+    })),
+  );
 });
