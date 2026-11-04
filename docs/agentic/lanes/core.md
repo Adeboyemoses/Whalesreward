@@ -1,15 +1,16 @@
 # lane:core
-WO-core-1b (WHR-41) Evidence survives staging updates: BUILD since 2026-11-04
+WO-core-1b (WHR-41) Evidence survives staging updates: READY since 2026-11-04
 
 ## In flight
-- core/wo-1b-evidence: preserved checkout resumed; plan eafac6d and regression draft retained, current staging merged.
-- Exact scope: intersect paths changed after review with the PR diff; keep ancestor and unchanged-plan checks. Unrelated base merge passes; changed PR file and later commit fail.
-- WHR-3 (PRs #10/#11) and WHR-44 (PRs #14/#15) ACCEPTED by Earl; close-out bundled here, Done after merge.
-- No product invariant or board row changed by WHR-41. WHR-3 foundation coverage accepted; full feature coverage remains pending.
+- [PR #17](https://github.com/Adeboyemoses/Whalesreward/pull/17) merged into staging at 746ede4; all five required CI checks passed.
+- Code/security/integrity PASS in round 1 at f14d6b6; evidence .review/core__wo-1b-evidence.md. EM typecheck, lint, unit 18, build, Bash 3.2 review 39 and guard 94 passed.
+- Unrelated staging merge passes; merge changing a PR file and later commit fail. Ancestor and unchanged-plan protections preserved.
+- WHR-3 and WHR-44 ACCEPTED and closed (Done); acceptance documentation merged in #17.
+- Final READY records in core/wo-1b-ready; no product invariant or board row changed by WHR-41. WHR-3 foundation coverage accepted, full feature coverage pending.
 
 ## Next
-- Independent code/security/integrity reviews, evidence, green CI and merge; then WHR-41 READY and stop.
-- WHR-4 remains approved for a separate core session; no work started.
+- Await Earl’s verification of WHR-41. Stop at READY; no next work order started.
+- WHR-4 remains approved for a separate core session.
 
 ## Earl's gos
 - 2026-11-04: "Earl accepted WO-core-2 (WHR-3) and WHR-44; close both. Resume WO-core-1b (WHR-41) from .worktrees/core-1b-evidence and take it to READY. Then stop and report."
@@ -18,4 +19,4 @@ WO-core-1b (WHR-41) Evidence survives staging updates: BUILD since 2026-11-04
 - Review enforcement must still reject changes to PR files, including conflict resolutions.
 - Runtime model ID unavailable; requested model is gpt-6.1-sol, reasoning high.
 
-dispatches=4 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
