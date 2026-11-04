@@ -229,3 +229,12 @@ body {
   font-weight: 400;
   font-family: var(--font-sans);
 }
+
+/* Compact admin variants still need phone-sized targets in standalone previews. */
+@media (max-width: 900px) {
+  .wr-root .wr-btn-sm,
+  .wr-root .wr-btn-link,
+  .wr-root .wr-navlist a {
+    min-height: var(--control-h);
+  }
+}
