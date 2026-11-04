@@ -2,9 +2,9 @@
 WO-core-15 (WHR-28) DigitalOcean staging preparation: READY since 2026-11-04
 
 ## In flight
-- [PR #22](https://github.com/Adeboyemoses/Whalesreward/pull/22): deployment spec, pinned non-root Docker image, TLS-safe migration/seed jobs, health endpoint, staging safeguards and Earl-run provisioning runbook. READY takes effect after its reviewed staging merge and these records merge.
+- [PR #22](https://github.com/Adeboyemoses/Whalesreward/pull/22): deployment spec, pinned non-root Docker image, TLS-safe migration/seed jobs, health endpoint, staging safeguards and Earl-run provisioning runbook. Merged into staging with all five required CI checks green. These records complete READY for Earl to provision.
 - Code/security/integrity PASS at 2b14b3f; later staging integrations are docs-only and remaining PR paths unchanged. Evidence .review/core__wo-15-staging.md validates. Round-1 job entrypoint P1 fixed; strict Prisma/pg TLS checked in the actual image.
-- EM typecheck/lint/unit 27/build/integration 49 PASS; amd64 Docker build, offline CLI, non-root/exclusions, migration/seed twice, four TLS negatives and staging/production HTTP checks PASS. Local Chromium startup blocked by sandbox; full browser CI required and checked before merge.
+- EM typecheck/lint/unit 27/build/integration 49 PASS; amd64 Docker build, offline CLI, non-root/exclusions, migration/seed twice, four TLS negatives and staging/production HTTP checks PASS. Local Chromium startup blocked by sandbox; full browser CI passed. A slow Ubuntu font download needed one CI retry.
 - WHR-41 ACCEPTED and Done after [PR #19](https://github.com/Adeboyemoses/Whalesreward/pull/19) merged with all five checks green. Coverage records describe preparation only; no complete photo-storage invariant or board parity claimed.
 
 ## Next
