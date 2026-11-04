@@ -45,8 +45,9 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const client = getAttendantClient();
     let active = true;
+    let initialized = false;
     const update = () => {
-      if (active)
+      if (active && initialized)
         setRuntime({
           client,
           state: client.getState(),
@@ -55,6 +56,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
         });
     };
     const fail = (error: unknown) => {
+      initialized = true;
       if (active)
         setRuntime({
           client,
@@ -64,18 +66,27 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
         });
     };
     const unsubscribe = client.subscribe(update);
-    void client.initialize().then(() => {
+    void (async () => {
+      await client.initialize();
+      // An already-online launch is not an online event. Validate its session
+      // before starting a new draft; offline launch stays entirely local.
+      if (navigator.onLine) await client.refresh();
+      initialized = true;
       update();
-      void registerAttendantWorker();
-    }, fail);
+      void registerAttendantWorker().catch(fail);
+    })().catch(fail);
     const network = () => {
       update();
       if (navigator.onLine) void client.refresh().then(update, fail);
       else void client.checkAccess().then(update, fail);
     };
     const resume = () => {
-      if (document.visibilityState === "visible")
-        void client.checkAccess().then(update, fail);
+      if (document.visibilityState !== "visible") return;
+      void (async () => {
+        await client.checkAccess();
+        if (navigator.onLine) await client.refresh();
+        update();
+      })().catch(fail);
     };
     const timer = window.setInterval(() => {
       void client.checkAccess().then(update, fail);
