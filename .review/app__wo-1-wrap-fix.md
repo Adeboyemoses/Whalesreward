@@ -2,6 +2,18 @@
 branch: app/wo-1-wrap-fix
 linear: WHR-2
 tier: high
+reviewed_head: 4b8eae4181e61c773913aab9ea401a39f091aeab
+rounds: 1
+builder: frontend-engineer
+reviewers:
+  code-reviewer: PASS
+  security-reviewer: PASS
+  integrity-reviewer: PASS
+blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
+dispatches: 6
+invariants: []
+p1: []
+tickets: []
 plan:
   goal: fix Earl’s AppHeader wordmark and narrow LoyaltyCard footer wrapping findings
   files: src/ui/navigation.tsx, src/ui/data-display.tsx, src/styles/app.css, tests/design-parity/design-system/**, docs/qa/**, .codex/agents/test-engineer.toml, lane/status/coverage docs
@@ -10,3 +22,11 @@ plan:
   risks: descendant selectors may affect new spans; preserve admin brand layout, card code, target sizes and explicit fixture-only scope
 ---
 Saved before builder or test-engineer dispatch. No credit, persistence, quantity formatting or auth changes.
+
+All three independent reviewers PASS on reviewed_head, no findings or reviewer edits.
+Four actual-width glyph regressions failed before the fix at 390px/360px, then passed.
+Independent test-engineer compared A02/A07 and nine target captures; report docs/qa/design-system-wrap-fidelity.md PASS.
+EM final gates PASS: typecheck, lint, 18 unit tests, build, 4 production browser tests and 14 gallery checks.
+The agent-file gotcha is required by the escape-to-test rule and does not expand authority.
+Quantity display remains WHR-45; no auth, persistence, credit or vendor CSS changes.
+Generated Next agent-file append and unrelated raster shifts excluded after testing; source worktree clean before evidence.
