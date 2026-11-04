@@ -1,23 +1,22 @@
 # lane:core
-WO-core-1b (WHR-41) Evidence survives staging updates: ACCEPTED since 2026-11-04
+WO-core-15 (WHR-28) DigitalOcean staging preparation: READY since 2026-11-04
 
 ## In flight
-- [PR #17](https://github.com/Adeboyemoses/Whalesreward/pull/17) merged into staging at 746ede4; all five required CI checks passed.
-- Code/security/integrity PASS in round 1 at f14d6b6; evidence .review/core__wo-1b-evidence.md. EM typecheck, lint, unit 18, build, Bash 3.2 review 39 and guard 94 passed.
-- Unrelated staging merge passes; merge changing a PR file and later commit fail. Ancestor and unchanged-plan protections preserved.
-- WHR-3 and WHR-44 ACCEPTED and closed (Done); acceptance documentation merged in #17.
-- READY records merged in PR #18; acceptance close-out in core/wo-1b-close; no product invariant or board row changed by WHR-41. WHR-3 foundation coverage accepted, full feature coverage pending.
+- [PR #22](https://github.com/Adeboyemoses/Whalesreward/pull/22): deployment spec, pinned non-root Docker image, TLS-safe migration/seed jobs, health endpoint, staging safeguards and Earl-run provisioning runbook. READY takes effect after its reviewed staging merge and these records merge.
+- Code/security/integrity PASS at 2b14b3f; later staging integrations are docs-only and remaining PR paths unchanged. Evidence .review/core__wo-15-staging.md validates. Round-1 job entrypoint P1 fixed; strict Prisma/pg TLS checked in the actual image.
+- EM typecheck/lint/unit 27/build/integration 49 PASS; amd64 Docker build, offline CLI, non-root/exclusions, migration/seed twice, four TLS negatives and staging/production HTTP checks PASS. Local Chromium startup blocked by sandbox; full browser CI required and checked before merge.
+- WHR-41 ACCEPTED and Done after [PR #19](https://github.com/Adeboyemoses/Whalesreward/pull/19) merged with all five checks green. Coverage records describe preparation only; no complete photo-storage invariant or board parity claimed.
 
 ## Next
-- Earl accepted WHR-41: "Accepted. lets close this session" (4 November). Close after the documentation PR merges; no next work order started.
-- WHR-4 remains approved for a separate core session.
+- Earl follows docs/ops/staging.md and docs/qa/smoke-2026-11-04-staging.md. Provider validation, provisioning, private Spaces/CORS, three console secrets, deployed HTTPS and next-merge redeploy proof remain pending.
+- Stop at READY for provisioning. No new work order started; WHR-4 remains separately approved.
 
 ## Earl's gos
-- 2026-11-04: "Accepted. lets close this session" — WHR-41 acceptance and session close.
-- 2026-11-04: "Earl accepted WO-core-2 (WHR-3) and WHR-44; close both. Resume WO-core-1b (WHR-41) from .worktrees/core-1b-evidence and take it to READY. Then stop and report."
+- 2026-11-04: “Earl accepted WO-core-1b (WHR-41); close it.”
+- 2026-11-04: “Do not run doctl and do not create cloud resources; Earl provisions from the runbook. Take it to READY, then stop.”
 
 ## Risks
-- Review enforcement must still reject changes to PR files, including conflict resolutions.
-- Runtime model ID unavailable; requested model is gpt-6.1-sol, reasoning high.
+- No cloud operations run; no deployed staging URL claimed. Public URL/noindex is not access control; fictional data only. Dev database has no production backup guarantee.
+- Dispatch flag: PR #22 has 11 > 8 dispatches due to a fix and shared-file staging synchronization; review rounds stay within cap 3. Runtime model ID unavailable.
 
-dispatches=4 prs=3 rounds_max=1 escalations=0 model=unavailable
+dispatches=11 prs=3 rounds_max=3 escalations=0 model=unavailable
