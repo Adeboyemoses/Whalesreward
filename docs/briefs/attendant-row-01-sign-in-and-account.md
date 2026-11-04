@@ -1,7 +1,7 @@
 # Attendant row 01: Sign in and account
 
 Boards: A01-SignIn, A26-SignInError, A12-Account, A13-Handover
-Feature: F01 · Invariants: I-01–I-06, I-09 · Work order: WO-app-0 (WHR-33)
+Feature: F01 · Invariants: I-01–I-06, I-09 · Work order: WO-app-2 (WHR-5), capture subset
 
 Decision note: `product-docs/04 UI Design/Attendant Mobile/Sign In and Handover Screen Decisions.md` (including Hi-fi flow — 4 November 2026); also `Attendant Connected Flow Notes.md` and F&R named feature sections. HTML and PNG for every named board inspected 4 November 2026. Repository brief contains build requirements, not copied source documents.
 
@@ -11,18 +11,19 @@ Use the vendored design system at `src/styles/design-system/`, `wr-root` at surf
 
 ## Contract status
 
-All names below are proposed **TODO-CONTRACT**, not approved exports or endpoints. Reconcile against `docs/engineering/contracts/m1.md` from WO-spec-1 when it merges, before implementing. No transport paths are invented by this brief. Money/rates travel as integer-kobo strings plus currency; quantities are decimal strings plus explicit unit; instants are ISO strings; IDs are UUIDs distinct from display codes. Server derives authenticated identity, assignment, receipt time, eligibility and credit.
+Reconciled 4 November 2026 against `docs/engineering/contracts/m1.md`; PNG and HTML for A01/A26/A12/A13/A02/A24/A03/A27/A05/A15/A18 inspected before code. `Session`, `PriceSnapshot`, `Lookup`, `OriginalSale`, `OutboxRow` and `OfflineWindow` use that normative contract. `src/client/api.ts` is the typed HTTP boundary; WO-core-3 supplies real sign-in/session endpoints. Contract-shaped fakes are test-only. WO-app-2 ends at atomic local save; A04/A16 and upload/retry/credit states remain WO-app-3.
 
+M1 navigation exposes Sale and Account only until Uploads/History/Register ship. Upload-first stays visibly disabled with an unavailable explanation; leave-pending and stay-signed-in work. The local receipt says the photo is saved and pending, never promises automatic delivery in this slice. `ClientState` is local UI state, never server authority.
 ## Board map
 
 Parenthetical state descriptions in screens.json are annotations, not literal URL segments. Sale IDs/local IDs are route parameters.
 
 | Board | Route | Components (src/ui) | Reads (contract) | Writes (contract) | States | Permission |
 |---|---|---|---|---|---|---|
-| A01-SignIn | `/attendant/sign-in` | AppHeader, TextField, Button, Notice | TODO-CONTRACT AttendantSession | TODO-CONTRACT SignIn | online empty/filled; submitting; unavailable network; disabled/unassigned account | online public sign-in |
-| A26-SignInError | `/attendant/sign-in` | AppHeader, TextField, Button, Notice | TODO-CONTRACT SignIn result | TODO-CONTRACT SignIn retry | offline disabled; wrong credentials; locked account; retry after connection | online public sign-in |
-| A12-Account | `/attendant/account` | AppHeader, KeyValueList, Notice, BottomNav, Button | TODO-CONTRACT AttendantSession, OwnQueueSummary | none | online/offline; zero/nonzero own pending count; session expired | originating attendant session/access; server checks each protected request |
-| A13-Handover | `/attendant/account/hand-over` | AppHeader, Notice, Button, BottomNav | TODO-CONTRACT OwnQueueSummary | TODO-CONTRACT SignOut, RetryOwnQueue | pending online; pending offline; uploading; upload failure; no pending; stay signed in; signed out | originating attendant session/access; server checks each protected request |
+| A01-SignIn | `/attendant/sign-in` | AppHeader, TextField, Button, Notice | Session | POST /api/attendant/sign-in | online empty/filled; submitting; unavailable network; disabled/unassigned account | online public sign-in |
+| A26-SignInError | `/attendant/sign-in` | AppHeader, TextField, Button, Notice | POST /api/attendant/sign-in result | POST /api/attendant/sign-in retry | offline disabled; wrong credentials; locked account; retry after connection | online public sign-in |
+| A12-Account | `/attendant/account` | AppHeader, KeyValueList, Notice, BottomNav, Button | Session, OwnQueueSummary | none | online/offline; zero/nonzero own pending count; session expired | originating attendant session/access; server checks each protected request |
+| A13-Handover | `/attendant/account/hand-over` | AppHeader, Notice, Button, BottomNav | account-scoped OutboxRow summary | POST /api/attendant/sign-out, RetryOwnQueue | pending online; pending offline; uploading; upload failure; no pending; stay signed in; signed out | originating attendant session/access; server checks each protected request |
 
 ## Behaviour
 
@@ -40,13 +41,15 @@ Parenthetical state descriptions in screens.json are annotations, not literal UR
 
 ## Contracts needed
 
-- **TODO-CONTRACT AttendantSession**: account ID, display attendant ID, name, username, station/pump/product IDs and labels, unit, current assignment version, last successful online sign-in instant, offline expiry instant and current access status. Credentials are transient sign-in input and never queued/cached/logged.
-- **TODO-CONTRACT ProductPrice**: station/product ID, integer-kobo rate, currency code, price/configuration version, quantity precision, activation instant and saved-at metadata. The captured snapshot is preserved with each sale.
-- **TODO-CONTRACT SignIn / SignOut**: transient username/password and online result; logout result must distinguish confirmed server revocation from retryable failure.
-- **TODO-CONTRACT OwnQueueSummary / RetryOwnQueue**: account-scoped count and per-operation upload outcome; no other account partition is exposed.
+- **Session**: account ID, display attendant ID, name, username, station/pump/product IDs and labels, unit, current assignment version, last successful online sign-in instant, offline expiry instant and current access status. Credentials are transient sign-in input and never queued/cached/logged.
+- **PriceSnapshot**: station/product ID, integer-kobo rate, currency code, price/configuration version, quantity precision, activation instant and saved-at metadata. The captured snapshot is preserved with each sale.
+- **POST /api/attendant/sign-in / SignOut**: transient username/password and online result; logout result must distinguish confirmed server revocation from retryable failure.
+- **account-scoped OutboxRow summary / RetryOwnQueue**: account-scoped count and per-operation upload outcome; no other account partition is exposed.
 
 ## Open questions and boundaries
 
-- WO-spec-1 owns final contract names/fields. Default: keep TODO-CONTRACT until its M1 document merges; do not ship guessed endpoint contracts.
+- The merged M1 contract resolves transport names. Phone acceptance waits until WO-core-3 merges; automation may use contract-shaped intercepted responses. No new product decision is needed.
 - Meter precision/halfway rounding and trustworthy capture timing remain configured/proposed as recorded in decisions; this brief settles none of them. No new product decision is required to draft these reversible docs. Missing implementation-specific failure copy must follow existing Notice/TextField patterns and be reviewed in its implementation work order.
 - Added boards are approved (P-16); use repo overrides for routes, 48px phone targets, vendoring and Linear questions. No feature flags for Q-520.
+
+Implementation copy deviation: A26 lockout count/unlock policy is not implied by M1 invalid_credentials; show the generic wrong-details message and server-provided retryable states. Quantity display uses the shared formatter (WHR-45 tracks fixed trailing-zero parity).
