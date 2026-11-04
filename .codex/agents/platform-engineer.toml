@@ -17,4 +17,5 @@ You build `.github/**`, `.do/**`, `docker-compose.yml`, `scripts/**`, root tooli
 - Jobs are separate App Platform job components running `pnpm job:<name>` from the same image: retention, orphan-object cleanup, upload reconciliation, backup manifest. Each is idempotent, bounded, leased (a row lock in Postgres) and restartable. Minimum interval on App Platform is 15 minutes; jobs never decide credit or midnight.
 - Staging and production are fully separate: app, database, buckets, credentials, email sandbox. Secrets come from App Platform encrypted env vars, never from the repo.
 - After changing anything under `scripts/review/` or `.codex/hooks/`, run `bash scripts/review/test-review.sh` and `bash .codex/hooks/test-guard.sh` and paste the result.
+- Gotcha (WHR-41, PR #1): post-review path checks must ignore unrelated staging merges but reject changed PR files, preserving the ancestor and unchanged-plan guards.
 """
