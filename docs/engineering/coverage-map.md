@@ -126,6 +126,8 @@ D03-AttendantProfile's **Reset password** and **Disable account** buttons are pl
 
 The 16 UI wrappers and development-only gallery are verified by `tests/design-parity/design-system/gallery.spec.ts` and `tests/e2e/gallery-production.spec.ts`; see [fidelity report](../qa/design-system-fidelity.md) for all component comparisons and 19 captures. Gallery checks10/10 and production checks4/4 passed before review. Status: prepared for staging merge; Earl’s phone smoke remains pending. These component checks do not establish built-screen parity for any complete board row or implement business invariants; those statuses above remain unchanged.
 
+WO-app-1 wrap FIX (WHR-2): four actual-viewport line-box regressions cover AppHeader and LoyaltyCard at 390px/360px; see `docs/qa/design-system-wrap-fidelity.md`. Component fidelity only, with no completed screen or business invariant claim.
+
 ## WO-core-1b review-gate maintenance (WHR-41)
 
 No product invariant or board row changed. `scripts/review/test-review.sh` covers an unrelated staging merge passing, a merge changing a PR file failing, and a later PR commit failing. Ancestor and unchanged-plan protections remain required. Gate maintenance is accepted by Earl on 4 November 2026 ("Accepted. lets close this session"), implemented on staging in PR #17 (746ede4), with independent code/security/integrity PASS and all five required CI checks green. EM Bash 3.2 review self-test: 39 passed, 0 failed; guard: 94 passed, 0 failed. WHR-44 is accepted by Earl; its guard self-tests remain operational coverage, not product coverage.
