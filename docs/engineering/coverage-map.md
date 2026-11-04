@@ -124,4 +124,4 @@ The 16 UI wrappers and development-only gallery are verified by `tests/design-pa
 
 ## WO-core-1b review-gate maintenance (WHR-41)
 
-No product invariant or board row changed. `scripts/review/test-review.sh` covers an unrelated staging merge passing, a merge changing a PR file failing, and a later PR commit failing. Ancestor and unchanged-plan protections remain required. Gate maintenance reaches on-staging when the reviewed PR merges with green CI. WHR-44 is accepted by Earl; its guard self-tests remain operational coverage, not product coverage.
+No product invariant or board row changed. `scripts/review/test-review.sh` covers an unrelated staging merge passing, a merge changing a PR file failing, and a later PR commit failing. Ancestor and unchanged-plan protections remain required. Gate maintenance is on-staging in PR #17 (746ede4), with independent code/security/integrity PASS and all five required CI checks green. EM Bash 3.2 review self-test: 39 passed, 0 failed; guard: 94 passed, 0 failed. WHR-44 is accepted by Earl; its guard self-tests remain operational coverage, not product coverage.
