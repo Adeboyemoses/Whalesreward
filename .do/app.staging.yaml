@@ -6,10 +6,10 @@ envs:
   - key: DATABASE_URL
     scope: RUN_TIME
     type: SECRET
-    value: ${db.DATABASE_URL}
+    value: ${pg.DATABASE_URL}
   - key: DATABASE_CA_CERT
     scope: RUN_TIME
-    value: ${db.CA_CERT}
+    value: ${pg.CA_CERT}
   - key: NODE_ENV
     scope: RUN_TIME
     value: production
@@ -22,7 +22,7 @@ envs:
   - key: BETTER_AUTH_URL
     scope: RUN_TIME
     value: ${APP_URL}
-  # Earl enters all three values in encrypted console fields after app creation.
+  # Earl enters the secret values in encrypted console fields after app creation.
   - key: BETTER_AUTH_SECRET
     scope: RUN_TIME
     type: SECRET
@@ -35,12 +35,20 @@ envs:
     value: fra1
   - key: STORAGE_BUCKET
     scope: RUN_TIME
-    value: whr-staging-evidence
+    value: whr-staging-evidences
   - key: STORAGE_ACCESS_KEY_ID
     scope: RUN_TIME
     type: SECRET
     value: ""
   - key: STORAGE_SECRET_ACCESS_KEY
+    scope: RUN_TIME
+    type: SECRET
+    value: ""
+  # Target do-connecting-ip only after ingress overwrite is confirmed; see runbook.
+  - key: WHR_TRUSTED_IP_HEADER
+    scope: RUN_TIME
+    value: ""
+  - key: WHR_SEED_ATTENDANT_PASSWORD
     scope: RUN_TIME
     type: SECRET
     value: ""
@@ -99,7 +107,8 @@ jobs:
     run_command: node scripts/deploy/entrypoint.mjs pnpm db:seed
 
 databases:
-  - name: db
+  - name: pg
     engine: PG
     version: "16"
-    production: false
+    production: true
+    cluster_name: whr-staging-db
