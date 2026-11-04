@@ -23,4 +23,4 @@ WO-app-2 (WHR-5) Offline capture: READY on reviewed green staging merge, 2026-11
 - Browser storage is not encrypted or a server backup; no automatic deletion implemented.
 - Dispatch flag: offline-capture PR exceeds 8 dispatches for deterministic handover/review fixes, runtime staging integration and a final documentation-only base reconciliation.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
