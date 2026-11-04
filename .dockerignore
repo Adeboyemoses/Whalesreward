@@ -1,0 +1,29 @@
+# Deny everything; only inputs referenced by the Dockerfile enter the context.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!pnpm-lock.yaml
+!.nvmrc
+!next.config.ts
+!tsconfig.json
+!postcss.config.mjs
+!src/
+!src/**
+!public/
+!public/**
+!prisma/
+!prisma/**
+!prisma.config.ts
+!scripts/
+!scripts/deploy/
+!scripts/deploy/entrypoint.mjs
+# Defense in depth for nested accidental secrets and development artifacts.
+**/.env*
+**/*.pem
+**/*.key
+**/node_modules
+**/product-docs
+**/.worktrees
+**/.git
+**/*.test.ts
