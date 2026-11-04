@@ -4,7 +4,48 @@ import { installAttendantFake } from "../../fixtures/attendant-http-fake";
 import { fillSale, save, signIn } from "../../fixtures/offline-browser";
 
 async function capture(page: Page, id: string, width: number) {
-  await page.evaluate(() => document.fonts.ready);
+  const heights: Record<string, number> = {
+    "A01-SignIn": 844,
+    "A26-SignInError": 844,
+    "A12-Account": 862,
+    "A13-Handover": 844,
+    "A02-Sale": 1229,
+    "A24-SaleCustomerNotFound": 1401,
+    "A03-SaleFilled": 1141,
+    "A27-SaleOffline": 1305,
+    "A05-SaleSavedOnPhone": 1211,
+    "A15-GasSale": 1163,
+    "A18-OfflineExpired": 968,
+  };
+  await page.setViewportSize({ width, height: heights[id] ?? 844 });
+  await page.evaluate(async () => {
+    window.scrollTo(0, 0);
+    await document.fonts.ready;
+  });
+  // Expand the artboard to its natural document height so sticky actions do not
+  // obscure content in a stitched full-page image. Phone-sized flows are tested
+  // independently with Pixel 7 emulation in tests/e2e/offline-capture.spec.ts.
+  const contentHeight = await page.evaluate(
+    () => document.documentElement.scrollHeight,
+  );
+  await page.setViewportSize({
+    width,
+    height: Math.max(heights[id] ?? 844, contentHeight),
+  });
+  const undersized = await page
+    .locator("button, input, a")
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => {
+          const box = element.getBoundingClientRect();
+          return box.width > 0 && box.height > 0 && box.height < 48;
+        })
+        .map((element) => ({
+          text: element.textContent,
+          height: element.getBoundingClientRect().height,
+        })),
+    );
+  expect(undersized).toEqual([]);
   await expect
     .poll(() =>
       page.evaluate(
@@ -12,6 +53,7 @@ async function capture(page: Page, id: string, width: number) {
       ),
     )
     .toBe(true);
+  await page.mouse.move(0, 0);
   await page.screenshot({
     path: path.join(
       import.meta.dirname,
@@ -30,6 +72,10 @@ for (const width of [390, 360]) {
     await page.clock.install({ time: now });
     const fake = await installAttendantFake(context, { now });
     await page.goto("/attendant/sign-in");
+    await page.getByLabel("Username", { exact: true }).fill("grace.okon");
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill("fictional-test-password");
     await capture(page, "A01-SignIn", width);
     await page.getByLabel("Username", { exact: true }).fill("grace.okon");
     await page
@@ -61,6 +107,8 @@ for (const width of [390, 360]) {
     await fillSale(page, { value: "20000.00" });
     await capture(page, "A03-SaleFilled", width);
     await save(page);
+    fake.setOffline(true);
+    await context.setOffline(true);
     await capture(page, "A05-SaleSavedOnPhone", width);
     await page
       .getByRole("button", { name: "Record next sale", exact: true })
@@ -82,6 +130,10 @@ for (const width of [390, 360]) {
     await signIn(page, "favour.james");
     await fillSale(page, { gas: true, value: "15000.00" });
     await capture(page, "A15-GasSale", width);
+    await page.goto("/attendant/account/hand-over");
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(page).toHaveURL(/\/attendant\/sign-in$/);
+    await signIn(page);
     fake.setOffline(true);
     await context.setOffline(true);
     await page.clock.fastForward(86_400_000);

@@ -36,7 +36,7 @@ export function sessionFixture(
     },
     station: {
       id: ids.station,
-      code: "STATION001",
+      code: "Station 01",
       name: "Station 01",
       timezone: "Africa/Lagos",
     },
