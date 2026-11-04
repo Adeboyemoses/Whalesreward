@@ -97,7 +97,12 @@ export function LoyaltyCard({
           <b>{name}</b>
           <div className="wr-sub">
             {category}
-            {customerId && ` · ${customerId}`}
+            {customerId && (
+              <>
+                {" · "}
+                <span className="wr-mono">{customerId}</span>
+              </>
+            )}
           </div>
         </div>
         <div className="wr-sub">Whales Energy · {station}</div>

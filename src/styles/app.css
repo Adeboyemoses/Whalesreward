@@ -61,7 +61,26 @@ body {
   min-width: 0;
 }
 .wr-brand-name {
-  white-space: normal;
+  white-space: nowrap;
+}
+.wr-brand > img,
+.wr-header-top > .wr-pill {
+  flex-shrink: 0;
+}
+/* Yield the surface label to the wordmark/pill based on available header space. */
+.wr-header,
+.wr-loyalty-card {
+  container-type: inline-size;
+}
+@container (max-width: 340px) {
+  .wr-header .wr-brand-surface {
+    display: none;
+  }
+  .wr-loyalty-card .wr-loyalty-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
 }
 .wr-context,
 .wr-kv-row dd,
