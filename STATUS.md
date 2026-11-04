@@ -15,7 +15,7 @@ Updated: 2026-11-04
 
 - WO-core-1c (WHR-44): exact local auto-mode rules hotfix and retained global-option Git guard protections merged to staging in PR #14. ACCEPTED by Earl on 4 November; all five CI checks and three independent reviews passed. Closed in PR #17.
 
-- WO-core-1b (WHR-41): READY; review-gate fix merged into staging in PR #17 (746ede4). Independent code/security/integrity PASS; all five CI checks green. EM Bash 3.2 review 39/39, guard 94/94, typecheck, lint, unit 18/18 and build passed. Ancestor and unchanged-plan checks preserved. No product flow changed.
+- WO-core-1b (WHR-41): ACCEPTED by Earl on 4 November ("Accepted. lets close this session"); review-gate fix merged into staging in PR #17 (746ede4). Independent code/security/integrity PASS; all five CI checks green. EM Bash 3.2 review 39/39, guard 94/94, typecheck, lint, unit 18/18 and build passed. Ancestor and unchanged-plan checks preserved. No product flow changed.
 
 ## In progress
 - WO-spec-3 (WHR-46): M3 contracts (38 endpoints), model additions and documentation coverage prepared; READY takes effect on the reviewed staging merge with green CI. Independent verdicts and final PR recorded on WHR-46. No product implementation or screen parity claimed.
@@ -31,7 +31,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- Await Earl’s verification of WO-core-1b after READY. WHR-3 and WHR-44 are accepted; both issues are Done following PR #17. WHR-4 attendant sign-in remains approved for a separate core session; WHR-46 M3 contracts belongs to lane:spec.
+- WO-core-1b is accepted; session closed after the acceptance documentation PR merges. WHR-3 and WHR-44 are accepted; both issues are Done following PR #17. WHR-4 attendant sign-in remains approved for a separate core session; WHR-46 M3 contracts belongs to lane:spec.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
