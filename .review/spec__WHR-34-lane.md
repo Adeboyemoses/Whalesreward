@@ -10,7 +10,7 @@ reviewers:
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 12
+dispatches: 15
 escalation: Earl said "p roceed" on 2026-11-04 in response to the explicit request for one additional review round.
 invariants: []
 p1: []

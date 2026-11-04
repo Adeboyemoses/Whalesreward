@@ -15,9 +15,9 @@ WO-spec-1 (WHR-32) Spec lane, M1 data model and contracts: closeout effective wh
 - 2026-11-04: "p roceed" authorized the explicitly requested fourth review round for PR #1. No review gate bypass.
 
 ## Risks
-- PR #1 has 12 review dispatches across four rounds (>8 flag); fourth round expressly authorized.
+- PR #1 has 15 review dispatches across four rounds (>8 flag); fourth round expressly authorized.
 - WHR-38 trusted capture evidence and WHR-39 nonreplacement retirement remain policy gates for implementation.
 - Specification review establishes no implemented invariant or screen parity. Runtime model ID unavailable.
-- Metrics describe this resumption: three review dispatches; no new PRs; fourth cumulative round on PR #1.
+- Metrics describe this resumption: six review dispatches (snapshot review plus committed-head confirmation); no new PRs; fourth cumulative round on PR #1.
 
-dispatches=3 prs=0 rounds_max=4 escalations=1 model=unavailable
+dispatches=6 prs=0 rounds_max=4 escalations=1 model=unavailable
