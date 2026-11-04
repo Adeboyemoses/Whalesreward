@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Gallery from "./gallery";
+import { galleryEnabled } from "@/server/lib/environment";
 
 export const dynamic = "force-dynamic";
 
 export default function GalleryPage() {
-  if (process.env.NODE_ENV !== "development") notFound();
+  if (!galleryEnabled()) notFound();
   return <Gallery />;
 }
