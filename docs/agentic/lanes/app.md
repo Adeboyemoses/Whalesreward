@@ -16,4 +16,4 @@ WO-app-0 (WHR-33): READY upon findings PR merge, 2026-11-04
 ## Risks
 - TODO-CONTRACT reconciliation and implementation-specific fixtures/injectors remain prerequisites for executing the drafts.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
