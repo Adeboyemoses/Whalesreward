@@ -32,3 +32,5 @@ Updated: 2026-11-04
 WO-app-0 findings (2026-11-04): draft runbooks split by capture/local-save versus server confirmation; row 02 checks expiry and omits the M2 registration link in M1. Ready after findings PR merge for Earl’s re-read; phone execution remains pending implementation.
 
 WO-app-1 (WHR-2): design assets, 16 typed wrappers, dev-only gallery and responsive shells prepared for staging. Independent gallery10/10 and production browser4/4 checks passed; report docs/qa/design-system-fidelity.md. Earl’s phone smoke remains pending.
+
+WO-app-1 PR #12: implementation and fidelity checks pass. Awaiting Earl’s approval for one additional review round after another PR moved staging beyond the already-reviewed head; PR remains open, no merge.

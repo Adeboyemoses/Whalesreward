@@ -1,10 +1,11 @@
 # lane:app
-WO-app-1 (WHR-2) Design system and app shells: READY upon reviewed staging merge, 2026-11-04
+WO-app-1 (WHR-2) Design system and app shells: BUILD; awaiting review-cap approval, 2026-11-04
 
 ## In flight
 - `app/wo-1-gallery`: 16 typed wrappers, unchanged vendored CSS/fonts, token-mapped Tailwind, dev-only gallery and both responsive shells.
 - Independent test-engineer: 10 gallery checks and 4 production browser checks pass; 19 captures, no blocking fidelity differences. Report: `docs/qa/design-system-fidelity.md`.
-- EM reruns final gates; code/integrity review and evidence precede staging merge.
+- PR #12: https://github.com/Adeboyemoses/Whalesreward/pull/12. Round 2 code/integrity PASS and CI green; staging moved during review.
+- Updated local branch passes typecheck/lint/18 unit tests/build/4 production/10 gallery checks. One additional final-head review needs Earl’s explicit approval; no merge until then.
 
 ## Next
 - Earl runs `docs/qa/smoke-2026-11-04-design-system.md` on the phone for acceptance.
