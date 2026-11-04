@@ -1,21 +1,23 @@
 # lane:app
-WO-app-0 (WHR-33) M0/M1 implementation briefs and smoke runbooks: READY upon staging merge; prepared 2026-11-04
+WO-app-1 (WHR-2) Design system and app shells: READY upon reviewed staging merge, 2026-11-04
 
 ## In flight
-- `app/wo-0-briefs`: six implementation briefs and three draft phone smoke runbooks; no app code.
-- Six briefs / three runbooks checked against all 16 PNGs, routes and decision notes. Independent review complete before merge.
-- Review gate: 37 passed; guard: 63 passed. App gates unavailable (no scaffold); phone runbooks unexecuted drafts.
+- `app/wo-1-gallery`: 16 typed wrappers, unchanged vendored CSS/fonts, token-mapped Tailwind, dev-only gallery and both responsive shells.
+- Independent test-engineer: 10 gallery checks and 4 production browser checks pass; 19 captures, no blocking fidelity differences. Report: `docs/qa/design-system-fidelity.md`.
+- PR #12: https://github.com/Adeboyemoses/Whalesreward/pull/12. Round 2 code/integrity PASS; final synchronized head receives the approved extra review before CI and merge.
+- Updated local branch passes typecheck/lint/18 unit tests/build/4 production/10 gallery checks. Earl approved the additional final-head round; evidence and green CI precede merge.
 
 ## Next
-- Earl reads `docs/briefs/attendant-row-02-record-a-sale-online.md` and `docs/qa/smoke-draft-wo-app-2.md` for acceptance after merge.
-- WO-app-1 after scaffold lands; WO-spec-1 supplies final M1 contract names.
+- Earl runs `docs/qa/smoke-2026-11-04-design-system.md` on the phone for acceptance.
+- Gallery: `pnpm dev`, `/dev/gallery`; production returns 404. Real screens/data and service-worker caching remain later work orders.
 
 ## Earl's gos
-- Approved WO-app-0 in Linear, 4 Nov 2026; current session names WO-app-0 / WHR-33.
+- 2026-11-04: “proceed” — approval for one additional code/integrity round on PR #12, followed by staging merge after CI passes.
+- 2026-11-04: approved WO-app-1 in Linear; current session names lane:app, WHR-2 and gallery brief.
 
 ## Risks
-- Contract names remain TODO-CONTRACT until WO-spec-1 merges.
-- Runbooks are drafts; no scaffold or phone execution yet.
-- Brand sign-off pending (Q-516).
+- Dispatch flag: this medium-tier PR uses 9 dispatches (builder, QA twice, two reviewers three times), above the 4-dispatch reporting threshold; third round explicitly approved by Earl.
+- Actual phone/TalkBack smoke remains Earl’s check; desktop emulation does not establish it.
+- Brand values remain tokens/swappable assets pending sign-off.
 
-dispatches=3 prs=1 rounds_max=2 escalations=0 model=unknown
+dispatches=9 prs=1 rounds_max=3 escalations=1 model=unknown

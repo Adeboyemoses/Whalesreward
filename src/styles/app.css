@@ -1,0 +1,249 @@
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./design-system/fonts.css";
+@import "./design-system/tokens.css";
+@import "./design-system/bundle.css";
+
+/* Tailwind has no default theme or preflight: only the shared design tokens. */
+@theme {
+  --*: initial;
+}
+@theme inline {
+  --color-surface-000: var(--surface-000);
+  --color-surface-050: var(--surface-050);
+  --color-surface-100: var(--surface-100);
+  --color-surface-200: var(--surface-200);
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-whale-700: var(--whale-700);
+  --color-whale-600: var(--whale-600);
+  --color-whale-100: var(--whale-100);
+  --color-whale-050: var(--whale-050);
+  --color-flare-700: var(--flare-700);
+  --color-flare-500: var(--flare-500);
+  --color-flare-400: var(--flare-400);
+  --color-flare-100: var(--flare-100);
+  --color-success-700: var(--success-700);
+  --color-success-600: var(--success-600);
+  --color-success-100: var(--success-100);
+  --color-danger-700: var(--danger-700);
+  --color-danger-600: var(--danger-600);
+  --color-danger-100: var(--danger-100);
+  --color-line-100: var(--line-100);
+  --color-line-300: var(--line-300);
+  --font-body: var(--font-sans);
+  --font-code: var(--font-mono);
+  --font-heading: var(--font-display);
+  --radius-control: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-sheet: var(--radius-xl);
+  --radius-pill-shape: var(--radius-pill);
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow-md);
+  --spacing-1: var(--space-1);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-8: var(--space-8);
+  --spacing-10: var(--space-10);
+  --spacing-12: var(--space-12);
+}
+
+body {
+  margin: 0;
+}
+.wr-phone {
+  width: min(100%, var(--phone-w));
+}
+.wr-brand {
+  min-width: 0;
+}
+.wr-brand-name {
+  white-space: normal;
+}
+.wr-context,
+.wr-kv-row dd,
+.wr-list-main b {
+  overflow-wrap: anywhere;
+}
+.wr-amount-xl,
+.wr-amount-lg,
+.wr-amount-md,
+.wr-total dd {
+  white-space: nowrap;
+}
+.wr-photo-image {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+.wr-photo {
+  font-family: var(--font-sans);
+  font-size: 16px;
+}
+.wr-photo-bar {
+  align-items: center;
+}
+.wr-photo-bar span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.wr-photo-bar .wr-btn-link {
+  min-height: var(--control-h);
+  min-width: var(--control-h);
+}
+.wr-phone .wr-btn-link,
+.wr-phone .wr-btn-sm {
+  min-height: var(--control-h);
+}
+.wr-segment {
+  min-height: var(--control-h);
+}
+.wr-attendant-shell {
+  min-height: 100dvh;
+  margin-inline: auto;
+}
+.wr-attendant-shell .wr-actionbar {
+  bottom: 74px;
+}
+.wr-admin-shell .wr-table {
+  min-width: 650px;
+}
+.wr-gallery {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.wr-gallery-intro {
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.wr-gallery-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.wr-gallery-links a {
+  min-height: var(--control-h);
+  display: inline-flex;
+  align-items: center;
+}
+.wr-gallery-section {
+  scroll-margin-top: var(--space-4);
+}
+.wr-gallery-section > h2 {
+  margin-bottom: var(--space-4);
+}
+.wr-gallery-preview {
+  padding: var(--space-4);
+  background: var(--surface-050);
+}
+.wr-gallery-phone {
+  max-width: 358px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.wr-gallery-wide {
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.wr-gallery-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.wr-gallery-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  max-width: 720px;
+}
+.wr-gallery-preview .wr-nav {
+  position: static;
+}
+.wr-gallery-sidebar {
+  min-height: 480px;
+}
+.wr-loyalty-head,
+.wr-loyalty-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+.wr-gallery-shell {
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-lg);
+  overflow: clip;
+}
+.wr-loading-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+@media (max-width: 600px) {
+  .wr-gallery-results {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .wr-admin .wr-btn,
+  .wr-admin .wr-btn-link,
+  .wr-admin .wr-input,
+  .wr-admin .wr-navlist a {
+    min-height: var(--control-h);
+  }
+}
+.wr-prefix-large {
+  height: var(--cta-h);
+}
+.wr-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.wr-loyalty-card .wr-brand-name {
+  color: var(--on-inverse);
+}
+.wr-segment:disabled,
+.wr-photo:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Amount cells retain regular-weight product/quantity metadata, as in the preview. */
+.wr-table .wr-amount .wr-sub {
+  font-weight: 400;
+  font-family: var(--font-sans);
+}
+
+/* Compact admin variants still need phone-sized targets in standalone previews. */
+@media (max-width: 900px) {
+  .wr-root .wr-btn-sm,
+  .wr-root .wr-btn-link,
+  .wr-root .wr-navlist a {
+    min-height: var(--control-h);
+  }
+}
+
+@media (max-width: 900px) {
+  .wr-root a.wr-btn-link {
+    display: inline-flex;
+    align-items: center;
+    min-width: var(--control-h);
+    justify-content: center;
+  }
+}

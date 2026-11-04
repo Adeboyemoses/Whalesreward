@@ -1,20 +1,25 @@
 # lane:core
-WO-core-1 (WHR-1) Repository scaffold: READY since 2026-11-04
+WO-core-1c (WHR-44) Auto-mode Git permissions hotfix: READY since 2026-11-04
 
 ## In flight
-- [PR #3](https://github.com/Adeboyemoses/Whalesreward/pull/3) merged into staging at df14dea; five required checks passed. CI: https://github.com/Adeboyemoses/Whalesreward/actions/runs/41877820475
-- EM verified typecheck, lint, unit (1), build, migration, integration (1), browser smoke (2), frozen install, review self-tests (37/0), guard self-tests (63/0), evidence validation and local services.
+- [PR #14](https://github.com/Adeboyemoses/Whalesreward/pull/14) merged into staging at de05d2d; all five required CI checks passed.
+- Exact local rules copy preserved. Global-option guard bypass fixed; code/security/integrity PASS in round 2 at d03fa0c. EM typecheck, lint, unit 18, build, Bash 3.2 guard 94 and review self-tests 37 passed.
+- No product invariant or board row changed; coverage map unchanged.
 
 ## Next
-- Wait for Earl's verification/acceptance; no new work order started.
+- Earl runs `git checkout -- .codex/rules/default.rules` then `git pull` in the main checkout, as WHR-44 prescribes. The local hotfix remains untouched by this session.
+- Await Earl's hotfix verification/acceptance; no next work order started.
+- WHR-4 attendant sign-in approved and queued for a separate core session. WHR-46 M3 contracts approved for lane:spec.
+- WHR-41 unfinished: plan eafac6d and uncommitted regression tests preserved in .worktrees/core-1b-evidence after Earl's earlier redirect.
 
 ## Earl's gos
-- none
+- 2026-11-04: "approve WHR-44, WHR-4, WHR-46"
+- 2026-11-04: "WHR-44: commit the git-permissions fix you applied by hand."
 
 ## Risks
-- No staging or production environment until the client's DigitalOcean account exists (T2 to provision).
-- PR #3 dispatch flag: 11 > 8; round two fixed Playwright worktree discovery, round three rechecked the updated staging documentation base. All reviewers passed; no open findings.
-- Time suite explicitly has no tests; maintenance jobs and seed are no-ops. Product invariants and hi-fi coverage remain unchanged.
-- Session model ID is not exposed by this surface; metric records unavailable.
+- Ambiguous qualified config commands, including quoted paths, are conservatively blocked; use a standalone command in the worktree for reads.
+- Literal CLI bash-wrapper policy probe is unmatched; separate cd/git probes allow. No blanket shell permission added.
+- WO-core-2 (WHR-3) remains READY pending acceptance; PR #10 dispatch flag 10 > 8, no open findings.
+- Requested Session model: gpt-6.1-sol, reasoning high. Runtime model ID is not exposed; metric follows the actual-runtime rule.
 
-dispatches=12 prs=2 rounds_max=3 escalations=0 model=unavailable
+dispatches=9 prs=2 rounds_max=2 escalations=0 model=unavailable

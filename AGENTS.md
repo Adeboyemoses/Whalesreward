@@ -45,6 +45,9 @@ Each session is the **engineering manager (EM)** ([role](docs/agentic/README.md#
 |---|---|---|
 | `lane:core` | `prisma/**` (holds `lock:schema`), `src/server/**`, `src/app/api/**`, `src/shared/**` (contracts, money, quantity), `jobs/**`, `scripts/**`, `.github/**`, `.do/**`, `docker-compose.yml`, root tooling config | backend-engineer, platform-engineer, test-engineer |
 | `lane:app` | `src/app/(attendant)/**`, `src/app/(admin)/**`, `src/client/**` (incl. `api.ts`), `src/ui/**`, `src/styles/**`, `public/**`, the web manifest, `docs/briefs/**` | frontend-engineer, offline-engineer, test-engineer |
+| `lane:spec` | `docs/engineering/data-model.md`, `docs/engineering/contracts/**`, `docs/engineering/coverage-map.md`, `docs/engineering/decisions/**`, `docs/agentic/lanes/spec.md`; triages `needs:human` | EM writes docs; no builders |
+
+Code lanes change a contract only through a `lane:spec` child issue or a PR that updates the contract doc in the same change. The spec lane never writes app code; independent reviewers still review its specs.
 
 Tests live with the lane of the code they test. `lane:app` may propose a `src/shared/**` change; `lane:core` reviews and merges it.
 
@@ -78,6 +81,7 @@ Tests live with the lane of the code they test. `lane:app` may propose a `src/sh
 - Settled decisions stay settled. If you want to revisit one, flag it; don't quietly change it. No deferred-scope features (Features and Requirements, "Deferred scope") without a scope change from Earl.
 - Commit as the repo's configured git user. No `Co-Authored-By` trailer. Never change git config. Never put Earl's personal email address in code, docs, commits or fixtures. Use `@example.com` for test identities.
 - Stage explicit paths. Never `git add -A` or `git add .`.
+- Run git commands on their own, or as `cd <worktree> && git …`; don't chain git after other commands (`pnpm … && git …`), because the whole chain then runs in the sandbox and fails.
 - Never read, print, copy or move secrets, `.env*` files, keys or tokens. Report the path only. Use `.env.example` for names.
 - Never touch cloud resources (DigitalOcean, DNS, Spaces, email or SMS providers) unless the work order and Earl's go say so.
 - Before pushing: `git diff --stat origin/staging...HEAD`, to catch stale-base deletions or stray `node_modules`.

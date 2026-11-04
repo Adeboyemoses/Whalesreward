@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "test": "TZ=UTC vitest run --project unit",
     "test:integration": "TZ=UTC vitest run --project integration",
-    "test:time": "TZ=UTC vitest run --project time --passWithNoTests && TZ=America/New_York vitest run --project time --passWithNoTests",
+    "test:time": "TZ=UTC vitest run --project time && TZ=America/New_York vitest run --project time",
     "test:e2e": "TZ=UTC playwright test",
     "db:migrate:dev": "prisma migrate dev --create-only",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -27,21 +27,29 @@
     "job:backup-manifest": "node jobs/backup-manifest.ts"
   },
   "dependencies": {
+    "lucide-react": "1.68.0",
+    "@prisma/client": "7.10.1",
     "next": "16.4.5",
+    "pino": "10.4.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "uuid": "14.0.3"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.4",
     "@types/node": "26.6.6",
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.1",
     "eslint-config-next": "16.4.5",
+    "fast-check": "4.10.2",
     "pg": "8.23.1",
+    "postcss": "8.5.32",
     "prettier": "3.9.10",
     "prisma": "7.10.1",
+    "tailwindcss": "4.3.4",
     "typescript": "5.9.3",
     "vitest": "5.1.0"
   }

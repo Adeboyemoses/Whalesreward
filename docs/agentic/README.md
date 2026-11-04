@@ -8,6 +8,7 @@ Earl (CEO, approves work orders and every T2 action)
 Rook (Cowork chief of staff: drafts work orders, reads STATUS.md, keeps the open-questions register)
   │   Linear team WHR (work orders)           product-docs/ (what to build)
   ▼
+Codex terminals (one per lane, no Orca): core · app · spec
 Codex session = Engineering Manager, one lane, one work order
   ├── builders (write code, each in its own worktree)
   │     backend-engineer · platform-engineer · offline-engineer · frontend-engineer · test-engineer
@@ -49,12 +50,14 @@ The EM may write code only for fixes of about 10 lines, docs, git operations and
 
 ## Lanes
 
-Two lanes, so two Codex sessions can run in parallel without colliding.
+Three lanes, with one Codex terminal per lane (no Orca), so sessions can run in parallel without colliding.
 
 - **`lane:core`**: the server. Prisma schema and migrations (it alone holds `lock:schema`), domain services, route handlers, sync and finalize endpoints, auth, jobs, CI and deployment.
 - **`lane:app`**: what people touch. Attendant PWA screens, admin portal screens, the offline client (Dexie outbox, service worker, camera), UI components and styles.
 
-A contract between the lanes (a route handler and its client call) is defined in `src/shared/contracts/**` (zod schemas and types). Either lane may propose a change there, but the PR that changes a contract must update both sides or open a child issue in the other lane. `src/shared/**` changes are reviewed as medium tier at least.
+- **`lane:spec`**: the documentation contract. Owns `docs/engineering/data-model.md`, `docs/engineering/contracts/**`, `docs/engineering/coverage-map.md`, `docs/engineering/decisions/**` and `docs/agentic/lanes/spec.md`, and triages `needs:human`. The EM writes specs itself, with no builders and no app code. Independent reviewers run as usual.
+
+A contract between the lanes (a route handler and its client call) is defined in `src/shared/contracts/**` (zod schemas and types). Code lanes change a contract only through a `lane:spec` child issue or a PR that updates the contract doc in the same change. The spec lane owns the documentation; `lane:core` retains ownership of `src/shared/**`. A contract implementation change must update both sides or open a child issue in the other code lane. `src/shared/**` changes are reviewed as medium tier at least.
 
 ## Rook and Earl
 

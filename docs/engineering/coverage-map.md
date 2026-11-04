@@ -2,7 +2,13 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-spec-1 documentation status (WHR-32)
+
+Data-model PR #4 is merged on staging with independent security and integrity PASS verdicts. M1 contracts PR #5 is merged with independent security and integrity PASS verdicts; lane setup and closeout complete when PR #1 merges. These are specification changes only: no invariant implementation or built-screen parity is claimed; test and board statuses remain unchanged.
+
 ## Invariants
+
+WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting model additions. Scope: I-01/I-02, I-04/I-05/I-05a, I-07–I-20, I-29/I-31/I-32, I-41/I-49/I-50; F08/I-21/I-21a are preservation boundaries, not recovery implementation. Board inputs: attendant rows 4/7; admin rows 1–3, 6 (C01/B05/S08 reads only), 7–10 and 15–16 (H07 permission projection only). Specification closeout takes effect when the spec/wo-2-m2-contracts PR merges into staging with green CI; independent committed-head review and the merged PR are recorded on WHR-40. This is documentation coverage only; all implementation test and board-parity statuses below remain unchanged.
 
 | ID | Rule (short) | Work order | Test | Status |
 |---|---|---|---|---|
@@ -64,7 +70,21 @@ Where each requirement stands. The EM updates the rows its work order touched at
 
 ## WO-app-0 documentation preparation (WHR-33)
 
+Earl’s 4 November findings: app-2/app-3 runbooks now split at local durable save versus server confirmation; row 02 includes I-03 capture/save guards and omits unavailable M2 registration navigation. These remain unexecuted drafts; coverage statuses below are unchanged.
+
 Rows 1, 2, 3, 6 and 8 have implementation briefs and draft phone runbooks prepared against their board PNGs and decision notes. This is documentation preparation only: it implements no invariant and establishes no built-screen parity. Tests and board statuses below remain todo until the respective implementation work orders verify them. Proposed M1 contract names remain TODO-CONTRACT pending WO-spec-1.
+
+## WO-core-2 foundation coverage (WHR-3)
+
+Database constraints and pure helpers support the following invariants; they do not establish complete feature coverage. Their existing invariant rows remain todo until the relevant services and client flows are implemented and verified. No board parity is claimed.
+
+| Foundation | Invariants supported | Named tests | Status |
+|---|---|---|---|
+| Exact kobo and captured-precision quantity arithmetic | I-29 | src/shared/money.test.ts; src/shared/quantity.test.ts | on-staging |
+| Explicit Lagos receipt/midnight helper | I-37, I-38 | tests/time/lagos.time.test.ts (UTC and America/New_York) | on-staging |
+| Unit-separated quantities | I-44 | src/shared/quantity.test.ts | on-staging |
+| Entity storage, normalized-phone uniqueness, fixed categories and product units | I-14, I-15, I-29, I-30 | tests/integration/schema-contract.test.ts | on-staging |
+| Immutable originals, append-only audit and operation uniqueness | I-22, I-28, I-41 | tests/integration/core-schema.test.ts | on-staging |
 
 ## Hi-fi boards (106, in canvas row order)
 
@@ -97,3 +117,7 @@ Rows 1, 2, 3, 6 and 8 have implementation briefs and draft phone runbooks prepar
 | Admin 16 · Roles and permissions | H05 H06 H10 H08 H07 | WO-app-4 | | todo |
 
 D03-AttendantProfile's **Reset password** and **Disable account** buttons are placeholders, not scope, until a work order covers them.
+
+## WO-app-1 design-system foundation (WHR-2)
+
+The 16 UI wrappers and development-only gallery are verified by `tests/design-parity/design-system/gallery.spec.ts` and `tests/e2e/gallery-production.spec.ts`; see [fidelity report](../qa/design-system-fidelity.md) for all component comparisons and 19 captures. Gallery checks10/10 and production checks4/4 passed before review. Status: prepared for staging merge; Earl’s phone smoke remains pending. These component checks do not establish built-screen parity for any complete board row or implement business invariants; those statuses above remain unchanged.
