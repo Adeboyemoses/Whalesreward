@@ -11,6 +11,7 @@ export default defineConfig([
     ".worktrees/**",
     "product-docs/**",
     "next-env.d.ts",
+    "public/attendant/sw.js",
     "playwright-report/**",
     "test-results/**",
   ]),

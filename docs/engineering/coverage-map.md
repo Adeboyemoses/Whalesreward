@@ -27,15 +27,15 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | ID | Rule (short) | Work order | Test | Status |
 |---|---|---|---|---|
 | I-01 | Each attendant has a personal account: name, unique username, password and a permanent sys… | | | todo |
-| I-02 | Sign-in, account switching and customer registration need connectivity | | | todo |
-| I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | | | todo |
+| I-02 | Sign-in, account switching and customer registration need connectivity | WO-app-2 (client) | tests/e2e/offline-capture.spec.ts (handover; client scope) | building |
+| I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | WO-app-2 (client) | src/client/offline/window.test.ts; offline-capture.spec.ts (24h, rollback, restart) | building |
 | I-04 | An account writes only for its authorized station and pump | | | todo |
 | I-05 | Pump reassignment is done by an authorized admin | | | todo |
 | I-05a | A queued record from before a reassignment is validated against that account's assignment … | WO-spec-3a (spec only) | Not implemented | todo |
-| I-06 | Logout offers upload-first when connected | | | todo |
+| I-06 | Logout offers upload-first when connected | WO-app-2 (client) | offline-capture.spec.ts (handover, cross-tab); client.test.ts (failed revocation) | building |
 | I-07 | Admin users, roles and permissions are separate from attendant accounts | WO-spec-4 (spec only) | Not implemented | todo |
 | I-08 | At least one active Owner always exists | | | todo |
-| I-09 | Disabling an account or removing a permission revokes it on active sessions | WO-spec-4 (spec only) | Not implemented | todo |
+| I-09 | Disabling an account or removing a permission revokes it on active sessions | WO-app-2 (client); WO-spec-4 (spec only) | offline-capture.spec.ts (online session revocation) | building |
 | I-10 | A role administrator cannot grant more authority than they hold | | | todo |
 | I-11 | Five sensitive permissions default to Owner only and are granted separately: `queueRecover… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-12 | Admin password recovery uses a verified email only | | | todo |
@@ -43,21 +43,21 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-14 | Registration captures name, phone and a fixed category: car owners, commercial bus drivers… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-15 | Phone numbers are normalized before the uniqueness check | | | todo |
 | I-16 | Card codes are unique across all batches, collision-retried, reserved before print export … | | | todo |
-| I-17 | QR scan and typed code resolve the same card | | | todo |
+| I-17 | QR scan and typed code resolve the same card | WO-app-2 (client) | offline-capture.spec.ts (QR and typed code) | building |
 | I-18 | Batch lifecycle is Generated → Printed → Active, forward only, server-validated, audited w… | | | todo |
 | I-19 | A card can be linked only when its batch is Active and the card is unassigned and not reti… | | | todo |
 | I-20 | PDF print sheets and Excel registers are generated from the reserved codes | | | todo |
 | I-21 | Card replacement keeps the customer and retires the old card atomically | | | todo |
 | I-21a | Before replacing a lost card, the admin verifies a code sent to the registered phone (thro… | | | todo |
 | I-22 | Every sale has a client-generated operation ID | | | todo |
-| I-23 | The sale and its photo blob are saved atomically in IndexedDB before the phone shows "Save… | | | todo |
-| I-24 | Photos come from the live in-app camera only | | | todo |
+| I-23 | The sale and its photo blob are saved atomically in IndexedDB before the phone shows "Save… | WO-app-2 (client) | offline-capture.spec.ts (offline restart, quota); client.test.ts (atomic save) | on-staging |
+| I-24 | Photos come from the live in-app camera only | WO-app-2 (client) | offline-capture.spec.ts (denied camera); client.test.ts (photo digest) | on-staging |
 | I-25 | Uploads go to a unique staging path through a short-lived signed permission scoped to that… | | | todo |
 | I-26 | Credit needs: resolved customer, complete details, validated photo, price checks and eligi… | WO-spec-3a (spec only) | Not implemented | todo |
 | I-27 | A definitive "customer not found" cancels the record with a reason | | | todo |
 | I-28 | Store app capture time and server receipt time separately | WO-spec-3a (spec only); WO-spec-4 (spec only) | Not implemented | todo |
-| I-29 | Amount entry is the default; Quantity entry is available | WO-spec-4 (spec only) | Not implemented | todo |
-| I-30 | Liquids offer Bought into: Vehicle, Keg, Three-wheeler, Bike | | | todo |
+| I-29 | Amount entry is the default; Quantity entry is available | WO-app-2 (client); WO-spec-4 (spec only) | client.test.ts (exact money); offline-capture.spec.ts (gas quantity) | building |
+| I-30 | Liquids offer Bought into: Vehicle, Keg, Three-wheeler, Bike | WO-app-2 (client) | client.test.ts and offline-capture.spec.ts (gas cylinder) | building |
 | I-31 | A sale is held for price review, with zero credit, only when its captured rate is an unres… | WO-spec-3a (spec only) | Not implemented | todo |
 | I-32 | Price activation is immediate on server confirmation, one price per product for the statio… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-33 | A sale uploaded against a card replaced before upload is held for card-eligibility review … | | | todo |
@@ -77,8 +77,8 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-46 | Finalization happens only after cutoff and grace have passed and all holds and reconciliat… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-47 | Prize distribution stays manual | WO-spec-4 (spec only) | Not implemented | todo |
 | I-48 | Photos live in private Spaces buckets per environment, under random paths with no names or… | WO-spec-4 (spec only) | Not implemented | todo |
-| I-49 | The service worker caches only the generic capture shell and fonts | WO-spec-4 (spec only) | Not implemented | todo |
-| I-50 | Cache only minimal customer lookup data on the phone | | | todo |
+| I-49 | The service worker caches only the generic capture shell and fonts | WO-app-2 (client); WO-spec-4 (spec only) | offline-capture.spec.ts (generic-only service-worker cache) | on-staging |
+| I-50 | Cache only minimal customer lookup data on the phone | WO-app-2 (client) | client.test.ts (account-scoped lookup); offline-capture.spec.ts (cache exclusions) | on-staging |
 | I-51 | Retention deletion runs only under an approved policy, skips pending evidence and active h… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-52 | Scheduled jobs are idempotent, bounded, leased and restartable | WO-spec-4 (spec only) | Not implemented | todo |
 
@@ -104,14 +104,14 @@ Earl accepted WO-core-2 on 4 November 2026. Database constraints and pure helper
 
 | Row | Boards | Work order | Parity check | Status |
 |---|---|---|---|---|
-| Attendant 1 · Sign in and account | A01 A26 A12 A13 | WO-core-3 | | todo |
-| Attendant 2 · Record a sale (online) | A02 A24 A03 A04 | WO-app-2, WO-app-3 | | todo |
-| Attendant 3 · Offline sale and uploads | A27 A05 A08 A23 A14 | WO-app-2, WO-app-3, WO-app-8 | | todo |
+| Attendant 1 · Sign in and account | A01 A26 A12 A13 | WO-app-2, WO-core-3 | offline-capture-fidelity.md (client; real endpoint pending) | building |
+| Attendant 2 · Record a sale (online) | A02 A24 A03 A04 | WO-app-2, WO-app-3 | offline-capture-fidelity.md (A02/A24/A03; A04 pending) | building |
+| Attendant 3 · Offline sale and uploads | A27 A05 A08 A23 A14 | WO-app-2, WO-app-3, WO-app-8 | offline-capture-fidelity.md (A27/A05; uploads pending) | building |
 | Attendant 4 · Register a customer | A06 A25 A07 | WO-app-6 | | todo |
 | Attendant 5 · History and own correction | A09 A10 A11 | WO-app-7 | | todo |
-| Attendant 6 · Cooking gas sale | A15 A16 | WO-app-2, WO-app-3 | | todo |
+| Attendant 6 · Cooking gas sale | A15 A16 | WO-app-2, WO-app-3 | offline-capture-fidelity.md (A15; A16 pending) | building |
 | Attendant 7 · Pump reassignment | A17 | WO-app-5 | | todo |
-| Attendant 8 · Offline access expired | A18 | WO-app-2 | | todo |
+| Attendant 8 · Offline access expired | A18 | WO-app-2 | offline-capture-fidelity.md; offline-capture.spec.ts | on-staging |
 | Attendant 9 · Admin-assisted recovery | A19 A20 A21 A22 | WO-app-9 | | todo |
 | Admin 1 · Sign in, first password, sign out | B01 B08 B09 B18 | WO-app-4 | | todo |
 | Admin 2 · Password recovery | B10 B11 M02 B12 B13 | WO-app-4 | | todo |
@@ -141,6 +141,14 @@ WO-app-1 wrap FIX (WHR-2): four actual-viewport line-box regressions cover AppHe
 ## WO-core-1b review-gate maintenance (WHR-41)
 
 No product invariant or board row changed. `scripts/review/test-review.sh` covers an unrelated staging merge passing, a merge changing a PR file failing, and a later PR commit failing. Ancestor and unchanged-plan protections remain required. Gate maintenance is accepted by Earl on 4 November 2026 ("Accepted. lets close this session"), implemented on staging in PR #17 (746ede4), with independent code/security/integrity PASS and all five required CI checks green. EM Bash 3.2 review self-test: 39 passed, 0 failed; guard: 94 passed, 0 failed. WHR-44 is accepted by Earl; its guard self-tests remain operational coverage, not product coverage.
+
+## WO-app-2 offline capture (WHR-5)
+
+Client implementation reaches READY on the reviewed green staging merge of `app/wo-2-offline`. EM verification: typecheck, lint, 74 unit tests, production build, 32 Playwright tests, and three timezone tests in each of UTC and America/New_York. The rows above map its named tests; phone acceptance remains pending. The test transport follows M1; real sign-in/session endpoints remain WO-core-3. Uploads/credit remain WO-app-3/WO-core-4. These tests do not establish server authorization, registration or upload-first completion.
+
+Required board subset: A01/A26/A12/A13, A02/A24/A03, A27/A05, A15 and A18. Independent parity report: `docs/qa/offline-capture-fidelity.md` (11 boards at 390 px and 360 px). Remaining boards in those shared rows retain their future work-order scope. Phone runbook: `docs/qa/smoke-2026-11-04-offline-capture.md`; Earl runs it only after WO-core-3 merges.
+
+Local-only invariants I-23, I-24, I-49 and I-50 and board A18 are implemented and tested; their on-staging status takes effect with this work order’s reviewed green staging merge. Broader rows remain building where server sign-in, registration, upload-first or server validation is still owed by another work order. The shared board rows also remain incomplete for A04/A08/A23/A14/A16; the report covers only the eleven WHR-5 boards above. Physical camera readability, storage eviction and Android/TalkBack behavior await the deferred phone smoke.
 
 ## WO-core-15 deployment preparation (WHR-28)
 

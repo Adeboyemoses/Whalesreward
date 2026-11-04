@@ -1,0 +1,286 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import {
+  getAttendantClient,
+  type ClientState,
+  type Session,
+} from "@/client/offline/client";
+import { registerAttendantWorker } from "@/client/sw/register";
+import { AppHeader, BottomNav, Notice, Button } from "@/ui";
+import type { NavLabel } from "@/ui/navigation";
+
+type Client = ReturnType<typeof getAttendantClient>;
+type Runtime = {
+  client: Client | null;
+  state: ClientState | null;
+  online: boolean;
+  error: string | null;
+};
+const RuntimeContext = createContext<Runtime>({
+  client: null,
+  state: null,
+  online: true,
+  error: null,
+});
+export function message(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "Something went wrong. Please try again.";
+}
+export function AttendantProvider({ children }: { children: ReactNode }) {
+  const [runtime, setRuntime] = useState<Runtime>({
+    client: null,
+    state: null,
+    online: true,
+    error: null,
+  });
+  useEffect(() => {
+    const client = getAttendantClient();
+    let active = true;
+    let initialized = false;
+    const update = () => {
+      if (active && initialized)
+        setRuntime({
+          client,
+          state: client.getState(),
+          online: navigator.onLine,
+          error: null,
+        });
+    };
+    const fail = (error: unknown) => {
+      initialized = true;
+      if (active)
+        setRuntime({
+          client,
+          state: client.getState(),
+          online: navigator.onLine,
+          error: message(error),
+        });
+    };
+    const unsubscribe = client.subscribe(update);
+    void (async () => {
+      await client.initialize();
+      // An already-online launch is not an online event. Validate its session
+      // before starting a new draft; offline launch stays entirely local.
+      if (navigator.onLine) await client.refresh();
+      initialized = true;
+      update();
+      void registerAttendantWorker().catch(fail);
+    })().catch(fail);
+    const network = () => {
+      update();
+      if (navigator.onLine) void client.refresh().then(update, fail);
+      else void client.checkAccess().then(update, fail);
+    };
+    const resume = () => {
+      if (document.visibilityState !== "visible") return;
+      void (async () => {
+        await client.checkAccess();
+        if (navigator.onLine) await client.refresh();
+        update();
+      })().catch(fail);
+    };
+    const timer = window.setInterval(() => {
+      void client.checkAccess().then(update, fail);
+    }, 1000);
+    window.addEventListener("online", network);
+    window.addEventListener("offline", network);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      active = false;
+      unsubscribe();
+      clearInterval(timer);
+      window.removeEventListener("online", network);
+      window.removeEventListener("offline", network);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, []);
+  return (
+    <RuntimeContext.Provider value={runtime}>
+      {children}
+    </RuntimeContext.Provider>
+  );
+}
+export function go(
+  router: { push: (href: string) => void; replace: (href: string) => void },
+  href: string,
+  replace = false,
+) {
+  if (!navigator.onLine) {
+    if (replace) window.location.replace(href);
+    else window.location.assign(href);
+  } else if (replace) router.replace(href);
+  else router.push(href);
+}
+export function useAttendant() {
+  return useContext(RuntimeContext);
+}
+export const productName: Record<string, string> = {
+  pms: "PMS",
+  diesel: "Diesel",
+  kerosene: "Kerosene",
+  cooking_gas: "Cooking gas",
+};
+export const categoryName: Record<string, string> = {
+  car_owner: "Car owner",
+  commercial_bus_driver: "Commercial bus driver",
+  three_wheeler_user: "Three-wheeler user",
+  bike_user: "Bike user",
+  keg_buyer: "Keg buyer",
+  cooking_gas_customer: "Cooking-gas customer",
+};
+export const mediumName: Record<string, string> = {
+  vehicle: "Vehicle",
+  keg: "Keg",
+  three_wheeler: "Three-wheeler",
+  bike: "Bike",
+  cylinder: "Cylinder",
+};
+export function stationName(session: Session) {
+  return session.station.name;
+}
+export function pumpName(code: string) {
+  return /^pump\b/i.test(code) ? code : `Pump ${code}`;
+}
+export function Assignment({ session }: { session: Session }) {
+  return (
+    <>
+      {stationName(session)} <span className="wr-dot">·</span>{" "}
+      {pumpName(session.pump.code)} <span className="wr-dot">·</span>{" "}
+      {productName[session.product.code]} <span className="wr-dot">·</span>{" "}
+      <b>{session.account.name}</b> <span className="wr-dot">·</span>{" "}
+      <span className="wr-mono wr-username">{session.account.username}</span>
+    </>
+  );
+}
+export function formatTime(instant: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Lagos",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(new Date(instant));
+  const part = (name: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === name)?.value ?? "";
+  return `${part("day")} ${part("month")} ${part("year")} · ${part("hour")}:${part("minute")} ${part("dayPeriod").toUpperCase()}`;
+}
+export function Frame({
+  title,
+  context,
+  children,
+  action,
+  active = "Sale",
+  noNav = false,
+  signIn = false,
+}: {
+  title: string;
+  context?: ReactNode;
+  children: ReactNode;
+  action?: ReactNode;
+  active?: NavLabel;
+  noNav?: boolean;
+  signIn?: boolean;
+}) {
+  const { online } = useAttendant();
+  return (
+    <div
+      className={`wr-root wr-phone wr-attendant-shell wr-capture-shell${noNav ? " wr-without-nav" : ""}${signIn ? " wr-sign-in" : ""}`}
+    >
+      <AppHeader
+        title={signIn ? "" : title}
+        context={context}
+        connection={online ? "online" : "offline"}
+        secondary={!signIn && title !== "New sale"}
+      />
+      <main className="wr-screen">{children}</main>
+      {action && <div className="wr-actionbar">{action}</div>}
+      {!noNav && (
+        <BottomNav
+          items={[
+            { label: "Sale", href: "/attendant/sale" },
+            { label: "Account", href: "/attendant/account" },
+          ]}
+          active={active}
+        />
+      )}
+    </div>
+  );
+}
+export function AccessGate({
+  children,
+  allowExpired = false,
+}: {
+  children: ReactNode;
+  allowExpired?: boolean;
+}) {
+  const { state, error } = useAttendant();
+  const router = useRouter();
+  useEffect(() => {
+    if (state?.access === "signed_out") go(router, "/attendant/sign-in", true);
+    else if (state?.access === "expired" && !allowExpired)
+      go(router, "/attendant/access-expired", true);
+  }, [state?.access, allowExpired, router]);
+  if (
+    !state?.session ||
+    state.access === "signed_out" ||
+    (state.access === "expired" && !allowExpired)
+  )
+    return (
+      <Frame title="Whales Rewards" noNav>
+        <Notice role="status">{error ?? "Checking access…"}</Notice>
+        {error && <Button onClick={() => location.reload()}>Try again</Button>}
+      </Frame>
+    );
+  return (
+    <div key={`${state.session.account.id}:${state.session.captureContextId}`}>
+      {children}
+    </div>
+  );
+}
+export function useOwnCount() {
+  const { client, state } = useAttendant();
+  const [count, setCount] = useState<number | null>(null);
+  const accountId = state?.session?.account.id;
+  const contextId = state?.session?.captureContextId;
+  const access = state?.access;
+  useEffect(() => {
+    let current = true;
+    if (client && accountId && access !== "signed_out")
+      void client.ownSales().then(
+        (rows) => {
+          if (current)
+            setCount(
+              rows.filter(
+                (row) => !["credited", "held", "cancelled"].includes(row.state),
+              ).length,
+            );
+        },
+        () => {
+          if (current) setCount(null);
+        },
+      );
+    return () => {
+      current = false;
+    };
+  }, [client, accountId, contextId, access]);
+  return count;
+}
+export function WindowNotice() {
+  return (
+    <Notice tone="warning">
+      Offline recording lasts <b>24 hours</b> after an online sign-in. Reopening
+      the app does not extend it.
+    </Notice>
+  );
+}

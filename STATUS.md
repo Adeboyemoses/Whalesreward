@@ -1,7 +1,7 @@
 # STATUS.md
 Updated: 2026-11-04
 
-## Milestone: M0 foundation delivery; M4 specification handoff (docs/engineering/roadmap.md)
+## Milestone: M1 vertical slice delivery; M4 specification handoff (docs/engineering/roadmap.md)
 
 ## Done this week
 - WO-spec-3a (WHR-52): ACCEPTED by Earl on 4 November 2026. Amendment PR #23 merged at 6663001 with three independent PASS verdicts and green CI. Accepted closeout PR #26 merged at b3debf0 with all five CI checks green; WHR-52 is Done. P-18/P-19 remain the build rules, with Q-528 client confirmation pending.
@@ -48,4 +48,4 @@ WO-app-0 findings (2026-11-04): draft runbooks split by capture/local-save versu
 
 WO-app-1 (WHR-2): ACCEPTED by Earl on 4 November 2026: “Earl accepted WO-app-1 (WHR-2); close it.” Foundation PR #12 and wrap fixes PR #20 are merged into staging. Independent component and viewport checks are recorded in docs/qa/design-system-fidelity.md and design-system-wrap-fidelity.md. Closeout is documentation only. WHR-45 remains separately tracked.
 
-WO-app-2 (WHR-5): BUILD under Earl’s explicit session go. Smoke runbook written before implementation; typed M1 client adapter and test-only contract fake precede real WO-core-3 endpoint integration. Stop at READY with Playwright green; Earl’s phone smoke waits until WO-core-3 merges.
+WO-app-2 (WHR-5): READY on reviewed green staging merge of app/wo-2-offline. Typed M1 adapter, static attendant screens, live photo/QR capture, account-partitioned Dexie queue, conservative 24-hour access and generic-only Workbox shell cache. EM checks: typecheck/lint/build, 74 unit tests, 32 Playwright checks and both timezone runs pass. Independent fidelity covers eleven boards at 390/360 px; report docs/qa/offline-capture-fidelity.md. Phone runbook docs/qa/smoke-2026-11-04-offline-capture.md was written first. STOP at READY: Earl’s phone smoke waits until WO-core-3 merges; upload/credit are later work. No real backend or device acceptance is claimed.
