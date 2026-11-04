@@ -365,6 +365,16 @@ for (const width of [390, 360]) {
       expect(wordmark.right).toBeLessThanOrEqual(pillBox!.x);
       expect(pillBox!.x + pillBox!.width).toBeLessThanOrEqual(width);
     }
+    const output = path.join(import.meta.dirname, "screenshots", "wrap-fix");
+    await mkdir(output, { recursive: true });
+    await page.addStyleTag({
+      content: "nextjs-portal { display: none !important; }",
+    });
+    for (const component of ["AppHeader", "AttendantShell"]) {
+      await page.locator(`[data-component="${component}"]`).screenshot({
+        path: path.join(output, `${component}-${width}.built.png`),
+      });
+    }
     const example = page.locator('[data-component="AppHeader"]');
     await example
       .getByRole("button", { name: "Toggle connection preview" })
@@ -399,6 +409,8 @@ for (const width of [390, 360]) {
     expect(identity.top).toBeGreaterThanOrEqual(name.bottom - 1);
     expect(station.top).toBeGreaterThanOrEqual(identity.bottom - 1);
     expect(id.fontFamily).toContain("IBM Plex Mono");
+    expect(Math.abs(identity.left - name.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(station.left - name.left)).toBeLessThanOrEqual(1);
     const box = await card.boundingBox();
     for (const line of [name, identity, station]) {
       expect(line.left).toBeGreaterThanOrEqual(box!.x);
@@ -409,5 +421,13 @@ for (const width of [390, 360]) {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    const output = path.join(import.meta.dirname, "screenshots", "wrap-fix");
+    await mkdir(output, { recursive: true });
+    await page.addStyleTag({
+      content: "nextjs-portal { display: none !important; }",
+    });
+    await page.locator('[data-component="LoyaltyCard"]').screenshot({
+      path: path.join(output, `LoyaltyCard-${width}.built.png`),
+    });
   });
 }
