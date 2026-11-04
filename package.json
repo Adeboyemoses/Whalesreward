@@ -1,0 +1,48 @@
+{
+  "name": "whales-rewards",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "scripts": {
+    "dev": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next dev",
+    "build": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next build",
+    "start": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "TZ=UTC vitest run --project unit",
+    "test:integration": "TZ=UTC vitest run --project integration",
+    "test:time": "TZ=UTC vitest run --project time --passWithNoTests && TZ=America/New_York vitest run --project time --passWithNoTests",
+    "test:e2e": "TZ=UTC playwright test",
+    "db:migrate:dev": "prisma migrate dev --create-only",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "job:retention": "node jobs/retention.ts",
+    "job:orphans": "node jobs/orphans.ts",
+    "job:reconcile-uploads": "node jobs/reconcile-uploads.ts",
+    "job:backup-manifest": "node jobs/backup-manifest.ts"
+  },
+  "dependencies": {
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.1",
+    "eslint-config-next": "16.4.5",
+    "pg": "8.23.1",
+    "prettier": "3.9.10",
+    "prisma": "7.10.1",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  }
+}
