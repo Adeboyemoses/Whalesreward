@@ -25,3 +25,5 @@ Updated: 2026-11-04
 - Five-to-six-week estimate against a November launch target for a December giveaway.
 - Brand and product name awaiting client sign-off (Q-516).
 - Verification provider, token expiries and role matrix not decided (D06).
+
+WO-app-0 findings (2026-11-04): draft runbooks split by capture/local-save versus server confirmation; row 02 checks expiry and omits the M2 registration link in M1. Ready after findings PR merge for Earl’s re-read; phone execution remains pending implementation.
