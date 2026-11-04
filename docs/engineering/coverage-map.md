@@ -78,11 +78,11 @@ Database constraints and pure helpers support the following invariants; they do 
 
 | Foundation | Invariants supported | Named tests | Status |
 |---|---|---|---|
-| Exact kobo and captured-precision quantity arithmetic | I-29 | src/shared/money.test.ts; src/shared/quantity.test.ts | building |
-| Explicit Lagos receipt/midnight helper | I-37, I-38 | tests/time/lagos.time.test.ts (UTC and America/New_York) | building |
-| Unit-separated quantities | I-44 | src/shared/quantity.test.ts | building |
-| Entity storage, normalized-phone uniqueness, fixed categories and product units | I-14, I-15, I-29, I-30 | tests/integration/schema-contract.test.ts | building |
-| Immutable originals, append-only audit and operation uniqueness | I-22, I-28, I-41 | tests/integration/core-schema.test.ts | building |
+| Exact kobo and captured-precision quantity arithmetic | I-29 | src/shared/money.test.ts; src/shared/quantity.test.ts | on-staging |
+| Explicit Lagos receipt/midnight helper | I-37, I-38 | tests/time/lagos.time.test.ts (UTC and America/New_York) | on-staging |
+| Unit-separated quantities | I-44 | src/shared/quantity.test.ts | on-staging |
+| Entity storage, normalized-phone uniqueness, fixed categories and product units | I-14, I-15, I-29, I-30 | tests/integration/schema-contract.test.ts | on-staging |
+| Immutable originals, append-only audit and operation uniqueness | I-22, I-28, I-41 | tests/integration/core-schema.test.ts | on-staging |
 
 ## Hi-fi boards (106, in canvas row order)
 

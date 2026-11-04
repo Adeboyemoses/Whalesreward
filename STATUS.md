@@ -10,9 +10,10 @@ Updated: 2026-11-04
 - Linear team WhalesReward (WHR) created by Earl.
 - WO-core-1 (WHR-1) Repository scaffold merged to staging in PR #3; strict Next.js scaffold, pinned tooling, local services and all five required CI checks passed. ACCEPTED by Earl: "Accepted. Scaffold verified." No product features implemented.
 
+- WO-core-2 (WHR-3): schema and exact helpers merged to staging in PR #10; READY for Earl’s backend verification. Three independent reviewers passed; unit 14, integration 48, time 3 per timezone and all five CI checks passed. Feature services remain out of scope.
+
 ## In progress
 - Earl's one-time setup (docs/agentic/setup.md).
-- WO-core-2 (WHR-3): core schema and exact money, quantity and Lagos time helpers; data-model PR #4 merged, builders dispatched, high-tier review pending.
 - WO-core-1b (WHR-41): regression-test draft preserved; Earl redirected lane:core to WHR-3 before the validator fix.
 - WO-app-0 (WHR-33): M0/M1 implementation briefs and draft phone smoke runbooks; six briefs and three draft phone runbooks prepared for staging; Earl reads row 02 and one runbook after merge. No app implementation or device verification claimed.
 
@@ -22,7 +23,7 @@ Updated: 2026-11-04
 - Launch date versus the December campaign start.
 
 ## Next up
-- Finish WO-core-2 verification and review; resume WHR-41 only when assigned. WO-app-1 follows its own approval.
+- Await Earl’s acceptance/findings for WO-core-2; resume WHR-41 only when assigned. WO-app-1 follows its own approval.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.
