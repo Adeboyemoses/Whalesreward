@@ -36,6 +36,25 @@ afterEach(async () => {
   open.length = 0;
   await db.delete();
 });
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+async function handoverClient(otherTab: boolean) {
+  if (!otherTab) return client;
+  const second = new AttendantClient(
+    api,
+    new CaptureDatabase(db.name),
+    () => ({ wall: now, mono, runtimeId: "handover-tab" }),
+    () => online,
+  );
+  open.push(second);
+  await second.initialize();
+  return second;
+}
 async function input(): Promise<CaptureInput> {
   const blob = new Blob(["fictional compressed jpeg"], { type: "image/jpeg" });
   const sha256 = Array.from(
@@ -221,36 +240,105 @@ describe("durable account partition", () => {
     expect(row.original.entry.quantity).toBe("10.25");
   });
   it("a delayed lookup cannot return after same-account reauthentication", async () => {
-    let resolve!: (
-      value: Awaited<ReturnType<FakeAttendantApi["lookup"]>>,
-    ) => void;
+    const entered = deferred<void>();
+    const response =
+      deferred<Awaited<ReturnType<FakeAttendantApi["lookup"]>>>();
     const result = await api.lookup({ source: "code", code: "A7K3M9X" });
-    api.lookup = () =>
-      new Promise((r) => {
-        resolve = r;
-      });
+    api.lookup = () => {
+      entered.resolve();
+      return response.promise;
+    };
     const pending = client.lookup("A7K3M9X");
-    await new Promise((r) => setTimeout(r, 5));
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: "account_changed",
+    });
+    await entered.promise;
     api.current = { ...api.current, captureContextId: uuidv7() };
     await client.signIn("grace", "fictional");
-    resolve(result);
-    await expect(pending).rejects.toMatchObject({ code: "account_changed" });
+    response.resolve(result);
+    await rejected;
   });
-  it("a delayed sign-in after signout cannot restore a window or leave a usable cookie", async () => {
-    let resolve!: (value: ReturnType<typeof sessionFixture>) => void;
-    const fresh = { ...api.current, captureContextId: uuidv7() };
-    api.signIn = () =>
-      new Promise((r) => {
-        resolve = r;
-      });
+  it("immediate same-tab handover cancels sign-in before its first local await completes", async () => {
+    let credentialRequests = 0;
+    api.signIn = async () => {
+      credentialRequests++;
+      return { ...api.current, captureContextId: uuidv7() };
+    };
     const pending = client.signIn("grace", "fictional");
-    await new Promise((r) => setTimeout(r, 5));
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: "account_changed",
+    });
     await client.signOut();
-    resolve(fresh);
-    await expect(pending).rejects.toMatchObject({ code: "account_changed" });
-    expect(client.getState().access).toBe("signed_out");
-    expect((await db.meta.get("installation"))?.activeAccountId).toBeNull();
+    await rejected;
+    expect(credentialRequests).toBe(0);
+    expect((await client.checkAccess()).access).toBe("signed_out");
   });
+  it.each([false, true])(
+    "handover during prerequisite revocation cancels the older sign-in before any credential request (other tab: %s)",
+    async (otherTab) => {
+      const actor = await handoverClient(otherTab);
+      // A previous offline sign-out must be revoked before a new credential request.
+      online = false;
+      await client.signOut();
+      online = true;
+      const entered = deferred<void>();
+      const resume = deferred<void>();
+      let revocations = 0;
+      let credentialRequests = 0;
+      api.signOut = async () => {
+        if (++revocations === 1) {
+          entered.resolve();
+          await resume.promise;
+        }
+      };
+      api.signIn = async () => {
+        credentialRequests++;
+        return { ...api.current, captureContextId: uuidv7() };
+      };
+      const pending = client.signIn("grace", "fictional");
+      const outcome = pending.then(
+        (value) => ({ value, error: null }),
+        (error) => ({ value: null, error }),
+      );
+      await entered.promise;
+      await actor.signOut();
+      resume.resolve();
+      expect((await outcome).error).toMatchObject({ code: "account_changed" });
+      expect(credentialRequests).toBe(0);
+      expect((await client.checkAccess()).access).toBe("signed_out");
+      expect((await db.meta.get("installation"))?.activeAccountId).toBeNull();
+    },
+  );
+  it.each([false, true])(
+    "a sign-in response arriving after handover cannot restore a window or usable cookie (other tab: %s)",
+    async (otherTab) => {
+      const actor = await handoverClient(otherTab);
+      const entered = deferred<void>();
+      const response = deferred<ReturnType<typeof sessionFixture>>();
+      const fresh = { ...api.current, captureContextId: uuidv7() };
+      let usableCookie = false;
+      api.signIn = async () => {
+        entered.resolve();
+        const result = await response.promise;
+        usableCookie = true;
+        return result;
+      };
+      api.signOut = async () => {
+        usableCookie = false;
+      };
+      const pending = client.signIn("grace", "fictional");
+      const rejected = expect(pending).rejects.toMatchObject({
+        code: "account_changed",
+      });
+      await entered.promise;
+      await actor.signOut();
+      response.resolve(fresh);
+      await rejected;
+      expect(usableCookie).toBe(false);
+      expect((await client.checkAccess()).access).toBe("signed_out");
+      expect((await db.meta.get("installation"))?.activeAccountId).toBeNull();
+    },
+  );
   it("wrong photo digest cannot be saved", async () => {
     const form = await input();
     await expect(

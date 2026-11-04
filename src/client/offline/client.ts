@@ -43,6 +43,7 @@ export class AttendantClient {
   private previousMono = new Map<string, number>();
   private channel: BroadcastChannel | null = null;
   private checking: Promise<ClientState> | null = null;
+  private authEpoch = 0;
   constructor(
     private api: AttendantApi = new HttpAttendantApi(),
     private db = new CaptureDatabase(),
@@ -84,16 +85,22 @@ export class AttendantClient {
   private signal() {
     this.channel?.postMessage("changed");
   }
-  private async installation(): Promise<Installation> {
+  private async installation(signInAttempt?: string): Promise<Installation> {
     return this.db.transaction("rw", this.db.meta, async () => {
       const found = await this.db.meta.get("installation");
-      if (found) return found;
+      if (found) {
+        if (signInAttempt === undefined) return found;
+        const claimed = { ...found, signInAttempt };
+        await this.db.meta.put(claimed);
+        return claimed;
+      }
       const row: Installation = {
         key: "installation",
         deviceId: uuidv7(),
         activeAccountId: null,
         logoutPending: false,
         logoutOperationId: null,
+        signInAttempt: signInAttempt ?? null,
       };
       await this.db.meta.add(row);
       return row;
@@ -172,10 +179,20 @@ export class AttendantClient {
   }
   async signIn(username: string, password: string): Promise<ClientState> {
     this.requireOnline();
-    await this.revokePending();
-    const meta = await this.installation();
+    const epoch = ++this.authEpoch;
     const attempt = uuidv7();
-    await this.db.meta.update("installation", { signInAttempt: attempt });
+    // Claim the attempt in the first transaction, before any revocation/network wait.
+    // Handover can invalidate this claim but this invocation never writes it again.
+    const meta = await this.installation(attempt);
+    if (epoch !== this.authEpoch) throw this.accountChanged();
+    await this.revokePending();
+    const current = await this.db.meta.get("installation");
+    if (
+      epoch !== this.authEpoch ||
+      current?.signInAttempt !== attempt ||
+      current.logoutPending
+    )
+      throw this.accountChanged();
     // Explicit sign-in is the only operation that creates or unlocks an offline window.
     const session = sessionSchema.parse(
       await this.api.signIn(
@@ -208,7 +225,11 @@ export class AttendantClient {
         this.db.windows,
         async () => {
           const current = await this.db.meta.get("installation");
-          if (current?.signInAttempt !== attempt || current.logoutPending)
+          if (
+            epoch !== this.authEpoch ||
+            current?.signInAttempt !== attempt ||
+            current.logoutPending
+          )
             throw new ClientError(
               "account_changed",
               "Another sign-in or sign-out occurred. Sign in again.",
@@ -242,7 +263,14 @@ export class AttendantClient {
     this.signal();
     return this.checkAccess();
   }
+  private accountChanged() {
+    return new ClientError(
+      "account_changed",
+      "Another sign-in or sign-out occurred. Sign in again.",
+    );
+  }
   async signOut(): Promise<ClientState> {
+    ++this.authEpoch;
     const key = uuidv7();
     await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
       const meta = await this.db.meta.get("installation");
