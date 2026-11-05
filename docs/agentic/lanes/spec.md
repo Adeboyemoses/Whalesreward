@@ -1,21 +1,20 @@
 # lane:spec
-WO-spec-3b (WHR-61) capture interval and M3 capture review: READY on reviewed green staging merge, 2026-11-05
+WO-spec-3b (WHR-61) capture interval and M3 capture review: ACCEPTED since 2026-11-05
 
 ## In flight
-- Specification PR branch `spec/wo-3b-capture`; merged PR and code/security/integrity verdicts are recorded on [WHR-61](https://linear.app/phaneum/issue/WHR-61). READY takes effect only after merge and green CI; then stop for Earl's verification.
-- P-20 refines P-18: [S, min(R, original offlineExpiresAt)]; receipt after expiry alone does not hold. M3 evidence-backed capture review requires sales AND dateReview and clears only capture blocks or cancels.
-- No application code or board parity. Q-528 remains pending. WHR-61 stays In Review, not Done, at READY.
+- Earl accepted the specification in [PR #38](https://github.com/Adeboyemoses/Whalesreward/pull/38), merged into staging at 5304f34 with independent code/security/integrity PASS and all five CI checks green.
+- P-20 and the M1/M3/model/I-45a amendments are accepted. This documentation closeout moves WHR-61 to Done after its reviewed green staging merge; the closeout PR is linked from WHR-61.
+- No new implementation or board parity is claimed. WO-core-4a's interval implementation merged separately in PR #39; M3 capture review remains WO-core-9.
 
 ## Next
-- Stop at READY. WO-core-4a implements the interval; WO-core-9 implements capture review. No further spec work order is started.
+- Stop after closure. No new work order is authorized.
 
 ## Earl's gos
-- 2026-11-05: “[spec · WO-spec-3b] You are the engineering manager for lane:spec. Work order: WO-spec-3b (WHR-61), Earl's P-20 refinement of the capture interval and the M3 capture review. Take it to READY, then stop. Follow AGENTS.md.”
+- 2026-11-05: “[spec] Earl accepted WO-spec-3b (WHR-61); close it, then stop. No new work order.”
 
 ## Risks
-- Client Q-528 confirmation remains pending; Rook should carry P-20 into the read-only product docs.
-- Existing implementation remains P-18 until WO-core-4a; capture decision/evidence checks await WO-core-9. Missing/insufficient evidence never grants credit.
-- No cloud or main action authorized. Runtime full model ID unavailable.
-- Dispatch flag: PR #38 uses 9 reviews (>8 high-tier threshold); round 3 rechecks overlapping status/coverage files after concurrent core closeout #37 merged. No new product scope.
+- Q-528 remains pending client confirmation; acceptance does not settle it.
+- PR #38's nine review dispatches exceeded the high-tier flag because concurrent status/coverage updates required a third review round; all three final verdicts passed. Delivery metrics and verification remain in that PR.
+- Metrics below cover this documentation closeout only. Runtime full model ID unavailable.
 
-dispatches=9 prs=1 rounds_max=3 escalations=0 model=unavailable
+dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable

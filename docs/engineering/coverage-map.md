@@ -22,7 +22,7 @@ WHR-54/55/56 track reconciliation/upload proof, launch/start/timing changes and 
 
 ## WO-spec-3b documentation status (WHR-61)
 
-P-20 refines P-18 in M1/M3, the data model and I-45a: capture interval [S, min(R, original offlineExpiresAt)] and evidence-backed capture review with sales AND dateReview. Documentation reaches READY on this branch's reviewed green staging merge; the merged PR and three verdicts are recorded on [WHR-61](https://linear.app/phaneum/issue/WHR-61). Q-528 remains pending. No application code, implementation tests or board parity are claimed.
+P-20 refines P-18 in M1/M3, the data model and I-45a: capture interval [S, min(R, original offlineExpiresAt)] and evidence-backed capture review with sales AND dateReview. Documentation status: ACCEPTED by Earl on 5 November 2026. [PR #38](https://github.com/Adeboyemoses/Whalesreward/pull/38) merged at 5304f34 with green CI and independent code/security/integrity PASS. WHR-61 moves to Done after this reviewed documentation closeout merges. Q-528 remains pending. Acceptance covers the specification; implementation coverage and board-parity statuses remain unchanged.
 
 WO-core-4a must verify late receipt, changes after versus at/before U, exact expiry, immutable bounds on retry/recovery, and receipt-based upload deadlines. WO-core-9 must verify capture confirm/cancel, insufficient evidence, permission conjunction/revocation, Domain replay, stale/concurrent guards, independent holds and retained resolutions. WO-core-4a adds the capped-policy implementation tests below; capture review remains WO-core-9. S03/S06/S07 remain visual inputs only; no capture-review board is invented.
 
