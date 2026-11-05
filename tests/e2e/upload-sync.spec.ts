@@ -35,6 +35,30 @@ async function reconnect(page: Page, fake: AttendantFake) {
   fake.setOffline(false);
   await page.context().setOffline(false);
 }
+// A routed PUT/request count is not a durable failure acknowledgement. Wait
+// through both the error patch and finally's lease release before replacing
+// the document, so these cases exercise retry of a completed failed attempt.
+async function photoFailureSettled(page: Page, operationId: string) {
+  await expect
+    .poll(async () => {
+      const row = (await rows(page)).find(
+        (row) => row.operationId === operationId,
+      );
+      return {
+        error: row?.lastErrorCode,
+        attempted: (row?.attempts ?? 0) > 0,
+        scheduled: !!row?.nextAttemptAt,
+        lease: row?.syncLease,
+      };
+    })
+    .toEqual({
+      error: "photo_upload_failed",
+      attempted: true,
+      scheduled: true,
+      lease: null,
+    });
+}
+
 async function synced(page: Page) {
   await expect(
     page.getByRole("heading", { name: "Sale synced", exact: true }),
@@ -131,6 +155,7 @@ test("I-25 partial photo failure retains evidence and retry uses the original sa
   fake.sync.setPutFailure(true);
   const original = await savedOffline(page, fake);
   await reconnect(page, fake);
+  await photoFailureSettled(page, original.operationId);
   await page.goto("/attendant/uploads");
   await expect(
     page.getByText("Photo upload failed", { exact: true }),
@@ -145,6 +170,11 @@ test("I-25 partial photo failure retains evidence and retry uses the original sa
     page.getByRole("heading", { name: "All uploads complete", exact: true }),
   ).toBeVisible({ timeout: 20000 });
   expect(fake.sync.records.size).toBe(1);
+  expect([...fake.sync.records.values()][0]!.credits).toBe(1);
+  const retried = (await rows(page))[0]!;
+  expect(retried.original).toEqual(original.original);
+  expect(retried.photoBlob).toEqual(original.photoBlob);
+  expect(retried.serverStatus?.photoValidated).toBe(true);
 });
 
 test("I-25 expired permission renews permission identity without changing the sale or photo", async ({
@@ -434,12 +464,7 @@ test("I-25 expired storage PUT permission preserves the signed-in account and re
   fake.sync.setPutForbidden(true);
   const original = await savedOffline(page, fake);
   await reconnect(page, fake);
-  await expect
-    .poll(
-      () =>
-        fake.sync.calls.filter((c) => c.path.startsWith("/storage/")).length,
-    )
-    .toBeGreaterThan(0);
+  await photoFailureSettled(page, original.operationId);
   await page.goto("/attendant/uploads");
   await expect(
     page.getByRole("heading", { name: "Pending uploads", exact: true }),
@@ -456,4 +481,8 @@ test("I-25 expired storage PUT permission preserves the signed-in account and re
   ).toBeVisible({ timeout: 20000 });
   expect(fake.sync.records.size).toBe(1);
   expect([...fake.sync.records.values()][0]!.credits).toBe(1);
+  const retried = (await rows(page))[0]!;
+  expect(retried.original).toEqual(original.original);
+  expect(retried.photoBlob).toEqual(original.photoBlob);
+  expect(retried.serverStatus?.photoValidated).toBe(true);
 });
