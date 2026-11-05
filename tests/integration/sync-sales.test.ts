@@ -690,6 +690,41 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
     );
     expect(status.status).toBe(200);
     expect((await status.json()).data.purchaseId).toBe(body.data.purchaseId);
+    process.env.STORAGE_ENDPOINT = endpoint;
+    process.env.STORAGE_REGION = storageConfig.region;
+    process.env.STORAGE_BUCKET = bucket;
+    process.env.STORAGE_ACCESS_KEY_ID = storageConfig.accessKeyId;
+    process.env.STORAGE_SECRET_ACCESS_KEY = storageConfig.secretAccessKey;
+    const permissionResponse = await handleSync(
+      request({ operationId: newId(), ...f.original.photo }),
+      "upload-permission",
+      body.data.purchaseId,
+    );
+    expect(permissionResponse.status).toBe(200);
+    const permission = (await permissionResponse.json()).data;
+    await put(permission.url, permission.headers, jpeg);
+    const finalizeBody = {
+      operationId: newId(),
+      uploadId: permission.uploadId,
+      expectedVersion: body.data.version,
+    };
+    const finalizeResponse = await handleSync(
+      request(finalizeBody),
+      "finalize",
+      body.data.purchaseId,
+    );
+    expect(finalizeResponse.status).toBe(200);
+    expect((await finalizeResponse.json()).data.state).toBe("credited");
+    expect(
+      (
+        await handleSync(
+          request(finalizeBody),
+          "finalize",
+          body.data.purchaseId,
+        )
+      ).status,
+    ).toBe(200);
+    expect(await creditCount(body.data.purchaseId)).toBe(1);
   });
   it("I-22 changed arithmetic under an existing operation conflicts before new-sale calculation validation", async () => {
     const f = await syncFixture(pool, jpeg);
