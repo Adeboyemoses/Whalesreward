@@ -17,4 +17,4 @@ WO-spec-3b (WHR-61) capture interval and M3 capture review: READY on reviewed gr
 - Existing implementation remains P-18 until WO-core-4a; capture decision/evidence checks await WO-core-9. Missing/insufficient evidence never grants credit.
 - No cloud or main action authorized. Runtime full model ID unavailable.
 
-dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
