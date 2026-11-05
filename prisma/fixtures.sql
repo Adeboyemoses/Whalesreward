@@ -48,3 +48,6 @@ INSERT INTO permission (id,code,required_view_code) VALUES ('019a5000-0000-7000-
 INSERT INTO role_permission (role_id,permission_code) VALUES ('019a5000-0000-7000-8000-000000000001','giveawayRevise') ON CONFLICT DO NOTHING;
 INSERT INTO permission (id,code,required_view_code) VALUES ('019a5000-0000-7000-8000-000000000038','priceReview','salesView') ON CONFLICT DO NOTHING;
 INSERT INTO role_permission (role_id,permission_code) VALUES ('019a5000-0000-7000-8000-000000000001','priceReview') ON CONFLICT DO NOTHING;
+
+-- Bootstrap explicit canonical Owner grants without changing custom roles.
+INSERT INTO role_permission(role_id,permission_code) SELECT '019a5000-0000-7000-8000-000000000001'::uuid,code FROM permission WHERE code=ANY(ARRAY['overview','sales','corrections','duplicates','priceReview','queueRecovery','cardEligibility','dateReview','giveawayFinalize','giveawayRevise','customers','recovery','managerRecovery','leaderboards','reports','reportExport','cards','cardGenerate','cardExport','cardPrint','cardActivate','attendants','pumps','prices','settings','audit','users','roles']) ON CONFLICT DO NOTHING;

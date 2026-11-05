@@ -1,0 +1,54 @@
+-- Additive M2 access state. Existing credentials, grants and audit history remain.
+ALTER TABLE auth_user ADD COLUMN last_sign_in_at TIMESTAMPTZ, ADD COLUMN created_by_user_id UUID REFERENCES auth_user(id);
+ALTER TABLE admin ADD COLUMN verification_generation BIGINT NOT NULL DEFAULT 0 CHECK(verification_generation>=0), ADD COLUMN reset_generation BIGINT NOT NULL DEFAULT 0 CHECK(reset_generation>=0);
+ALTER TABLE auth_session ADD COLUMN access_scope TEXT NOT NULL DEFAULT 'full' CHECK(access_scope IN ('full','first_password')), ADD COLUMN last_activity_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp();
+CREATE UNIQUE INDEX uq_role_normalized_name ON role(lower(btrim(name)));
+CREATE TABLE security_state (id BOOLEAN PRIMARY KEY DEFAULT true CHECK(id), version BIGINT NOT NULL DEFAULT 1 CHECK(version>0));
+INSERT INTO security_state(id) VALUES(true);
+CREATE TABLE mutation_receipt (actor_user_id UUID NOT NULL REFERENCES auth_user(id), operation_kind TEXT NOT NULL, operation_id UUID NOT NULL, request_digest TEXT NOT NULL, digest_key_version TEXT NOT NULL, result_snapshot JSONB NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), PRIMARY KEY(actor_user_id,operation_kind,operation_id));
+CREATE TRIGGER guard_mutation_receipt BEFORE UPDATE OR DELETE ON mutation_receipt FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns();
+CREATE TABLE auth_request_dedup (scope_digest TEXT NOT NULL, operation_kind TEXT NOT NULL CHECK(operation_kind IN ('admin_sign_in','reset_request')), request_key UUID NOT NULL, request_hmac TEXT NOT NULL, key_version TEXT NOT NULL, session_id UUID REFERENCES auth_session(id), expires_at TIMESTAMPTZ NOT NULL, tombstone_until TIMESTAMPTZ NOT NULL, PRIMARY KEY(scope_digest,operation_kind,request_key), CHECK(tombstone_until>=expires_at));
+CREATE TABLE mail_request (id UUID PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), admin_id UUID NOT NULL REFERENCES admin(id), purpose TEXT NOT NULL CHECK(purpose IN ('verify_email','reset_password','reset_notice')), generation BIGINT, operation_id UUID NOT NULL, target_digest TEXT NOT NULL, target_key_version TEXT NOT NULL, destination_email TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','sending','sent','failed','superseded')), challenge_id UUID REFERENCES verification_challenge(id), lease_nonce TEXT, lease_until TIMESTAMPTZ, fencing_version BIGINT NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0, sent_at TIMESTAMPTZ, failure_code TEXT, UNIQUE(admin_id,purpose,operation_id), CHECK((purpose='reset_notice' AND generation IS NULL) OR (purpose<>'reset_notice' AND generation>0)));
+CREATE INDEX mail_request_work ON mail_request(status,created_at);
+ALTER TABLE verification_challenge ADD COLUMN issuance_generation BIGINT, ADD COLUMN mail_request_id UUID REFERENCES mail_request(id), ADD COLUMN target_key_version TEXT;
+-- Extend existing immutable-column allowlists only for new live-state columns.
+DROP TRIGGER guard_auth_user_immutable ON auth_user;
+CREATE TRIGGER guard_auth_user_immutable BEFORE UPDATE OR DELETE ON auth_user FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('username','username_normalized','display_name','enabled','auth_version','must_change_password','updated_at','last_sign_in_at');
+DROP TRIGGER guard_admin_immutable ON admin;
+CREATE TRIGGER guard_admin_immutable BEFORE UPDATE OR DELETE ON admin FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('email_normalized','email_verified_at','role_id','version','verification_generation','reset_generation');
+DROP TRIGGER guard_auth_session_immutable ON auth_session;
+CREATE TRIGGER guard_auth_session_immutable BEFORE UPDATE ON auth_session FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('revoked_at','last_activity_at');
+CREATE TABLE admin_access_event (id UUID PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), target_type TEXT NOT NULL CHECK(target_type IN ('admin','role')), target_id UUID NOT NULL, action TEXT NOT NULL CHECK(action IN ('user_created','user_access_changed','role_created','role_changed','verification_requested','email_verified','password_changed','password_reset')), actor_user_id UUID REFERENCES auth_user(id), reason TEXT NOT NULL CHECK(length(btrim(reason)) BETWEEN 1 AND 1000), before_values JSONB, after_values JSONB);
+CREATE TRIGGER guard_admin_access_event BEFORE UPDATE OR DELETE ON admin_access_event FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns();
+
+-- Canonical action catalogue; legacy aliases remain historical and grant no runtime authority.
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000001', 'overview') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000002', 'sales') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000003', 'corrections') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000004', 'duplicates') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000005', 'priceReview') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000006', 'queueRecovery') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000007', 'cardEligibility') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000008', 'dateReview') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000009', 'giveawayFinalize') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000010', 'giveawayRevise') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000011', 'customers') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000012', 'recovery') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000013', 'managerRecovery') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000014', 'leaderboards') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000015', 'reports') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000016', 'reportExport') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000017', 'cards') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000018', 'cardGenerate') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000019', 'cardExport') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000020', 'cardPrint') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000021', 'cardActivate') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000022', 'attendants') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000023', 'pumps') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000024', 'prices') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000025', 'settings') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000026', 'audit') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000027', 'users') ON CONFLICT(code) DO NOTHING;
+INSERT INTO permission(id,code) VALUES('019a6000-0000-7000-8000-000000000028', 'roles') ON CONFLICT(code) DO NOTHING;
+INSERT INTO role_permission(role_id,permission_code) SELECT r.id,p.code FROM role r CROSS JOIN permission p WHERE r.is_owner AND p.code=ANY(ARRAY['overview','sales','corrections','duplicates','priceReview','queueRecovery','cardEligibility','dateReview','giveawayFinalize','giveawayRevise','customers','recovery','managerRecovery','leaderboards','reports','reportExport','cards','cardGenerate','cardExport','cardPrint','cardActivate','attendants','pumps','prices','settings','audit','users','roles']) ON CONFLICT DO NOTHING;
+CREATE TABLE admin_reset_work(id UUID PRIMARY KEY,created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),target_digest TEXT NOT NULL,cursor_id UUID,completed BOOLEAN NOT NULL DEFAULT false);
