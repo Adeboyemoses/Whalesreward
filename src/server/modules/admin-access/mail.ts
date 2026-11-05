@@ -129,7 +129,7 @@ async function resolveResetWork(db: pg.PoolClient, config: AdminConfig) {
       "SELECT * FROM admin_reset_work WHERE NOT completed ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
     )
   ).rows[0];
-  if (!work) return;
+  if (!work) return false;
   const rows = (
     await db.query(
       "SELECT a.*,u.enabled FROM admin a JOIN auth_user u ON u.id=a.user_id WHERE ($1::uuid IS NULL OR a.id>$1) ORDER BY a.id LIMIT 100",
@@ -152,6 +152,7 @@ async function resolveResetWork(db: pg.PoolClient, config: AdminConfig) {
       "UPDATE admin_reset_work SET completed=$2,cursor_id=$3 WHERE id=$1",
       [work.id, rows.length < 100, rows.at(-1)?.id ?? work.cursor_id],
     );
+  return true;
 }
 export async function processMail(
   pool: pg.Pool,
@@ -164,15 +165,19 @@ export async function processMail(
       mailpitUrl: config.mailpitUrl,
     }),
 ) {
+  // A processed step can advance lookup/cleanup without sending a message.
+  // Only exhaustion returns false, so the bounded job can reach later work.
+  let progressed = false;
   const task = await transaction(pool, async (db) => {
     await securityLock(db);
-    await resolveResetWork(db, config);
+    progressed = await resolveResetWork(db, config);
     // An interrupted sender cannot recover or reconstruct its raw token.
     const stale = (
       await db.query(
         "SELECT challenge_id FROM mail_request WHERE status='sending' AND lease_until<=clock_timestamp() FOR UPDATE",
       )
     ).rows;
+    progressed ||= stale.length > 0;
     for (const r of stale)
       if (r.challenge_id)
         await db.query(
@@ -207,6 +212,7 @@ export async function processMail(
         "UPDATE mail_request SET status='superseded' WHERE id=$1",
         [m.id],
       );
+      progressed = true;
       return null;
     }
     const nonce = randomBytes(32).toString("hex");
@@ -248,7 +254,7 @@ export async function processMail(
       token,
     };
   });
-  if (!task) return { processed: false };
+  if (!task) return { processed: progressed };
   let delivered = false;
   try {
     delivered = (

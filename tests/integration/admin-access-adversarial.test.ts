@@ -168,7 +168,7 @@ async function mailFor(email: string, subject: string) {
       }
       return { delivered: true };
     });
-    if (!result.processed && found) break;
+    if (!result.processed) break;
   }
   expect(found, `Expected fictional ${subject} delivery`).toBe(true);
   return token;
@@ -1054,6 +1054,168 @@ describe("independent M2 admin access adversarial checks", () => {
       ).rows[0].must_change_password,
     ).toBe(false);
     await login("ada.williams");
+  });
+
+  it("I-07/I-10 authorized role lists paginate and assignable roles exclude excess authority", async () => {
+    const actor = await account(await role(["users", "roles", "sales"]));
+    const allowedA = await role(["sales"]),
+      allowedB = await role([]),
+      forbidden = await role(["sales", "priceReview"]);
+    const first = await call("roles-list", {
+      cookie: actor.cookie,
+      query: "?limit=1",
+    });
+    expect(first.response.status, JSON.stringify(first.body)).toBe(200);
+    expect(first.body.data.items).toHaveLength(1);
+    expect(first.body.data.items[0].id).toBe(forbidden);
+    expect(first.body.data.nextCursor).toBeTruthy();
+    const second = await call("roles-list", {
+      cookie: actor.cookie,
+      query: `?limit=1&cursor=${encodeURIComponent(first.body.data.nextCursor)}`,
+    });
+    expect(second.response.status).toBe(200);
+    expect(second.body.data.items[0].id).toBe(allowedB);
+    const assignable = await call("assignable-roles", {
+      cookie: actor.cookie,
+      query: "?limit=1",
+    });
+    expect(assignable.response.status, JSON.stringify(assignable.body)).toBe(
+      200,
+    );
+    expect(assignable.body.data.items[0].id).toBe(allowedB);
+    const more = await call("assignable-roles", {
+      cookie: actor.cookie,
+      query: `?limit=1&cursor=${encodeURIComponent(assignable.body.data.nextCursor)}`,
+    });
+    expect(more.response.status).toBe(200);
+    expect(more.body.data.items[0].id).toBe(allowedA);
+    const all = await call("assignable-roles", {
+      cookie: actor.cookie,
+      query: "?limit=100",
+    });
+    expect(all.response.status).toBe(200);
+    expect(
+      all.body.data.items.some(
+        (r: { id: string; isOwner: boolean }) =>
+          r.id === forbidden || r.isOwner,
+      ),
+    ).toBe(false);
+    const wrongScope = await call("assignable-roles", {
+      cookie: actor.cookie,
+      query: `?limit=1&cursor=${encodeURIComponent(first.body.data.nextCursor)}`,
+    });
+    expect(wrongScope.response.status).toBe(400);
+  });
+
+  // Match jobs/admin-mail.ts exactly: false means stop, with a bounded 100-step run.
+  async function jobRun() {
+    const delivered: string[] = [];
+    for (let n = 0; n < 100; n++) {
+      const result = await processMail(pool, adminConfig(), async (message) => {
+        delivered.push(message.to);
+        return { delivered: true };
+      });
+      if (!result.processed) break;
+    }
+    return delivered;
+  }
+  async function isolateMailQueue() {
+    // Only this suite's disposable schema; prior cases retain their historical rows.
+    await pool.query(
+      "UPDATE admin_reset_work SET completed=true WHERE NOT completed",
+    );
+    await pool.query(
+      "UPDATE mail_request SET status='superseded' WHERE status='pending'",
+    );
+  }
+  it("I-12 bounded mail job continues after unknown and unverified requests to a valid reset", async () => {
+    await isolateMailQueue();
+    const empty = await role([]),
+      unverified = await account(empty),
+      valid = await account(empty, { verified: true });
+    for (const email of [
+      `unknown.${newId()}@example.com`,
+      unverified.email,
+      valid.email,
+    ]) {
+      expect(
+        (await call("password-reset-requests", { body: { email } })).response
+          .status,
+      ).toBe(202);
+    }
+    const sent = await jobRun();
+    expect(sent).toContain(valid.email);
+    expect(sent).not.toContain(unverified.email);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS n FROM admin_reset_work WHERE NOT completed",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  });
+  it("I-12 bounded mail job continues after superseding an obsolete delivery intent", async () => {
+    await isolateMailQueue();
+    const empty = await role([]),
+      stale = await account(empty),
+      valid = await account(empty);
+    for (const target of [stale, valid])
+      await adminWrite(
+        pool,
+        adminConfig(),
+        ownerCookie.split("=")[1],
+        "verification-requests",
+        { operationId: newId(), expectedVersion: 1 },
+        target.adminId,
+      );
+    await pool.query(
+      "UPDATE admin SET email_normalized=$2,version=version+1 WHERE id=$1",
+      [stale.adminId, `replacement.${newId()}@example.com`],
+    );
+    const sent = await jobRun();
+    expect(sent).toContain(valid.email);
+    expect(sent).not.toContain(stale.email);
+    expect(
+      (
+        await pool.query("SELECT status FROM mail_request WHERE admin_id=$1", [
+          stale.adminId,
+        ])
+      ).rows[0].status,
+    ).toBe("superseded");
+  });
+  it("I-12 bounded mail job continues across the 100-account lookup page", async () => {
+    await isolateMailQueue();
+    const empty = await role([]);
+    const userIds = Array.from({ length: 105 }, () => newId()),
+      adminIds = Array.from({ length: 105 }, () => newId());
+    await pool.query(
+      "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) SELECT id,'admin','page.'||id::text,'page.'||id::text,'Fictional pagination account',true,1,false,clock_timestamp() FROM unnest($1::uuid[]) AS id",
+      [userIds],
+    );
+    await pool.query(
+      "INSERT INTO admin(id,user_id,admin_code,email_normalized,role_id,version) SELECT a,u,'PAGE-'||a::text,'page.'||a::text||'@example.com',$3,1 FROM unnest($1::uuid[],$2::uuid[]) AS rows(a,u)",
+      [adminIds, userIds, empty],
+    );
+    const valid = await account(empty, { verified: true });
+    expect(
+      (
+        await pool.query("SELECT count(*)::int AS n FROM admin WHERE id<$1", [
+          valid.adminId,
+        ])
+      ).rows[0].n,
+    ).toBeGreaterThan(100);
+    expect(
+      (await call("password-reset-requests", { body: { email: valid.email } }))
+        .response.status,
+    ).toBe(202);
+    expect(await jobRun()).toContain(valid.email);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS n FROM admin_reset_work WHERE NOT completed",
+        )
+      ).rows[0].n,
+    ).toBe(0);
   });
 
   it("I-08 two concurrent Owner self-demotions leave exactly one active Owner", async () => {

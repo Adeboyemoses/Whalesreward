@@ -375,7 +375,6 @@ export async function adminRead(
             action === "assignable-roles",
             actor.is_owner,
             permissionCodes,
-            permissionLabels,
             actor.permissions.filter((p) => ADMIN_POLICY.delegable.includes(p)),
             limit + 1,
             offset,
