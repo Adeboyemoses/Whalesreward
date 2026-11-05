@@ -2,8 +2,8 @@
 branch: app/wo-3-uploads
 linear: WHR-7
 tier: high
-reviewed_head: f13ad2f6afe0632707a76fa5f7e54a15ad1d7694
-rounds: 4
+reviewed_head: d06883ba665f9c18b47f7b1dc2ce72a42976263e
+rounds: 5
 builder: offline-engineer
 reviewers:
   code-reviewer: PASS
@@ -52,5 +52,6 @@ Round 4 code/security/integrity reviewers all PASS f13ad2f; no findings, no app/
 Their prior application review carries forward; the plan block is unchanged.
 Earl replaced the conflict-resolution scope on 2026-11-05 (WHR-7 comment 27a527fb-af09-4d13-b6b5-083bc7e20ef5).
 Only the three named shared records were reset byte-for-byte to staging a1e674c; no other non-evidence file changed.
-One final documentation-only round is authorized; verdicts are pending.
+Round 5 code/security/integrity reviewers all PASS d06883b; zero findings; clean unchanged worktree.
+All three reset files match staging exactly; prior application reviews carry forward.
 READY records will follow in a separate PR after the feature merges with green CI and evidence.
