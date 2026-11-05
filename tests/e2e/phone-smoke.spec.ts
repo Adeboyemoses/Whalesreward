@@ -220,6 +220,73 @@ for (const mode of ["3G", "offline"] as const) {
   });
 }
 
+test("I-23 resolved capture saves and resets within two seconds even when every later lookup stalls", async ({
+  page,
+  context,
+}) => {
+  const fake = await installAttendantFake(context, { sync: true });
+  fake.sync.setPutPaused(true);
+  const release = deferred();
+  await signIn(page);
+  await waitForWorker(page);
+  await fillSale(page, { value: "20000.01" });
+  await expect(page.getByText("Amina Bello", { exact: true })).toBeVisible();
+  const session = structuredClone(fake.activeSession())!;
+  await context.route("**/api/attendant/cards/lookup", async (route) => {
+    await release.promise;
+    await route.fallback();
+  });
+  try {
+    expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+    const started = performance.now();
+    await page
+      .getByRole("button", { name: /^Save sale(?: on phone)?$/ })
+      .click({ noWaitAfter: true });
+    // Do not await a lookup request: the fixed implementation need not send one.
+    await expect(receipt(page)).toBeVisible({ timeout: 2000 });
+    expect(performance.now() - started).toBeLessThanOrEqual(2000);
+    const saved = await rows(page);
+    expect(saved).toHaveLength(1);
+    const original = saved[0]!;
+    expect(original.originatingAccountId).toBe(session.account.id);
+    expect(original.original).toMatchObject({
+      cardCode: "A7K3M9Q",
+      captureContextId: session.captureContextId,
+      assignmentId: session.assignment.id,
+      medium: "vehicle",
+      entry: {
+        basis: "amount",
+        enteredAmountKobo: "2000001",
+        amountKobo: "2000001",
+      },
+    });
+    expect(original.customerCache?.customer.name).toBe("Amina Bello");
+    expect(original.photoBlob.size).toBeGreaterThan(0);
+    expect(original.photoBlob.digest).toBe(original.original.photo.sha256);
+    await expect(
+      page.getByRole("heading", { name: "Sale synced", exact: true }),
+    ).toHaveCount(0);
+    expect(
+      [...fake.sync.records.values()].every(
+        (record) => !record.status.credited && record.credits === 0,
+      ),
+    ).toBe(true);
+    const next = performance.now();
+    await page
+      .getByRole("button", { name: "Record next sale", exact: true })
+      .click({ noWaitAfter: true });
+    await expect(form(page)).toBeVisible({ timeout: 2000 });
+    await expect(form(page)).toHaveValue("");
+    expect(performance.now() - next).toBeLessThanOrEqual(2000);
+    const remaining = (await rows(page))[0]!;
+    expect(remaining.original).toEqual(original.original);
+    expect(remaining.photoBlob).toEqual(original.photoBlob);
+  } finally {
+    release.resolve();
+    fake.sync.setPutPaused(false);
+  }
+});
+
 test("I-23 capture navigation never waits for a stalled RSC request", async ({
   page,
   context,
