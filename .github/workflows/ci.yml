@@ -57,6 +57,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: docker compose up -d minio
       - run: pnpm db:migrate:deploy && pnpm test:integration && pnpm test:time
 
   e2e:
