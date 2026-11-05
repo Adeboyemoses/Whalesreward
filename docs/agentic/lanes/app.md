@@ -1,26 +1,26 @@
 # lane:app
-WO-app-3 (WHR-7) Uploads, retries and synced receipt: BUILD; PR #35 awaits review-cap exception, 2026-11-05
-WO-app-2 (WHR-5) Offline capture: READY; Earl's phone smoke pending
+WO-app-0 (WHR-33) M0/M1 briefs and smoke runbooks: ACCEPTED since 2026-11-05
+WO-app-2 (WHR-5) Offline capture: READY on reviewed green staging merge, 2026-11-04
 
 ## In flight
-- PR #35 preserves the concurrent PR #34 closeout after resolving shared-doc conflicts. Application code is unchanged from the three PASS reviews; changed docs require re-review. Earl has been asked for one extra round; no approval or exception recorded yet.
-- app/wo-3-uploads: typed M1 submit/permission/PUT/finalize/status, durable leases and backoff, original/photo retention, authoritative receipts and holds, pending uploads and cancellable upload-first sign-out.
-- EM checks: typecheck/lint/build, 107 unit tests, 66 browser passes plus two unchanged targeted rerun passes (4 existing skips; WHR-60 tracks timing flakes), 3 time tests per timezone. Independent five-board fidelity at 390/360 px; ten screenshots.
-- Four first-round P1s fixed: storage403 versus session denial, backoff reset, delayed logout after cancellation, hidden cancellation reason. Second-round photo-rejection refresh fix retains Needs attention. Final code/security/integrity evidence: .review/app__wo-3-uploads.md.
-- WO-app-0 accepted closeout PR #31 merged; WO-app-1 accepted closeout #24 merged. WHR-5 remains READY.
+- WO-app-0 accepted documentation closeout; PRs #2 and #9 already merged. Mark WHR-33 Done after the reviewed closeout merges.
+- `app/wo-2-offline`: typed M1 HTTP adapter/test fake, Dexie v1 atomic account partitions, 24-hour/rollback lock, live camera/QR, static attendant screens and Workbox shell cache.
+- EM: typecheck/lint/build, 74 unit tests, 32 Playwright checks and 3 time tests per timezone pass. Independent fidelity: 11 boards at 390/360 px in `docs/qa/offline-capture-fidelity.md`.
+- WO-app-1 accepted and closed: PR #24 merged, WHR-2 Done; implementation #12 and wrapping #20.
 
 ## Next
-- Await Earl’s answer: recommend one extra review round for documentation reconciliation; default leave PR #35 unmerged. Then STOP at READY after green staging merge. Earl uses docs/qa/smoke-2026-11-05-upload-sync.md when WO-core-4 supplies real upload endpoints.
-- Keep WHR-5 READY pending Earl's phone smoke. No next work order started.
+- STOP at READY. Earl runs `docs/qa/smoke-2026-11-04-offline-capture.md` only after WO-core-3 merges.
+- Real session/sign-in endpoints belong to WO-core-3; uploading and crediting to WO-app-3/WO-core-4. No further scope started.
 
 ## Earl's gos
-- 2026-11-05: “approve WHR-7”.
-- 2026-11-05: “Build against docs/engineering/contracts/m1.md behind the existing typed adapter, with a contract-shaped fake; WO-core-4 provides the real endpoints. Never show "Synced" or credit from a client-side flag. Take it to READY, then stop.”
-- 2026-11-05: “WO-app-2 (WHR-5) stays READY until Earl's phone smoke.”
+- 2026-11-05: “Accept WO-app-0 (WHR-33)”. Documentation acceptance only; phone runbooks remain unexecuted drafts.
+- 2026-11-04: “Earl accepted WO-app-1 (WHR-2); close it.”
+- 2026-11-04: “Work order: WO-app-2 (WHR-5), offline capture.” Build against M1 typed adapter and test fake; “Take it to READY with Playwright green, then stop: Earl's phone smoke test waits until WO-core-3 merges.”
 
 ## Risks
-- Real storage validation/credit and physical Android acceptance remain pending. Contract fixtures do not prove server enforcement, camera readability, eviction or TalkBack.
-- WHR-45 quantity trailing-zero presentation remains unchanged. No auto deletion or browser-storage backup claim.
-- Dispatch flag: 16 exceeds the high-tier flag of 8 (three builders, targeted fixes and three independent review rounds).
+- Automated contract fixtures do not prove real authentication, Android camera readability, storage eviction or TalkBack behavior; phone acceptance pending.
+- WHR-45 quantity display drift remains separate. No upload-first completion in this capture-only order; UI explains pending sales.
+- Browser storage is not encrypted or a server backup; no automatic deletion implemented.
+- Dispatch flag: offline-capture PR exceeds 8 dispatches for deterministic handover/review fixes, runtime staging integration and a final documentation-only base reconciliation.
 
-dispatches=16 prs=1 rounds_max=3 escalations=1 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
