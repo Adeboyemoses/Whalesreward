@@ -106,3 +106,34 @@ Running 4 tests using 2 workers
 ```
 
 Zero failures and zero retries. Scoped ESLint exited 0 with no diagnostics.
+
+## EM repeat-run investigation
+
+The first independent 80-execution run finished **79 passed, 1 failed (14.0m)**,
+with two workers and zero retries. Attendant expired-PUT repeat 13 reached
+`Offline access expired` while awaiting completion. The durable failure and
+released-lease checkpoint had passed. The trace showed the same context and
+sign-in/next-day expiry across all session responses, so this was a different
+failure from the original navigation/lease race. The full suite on identical
+test/application code passed **68 tests, 4 existing skips (6.3m)**, zero retries.
+
+A temporary read-only observer of clock samples and window writes completed
+**40 instrumented executions (6.3m)** without reproducing the lock. An independent
+empty Chromium page, with no application or clock mocks, sampled the unchanged
+clocks 11,708 times over 60 seconds and observed this real environment rollback:
+
+| Sample | Wall clock (Unix ms) | Monotonic clock (ms) |
+| --- | --- | --- |
+| Before | 1793893115206 | 38250.8 |
+| After | 1793893115203 | 38261.2 |
+
+The wall clock stepped backward 3 ms while the monotonic clock advanced 10.4 ms
+(2026-11-05 15:38:35 UTC). The existing I-03 rollback unit test requires even a
+1 ms rollback to lock; no production policy change is justified by this result.
+The original failed trace lacks clock checkpoints, so attributing that failure
+to the observed environment rollback remains an inference, not direct proof.
+
+Diagnostic instrumentation was removed. The EM repeats the unchanged two-case
+fix for the required 80 executions; the final result and both CI execution links
+are recorded in review evidence and the PR. No browser clocks, expiry checks,
+timeouts or retry settings are changed to obtain a pass.
