@@ -1,21 +1,19 @@
 # lane:core
-WO-core-4a (WHR-62) capped capture policy: READY on reviewed green staging merge, 5 November 2026
+WO-core-4a (WHR-62) capped capture policy: ACCEPTED by Earl, 5 November 2026
 
 ## In flight
-- WHR-6 ACCEPTED/Done: implementation #36, documentation closeout [#37](https://github.com/Adeboyemoses/Whalesreward/pull/37), merge 2b65d9b; all five CI checks green and independent code-reviewer PASS.
-- WHR-62 started only after dependency [#38](https://github.com/Adeboyemoses/Whalesreward/pull/38) merged at 5304f34. P-20 caps exact capture history at original offline expiry, keeps receipt-based upload deadlines and stores policy version 2 only for new settlements.
-- Named tests cover Monday outage, in-window holds, exact expiry microseconds and unchanged v1 held replay. Final EM verification, implementation PR and independent code/security/integrity verdicts are posted on WHR-62; evidence: .review/core__wo-4a-capture.md.
+- Implementation [PR #39](https://github.com/Adeboyemoses/Whalesreward/pull/39) merged at a1e674c; five CI checks and independent code/security/integrity reviews passed. EM verification: unit108, integration104, browser36 with4 existing conditional skips, time3 per timezone, typecheck/lint/build PASS. Named output remains on WHR-62.
+- This records-only closeout moves WHR-62 to Done after green staging merge.
 
 ## Next
-- STOP at READY after green staging merge and pasted verification. Earl reads the results; no next work order starts.
-- M3 capture review belongs to WO-core-9; no silent hold re-evaluation or backfill.
+- Approved WO-core-1e (WHR-63): prevent feature PRs from editing shared records. Implementation and READY records use separate PRs. Stop at READY.
 
 ## Earl's gos
-- 2026-11-05: “Earl accepted WO-core-4 (WHR-6); close it.”
-- 2026-11-05: “Wait until WO-spec-3b (WHR-61) is merged into staging, then implement it, take it to READY and stop.”
+- 2026-11-05: “Earl accepted WO-core-4a (WHR-62); close it.”
+- 2026-11-05: “Next work order: WO-core-1e (WHR-63), feature PRs never edit STATUS.md, the coverage map or lane files.”
 
 ## Risks
-- Q-528 client confirmation remains pending. WHR-58 remains separate. Automated local evidence does not claim physical-phone or live Spaces acceptance.
-- No cloud-resource, staging-data or main-branch operations.
+- Q-528 and WHR-58 remain separate. M3 capture review stays in WO-core-9; existing held rows remain unchanged.
+- Task renamed as requested; running EM model change is not exposed by tools. Delegated work uses requested gpt-6.1-sol with role-prescribed reasoning.
 
-dispatches=5 prs=2 rounds_max=1 escalations=0 model=unavailable
+dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
