@@ -79,6 +79,40 @@ async function input(): Promise<CaptureInput> {
   };
 }
 describe("durable account partition", () => {
+  it("an inferred outage permits local pending capture but never suppresses browser-online revocation checks", async () => {
+    const local = new AttendantClient(
+      api,
+      new CaptureDatabase(db.name),
+      () => ({ wall: now, mono, runtimeId: "outage-tab" }),
+      () => true,
+      () => false,
+    );
+    open.push(local);
+    await local.initialize();
+    const form = await input();
+    api.lookup = async () => {
+      throw new Error("Lookup must stay local while unreachable");
+    };
+    expect(await local.lookup("A7K3M9Y")).toBeNull();
+    const saved = await local.saveCapture(await local.beginCapture(), {
+      ...form,
+      cardCode: "A7K3M9Y",
+      customerCache: null,
+    });
+    expect(saved.original.entry.amountKobo).toBe("2000000");
+    let revalidations = 0;
+    api.session = async () => {
+      revalidations++;
+      throw new ClientError("unauthenticated", "Revoked");
+    };
+    await local.refresh();
+    expect(revalidations).toBe(1);
+    expect(local.getState().access).toBe("expired");
+    await expect(local.beginCapture()).rejects.toMatchObject({
+      code: "access_expired",
+    });
+    expect(await db.outbox.count()).toBe(1);
+  });
   it("atomically stores original, attribution and photo, with exact money and same-ID replay", async () => {
     const draft = await client.beginCapture();
     const form = await input();
