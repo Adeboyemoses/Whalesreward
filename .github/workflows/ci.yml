@@ -82,4 +82,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+      - run: docker compose up -d minio
       - run: pnpm db:migrate:deploy && pnpm db:seed && pnpm test:e2e
+      - run: pnpm exec playwright test -c tests/storage/playwright.config.ts
