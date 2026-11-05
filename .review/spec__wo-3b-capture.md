@@ -2,15 +2,15 @@
 branch: spec/wo-3b-capture
 linear: WHR-61
 tier: high
-reviewed_head: 2d49ed43bcb29ec08dfdfec6022a274cba91e263
-rounds: 2
+reviewed_head: 10714883a10f5e94f408f002f11ef810ef95db64
+rounds: 3
 builder: spec-em
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 6
+dispatches: 9
 invariants: [I-03, I-05a, I-07, I-09, I-11, I-22, I-26, I-28, I-31, I-34, I-35, I-39, I-41, I-42, I-45a, I-46]
 p1: ["fixed terminal cancellation bookkeeping for original validation blocks"]
 tickets: []
@@ -34,3 +34,8 @@ EM verification: typecheck PASS; lint PASS; 19 unit files / 96 tests PASS;
 build PASS; git diff --check PASS. Amendment and <=120-word prose checks PASS.
 No runtime source/schema or user flow changed; integration/e2e not locally
 required for this docs-only slice. CI remains required before staging merge.
+
+Round 3: concurrent accepted core closeout PR #37 advanced staging. Its clean
+merge touched STATUS and coverage, so all three reviewers rechecked the final
+head and PASS. Product spec unchanged; EM gates rerun PASS (96 unit tests).
+The lane file flags nine dispatches; no escalation or over-cap round.
