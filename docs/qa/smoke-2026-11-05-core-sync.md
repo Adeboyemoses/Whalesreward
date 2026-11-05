@@ -8,12 +8,13 @@ Run from the reviewed worktree with an isolated local PostgreSQL database, migra
 
 1. Run `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 2. Run `pnpm test:integration --reporter=verbose` and retain output for the named lost-response retry, concurrent finalize and adversarial evidence tests. Each uses real PostgreSQL. The adversarial test must PUT different bytes through the original staging permission after acceptance and prove final bytes/digest/revision remain unchanged.
-3. Run `pnpm test:time` under its two configured timezones and `pnpm test:e2e` against a local server/database.
-4. Run the evidence validator on the final head; record independent code/security/integrity verdicts and all CI checks before merge.
+3. Run `pnpm exec playwright test -c tests/storage/playwright.config.ts` against local MinIO: actual Chromium Blob PUT succeeds at the signed length and a wrong-length body is denied. Trace/video/screenshots are disabled so signed URLs are not captured.
+4. Run `pnpm test:time` under its two configured timezones and `pnpm test:e2e` against a local server/database.
+5. Run the evidence validator on the final head; record independent code/security/integrity verdicts and all CI checks before merge.
 
 ## Storage behavior to verify
 
-- Only a random staging key is presigned. The permission is PUT-only, expires after five minutes, and signs the JPEG Content-Type.
+- Only a random staging key is presigned. The permission is PUT-only, expires after five minutes, and signs the JPEG Content-Type and exact original byte length. The browser supplies Content-Length automatically; the app sends only the returned Content-Type header.
 - Normal MinIO HTTP is allowed only for local development; staging uses the configured HTTPS Spaces origin and its private bucket. No CDN, public ACL or client write access to final keys.
 - The browser sends only the returned headers. The existing staging CORS rule permits its exact app origin, PUT/GET/HEAD and Content-Type; no ETag response header is needed.
 - Finalize bounds downloaded bytes and image decoding, validates SHA-256 and immutable metadata, writes the validated buffer under a final key, then rechecks live authority and commits the revision/audit once.
