@@ -9,6 +9,8 @@ import {
   type EvidenceStorage,
 } from "../../src/server/adapters/storage";
 import { createSyncService } from "../../src/server/modules/sync/service";
+import { handleSync } from "../../src/server/modules/sync/http";
+import { COOKIE } from "../../src/server/modules/auth/http";
 import {
   syncFixture,
   newSession,
@@ -368,9 +370,19 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
     );
     expect(held.state).toBe("held");
     expect(held.credited).toBe(false);
-    expect(held.holds.map((h) => h.reasonCode)).toEqual(
+    expect(held.holds).toContainEqual({
+      kind: "price",
+      reasonCode: "price_uncertain",
+    });
+    expect(held.pendingReason).toBe("policy_review_required");
+    const validation = (
+      await pool.query(
+        "SELECT reasons FROM sync_validation WHERE purchase_id=$1",
+        [held.purchaseId],
+      )
+    ).rows[0];
+    expect(validation.reasons).toEqual(
       expect.arrayContaining([
-        "price_uncertain",
         "capture_authorization_unresolved",
         "capture_time_unresolved",
       ]),
@@ -610,5 +622,73 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
     expect(retry.created).toBe(false);
     expect(retry.status.serverReceivedAt).toBe(pending.serverReceivedAt);
     expect(retry.status.state).toBe("photo_pending");
+  });
+  it("I-25 MinIO presigned PUT answers browser Content-Type CORS preflight", async () => {
+    const f = await syncFixture(pool, jpeg),
+      p = await prepared(f);
+    const response = await fetch(p.upload.url, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://station.example.test",
+        "Access-Control-Request-Method": "PUT",
+        "Access-Control-Request-Headers": "content-type",
+      },
+    });
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://station.example.test",
+    );
+    expect(response.headers.get("access-control-allow-methods")).toContain(
+      "PUT",
+    );
+    expect(
+      response.headers.get("access-control-allow-headers")?.toLowerCase(),
+    ).toContain("content-type");
+  });
+  it("HTTP sync validates Origin, strict body, status envelope, no-store and duplicate response status", async () => {
+    process.env.BETTER_AUTH_SECRET =
+      "fictional-sync-http-secret-at-least-32-characters";
+    process.env.BETTER_AUTH_URL = "https://station.example.test";
+    const f = await syncFixture(pool, jpeg);
+    const request = (body: unknown, origin = "https://station.example.test") =>
+      new Request("https://station.example.test/api/sync/sales", {
+        method: "POST",
+        headers: {
+          Origin: origin,
+          "content-type": "application/json",
+          cookie: `${COOKIE}=${f.token}`,
+        },
+        body: JSON.stringify(body),
+      });
+    const rejected = await handleSync(
+      request(f.original, "https://foreign.example.test"),
+      "submit",
+    );
+    expect(rejected.status).toBe(403);
+    expect((await rejected.json()).error.code).toBe("origin_rejected");
+    const extra = await handleSync(
+      request({ ...f.original, attendantId: f.attendantId }),
+      "submit",
+    );
+    expect(extra.status).toBe(400);
+    const response = await handleSync(request(f.original), "submit");
+    expect(response.status).toBe(201);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body.requestId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(body.data.credited).toBe(false);
+    expect(body.serverTime).toMatch(/Z$/);
+    expect(JSON.stringify(body)).not.toContain(f.token);
+    expect((await handleSync(request(f.original), "submit")).status).toBe(200);
+    const status = await handleSync(
+      new Request(
+        `https://station.example.test/api/sync/sales/by-operation/${f.original.operationId}`,
+        { headers: { cookie: `${COOKIE}=${f.token}` } },
+      ),
+      "status",
+      f.original.operationId,
+    );
+    expect(status.status).toBe(200);
+    expect((await status.json()).data.purchaseId).toBe(body.data.purchaseId);
   });
 });
