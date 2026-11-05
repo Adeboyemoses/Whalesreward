@@ -1,0 +1,19 @@
+{
+  "width": 360,
+  "wordmark": [
+    {
+      "x": 52,
+      "y": 17,
+      "width": 118.90625,
+      "height": 21
+    }
+  ],
+  "loyaltyFooter": [
+    {
+      "x": 21,
+      "y": 1107,
+      "width": 318,
+      "height": 17
+    }
+  ]
+}

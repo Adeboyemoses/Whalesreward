@@ -39,13 +39,18 @@ async function holdSession(
   context: BrowserContext,
   response: unknown,
   status = 200,
+  reloadingPage?: Page,
 ) {
+  let armed = !reloadingPage;
+  reloadingPage?.once("framenavigated", (frame) => {
+    if (frame === reloadingPage.mainFrame()) armed = true;
+  });
   const entered = deferred(),
     release = deferred(),
     completed = deferred();
   let claimed = false;
   await context.route("**/api/attendant/session", async (route) => {
-    if (claimed) return route.fallback();
+    if (claimed || !armed) return route.fallback();
     claimed = true;
     entered.resolve();
     await release.promise;
@@ -85,7 +90,7 @@ test("I-03 I-09 valid local capture renders before slow revalidation and a delay
   await signIn(page);
   await expect(form(page)).toBeVisible();
   await waitForWorker(page);
-  const held = await holdSession(context, null, 401);
+  const held = await holdSession(context, null, 401, page);
   try {
     await page.reload();
     await held.entered.promise;
@@ -109,14 +114,14 @@ test("I-03 an expired local window locks while successful session revalidation i
   await page.clock.install({ time: now });
   const fake = await installAttendantFake(context, {
     now,
-    signInAgeMs: 86_399_000,
+    signInAgeMs: 86_340_000,
   });
   await signIn(page);
   await expect(form(page)).toBeVisible();
   const old = structuredClone(fake.activeSession());
-  const held = await holdSession(context, old);
+  const held = await holdSession(context, old, 200, page);
   try {
-    await page.clock.fastForward(1000);
+    await page.clock.fastForward(60_000);
     await expect(expired(page)).toBeVisible();
     await page.reload();
     await held.entered.promise;
@@ -140,6 +145,8 @@ test("I-06 a delayed successful old-account revalidation cannot restore that acc
   const held = await holdSession(
     context,
     structuredClone(fake.activeSession()),
+    200,
+    page,
   );
   try {
     await page.reload();
@@ -150,9 +157,13 @@ test("I-06 a delayed successful old-account revalidation cannot restore that acc
     await other.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(other).toHaveURL(/\/sign-in$/);
     await signIn(other, "favour.james");
-    await expect(page.getByText("Favour James", { exact: true })).toBeVisible();
+    await expect(
+      other.getByText("Favour James", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
     held.release.resolve();
     await held.completed.promise;
+    await page.goto("/attendant/sale");
     await expect(page.getByText("Favour James", { exact: true })).toBeVisible();
     await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
     await expect(form(page)).toBeVisible();
@@ -242,87 +253,98 @@ test("I-23 capture navigation never waits for a stalled RSC request", async ({
   }
 });
 
-test("I-49 a stalled real navigation falls back to the precached receipt shell within two seconds", async ({
-  page,
-  context,
-  baseURL,
-}) => {
-  const entered = deferred(),
-    release = deferred();
-  let held = false;
-  const upstream = new URL(baseURL!);
-  const server = createServer(async (req, res) => {
-    if (
-      held &&
-      /^\/attendant\/sale\/[^/]+\/recorded/.test(req.url ?? "") &&
-      req.headers.accept?.includes("text/html")
-    ) {
-      entered.resolve();
-      await release.promise;
-    }
-    if (res.destroyed) return;
-    const target = httpRequest(
-      {
-        hostname: upstream.hostname,
-        port: upstream.port,
-        path: req.url,
-        method: req.method,
-        headers: { ...req.headers, host: upstream.host },
-      },
-      (response) => {
-        res.writeHead(response.statusCode ?? 502, response.headers);
-        response.pipe(res);
-      },
+for (const phase of ["headers", "body"] as const) {
+  test(`I-49 navigation with stalled ${phase} falls back to the precached receipt shell within two seconds`, async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    const entered = deferred(),
+      release = deferred();
+    let held = false;
+    const upstream = new URL(baseURL!);
+    const server = createServer(async (req, res) => {
+      const shouldHold = !!(
+        held &&
+        /^\/attendant\/sale\/[^/]+\/recorded/.test(req.url ?? "") &&
+        req.headers.accept?.includes("text/html")
+      );
+      if (shouldHold && phase === "headers") {
+        entered.resolve();
+        await release.promise;
+      }
+      if (res.destroyed) return;
+      const target = httpRequest(
+        {
+          hostname: upstream.hostname,
+          port: upstream.port,
+          path: req.url,
+          method: req.method,
+          headers: { ...req.headers, host: upstream.host },
+        },
+        async (response) => {
+          res.writeHead(response.statusCode ?? 502, response.headers);
+          if (shouldHold && phase === "body") {
+            response.pause();
+            res.flushHeaders();
+            entered.resolve();
+            await release.promise;
+          }
+          response.pipe(res);
+        },
+      );
+      target.on("error", () => {
+        if (!res.destroyed) res.end();
+      });
+      req.pipe(target);
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
     );
-    target.on("error", () => {
-      if (!res.destroyed) res.end();
-    });
-    req.pipe(target);
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("Missing local proxy address");
+    const origin = `http://127.0.0.1:${address.port}`;
+    const fake = await installAttendantFake(context);
+    try {
+      await page.goto(`${origin}/attendant/sign-in`);
+      await page.getByLabel("Username", { exact: true }).fill("grace.okon");
+      await page
+        .getByLabel("Password", { exact: true })
+        .fill("fictional-test-password");
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(form(page)).toBeVisible();
+      await waitForWorker(page);
+      await fillSale(page);
+      await save(page);
+      const receiptUrl = page.url();
+      expect(new URL(receiptUrl).origin).toBe(origin);
+      await page
+        .getByRole("button", { name: "Record next sale", exact: true })
+        .click();
+      await expect(form(page)).toBeVisible();
+      held = true;
+      const start = performance.now();
+      const navigation = page.goto(receiptUrl, {
+        waitUntil: "commit",
+        timeout: 2000,
+      });
+      void navigation.catch(() => {});
+      await entered.promise;
+      await navigation;
+      expect(performance.now() - start).toBeLessThanOrEqual(2000);
+      await expect(receipt(page)).toBeVisible({ timeout: 2000 });
+      expect(await rows(page)).toHaveLength(1);
+      expect(
+        fake.calls.some((call) => call.path === "/api/attendant/session"),
+      ).toBe(true);
+    } finally {
+      release.resolve();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (!address || typeof address === "string")
-    throw new Error("Missing local proxy address");
-  const origin = `http://127.0.0.1:${address.port}`;
-  const fake = await installAttendantFake(context);
-  try {
-    await page.goto(`${origin}/attendant/sign-in`);
-    await page.getByLabel("Username", { exact: true }).fill("grace.okon");
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill("fictional-test-password");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(form(page)).toBeVisible();
-    await waitForWorker(page);
-    await fillSale(page);
-    await save(page);
-    const receiptUrl = page.url();
-    expect(new URL(receiptUrl).origin).toBe(origin);
-    await page
-      .getByRole("button", { name: "Record next sale", exact: true })
-      .click();
-    await expect(form(page)).toBeVisible();
-    held = true;
-    const start = performance.now();
-    const navigation = page.goto(receiptUrl, {
-      waitUntil: "commit",
-      timeout: 2000,
-    });
-    void navigation.catch(() => {});
-    await entered.promise;
-    await navigation;
-    await expect(receipt(page)).toBeVisible({ timeout: 2000 });
-    expect(performance.now() - start).toBeLessThanOrEqual(2000);
-    expect(await rows(page)).toHaveLength(1);
-    expect(
-      fake.calls.some((call) => call.path === "/api/attendant/session"),
-    ).toBe(true);
-  } finally {
-    release.resolve();
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-});
+}
 
 test("connection pill responds to network events and failed requests without treating HTTP rejection as offline", async ({
   page,

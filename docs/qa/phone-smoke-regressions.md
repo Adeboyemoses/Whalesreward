@@ -18,3 +18,17 @@ The tests hold requests with explicit release promises and release them in clean
 `tests/e2e/phone-smoke.spec.ts` covers local-first display followed by a delayed authoritative revocation, sticky expiry despite delayed success, cross-account stale response, two-second save/next with pending upload, offline/3G, stalled RSC, actual service-worker fallback, browser events/request outcomes, exact amount/quantity semantics, and pending/assigned/credited references for PMS and gas. Upload-reference tests wait for durable failure bookkeeping before full navigation, preserving the WHR-60 fixture rule.
 
 Final integrated results and independent board fidelity remain pending.
+
+# Integrated verification
+
+Application head `8cf5afd`, with final test-only fixture amendments; both projects, zero runner retries and no skipped cases.
+
+- First integrated run: **17 passed, 7 failed**. Cross-account assertions incorrectly expected the original tab to leave the safe sign-in route automatically. The test now checks no original identity, then explicitly navigates to the new account's form. Repeated amount fills raced focus restoration; the helper now focuses and waits for raw text before replacement.
+- Second run: **20 passed, 4 failed**. Two artifact ENOENT failures came from parity sharing the functional output directory. One cold navigation totaled 2462.4ms under concurrent load. Parity now has separate output and timing checks run alone.
+- The delayed401 fixture could capture the prior document's late startup request after worker setup reloaded. It now arms at the explicit main-frame navigation commit. Both projects then passed while subsequent fake session responses remained successful, proving denial remains sticky without globally revoking the fake.
+- Clean isolated targeted run: **23 passed, 1 failed (2.6m)**. The sole failure constrained complete cold receipt hydration to two seconds: document commit met two seconds, but total receipt visibility was **2250.3ms**. EM confirmed cold navigation requires bounded shell fallback; the user's two-second end-to-end threshold applies to Save and Record next sale. The corrected test asserts document commit within two seconds, then hydration within two seconds separately. Save/next thresholds are unchanged.
+- Corrected SW rerun with two workers: **4 passed, 0 failed (43.5s)**, stalled headers and body through the actual worker in both projects. All 24 targeted cases have passing evidence across these runs; this is not a single 24/24 run. EM independently runs the final full suite.
+
+Expiry starts at 23:59 and advances 60 seconds to avoid a one-second setup race while testing the exact 24-hour boundary. No authorization rule changed. Exact 2000001 kobo is asserted in PMS and gas originals.
+
+Local test command: `docker exec -w /app -e DATABASE_URL=postgresql://postgres@whr-phone-db:5432/whr_phone_test whr-phone-tests pnpm test:e2e tests/e2e/phone-smoke.spec.ts --workers=2 --retries=0`. EM receives the tracked-source archive sync commands separately. The isolated fictional Postgres has no published host port. No secrets were read. Do not run timing checks concurrently with screenshots. Fidelity report: `tests/design-parity/phone-smoke/REPORT.md`.
