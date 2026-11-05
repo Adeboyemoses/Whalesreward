@@ -184,7 +184,7 @@ export async function adminWrite(
             [uid, p.username, p.name, actor.user_id],
           );
           await db.query(
-            "INSERT INTO auth_credential(id,user_id,provider,provider_account_id,password_hash,updated_at) VALUES($1,$2,'credential',$2::text,$3,clock_timestamp())",
+            "INSERT INTO auth_credential(id,user_id,provider,provider_account_id,password_hash,updated_at) VALUES($1,$2::uuid,'credential',$2::text,$3,clock_timestamp())",
             [newId(), uid, hash],
           );
           await db.query(

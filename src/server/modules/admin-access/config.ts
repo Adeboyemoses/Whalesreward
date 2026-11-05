@@ -54,10 +54,35 @@ export type AdminConfig = {
   production?: boolean;
   delivery?: "mailpit" | "noop";
   mailpitUrl?: string;
+  receiptKeys?: Record<string, string>;
+  receiptKeyVersion?: string;
 };
 export function adminConfig(): AdminConfig {
+  const raw = process.env.WHR_ADMIN_RECEIPT_KEYS;
+  let receiptKeys: Record<string, string> | undefined;
+  if (raw) {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      Object.entries(parsed).some(
+        ([k, v]) =>
+          !/^[a-zA-Z0-9_-]{1,32}$/.test(k) ||
+          typeof v !== "string" ||
+          v.length < 32,
+      )
+    )
+      throw new Error("Receipt key configuration unavailable");
+    receiptKeys = parsed as Record<string, string>;
+  }
+  const receiptKeyVersion = process.env.WHR_ADMIN_RECEIPT_KEY_VERSION ?? "v1";
+  if (receiptKeys && !receiptKeys[receiptKeyVersion])
+    throw new Error("Current receipt key unavailable");
   return {
     ...authConfig(),
+    receiptKeys,
+    receiptKeyVersion,
     production:
       process.env.WHR_ENV === "production" ||
       (!process.env.WHR_ENV && process.env.NODE_ENV === "production"),
