@@ -35,6 +35,24 @@ async function reconnect(page: Page, fake: AttendantFake) {
   fake.setOffline(false);
   await page.context().setOffline(false);
 }
+async function photoFailureSettled(
+  page: Page,
+  original: Awaited<ReturnType<typeof rows>>[number],
+) {
+  // A started PUT is not a durable failure: navigation can abandon its live lease.
+  await expect
+    .poll(async () => {
+      const row = (await rows(page)).find(
+        (row) =>
+          row.originatingAccountId === original.originatingAccountId &&
+          row.operationId === original.operationId,
+      );
+      return (
+        row && { lastErrorCode: row.lastErrorCode, syncLease: row.syncLease }
+      );
+    })
+    .toEqual({ lastErrorCode: "photo_upload_failed", syncLease: null });
+}
 async function synced(page: Page) {
   await expect(
     page.getByRole("heading", { name: "Sale synced", exact: true }),
@@ -131,6 +149,7 @@ test("I-25 partial photo failure retains evidence and retry uses the original sa
   fake.sync.setPutFailure(true);
   const original = await savedOffline(page, fake);
   await reconnect(page, fake);
+  await photoFailureSettled(page, original);
   await page.goto("/attendant/uploads");
   await expect(
     page.getByText("Photo upload failed", { exact: true }),
@@ -434,12 +453,7 @@ test("I-25 expired storage PUT permission preserves the signed-in account and re
   fake.sync.setPutForbidden(true);
   const original = await savedOffline(page, fake);
   await reconnect(page, fake);
-  await expect
-    .poll(
-      () =>
-        fake.sync.calls.filter((c) => c.path.startsWith("/storage/")).length,
-    )
-    .toBeGreaterThan(0);
+  await photoFailureSettled(page, original);
   await page.goto("/attendant/uploads");
   await expect(
     page.getByRole("heading", { name: "Pending uploads", exact: true }),
