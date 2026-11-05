@@ -1,23 +1,19 @@
 # lane:core
-WO-core-1e (WHR-63) feature/records separation: READY on green records-PR merge, 5 November 2026
+WO-core-5 (WHR-8) admin access, roles and verified-email recovery: BUILD since 2026-11-05
 
 ## In flight
-- Feature [PR #43](https://github.com/Adeboyemoses/Whalesreward/pull/43) merged at e8b7550 with five green CI checks. No STATUS, coverage or lane changes were included; this separate records PR follows the feature merge.
-- Validator rejects protected record edits/removals/renames when evidence declares a non-docs tier; ordinary docs-only records remain allowed. The rule is in AGENTS, work-orders and both close/review skills.
-- Independent code/security/integrity PASS round2 at fb89494; evidence .review/core__wo-1e-records.md. Round1 scope P1 fixed with paired docs-only exemption regressions. EM review53/53, guard94/94, unit135, typecheck/lint/build PASS; final output and PR links on WHR-63.
-- WHR-62 ACCEPTED/Done through records closeout [#41](https://github.com/Adeboyemoses/Whalesreward/pull/41), merge127304b; implementation #39 remains accepted.
+- WHR-63 ACCEPTED by Earl. Feature [#43](https://github.com/Adeboyemoses/Whalesreward/pull/43), e8b7550, and READY records [#44](https://github.com/Adeboyemoses/Whalesreward/pull/44), 4b88f93, merged green. Review53/53, guard94/94; three independent reviewers PASS. This separate closeout makes it Done after merge.
+- WHR-8 approved Todo verified; high-tier plan committed before backend dispatch. Scope is m2 access/users/roles only, I-07–I-13 and I-41. Feature excludes STATUS, coverage and lane files.
 
 ## Next
-- STOP at READY after this records PR merges green and WHR-63 moves In Review. No next work order.
+- Implement and independently test admin sessions, first-password change, 28 permissions, delegation/last Owner and verified-email recovery. Code/security/integrity review, EM gates, staging merge, separate READY records, pasted named output, then stop.
 
 ## Earl's gos
-- 2026-11-05: “Earl accepted WO-core-4a (WHR-62); close it.”
-- 2026-11-05: “Next work order: WO-core-1e (WHR-63), feature PRs never edit STATUS.md, the coverage map or lane files.”
+- 2026-11-05: “Earl accepted WO-core-1e (WHR-63); close it.”
+- 2026-11-05: “Work order: WO-core-5 (WHR-8), admin access, roles and verified-email recovery, against docs/engineering/contracts/m2.md. Take it to READY with the named test output pasted, then stop. No cloud operations.”
 
 ## Risks
-- No product code, migration, cloud or staging-data changes. Q-528 and WHR-58 remain separate.
-- Renamed task as requested. Running-turn model switching was unavailable; builder used requested gpt-6.1-sol with medium role reasoning, reviewers gpt-6.1-sol with high role reasoning; EM runtime model remains unverified.
-- WHR-60 stayed in lane:app: fix #45 (e7999cc) and records #46 merged before refreshing #44. Earlier browser failures remain documented on WHR-60; final CI must pass before this records merge.
-- Eight feature dispatches (not over high-tier flag); session includes two closeout reviews and two READY-records reviews.
+- WHR-42/43 remain proposals: local/no-op mail, production policy fails closed, automatic role preset provisioning disabled. No real provider, cloud or staging-data operations.
+- Admin screens remain WO-app-4; attendant management remains WO-core-6. Runtime model ID unavailable.
 
-dispatches=12 prs=3 rounds_max=2 escalations=0 model=unavailable
+dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
