@@ -16,6 +16,6 @@ WO-app-3b (WHR-65), WO-app-3 (WHR-7), WO-app-2 (WHR-5): ACCEPTED by Earl on 2026
 
 ## Risks
 - WHR-67: separate existing handover-fixture navigation race; later combined CI clean. WHR-45 presentation drift remains separate.
-- Dispatch flag: feature14 exceeds high-tier flag8; two feature review rounds within cap3. Three records reviews (READY, acceptance, concurrent merge) bring session total17. Model identity unavailable.
+- Dispatch flag: feature14 exceeds high-tier flag8; two feature review rounds within cap3. Four docs-only records reviews (READY, acceptance, two concurrent merges) bring session total18; no open findings. Model identity unavailable.
 
-dispatches=17 prs=2 rounds_max=3 escalations=0 model=unknown
+dispatches=18 prs=2 rounds_max=4 escalations=0 model=unknown

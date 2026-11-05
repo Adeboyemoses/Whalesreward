@@ -1,21 +1,22 @@
 # lane:core
-WO-core-5 (WHR-8): ACCEPTED, closes on green records merge, 2026-11-05
+WO-core-5a (WHR-66) staging transactional email: READY on green records merge, 2026-11-05
 
 ## In flight
-- Earl accepted WHR-8: feature [#50](https://github.com/Adeboyemoses/Whalesreward/pull/50) e153287 and READY [#51](https://github.com/Adeboyemoses/Whalesreward/pull/51) 1514b86 are merged with all five CI checks green.
-- Existing code/security/integrity PASS round2 at5397551; unit140, integration129 including25 admin cases, Linux browser68/4existing skips, typecheck/lint/build PASS. Named evidence remains on WHR-8. This closeout changes records only.
-- Approved WO-core-5a (WHR-66) is BUILD in an isolated worktree: staging-only Zoho CPaaS delivery and insert-only test inbox. High-tier plan committed before builder dispatch. Feature excludes shared records.
+- [Feature #55](https://github.com/Adeboyemoses/Whalesreward/pull/55) merged with all five checks green. Guarded Zoho CPaaS EU staging adapter, environment-only private configuration, exact allowlist, test markings, bounded delivery, insert-only seed inbox and bundled worker. Feature excludes shared records.
+- Code/security/integrity PASS round 2 at a9c8efd; evidence `.review/core__wo-5a-zoho-email.md` validates. EM found Next caught the startup error and stayed listening; fixed with process exit 1 and red-to-green unit/compiled-server regressions. No open findings.
+- EM typecheck/lint/build PASS; unit 185, PostgreSQL/MinIO 137, Linux browser 98 passed/4 existing staging-only skips/no retries. amd64 non-root image, local bounded worker and production startup guard PASS. Named tests posted on WHR-66 at READY.
+- T-15 decision [#54](https://github.com/Adeboyemoses/Whalesreward/pull/54) merged; T-14 already confirms authentication. WHR-8 ACCEPTED/Done through closeout [#53](https://github.com/Adeboyemoses/Whalesreward/pull/53), 120ae71.
 
 ## Next
-- Close WHR-8 after this records merge. Complete WHR-66, independent code/security/integrity reviews, EM gates and green staging merge; then READY records and stop.
+- Stop at READY with WHR-66 In Review after this records merge. Earl uses docs/ops/staging.md for private configuration and one verification delivery confirmation. No next work order.
 
 ## Earl's gos
 - 2026-11-05: “Earl accepted WO-core-5 (WHR-8); close it.”
 - 2026-11-05: “Never commit the domain, sender, recipients or token. Take it to READY, then stop. No cloud operations.”
 
 ## Risks
-- No cloud/provider calls or staging-data changes. Real inbox acceptance is Earl-run after READY. Production policy and WHR-42/43 remain separate.
-- T-14 already confirms authentication; provider decision will use next available T-15 and note the work-order numbering collision.
-- Earlier feature #50 dispatch flag9 >8 remains recorded; this closeout has one independent reviewer. Runtime model ID unavailable.
+- No cloud/provider calls or staging-data changes. Real inbox acceptance pending; seed never backfills an existing inbox. Production activation, WHR-42/43 policy and Q-535 consent remain separate.
+- One existing sync test hit its unchanged 5s timeout during concurrent image/browser work; focused and full isolated reruns passed without changes.
+- Feature dispatch flag 9 > 8; two review rounds within cap 3. Session includes acceptance, decision and READY records reviews. Runtime model ID unavailable.
 
-dispatches=2 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=13 prs=4 rounds_max=2 escalations=0 model=unavailable
