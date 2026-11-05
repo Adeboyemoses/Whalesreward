@@ -269,3 +269,20 @@ Feature [PR #50](https://github.com/Adeboyemoses/Whalesreward/pull/50) merged at
 Additional named regressions in `admin-access-adversarial.test.ts`: `I-07/I-10 authorized role lists paginate and assignable roles exclude excess authority`; `I-12 bounded mail job continues after unknown and unverified requests to a valid reset`; `I-12 bounded mail job continues after superseding an obsolete delivery intent`; `I-12 bounded mail job continues across the 100-account lookup page`. All four failed before the round-1 fixes and passed afterward. Token inspection, concurrent consumption, uncertain delivery, credential receipt key rotation and historical replay are also covered. Full named output is pasted on WHR-8 at READY.
 
 B01/B08–B18, M01/M02 and H01–H10 have backend support only. Admin board rows remain `todo` for WO-app-4 screen implementation/parity; no UI acceptance claimed. WHR-42/43 defaults remain proposed and centrally configured; production auth/delegation closed, staging no-op mail, automatic presets disabled. No live provider or cloud/staging-data operations. This separate records PR follows the feature merge; stop at READY after its green merge. WHR-63 is ACCEPTED/Done through #48 (82dfe65).
+
+## WO-app-3b phone-smoke READY (WHR-65)
+
+[PR #49](https://github.com/Adeboyemoses/Whalesreward/pull/49) merged and deployed at `d3481fc6e39dabe8ab5e087ee581b91d891f56ed`; health matched with db ok. Code/security/integrity PASS round2. These scoped regressions preserve the original strict rules; they do not mark broader board rows complete.
+
+| Invariant / boards | Evidence | Status |
+|---|---|---|
+| I-03, I-09: original 24-hour boundary and revocation | `tests/e2e/phone-smoke.spec.ts`: delayed revocation, exact expiry despite late success; `src/client/offline/client.test.ts`: late auth/permission/assignment denial retains original/photo and sticky lock | on-staging; READY |
+| I-06: account/context partition | `phone-smoke.spec.ts`: stale cross-account session response; retained upload/handover suite | on-staging; READY |
+| I-23: durable atomic capture independent of network | `phone-smoke.spec.ts`: held repeated lookup, stalled RSC, pending upload, two-second Save/next on 3G/offline; original/photo retained | on-staging; READY |
+| I-29: exact money and quantity | `phone-smoke.spec.ts`: PMS/gas blur/refocus and exact2000001kobo original; unchanged quantity semantics | on-staging; READY |
+| I-26: authoritative credit/reference | `phone-smoke.spec.ts`: pending, assigned and credited PMS/gas references; no false Synced or local credit | on-staging; READY |
+| I-49: generic-only shell cache | `phone-smoke.spec.ts`: actual service-worker stalled headers/body fallback;1200ms deadline; no API/personal cache | on-staging; READY |
+| I-02, I-04, I-50: preserved capture/context/evidence boundaries | `phone-smoke.spec.ts`: original account/context/card/spend/photo digest retained after delayed lookup and next sale; existing offline/upload suites retained | on-staging; regression coverage |
+| A02, A03, A04, A05, A08, A16 | `tests/design-parity/phone-smoke/REPORT.md`: independent six-board comparison,12 screenshots at390/360px;48px targets/no overflow | scoped fidelity verified; existing WHR-45 differences separate |
+
+Final EM typecheck/lint/build and unit164 passed; browser94 passed/4 existing skips/zero retries. [Final CI](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42094998766): integration129, time3+3, browser94/4 existing skips/no flaky cases, storage1. [Baseline](../qa/phone-stall-baseline.md) measured real staging before edits: Save4145.2ms, next2021.9ms; the reported1–3minute wait was not reproduced. No deployed after-timings claimed. Earl/Rook superseded desktop after-timing work and instructed READY without Computer Use, with “physical Samsung acceptance pending Earl's rerun”. Rook's subsequent20:36UTC WHR-65 comment reports Earl's successful Samsung rerun without saved numeric timings. This session records that report and stops at READY; it does not close M1 or other work orders. [Runbook](../qa/smoke-2026-11-05-phone-stall.md). WHR-67 remains separate.

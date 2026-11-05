@@ -1,23 +1,22 @@
 # lane:app
-WO-app-3a (WHR-60) Upload-failure browser tests: READY since 2026-11-05
-WO-app-3 (WHR-7) and WO-app-2 (WHR-5): READY; Earl's phone smoke pending
+WO-app-3b (WHR-65) Phone-smoke findings: READY since 2026-11-05
 
 ## In flight
-- [Feature PR #45](https://github.com/Adeboyemoses/Whalesreward/pull/45) merged into staging at e7999cc after two consecutive full green CI runs. The two fixtures wait for the original account/operation's durable photo failure and released lease before navigation.
-- Root cause: fixture navigation interrupted failure bookkeeping. Unchanged production lease recovery passed on both browser profiles at about 60.2 seconds, retaining the sale/photo and crediting once.
-- Verification: 80/80 local repeats (two cases × two profiles × 20, two workers, zero retries); EM full browser 68 passed/4 existing skips, unit135, typecheck/lint/build PASS. Independent code/security/integrity PASS, round1; evidence validates.
-- CI: [first pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/1), [second pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/2). Both browser suites68 passed plus storage1, no flaky cases.
-- This separate records PR updates only STATUS, coverage and the app lane after the feature merge.
+- [Feature PR #49](https://github.com/Adeboyemoses/Whalesreward/pull/49) merged and deployed at d3481fc6e39dabe8ab5e087ee581b91d891f56ed; health version matched, db ok. This separate records PR completes READY after its green merge.
+- Durable checked access renders before background revalidation; capture navigation and resolved-card Save no longer await network. Generic navigation fallback: 1200 ms. Connectivity reacts to events/outcomes; receipts/Uploads show server references; amount blur formats exact money. Original 24-hour and revocation checks remain equally strict.
+- Code/security/integrity PASS round2. EM typecheck/lint/build, unit164, browser94 passed/4 existing skips/zero retries; final CI integration129, time3+3, browser94 plus storage1, no flaky cases. Independent parity: six boards, 12 screenshots at390/360px.
+- Pre-change staging 3G: Save4145.2ms, next2021.9ms. Reported1–3minute wait was not reproduced. No deployed after-timings claimed; no further Computer Use.
 
 ## Next
-- STOP at READY. Earl reads docs/qa/upload-failure-browser-diagnosis.md and WHR-60 verification; no next work order starts here.
-- Existing M1 phone/Spaces smoke remains docs/qa/smoke-2026-11-05-upload-sync.md. WHR-5 and WHR-7 are not accepted by this test-only work.
+- STOP at READY. Runbook: docs/qa/smoke-2026-11-05-phone-stall.md. Requested handoff caveat: “physical Samsung acceptance pending Earl's rerun”.
+- Rook's later WHR-65 comment (20:36 UTC) reports Earl accepted the Samsung S25 rerun; no numerical results were saved. Record that report separately; this session does not close WHR-65/WHR-5/WHR-7 or M1. WHR-60 remains READY.
 
 ## Earl's gos
-- 2026-11-05: “Work order: WO-app-3a (WHR-60), stabilize the upload-failure browser tests. Determine test vs product cause first; never shorten LEASE_MS or add sleeps or runner retries. Take it to READY, then stop.”
+- 2026-11-05: “Measure the \"Checking access\" stall on staging before changing anything; keep the 24-hour and revocation checks exactly as strict. Take it to READY, then stop.”
+- 2026-11-05: “don't use Computer Use for timings. Post READY with the deployed commit and \"physical Samsung acceptance pending Earl's rerun\", then stop.”
 
 ## Risks
-- No production code, lease duration, runner retries or sleeps changed. Physical Android and deployed Spaces acceptance remain pending; WHR-45 stays separate.
-- Local macOS Chromium startup is sandbox-blocked; browser evidence came from an isolated local Linux container and GitHub CI.
+- WHR-67 tracks a separate existing handover-fixture navigation race; later combined CI runs were clean. WHR-45 presentation drift stays separate.
+- Dispatch flag: feature PR used14 dispatches, above high-tier flag8; two review rounds stayed within cap3. Records review adds one dispatch. Model identity unavailable, recorded as unknown.
 
-dispatches=5 prs=2 rounds_max=1 escalations=0 model=unknown
+dispatches=15 prs=2 rounds_max=2 escalations=0 model=unknown
