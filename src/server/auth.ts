@@ -11,6 +11,7 @@ export function attendantAuth(
   db: pg.PoolClient,
   config: { secret: string; origin: string },
   createSession: (userId: string) => Promise<Record<string, unknown>>,
+  kind: "attendant" | "admin" = "attendant",
 ) {
   const unsupported = async (): Promise<never> => {
     throw new Error("Unsupported attendant auth adapter operation");
@@ -37,8 +38,8 @@ export function attendantAuth(
         ) {
           const result = await db.query(
             `SELECT id, display_name AS name, username_normalized AS username, username AS "displayUsername", created_at AS "createdAt", updated_at AS "updatedAt"
-            FROM auth_user WHERE username_normalized=$1 AND kind='attendant' AND enabled=true AND EXISTS(SELECT 1 FROM auth_credential c WHERE c.user_id=auth_user.id AND c.provider='credential' AND c.provider_account_id=auth_user.id::text AND c.password_hash IS NOT NULL) FOR SHARE`,
-            [where[0].value],
+            FROM auth_user WHERE username_normalized=$1 AND kind=$2 AND enabled=true AND EXISTS(SELECT 1 FROM auth_credential c WHERE c.user_id=auth_user.id AND c.provider='credential' AND c.provider_account_id=auth_user.id::text AND c.password_hash IS NOT NULL) FOR SHARE`,
+            [where[0].value, kind],
           );
           const user = result.rows[0];
           return user
