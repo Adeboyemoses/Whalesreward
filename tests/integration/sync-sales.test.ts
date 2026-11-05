@@ -691,4 +691,35 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
     expect(status.status).toBe(200);
     expect((await status.json()).data.purchaseId).toBe(body.data.purchaseId);
   });
+  it("I-22 changed arithmetic under an existing operation conflicts before new-sale calculation validation", async () => {
+    const f = await syncFixture(pool, jpeg);
+    await service.submit(f.token, f.original);
+    await expect(
+      service.submit(f.token, {
+        ...f.original,
+        entry: { ...f.original.entry, quantity: "21" },
+      }),
+    ).rejects.toMatchObject({ code: "operation_conflict", status: 409 });
+    await expect(
+      service.submit(f.token, {
+        ...f.original,
+        operationId: newId(),
+        entry: { ...f.original.entry, quantity: "21" },
+      }),
+    ).rejects.toMatchObject({ code: "calculation_invalid", status: 422 });
+  });
+  it("I-29 fabricated captured precision cannot borrow a genuine price-version ID", async () => {
+    const f = await syncFixture(pool, jpeg);
+    await expect(
+      service.submit(f.token, { ...f.original, quantityPrecision: 3 }),
+    ).rejects.toMatchObject({ code: "calculation_invalid", status: 422 });
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM purchase WHERE operation_id=$1",
+          [f.original.operationId],
+        )
+      ).rows[0].count,
+    ).toBe(0);
+  });
 });
