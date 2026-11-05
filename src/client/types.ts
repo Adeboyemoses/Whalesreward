@@ -230,8 +230,137 @@ export class ClientError extends Error {
   constructor(
     public readonly code: string,
     message: string,
+    public readonly status?: number,
+    public readonly retryAfterMs: number | null = null,
+    public readonly retryable = false,
   ) {
     super(message);
     this.name = "ClientError";
   }
 }
+
+export type UploadPermissionRequest = {
+  operationId: string;
+  sha256: string;
+  bytes: number;
+  mediaType: "image/jpeg";
+};
+export type UploadPermission = {
+  uploadId: string;
+  method: "PUT";
+  url: string;
+  headers: Record<string, string>;
+  expiresAt: string;
+  maxBytes: number;
+};
+export type FinalizeRequest = NonNullable<OutboxRow["finalizeRequest"]>;
+export type SyncResult = { status: SaleStatus; retryAfterMs: number | null };
+export const saleStatusSchema: z.ZodType<SaleStatus> = z
+  .strictObject({
+    purchaseId: id,
+    operationId: id,
+    saleCode: label.max(64),
+    version,
+    state: z.enum([
+      "received",
+      "photo_pending",
+      "finalizing",
+      "credited",
+      "held",
+      "cancelled",
+    ]),
+    detailsReceived: z.literal(true),
+    photoValidated: z.boolean(),
+    credited: z.boolean(),
+    currentRevisionId: id.nullable(),
+    customer: lookupSchema.shape.customer.nullable(),
+    holds: z
+      .array(
+        z.discriminatedUnion("kind", [
+          z.strictObject({
+            kind: z.literal("price"),
+            reasonCode: z.literal("price_uncertain"),
+          }),
+          z.strictObject({
+            kind: z.literal("card"),
+            reasonCode: z.literal("replaced_card"),
+          }),
+          z.strictObject({
+            kind: z.literal("date"),
+            reasonCode: z.enum([
+              "capture_date_uncertain",
+              "capture_time_unresolved",
+              "capture_authorization_unresolved",
+            ]),
+          }),
+        ]),
+      )
+      .max(10),
+    cancellationReason: z
+      .enum(["customer_not_found", "invalid_purchase"])
+      .nullable(),
+    pendingReason: z
+      .enum([
+        "lookup_pending",
+        "photo_required",
+        "validation_pending",
+        "policy_review_required",
+      ])
+      .nullable(),
+    serverReceivedAt: instant,
+  })
+  .refine((s) => {
+    if (s.state === "credited")
+      return (
+        s.credited &&
+        s.photoValidated &&
+        !!s.currentRevisionId &&
+        !!s.customer &&
+        s.holds.length === 0 &&
+        s.pendingReason === null &&
+        s.cancellationReason === null
+      );
+    if (s.credited) return false;
+    if ((s.state === "cancelled") !== (s.cancellationReason !== null))
+      return false;
+    if (s.state === "held")
+      return (
+        s.photoValidated &&
+        (s.holds.length > 0 || s.pendingReason === "policy_review_required")
+      );
+    return true;
+  });
+export const uploadPermissionSchema: z.ZodType<UploadPermission> =
+  z.strictObject({
+    uploadId: id,
+    method: z.literal("PUT"),
+    url: z
+      .url()
+      .max(4096)
+      .refine((value) => {
+        const url = new URL(value);
+        return (
+          url.protocol === "https:" &&
+          !url.username &&
+          !url.password &&
+          !url.hash
+        );
+      }),
+    headers: z
+      .record(z.string().min(1).max(128), z.string().max(4096))
+      .refine((headers) =>
+        Object.entries(headers).every(
+          ([key, value]) =>
+            !/[\r\n]/.test(key + value) &&
+            !["authorization", "cookie", "set-cookie", "host"].includes(
+              key.toLowerCase(),
+            ),
+        ),
+      ),
+    expiresAt: instant,
+    maxBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(8 * 1024 * 1024),
+  });

@@ -1,6 +1,7 @@
 import { expect, type BrowserContext, type Route } from "@playwright/test";
 
 import { v7 as uuidv7 } from "uuid";
+import { installSyncFake } from "./sync-http-fake";
 import type { Session } from "../../src/client/types";
 
 // Test transport only. Production always calls the real M1 HTTP adapter.
@@ -75,7 +76,7 @@ const uuid =
 
 export async function installAttendantFake(
   context: BrowserContext,
-  options: { now?: number; signInAgeMs?: number } = {},
+  options: { now?: number; signInAgeMs?: number; sync?: boolean } = {},
 ) {
   let active: FixtureSession | null = null;
   let offline = false;
@@ -199,15 +200,16 @@ export async function installAttendantFake(
     }
     throw new Error(`Unexpected test API call: ${method} ${path}`);
   });
-  await context.route("**/api/sync/**", (route) => {
-    calls.push({
-      path: new URL(route.request().url()).pathname,
-      method: route.request().method(),
-    });
-    throw new Error("WO-app-2 must not upload or credit a saved sale");
+  const sync = await installSyncFake(context, {
+    enabled: options.sync ?? false,
+    session: () => active,
+    offline: () => offline,
+    revoked: () => revoked,
+    now,
   });
   return {
     calls,
+    sync,
     setOffline(value: boolean) {
       offline = value;
     },

@@ -13,6 +13,7 @@ import {
   type CaptureInput,
 } from "../types";
 import { CaptureDatabase, type Installation } from "./db";
+import { SaleSynchronizer } from "./sync";
 import {
   advanceWindow,
   requestDuration,
@@ -49,6 +50,10 @@ export class AttendantClient {
   private channel: BroadcastChannel | null = null;
   private checking: Promise<ClientState> | null = null;
   private authEpoch = 0;
+  private salesListeners = new Set<() => void>();
+  private foregroundCleanup: (() => void) | null = null;
+  private synchronizer: SaleSynchronizer;
+
   constructor(
     private api: AttendantApi = new HttpAttendantApi(),
     private db = new CaptureDatabase(),
@@ -60,12 +65,44 @@ export class AttendantClient {
     private online: () => boolean = () =>
       typeof navigator === "undefined" || navigator.onLine,
   ) {
+    this.synchronizer = new SaleSynchronizer({
+      api,
+      db,
+      now: () => this.clock().wall,
+      authorize: async (readOnly) => {
+        if (!this.online())
+          throw new ClientError("offline", "Uploads pause while offline.");
+        const state = await this.checkAccess();
+        if (!state.session || (!readOnly && state.access !== "active"))
+          throw new ClientError(
+            "access_expired",
+            "Sign in online again to upload.",
+          );
+        const window = await this.db.windows.get(state.session.account.id);
+        if (
+          !window ||
+          Date.parse(window.lastOnlineSignInAt) +
+            window.elapsedAtCheckpointMs >=
+            Date.parse(state.session.sessionExpiresAt)
+        ) {
+          await this.lockContext(state.session);
+          throw new ClientError(
+            "access_expired",
+            "Sign in online again to upload.",
+          );
+        }
+        return state.session;
+      },
+      lock: (session) => this.lockContext(session),
+      changed: () => this.salesChanged(),
+    });
     if (
       typeof window !== "undefined" &&
       typeof BroadcastChannel !== "undefined"
     ) {
       this.channel = new BroadcastChannel("whales-capture-state");
       this.channel.onmessage = () => {
+        for (const listener of this.salesListeners) listener();
         void this.checkAccess().catch(() =>
           this.publish({
             session: null,
@@ -86,6 +123,56 @@ export class AttendantClient {
   private publish(state: ClientState) {
     this.state = state;
     for (const listener of this.listeners) listener();
+  }
+  subscribeSales = (listener: () => void) => {
+    this.salesListeners.add(listener);
+    return () => {
+      this.salesListeners.delete(listener);
+    };
+  };
+  private salesChanged() {
+    for (const listener of this.salesListeners) listener();
+    this.signal();
+  }
+  retryUploads() {
+    return this.synchronizer.run();
+  }
+  refreshSale(operationId: string) {
+    return this.synchronizer.run(operationId, true);
+  }
+  startForegroundSync(): () => void {
+    if (this.foregroundCleanup) return this.foregroundCleanup;
+    const run = () => {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
+      void this.retryUploads().catch(() => {
+        /* Durable row survives storage/service interruption. */
+      });
+    };
+    const pause = () => this.synchronizer.stop();
+    const interval = setInterval(run, 1000);
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", run);
+      window.addEventListener("offline", pause);
+      window.addEventListener("focus", run);
+      document.addEventListener("visibilitychange", run);
+    }
+    run();
+    this.foregroundCleanup = () => {
+      clearInterval(interval);
+      pause();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", run);
+        window.removeEventListener("offline", pause);
+        window.removeEventListener("focus", run);
+        document.removeEventListener("visibilitychange", run);
+      }
+      this.foregroundCleanup = null;
+    };
+    return this.foregroundCleanup;
   }
   private signal() {
     this.channel?.postMessage("changed");
@@ -193,6 +280,7 @@ export class AttendantClient {
   }
   async signIn(username: string, password: string): Promise<ClientState> {
     this.requireOnline();
+    this.synchronizer.stop();
     const epoch = ++this.authEpoch;
     const attempt = uuidv7();
     // Claim the attempt in the first transaction, before any revocation/network wait.
@@ -293,6 +381,7 @@ export class AttendantClient {
     );
   }
   async signOut(): Promise<ClientState> {
+    this.synchronizer.stop();
     ++this.authEpoch;
     const key = uuidv7();
     await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
@@ -662,7 +751,7 @@ export class AttendantClient {
           return row;
         },
       );
-      this.signal();
+      this.salesChanged();
       return saved;
     } catch (error) {
       if (error instanceof ClientError) throw error;
@@ -714,6 +803,8 @@ export class AttendantClient {
     }
   }
   close() {
+    this.foregroundCleanup?.();
+    this.synchronizer.stop();
     this.channel?.close();
     this.db.close();
   }

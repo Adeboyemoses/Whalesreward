@@ -40,6 +40,7 @@ export function ListRow({
   tone,
   action = "View details",
   href,
+  description,
 }: {
   name: string;
   amount: string;
@@ -48,6 +49,7 @@ export function ListRow({
   tone: Tone;
   action?: string;
   href: string;
+  description?: ReactNode;
 }) {
   return (
     <a className="wr-list-row" href={href}>
@@ -62,6 +64,7 @@ export function ListRow({
         </StatusPill>
         <span className="wr-action">{action}</span>
       </div>
+      {description && <div className="wr-list-meta">{description}</div>}
     </a>
   );
 }

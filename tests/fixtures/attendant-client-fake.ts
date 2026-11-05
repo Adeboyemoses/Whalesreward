@@ -1,6 +1,15 @@
 import { v7 as uuidv7 } from "uuid";
 import type { AttendantApi } from "../../src/client/api";
-import { ClientError, type Session, type Lookup } from "../../src/client/types";
+import {
+  ClientError,
+  type Session,
+  type Lookup,
+  type SyncResult,
+  type UploadPermission,
+  type OriginalSale,
+  type UploadPermissionRequest,
+  type FinalizeRequest,
+} from "../../src/client/types";
 export function sessionFixture(now: number, accountId = uuidv7()): Session {
   const at = new Date(now).toISOString();
   return {
@@ -38,6 +47,35 @@ export function sessionFixture(now: number, accountId = uuidv7()): Session {
 }
 export class FakeAttendantApi implements AttendantApi {
   constructor(public current: Session) {}
+  async submitSale(_original: OriginalSale): Promise<SyncResult> {
+    void _original;
+    throw new ClientError("network_unavailable", "Unavailable");
+  }
+  async saleStatus(_operationId: string): Promise<SyncResult> {
+    void _operationId;
+    throw new ClientError("network_unavailable", "Unavailable");
+  }
+  async uploadPermission(
+    _purchaseId: string,
+    _input: UploadPermissionRequest,
+  ): Promise<UploadPermission> {
+    void _purchaseId;
+    void _input;
+    throw new ClientError("network_unavailable", "Unavailable");
+  }
+  async uploadPhoto(_permission: UploadPermission, _blob: Blob): Promise<void> {
+    void _permission;
+    void _blob;
+    throw new ClientError("network_unavailable", "Unavailable");
+  }
+  async finalizeSale(
+    _purchaseId: string,
+    _input: FinalizeRequest,
+  ): Promise<SyncResult> {
+    void _purchaseId;
+    void _input;
+    throw new ClientError("network_unavailable", "Unavailable");
+  }
   revocationFails = false;
   async signIn() {
     return structuredClone(this.current);
