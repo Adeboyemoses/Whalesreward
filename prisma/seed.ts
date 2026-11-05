@@ -3,6 +3,7 @@ import pg from "pg";
 import {
   seedAttendantCredentials,
   seedAdminCredentials,
+  configureAdminSeedEmail,
 } from "./seed-auth.mjs";
 
 if (process.env.WHR_ENV === "production")
@@ -13,6 +14,7 @@ const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await db.connect();
 try {
   await db.query("BEGIN");
+  await configureAdminSeedEmail(db);
   await db.query(
     await readFile(new URL("./fixtures.sql", import.meta.url), "utf8"),
   );
@@ -22,9 +24,10 @@ try {
   console.info(
     "Fictional station, pump, staff, customer and card fixtures seeded.",
   );
-} catch (error) {
+} catch {
   await db.query("ROLLBACK");
-  throw error;
+  // Database constraint details may include the configured private test inbox.
+  throw new Error("Fictional fixture seed failed");
 } finally {
   await db.end();
 }
