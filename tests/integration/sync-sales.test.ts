@@ -10,6 +10,7 @@ import {
 } from "../../src/server/adapters/storage";
 import { createSyncService } from "../../src/server/modules/sync/service";
 import { handleSync } from "../../src/server/modules/sync/http";
+import { payloadDigest } from "../../src/server/modules/sync/canonical";
 import { COOKIE } from "../../src/server/modules/auth/http";
 import {
   syncFixture,
@@ -120,6 +121,37 @@ async function exactCaptureContext(
   f.original.captureContextId = contextId;
   f.original.assignmentId = assignmentId;
 }
+async function mondayFixture() {
+  // Lagos Monday 07:00 through Tuesday 07:00; receipt is 2h05m later.
+  const signedIn = new Date("2026-11-02T06:00:00.000Z");
+  const f = await syncFixture(pool, jpeg, Date.now() - signedIn.getTime());
+  const cardId = newId();
+  const code = cardId
+    .slice(-7)
+    .toUpperCase()
+    .replaceAll("0", "G")
+    .replaceAll("1", "H");
+  await pool.query(
+    "INSERT INTO card(id,batch_id,code,qr_payload,state,version) SELECT $1,batch_id,$2,$2,'unassigned',1 FROM card WHERE code='A7K3M9Q'",
+    [cardId, code],
+  );
+  const customerId = newId();
+  const phone = `+234800${(BigInt(`0x${customerId.replaceAll("-", "")}`) % 10000000n).toString().padStart(7, "0")}`;
+  await pool.query(
+    "INSERT INTO customer(id,customer_code,name,phone_normalized,category,version) VALUES($1,$2,'Amina Bello',$3,'car_owner',1)",
+    [customerId, `TEST-${customerId}`, phone],
+  );
+  await pool.query(
+    "INSERT INTO card_customer_link(id,card_id,customer_id,linked_at,actor_user_id,reason) VALUES($1,$2,$3,'2026-11-01T00:00:00Z','019a5000-0000-7000-8000-000000000002','Fictional historical registration')",
+    [newId(), cardId, customerId],
+  );
+  await pool.query("UPDATE card SET state='linked',version=2 WHERE id=$1", [
+    cardId,
+  ]);
+  f.original.cardCode = code;
+  f.token = (await newSession(pool, f)).token;
+  return f;
+}
 describe("M1 real PostgreSQL and MinIO sync", () => {
   beforeAll(async () => {
     await pool.query(
@@ -138,6 +170,166 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
   afterAll(async () => {
     s3.destroy();
     await pool.end();
+  });
+  it.each(["uniform", "price", "assignment"])(
+    "P-20 Monday 07:00 capture with Tuesday 09:05 receipt and fresh upload authority: %s",
+    async (change) => {
+      const f = await mondayFixture();
+      const originalContext = f.original.captureContextId;
+      const fresh = await newSession(pool, f);
+      f.token = fresh.token;
+      if (change === "price") await changePrice(pool, f);
+      if (change === "assignment")
+        await pool.query(
+          "UPDATE assignment SET effective_until=$2 WHERE id=$1",
+          [f.assignmentId, "2026-11-03T05:59:59.999999Z"],
+        );
+      const p = await exactReceipt(
+        f.stationId,
+        "2026-11-03T08:05:00.000000Z",
+        () => prepared(f),
+      );
+      const final = await service.finalize(
+        f.token,
+        p.submitted.status.purchaseId,
+        p.finalize,
+      );
+      expect(final.state).toBe(change === "uniform" ? "credited" : "held");
+      expect(await creditCount(final.purchaseId)).toBe(
+        change === "uniform" ? 1 : 0,
+      );
+      const row = (
+        await pool.query(
+          "SELECT v.policy_version,v.reasons,p.capture_context_id,p.server_received_at FROM sync_validation v JOIN purchase p ON p.id=v.purchase_id WHERE p.id=$1",
+          [final.purchaseId],
+        )
+      ).rows[0];
+      expect(row.policy_version).toBe(2);
+      expect(row.reasons).toEqual(
+        change === "uniform"
+          ? []
+          : [
+              change === "price"
+                ? "price_uncertain"
+                : "capture_authorization_unresolved",
+            ],
+      );
+      expect(row.capture_context_id).toBe(originalContext);
+      expect(row.server_received_at.toISOString()).toBe(
+        "2026-11-03T08:05:00.000Z",
+      );
+      expect((await service.submit(f.token, f.original)).status).toEqual(final);
+    },
+  );
+  it.each(["123499", "123500", "123501"])(
+    "P-20 PostgreSQL price boundary at original expiry microseconds %s",
+    async (fraction) => {
+      const f = await mondayFixture();
+      await exactCaptureContext(f, "2026-11-02T06:00:00.123500Z");
+      await pool.query(
+        "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,'019a5000-0000-7000-8000-000000000009',2,110000,'NGN',2,$3,'019a5000-0000-7000-8000-000000000005','Fictional expiry boundary')",
+        [newId(), f.stationId, `2026-11-03T06:00:00.${fraction}Z`],
+      );
+      const p = await exactReceipt(f.stationId, "2026-11-03T08:05:00Z", () =>
+        prepared(f),
+      );
+      const result = await service.finalize(
+        f.token,
+        p.submitted.status.purchaseId,
+        p.finalize,
+      );
+      expect(result.state).toBe(fraction === "123501" ? "credited" : "held");
+      expect(
+        (
+          await pool.query(
+            "SELECT reasons FROM sync_validation WHERE purchase_id=$1",
+            [result.purchaseId],
+          )
+        ).rows[0].reasons,
+      ).toEqual(fraction === "123501" ? [] : ["price_uncertain"]);
+    },
+  );
+  it("P-20 existing v1 expiry-only hold survives retry and reauthentication unchanged", async () => {
+    const f = await mondayFixture();
+    const p = await exactReceipt(
+      f.stationId,
+      "2026-11-03T08:05:00.000000Z",
+      () => prepared(f),
+    );
+    const id = p.submitted.status.purchaseId;
+    // Seed the durable v1 settlement shape. It has no in-window change and
+    // would credit under v2 if a retry incorrectly reran capture policy.
+    const finalKey = `final/${newId()}/${newId()}`;
+    await storage.writeFinal(finalKey, jpeg);
+    const db = await pool.connect();
+    try {
+      await db.query("BEGIN");
+      await db.query(
+        "UPDATE purchase SET status='finalizing',version=version+1 WHERE id=$1",
+        [id],
+      );
+      await db.query(
+        "UPDATE photo_asset SET state='validated',final_key=$2,validated_digest=expected_digest,validated_bytes=expected_bytes,width=40,height=30,media_type='image/jpeg',validated_at=clock_timestamp() WHERE id=$1",
+        [p.upload.uploadId, finalKey],
+      );
+      await db.query(
+        `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,kind,state,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id)
+        SELECT $1,id,1,operation_id,$2,payload_digest,'original','proposed',server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,$3 FROM purchase WHERE id=$4`,
+        [newId(), f.userId, p.upload.uploadId, id],
+      );
+      await db.query(
+        `INSERT INTO sync_validation(purchase_id,policy_version,reasons,campaign_eligible) VALUES($1,1,'["capture_authorization_unresolved"]',false)`,
+        [id],
+      );
+      await db.query(
+        "UPDATE purchase SET status='held',version=version+1 WHERE id=$1",
+        [id],
+      );
+      await db.query(
+        "INSERT INTO sync_finalize_operation(purchase_id,operation_id,payload_digest,upload_id,expected_version,completed_at) VALUES($1,$2,$3,$4,$5,clock_timestamp())",
+        [
+          id,
+          p.finalize.operationId,
+          payloadDigest(p.finalize),
+          p.upload.uploadId,
+          p.finalize.expectedVersion,
+        ],
+      );
+      await db.query("COMMIT");
+    } catch (error) {
+      await db.query("ROLLBACK");
+      throw error;
+    } finally {
+      db.release();
+    }
+    const snapshot = async () =>
+      (
+        await pool.query(
+          "SELECT to_jsonb(p) AS purchase,to_jsonb(c) AS context,to_jsonb(v) AS validation FROM purchase p JOIN capture_context c ON c.id=p.capture_context_id JOIN sync_validation v ON v.purchase_id=p.id WHERE p.id=$1",
+          [id],
+        )
+      ).rows[0];
+    const before = await snapshot();
+    const held = await service.status(f.token, f.original.operationId);
+    expect(held.state).toBe("held");
+    expect(held.pendingReason).toBe("policy_review_required");
+    expect(await service.finalize(f.token, id, p.finalize)).toEqual(held);
+    const fresh = await newSession(pool, f);
+    expect((await service.submit(fresh.token, f.original)).status).toEqual(
+      held,
+    );
+    expect(await service.finalize(fresh.token, id, p.finalize)).toEqual(held);
+    expect(await snapshot()).toEqual(before);
+    expect(before.validation.policy_version).toBe(1);
+    expect(await creditCount(id)).toBe(0);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM purchase_revision WHERE purchase_id=$1",
+          [id],
+        )
+      ).rows[0].count,
+    ).toBe(1);
   });
   it("I-17/I-50 code and QR lookup return the same minimal customer without phone data", async () => {
     const f = await syncFixture(pool, jpeg);
