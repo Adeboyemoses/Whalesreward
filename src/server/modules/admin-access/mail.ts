@@ -105,7 +105,7 @@ export async function requestReset(
     const scope = hmac(config.secret, "reset-scope", ip),
       hash = targetDigest(config, email);
     const inserted = await db.query(
-      "INSERT INTO auth_request_dedup VALUES($1,'reset_request',$2,$3,'v1',NULL,clock_timestamp()+interval '24 hours',clock_timestamp()+interval '24 hours') ON CONFLICT DO NOTHING RETURNING request_key",
+      "INSERT INTO auth_request_dedup VALUES($1,'reset_request',$2,$3,'v1',NULL,clock_timestamp()+interval '24 hours',clock_timestamp()+interval '24 hours') ON CONFLICT(scope_digest,operation_kind,request_key) DO UPDATE SET request_hmac=EXCLUDED.request_hmac,expires_at=EXCLUDED.expires_at,tombstone_until=EXCLUDED.tombstone_until WHERE auth_request_dedup.expires_at<=clock_timestamp() RETURNING request_key",
       [scope, key, hash],
     );
     if (inserted.rowCount && !suppressed && deliveryConfigured(config))
