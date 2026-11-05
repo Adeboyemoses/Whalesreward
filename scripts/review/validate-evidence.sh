@@ -23,6 +23,15 @@ fail=0
 err() { echo "validate-evidence: FAIL: $*" >&2; fail=1; }
 rank() { case "$1" in docs) echo 0;; low) echo 1;; medium) echo 2;; high) echo 3;; *) echo -1;; esac; }
 
+# Count old and new paths, including removals and renames out of shared records.
+check_records() {
+  if [ "$(rank "$1")" -ge 1 ]; then
+    records="$(git -c core.quotePath=false diff --no-renames --name-only "$base...$head" -- \
+      STATUS.md docs/engineering/coverage-map.md ':(glob)docs/agentic/lanes/*.md')"
+    [ -z "$records" ] || err "feature PR must not change shared records: $(echo $records); the EM updates them in a separate docs-only READY or close records PR after the feature PR merges"
+  fi
+}
+
 # 1. What does the diff require?
 routing="$(bash "$here/required-reviewers.sh" "$base...$head")" || { echo "validate-evidence: routing failed" >&2; exit 2; }
 need_tier="$(printf '%s\n' "$routing" | sed -n 's/^tier=//p')"
@@ -42,11 +51,9 @@ fi
 # Docs-only routing may still carry evidence that explicitly raises the tier.
 if [ "$need_tier" = "docs" ]; then
   declared_tier="$(printf '%s\n' "$body" | awk 'NR==1 && $0!="---"{exit} NR==1{next} $0=="---"{exit} /^tier:/ {sub(/^tier:[ ]*/,""); sub(/[ ]+#.*$/,""); print; exit}')"
-  if [ "$(rank "$declared_tier")" -lt 1 ]; then
-    echo "validate-evidence: docs-only change, no evidence needed"; exit 0
-  fi
-  need_reviewers="code-reviewer"
-  [ "$declared_tier" = "medium" ] && need_reviewers="code-reviewer security-reviewer"
+  check_records "$declared_tier"
+  [ "$fail" -eq 0 ] || exit 1
+  echo "validate-evidence: docs-only change, no evidence needed"; exit 0
 fi
 
 front="$(printf '%s\n' "$body" | awk 'NR==1 && $0!="---"{exit} NR==1{next} $0=="---"{exit} {print}')"
@@ -85,13 +92,7 @@ ev_branch="$(val branch)"
 ev_tier="$(val tier)"
 if [ "$(rank "$ev_tier")" -lt 1 ]; then err "tier '$ev_tier' is not low, medium or high"
 elif [ "$(rank "$ev_tier")" -lt "$(rank "$need_tier")" ]; then err "tier $ev_tier is below the computed minimum $need_tier"; fi
-# A feature PR cannot bundle shared READY/close records. Disable rename detection
-# so both the old and new paths count, including removals and renames out of records.
-if [ "$(rank "$ev_tier")" -ge 1 ]; then
-  records="$(git -c core.quotePath=false diff --no-renames --name-only "$base...$head" -- \
-    STATUS.md docs/engineering/coverage-map.md ':(glob)docs/agentic/lanes/*.md')"
-  [ -z "$records" ] || err "feature PR must not change shared records: $(echo $records); the EM updates them in a separate docs-only READY or close records PR after the feature PR merges"
-fi
+check_records "$ev_tier"
 # The evidence may raise the tier: required reviewers follow the higher tier.
 if [ "$ev_tier" = "high" ]; then need_reviewers="code-reviewer security-reviewer integrity-reviewer"; fi
 

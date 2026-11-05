@@ -206,6 +206,22 @@ mkdir -p docs && echo note > docs/x.md && git add docs && git commit -qm docs
 bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch docs/WHR-30-notes >/dev/null 2>&1
 [ $? -eq 0 ] && ok || bad "docs-only should pass without evidence"
 
+# Docs-only exemption survives incomplete feature evidence unless records change.
+git checkout -q -b docs/incomplete-evidence base-ref
+echo note >> README.md
+mkdir -p .review
+printf '%s\n' '---' 'tier: low' '---' > .review/docs__incomplete-evidence.md
+git add README.md .review/docs__incomplete-evidence.md
+git commit -qm docs-incomplete-evidence
+out="$(bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch docs/incomplete-evidence 2>&1)"
+[ $? -eq 0 ] && ok || bad "README-only with incomplete feature evidence should pass: $out"
+echo ready > STATUS.md
+git add STATUS.md
+git commit -qm docs-incomplete-evidence-record
+out="$(bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch docs/incomplete-evidence 2>&1)"
+status=$?
+[ "$status" -eq 1 ] && printf '%s\n' "$out" | grep -Fq 'feature PR must not change shared records: STATUS.md' && ok || bad "incomplete feature evidence with records should fail clearly: $out"
+
 # Shared records belong in a separate docs-only READY or close PR.
 git checkout -q -b records-fixture base-ref
 mkdir -p docs/engineering docs/agentic/lanes
