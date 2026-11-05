@@ -13,7 +13,9 @@ Acceptance checks:
 5. Run the complete browser suite and EM typecheck/lint/unit/build gates.
 6. Record two consecutive green CI execution links on the unchanged reviewed feature head before merging.
 
-Results are pending. WHR-5 and WHR-7 remain READY; this work does not claim physical-phone acceptance.
+The EM's final repeat counts, gates and consecutive CI links are recorded in the
+review evidence and feature PR. WHR-5 and WHR-7 remain READY; this work does not
+claim physical-phone acceptance.
 
 ## Diagnosis (2026-11-05)
 
