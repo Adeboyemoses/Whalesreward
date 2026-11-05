@@ -1,19 +1,22 @@
 # lane:core
-WO-core-4a (WHR-62) capped capture policy: ACCEPTED by Earl, 5 November 2026
+WO-core-1e (WHR-63) feature/records separation: READY on green records-PR merge, 5 November 2026
 
 ## In flight
-- Implementation [PR #39](https://github.com/Adeboyemoses/Whalesreward/pull/39) merged at a1e674c; five CI checks and independent code/security/integrity reviews passed. EM verification: unit108, integration104, browser36 with4 existing conditional skips, time3 per timezone, typecheck/lint/build PASS. Named output remains on WHR-62.
-- This records-only closeout moves WHR-62 to Done after green staging merge.
+- Feature [PR #43](https://github.com/Adeboyemoses/Whalesreward/pull/43) merged at e8b7550 with five green CI checks. No STATUS, coverage or lane changes were included; this separate records PR follows the feature merge.
+- Validator rejects protected record edits/removals/renames when evidence declares a non-docs tier; ordinary docs-only records remain allowed. The rule is in AGENTS, work-orders and both close/review skills.
+- Independent code/security/integrity PASS round2 at fb89494; evidence .review/core__wo-1e-records.md. Round1 scope P1 fixed with paired docs-only exemption regressions. EM review53/53, guard94/94, unit135, typecheck/lint/build PASS; final output and PR links on WHR-63.
+- WHR-62 ACCEPTED/Done through records closeout [#41](https://github.com/Adeboyemoses/Whalesreward/pull/41), merge127304b; implementation #39 remains accepted.
 
 ## Next
-- Approved WO-core-1e (WHR-63): prevent feature PRs from editing shared records. Implementation and READY records use separate PRs. Stop at READY.
+- STOP at READY after this records PR merges green and WHR-63 moves In Review. No next work order.
 
 ## Earl's gos
 - 2026-11-05: “Earl accepted WO-core-4a (WHR-62); close it.”
 - 2026-11-05: “Next work order: WO-core-1e (WHR-63), feature PRs never edit STATUS.md, the coverage map or lane files.”
 
 ## Risks
-- Q-528 and WHR-58 remain separate. M3 capture review stays in WO-core-9; existing held rows remain unchanged.
-- Task renamed as requested; running EM model change is not exposed by tools. Delegated work uses requested gpt-6.1-sol with role-prescribed reasoning.
+- No product code, migration, cloud or staging-data changes. Q-528 and WHR-58 remain separate.
+- Renamed task as requested. Running-turn model switching was unavailable; builder used requested gpt-6.1-sol with medium role reasoning, reviewers gpt-6.1-sol with high role reasoning; EM runtime model remains unverified.
+- Eight feature dispatches (not over high-tier flag); session includes two closeout reviews and one READY-records review.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=11 prs=3 rounds_max=2 escalations=0 model=unavailable

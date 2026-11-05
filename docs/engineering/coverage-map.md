@@ -231,3 +231,7 @@ M3 capture review remains WO-core-9. Q-528 client confirmation, physical-phone a
 ## WO-core-4a accepted closeout (WHR-62), 5 November 2026
 
 Earl accepted P-20 implementation in PR #39 (a1e674c). The named capped-interval, microsecond and unchanged-held-replay tests above are accepted: unit108, integration104, browser36 with4 existing conditional skips, time3 per timezone, and all five CI checks passed. No new product coverage or board parity is claimed by this records-only closeout.
+
+## WO-core-1e feature/records separation (WHR-63)
+
+Operational coverage only: PR #43 merged at e8b7550 with three independent reviewers passing round2 and all five CI checks green. `scripts/review/test-review.sh` verifies protected STATUS/coverage/lane edits, removal and rename fail with feature evidence; docs-only records and unrelated staging record changes pass; README-only incomplete evidence retains the existing exemption while adding STATUS fails. EM review53/53 and guard94/94 passed, along with typecheck/lint/unit135/build. No product invariant or board status changes. This READY record is published separately after the feature merge, under the new rule.
