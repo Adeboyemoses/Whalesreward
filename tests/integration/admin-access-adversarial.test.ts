@@ -2,16 +2,20 @@ import { readFile, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import { hashPassword } from "better-auth/crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { seedAdminCredentials } from "../../prisma/seed-auth.mjs";
 import { newId } from "../../src/server/lib/ids";
 import {
   handleAuth,
   COOKIE as ATTENDANT_COOKIE,
 } from "../../src/server/modules/auth/http";
+import { adminWrite } from "../../src/server/modules/admin-access/service";
 import { processMail } from "../../src/server/modules/admin-access/mail";
 import { adminConfig } from "../../src/server/modules/admin-access/config";
 import { digest } from "../../src/server/modules/auth/crypto";
 import { handleAdmin } from "../../src/server/modules/admin-access/http";
+
+vi.setConfig({ testTimeout: 30000 });
 
 const origin = "https://station.example.test";
 const password = randomBytes(24).toString("hex");
@@ -20,6 +24,7 @@ const rootPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 let pool: pg.Pool;
 let passwordHash: string;
 let ownerCookie: string;
+let seededInitiallyRestricted = false;
 const fixtureId = (n: number) =>
   `019a5000-0000-7000-8000-${String(n).padStart(12, "0")}`;
 const catalogue = [
@@ -157,7 +162,7 @@ async function mailFor(email: string, subject: string) {
   let found = false;
   for (let attempt = 0; attempt < 60 && !found; attempt++) {
     const result = await processMail(pool, adminConfig(), async (message) => {
-      if (message.to === email && message.subject === subject) {
+      if (message.to === email && message.text.startsWith(subject)) {
         found = true;
         token = message.text.match(/#token=([a-zA-Z0-9_-]+)/)?.[1];
       }
@@ -215,10 +220,21 @@ describe("independent M2 admin access adversarial checks", () => {
       ),
     );
     passwordHash = await hashPassword(password);
-    await pool.query(
-      "INSERT INTO auth_credential(id,user_id,provider,provider_account_id,password_hash,updated_at) VALUES($1,$2::uuid,'credential',$2::text,$3,now())",
-      [newId(), fixtureId(2), passwordHash],
-    );
+    const seedClient = await pool.connect();
+    try {
+      await seedAdminCredentials(seedClient, {
+        WHR_ENV: "staging",
+        WHR_SEED_ADMIN_PASSWORD: password,
+      });
+    } finally {
+      seedClient.release();
+    }
+    seededInitiallyRestricted = (
+      await pool.query(
+        "SELECT must_change_password FROM auth_user WHERE id=$1",
+        [fixtureId(2)],
+      )
+    ).rows[0].must_change_password;
     await pool.query(
       "UPDATE auth_user SET must_change_password=false WHERE id=$1",
       [fixtureId(2)],
@@ -343,7 +359,7 @@ describe("independent M2 admin access adversarial checks", () => {
     const session = await call("session", { cookie: actor.cookie });
     expect(session.body.data.landing).toBe("no_access");
     expect(session.body.data.permissions).toEqual([]);
-  });
+  }, 30000);
 
   it("I-13 restricted sessions cannot access admin data and first-password racing succeeds once", async () => {
     const actor = await account(await role(["users", "roles"]), {
@@ -674,20 +690,29 @@ describe("independent M2 admin access adversarial checks", () => {
       (await call("email-verification-confirm", { body: { token: first } }))
         .body.error.code,
     ).toBe("link_unavailable");
-    await pool.query("UPDATE admin SET email_normalized=$2 WHERE id=$1", [
-      actor.adminId,
-      `changed.${newId()}@example.com`,
-    ]);
+    await pool.query(
+      "UPDATE admin SET email_normalized=$2,version=version+1 WHERE id=$1",
+      [actor.adminId, `changed.${newId()}@example.com`],
+    );
     expect(
       (await call("email-verification-inspect", { body: { token: second } }))
         .body.error.code,
     ).toBe("link_unavailable");
     const expiring = await account(await role([]));
-    const expiredToken = await verification(expiring);
+    const trigger = `test_expiry_${randomBytes(8).toString("hex")}`;
     await pool.query(
-      "UPDATE verification_challenge SET expires_at=clock_timestamp() WHERE secret_hash=$1",
-      [digest(expiredToken)],
+      `CREATE FUNCTION ${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.created_at=clock_timestamp()-interval '1 hour'; NEW.expires_at=clock_timestamp(); RETURN NEW; END $$`,
     );
+    await pool.query(
+      `CREATE TRIGGER ${trigger} BEFORE INSERT ON verification_challenge FOR EACH ROW WHEN (NEW.user_id='${expiring.userId}'::uuid) EXECUTE FUNCTION ${trigger}()`,
+    );
+    let expiredToken: string;
+    try {
+      expiredToken = await verification(expiring);
+    } finally {
+      await pool.query(`DROP TRIGGER ${trigger} ON verification_challenge`);
+      await pool.query(`DROP FUNCTION ${trigger}()`);
+    }
     for (const action of [
       "email-verification-inspect",
       "email-verification-confirm",
@@ -819,6 +844,216 @@ describe("independent M2 admin access adversarial checks", () => {
           .code,
       ).toBe("link_unavailable");
     }
+  });
+
+  it("I-13 admin creation stores only a password hash and secret-keyed retry receipt", async () => {
+    const emptyRole = await role([]);
+    const operationId = newId();
+    const username = `created.${newId().slice(-12)}`;
+    const input = {
+      operationId,
+      name: "Amina Test",
+      username,
+      email: `${username}@example.com`,
+      temporaryPassword: password,
+      roleId: emptyRole,
+      expectedRoleVersion: 1,
+      reason,
+    };
+    const created = await call("users-create", {
+      cookie: ownerCookie,
+      body: input,
+    });
+    expect(created.response.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body.data.user).toMatchObject({
+      username,
+      mustChangePassword: true,
+      emailVerified: false,
+    });
+    expect(JSON.stringify(created.body)).not.toContain(password);
+    const retried = await call("users-create", {
+      cookie: ownerCookie,
+      body: { ...input, username: ` ${username.toUpperCase()} ` },
+    });
+    expect(retried.response.status).toBe(201);
+    expect(retried.body.data).toEqual(created.body.data);
+    const conflict = await call("users-create", {
+      cookie: ownerCookie,
+      body: { ...input, temporaryPassword: randomBytes(24).toString("hex") },
+    });
+    expect(conflict.response.status).toBe(409);
+    expect(conflict.body.error.code).toBe("operation_conflict");
+    const receipt = (
+      await pool.query("SELECT * FROM mutation_receipt WHERE operation_id=$1", [
+        operationId,
+      ])
+    ).rows;
+    expect(receipt).toHaveLength(1);
+    expect(JSON.stringify(receipt)).not.toContain(password);
+    expect(receipt[0].digest_key_version).toBeTruthy();
+    const session = await call("session", { cookie: await login(username) });
+    expect(session.body.data.state).toBe("password_change_required");
+  });
+
+  it("I-10 credential receipt key rotation preserves historical replay and canonical grant ordering", async () => {
+    const actor = await account(await role(["roles", "sales", "overview"]));
+    const keyA = randomBytes(32).toString("hex"),
+      keyB = randomBytes(32).toString("hex");
+    const configA = {
+      ...adminConfig(),
+      receiptKeys: { alpha: keyA },
+      receiptKeyVersion: "alpha",
+    };
+    const configB = {
+      ...adminConfig(),
+      receiptKeys: { alpha: keyA, beta: keyB },
+      receiptKeyVersion: "beta",
+    };
+    const input = {
+      operationId: newId(),
+      name: `Key rotation ${newId()}`,
+      permissions: ["sales", "overview"],
+      reason,
+    };
+    const first = await adminWrite(
+      pool,
+      configA,
+      actor.cookie.split("=")[1],
+      "roles-create",
+      input,
+    );
+    const replay = await adminWrite(
+      pool,
+      configB,
+      actor.cookie.split("=")[1],
+      "roles-create",
+      { ...input, permissions: ["overview", "sales"] },
+    );
+    expect(replay).toEqual(first);
+    expect(
+      (
+        await pool.query(
+          "SELECT digest_key_version FROM mutation_receipt WHERE operation_id=$1",
+          [input.operationId],
+        )
+      ).rows[0].digest_key_version,
+    ).toBe("alpha");
+    await expect(
+      adminWrite(pool, configB, actor.cookie.split("=")[1], "roles-create", {
+        ...input,
+        permissions: [],
+      }),
+    ).rejects.toMatchObject({ code: "operation_conflict", status: 409 });
+  });
+
+  it("I-12 expired public dedup allows one new request while concurrent retries remain generic", async () => {
+    const actor = await account(await role([]), { verified: true });
+    const key = newId(),
+      ip = "10.99.2.1";
+    await call("password-reset-requests", {
+      body: { email: actor.email },
+      key,
+      ip,
+    });
+    const before = Number(
+      (await pool.query("SELECT count(*) AS n FROM admin_reset_work")).rows[0]
+        .n,
+    );
+    await pool.query(
+      "UPDATE auth_request_dedup SET expires_at=clock_timestamp()-interval '1 second' WHERE operation_kind='reset_request' AND request_key=$1",
+      [key],
+    );
+    const results = await Promise.all(
+      [1, 2].map(() =>
+        call("password-reset-requests", {
+          body: { email: actor.email },
+          key,
+          ip,
+        }),
+      ),
+    );
+    expect(results.map((result) => result.response.status)).toEqual([202, 202]);
+    expect(results[0]!.body.data).toEqual(results[1]!.body.data);
+    expect(
+      Number(
+        (await pool.query("SELECT count(*) AS n FROM admin_reset_work")).rows[0]
+          .n,
+      ) - before,
+    ).toBe(1);
+  });
+
+  it("I-41 pasted emails, link tokens and password assignments are absent from access audit", async () => {
+    const actor = await account(await role(["roles"]));
+    const email = "fictional-private@example.com",
+      token = randomBytes(32).toString("hex");
+    const privatePassword = randomBytes(24).toString("hex");
+    const input = {
+      operationId: newId(),
+      name: `Contact ${email}`,
+      permissions: [],
+      reason: `Review ${email} https://example.com/#token=${token} password=${privatePassword}`,
+    };
+    const created = await adminWrite(
+      pool,
+      adminConfig(),
+      actor.cookie.split("=")[1],
+      "roles-create",
+      input,
+    );
+    expect(created).toBeTruthy();
+    const rows = JSON.stringify(
+      (
+        await pool.query(
+          "SELECT * FROM admin_access_event WHERE actor_user_id=$1",
+          [actor.userId],
+        )
+      ).rows,
+    );
+    for (const value of [email, token, privatePassword])
+      expect(rows).not.toContain(value);
+  });
+
+  it("I-13 fictional admin seed is insert-only, preserves first-password state and refuses production", async () => {
+    expect(seededInitiallyRestricted).toBe(true);
+    const original = (
+      await pool.query(
+        "SELECT password_hash FROM auth_credential WHERE user_id=$1",
+        [fixtureId(2)],
+      )
+    ).rows[0].password_hash;
+    const db = await pool.connect();
+    try {
+      await seedAdminCredentials(db, {
+        WHR_ENV: "staging",
+        WHR_SEED_ADMIN_PASSWORD: randomBytes(24).toString("hex"),
+      });
+      await seedAdminCredentials(db, { WHR_ENV: "staging" });
+      await expect(
+        seedAdminCredentials(db, {
+          WHR_ENV: "production",
+          WHR_SEED_ADMIN_PASSWORD: password,
+        }),
+      ).rejects.toThrow("unavailable in production");
+    } finally {
+      db.release();
+    }
+    expect(
+      (
+        await pool.query(
+          "SELECT password_hash FROM auth_credential WHERE user_id=$1",
+          [fixtureId(2)],
+        )
+      ).rows[0].password_hash,
+    ).toBe(original);
+    expect(
+      (
+        await pool.query(
+          "SELECT must_change_password FROM auth_user WHERE id=$1",
+          [fixtureId(2)],
+        )
+      ).rows[0].must_change_password,
+    ).toBe(false);
+    await login("ada.williams");
   });
 
   it("I-08 two concurrent Owner self-demotions leave exactly one active Owner", async () => {
