@@ -4,6 +4,7 @@ Updated: 2026-11-05
 ## Milestone: M1 vertical slice delivery; M4 specification handoff (docs/engineering/roadmap.md)
 
 ## Done this week
+- WO-spec-3b (WHR-61): READY on the reviewed green staging merge of `spec/wo-3b-capture`; merged PR and three independent verdicts are linked from WHR-61. P-20 caps capture at the original offline expiry and defines evidence-backed M3 capture confirm/cancel with sales AND dateReview. Documentation only; WO-core-4a/9 implement it. Q-528 remains pending. Stop at READY, awaiting Earl's verification; no acceptance or implementation coverage claimed.
 - WO-spec-4 (WHR-51): ACCEPTED by Earl on 5 November 2026. M4 contracts PR #27 merged at 71f3e68 with independent code/security/integrity PASS and all five CI checks green. The 26 endpoint contracts, model additions and coverage are specification only. WHR-51 moves to Done after this reviewed documentation closeout merges with green CI. Stop after closure; no new work order.
 - WO-spec-3a (WHR-52): ACCEPTED by Earl on 4 November 2026. Amendment PR #23 merged at 6663001 with three independent PASS verdicts and green CI. Accepted closeout PR #26 merged at b3debf0 with all five CI checks green; WHR-52 is Done. P-18/P-19 remain the build rules, with Q-528 client confirmation pending.
 - WO-spec-3 (WHR-46): accepted by Earl; M3 contracts merged in PR #16. Closeout PR #21 records acceptance; Done after its green staging merge.
@@ -40,7 +41,7 @@ Updated: 2026-11-05
 - Launch date versus the December campaign start.
 
 ## Next up
-- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in stops at READY after PR #30 merges with green CI; Earl reads verification and runs the phone checks; WO-spec-4 (WHR-51) is accepted; lane:spec stops after its documentation closeout, with no new work order.
+- WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in stops at READY after PR #30 merges with green CI; Earl reads verification and runs the phone checks; WO-spec-4 (WHR-51) is accepted; lane:spec now stops at WO-spec-3b READY, awaiting Earl’s verification.
 
 ## Known risks
 - Five-to-six-week estimate against a November launch target for a December giveaway.

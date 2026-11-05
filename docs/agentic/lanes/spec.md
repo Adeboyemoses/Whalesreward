@@ -1,22 +1,21 @@
 # lane:spec
-WO-spec-4 (WHR-51) M4 contracts: ACCEPTED since 2026-11-05
+WO-spec-3b (WHR-61) capture interval and M3 capture review: READY on reviewed green staging merge, 2026-11-05
 
 ## In flight
-- Earl accepted M4 contracts. [PR #27](https://github.com/Adeboyemoses/Whalesreward/pull/27) merged at 71f3e68 with independent code/security/integrity PASS and all five CI checks green.
-- The accepted specification defines 26 endpoints for rankings, giveaway finalization/revisions, reports/exports, overview and settings, with model additions and documentation coverage. No implementation or board parity is claimed.
-- This documentation closeout records acceptance; WHR-51 moves to Done after its reviewed green staging merge. PR and verification are linked from WHR-51.
-- WO-spec-3a (WHR-52) remains accepted and closed through PR #26.
+- Specification PR branch `spec/wo-3b-capture`; merged PR and code/security/integrity verdicts are recorded on [WHR-61](https://linear.app/phaneum/issue/WHR-61). READY takes effect only after merge and green CI; then stop for Earl's verification.
+- P-20 refines P-18: [S, min(R, original offlineExpiresAt)]; receipt after expiry alone does not hold. M3 evidence-backed capture review requires sales AND dateReview and clears only capture blocks or cancels.
+- No application code or board parity. Q-528 remains pending. WHR-61 stays In Review, not Done, at READY.
 
 ## Next
-- Stop after closure. No new work order is authorized.
+- Stop at READY. WO-core-4a implements the interval; WO-core-9 implements capture review. No further spec work order is started.
 
-## Earl’s gos
-- 2026-11-05: “Earl accepted WO-spec-4 (WHR-51); close it, then stop. No new work order.”
+## Earl's gos
+- 2026-11-05: “[spec · WO-spec-3b] You are the engineering manager for lane:spec. Work order: WO-spec-3b (WHR-61), Earl's P-20 refinement of the capture interval and the M3 capture review. Take it to READY, then stop. Follow AGENTS.md.”
 
 ## Risks
-- WHR-54: final reconciliation and trusted complete-upload policy; finalization blocked until configured.
-- WHR-55: launch/start and timing-change policy; client dates/grace unset. WHR-56: stored copies/removal policy; deletion disabled.
-- P-18/Q-528 and WHR-39/47/50 remain prior eligibility gates. Acceptance does not settle these policies.
-- Metrics cover this documentation closeout. M4 delivery review and verification remain archived in PR #27. Runtime full model ID unavailable.
+- Client Q-528 confirmation remains pending; Rook should carry P-20 into the read-only product docs.
+- Existing implementation remains P-18 until WO-core-4a; capture decision/evidence checks await WO-core-9. Missing/insufficient evidence never grants credit.
+- No cloud or main action authorized. Runtime full model ID unavailable.
+- Dispatch flag: PR #38 uses 9 reviews (>8 high-tier threshold); round 3 rechecks overlapping status/coverage files after concurrent core closeout #37 merged. No new product scope.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=9 prs=1 rounds_max=3 escalations=0 model=unavailable
