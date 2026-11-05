@@ -55,7 +55,7 @@ Tests live with the lane of the code they test. `lane:app` may propose a `src/sh
 - The EM coordinates. It writes code only for fixes of about 10 lines, docs, git operations and triage. Builders (`.codex/agents/*.toml`) write feature code, each in its own worktree under `.worktrees/`. Nobody runs `git checkout` or `git switch` in the main checkout.
 - If subagents are unavailable in your Codex surface, run each builder or reviewer as a separate Codex thread with that agent's instructions. **Never review a diff in the thread that wrote it.**
 - Found work becomes a Linear issue labelled `found-in:<WO>`, never extra scope.
-- At session close, overwrite your lane file (3 KB at most, metric line last) and update `STATUS.md`.
+- Session records follow the standing rule below; lane files stay within 3 KB with the metric line last.
 
 ## Risk tiers (full rules: [review.md](docs/agentic/review.md))
 
@@ -76,6 +76,8 @@ Tests live with the lane of the code they test. `lane:app` may propose a `src/sh
 - Nobody bypasses the review gate from Codex. If Earl wants a bypass, he merges it himself in GitHub.
 
 ## Standing rules
+
+- A feature PR never changes `STATUS.md`, `docs/engineering/coverage-map.md` or `docs/agentic/lanes/*.md`; the EM updates them only in the READY or close records PR after the feature PR merges.
 
 - **This repository is public.** Never commit client data, personal data, commercial terms (fees, invoices, payment milestones), credentials, or copies of product-docs text beyond what the code needs. Fixtures stay fictional.
 - Settled decisions stay settled. If you want to revisit one, flag it; don't quietly change it. No deferred-scope features (Features and Requirements, "Deferred scope") without a scope change from Earl.
