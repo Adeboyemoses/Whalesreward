@@ -45,6 +45,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 | T-12 | Attendant pages are static client shells reading Dexie and the session endpoint; no server-rendered personal data | 2026-11-04 |
 | T-14 | Confirm T-13: one Better Auth user with `kind`, separate profiles and revocable database sessions behind attendant wrappers; recovery grants remain separate and deferred. Supersedes T-13 proposal | 2026-11-05 (WO-core-3 plan) |
 
+| T-15 | Staging transactional email uses Zoho CPaaS EU behind the email adapter, environment-only credentials/sender and exact test-recipient allowlist; local Mailpit and production activation gates remain | Earl, 2026-11-05; WHR-66 |
+
 ## Open product decisions that touch code
 
 D02 (meter settings, halfway rounding; capped capture build default P-20 (refines P-18) awaits Q-528 client confirmation), D05 (other retirement cases), D06 (role matrix, token expiries, providers, loss-of-email process), D07 (photo originals, backups, restore objectives), D08 (field validation), D09 (campaign dates, grace, retention values). See `product-docs/06 Delivery and Handoffs/Design Handoff Readiness.md`. Build them behind configuration or adapters; never invent the client's policy.
