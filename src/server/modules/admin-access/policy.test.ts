@@ -30,3 +30,37 @@ describe("M2 access policy", () => {
     );
   });
 });
+
+import { auditText } from "./privacy";
+import { accessEmail } from "./templates";
+it("I-12/I-41 audit text excludes pasted addresses, links and bearer values", () => {
+  const token = "a".repeat(64);
+  const result = auditText(
+    `Contact ada@example.com token=${token} https://example.test/#token=${token}`,
+  );
+  expect(result).not.toContain("ada@example.com");
+  expect(result).not.toContain(token);
+  expect(result).not.toContain("https://");
+});
+it("M01/M02 emails use inline tables, matching text, configured lifetime and explicit confirmation", () => {
+  const verify = accessEmail({
+    purpose: "verify_email",
+    email: "ada@example.com",
+    origin: "https://station.example.test",
+    token: "fictional",
+  });
+  expect(verify.html).toContain("<table");
+  expect(verify.html).not.toContain("<script");
+  expect(verify.html).not.toContain("var(--");
+  expect(verify.text).toContain("24 hours");
+  expect(verify.text).toContain("until you confirm");
+  const reset = accessEmail({
+    purpose: "reset_password",
+    email: "ada@example.com",
+    origin: "https://station.example.test",
+    token: "fictional",
+  });
+  expect(reset.text).toContain("30 minutes");
+  expect(reset.text).toContain("every other session");
+  expect(reset.html).toContain("30 minutes");
+});

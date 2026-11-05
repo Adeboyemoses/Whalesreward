@@ -1,3 +1,4 @@
+import { auditText } from "./privacy";
 import type pg from "pg";
 import { AuthError } from "../auth/errors";
 import { digest, hmac } from "../auth/crypto";
@@ -163,9 +164,29 @@ export async function audit(
   before: unknown,
   after: unknown,
 ) {
-  const a = before === null ? null : accessValuesSchema.parse(before),
-    b = after === null ? null : accessValuesSchema.parse(after);
-  await db.query(`INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,clock_timestamp())`,[newId(),actor,actor?'user':'system',action,type,target,JSON.stringify(a),JSON.stringify(b),reason]);
+  const clean = (value: unknown) => {
+    if (value === null) return null;
+    const parsed = accessValuesSchema.parse(value);
+    if (parsed.roleName) parsed.roleName = auditText(parsed.roleName);
+    return parsed;
+  };
+  const a = clean(before),
+    b = clean(after);
+  reason = auditText(reason);
+  await db.query(
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,clock_timestamp())`,
+    [
+      newId(),
+      actor,
+      actor ? "user" : "system",
+      action,
+      type,
+      target,
+      JSON.stringify(a),
+      JSON.stringify(b),
+      reason,
+    ],
+  );
   await db.query(
     "INSERT INTO admin_access_event(id,actor_user_id,target_type,target_id,action,reason,before_values,after_values) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
     [newId(), actor, type, target, action, reason, a, b],
@@ -189,22 +210,44 @@ export async function receipt<T>(
   input: { operationId: string; [key: string]: unknown },
   run: () => Promise<T>,
 ): Promise<T> {
-  const hash = hmac(config.secret, "admin-receipt-v1", JSON.stringify(input));
+  const canonical = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(canonical)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([key, v]) => [
+                key,
+                key === "permissions" && Array.isArray(v)
+                  ? [...v].sort()
+                  : canonical(v),
+              ]),
+          )
+        : value;
+  const payload = JSON.stringify(canonical(input));
+  const version = config.receiptKeyVersion ?? "v1";
+  const keys = config.receiptKeys ?? { v1: config.secret };
+  const hashFor = (v: string) => {
+    const key = keys[v];
+    if (!key) throw new AuthError("temporarily_unavailable", 503);
+    return hmac(key, "admin-receipt-v1", payload);
+  };
   const old = (
     await db.query(
-      "SELECT request_digest,result_snapshot FROM mutation_receipt WHERE actor_user_id=$1 AND operation_kind=$2 AND operation_id=$3",
+      "SELECT request_digest,digest_key_version,result_snapshot FROM mutation_receipt WHERE actor_user_id=$1 AND operation_kind=$2 AND operation_id=$3",
       [actor.user_id, kind, input.operationId],
     )
   ).rows[0];
   if (old) {
-    if (old.request_digest !== hash)
+    if (old.request_digest !== hashFor(old.digest_key_version))
       throw new AuthError("operation_conflict", 409);
     return old.result_snapshot as T;
   }
   const result = await run();
   await db.query(
-    "INSERT INTO mutation_receipt(actor_user_id,operation_kind,operation_id,request_digest,digest_key_version,result_snapshot) VALUES($1,$2,$3,$4,'v1',$5)",
-    [actor.user_id, kind, input.operationId, hash, result],
+    "INSERT INTO mutation_receipt(actor_user_id,operation_kind,operation_id,request_digest,digest_key_version,result_snapshot) VALUES($1,$2,$3,$4,$5,$6)",
+    [actor.user_id, kind, input.operationId, hashFor(version), version, result],
   );
   return result;
 }
