@@ -3,10 +3,18 @@ import path from "node:path";
 import { v7 as uuidv7 } from "uuid";
 import type { OutboxRow } from "../../../src/client/types";
 import { installAttendantFake } from "../../fixtures/attendant-http-fake";
-import { fillSale, save, signIn } from "../../fixtures/offline-browser";
+import {
+  fillSale,
+  save,
+  signIn,
+  waitForWorker,
+} from "../../fixtures/offline-browser";
 
 async function capture(page: Page, board: string, width: number) {
-  await page.setViewportSize({ width, height: 1100 });
+  const boardHeight = ["A04-SaleSynced", "A16-GasSynced"].includes(board)
+    ? 1108
+    : 844;
+  await page.setViewportSize({ width, height: boardHeight });
   await page.evaluate(async () => {
     window.scrollTo(0, 0);
     await document.fonts.ready;
@@ -14,7 +22,7 @@ async function capture(page: Page, board: string, width: number) {
   const height = await page.evaluate(
     () => document.documentElement.scrollHeight,
   );
-  await page.setViewportSize({ width, height });
+  await page.setViewportSize({ width, height: Math.max(boardHeight, height) });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -51,6 +59,7 @@ for (const width of [390, 360]) {
       if (state === "held") fake.sync.setOutcome("held");
       if (state === "pending") fake.sync.setPutFailure(true);
       await signIn(page, state === "gas" ? "favour.james" : "grace.okon");
+      await waitForWorker(page);
       await fillSale(page, {
         gas: state === "gas",
         value:
@@ -66,6 +75,12 @@ for (const width of [390, 360]) {
       fake.setOffline(false);
       await context.setOffline(false);
       if (state === "pending") {
+        await expect(
+          page.getByRole("heading", {
+            name: "Photo upload failed",
+            exact: true,
+          }),
+        ).toBeVisible({ timeout: 20000 });
         await page.goto("/attendant/uploads");
         await expect(
           page.getByText("Photo upload failed", { exact: true }),

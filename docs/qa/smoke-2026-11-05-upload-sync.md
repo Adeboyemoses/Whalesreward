@@ -22,4 +22,8 @@ Record actual phone/browser, commit, outcomes and any failures here before accep
 
 ## Automated preparation and execution
 
-Test-engineer prepared `tests/e2e/upload-sync.spec.ts` and `tests/design-parity/uploads/capture.spec.ts` with a contract-shaped HTTP fake. Typecheck and lint passed. The first Playwright attempt built the production app successfully but failed before executing the scenario: Chromium macOS process registration was denied by the sandbox (`Permission denied (1100)`, SIGTRAP). Result: 1 launch failure, 0 browser scenarios executed. Browser and fidelity verification remain pending; this is not a smoke pass.
+Test-engineer exercised the production browser client using the contract-shaped HTTP fake in local Linux Chromium. Initial full run: **64 passed, 4 failed, 4 existing staging-only skips**. The four failures were two fixture assumptions repeated at both viewport projects: upload-first already signs out after completion, and navigation can retain an active request lease. Corrected deterministic delayed-PUT tests passed **8/8 (55.9s)**, with no failures or new skips. The EM independently reruns the complete suite on the final integration head; its final browser count is pending. EM-reported gates: 106 unit tests passed and time suites passed 3/3 under UTC and 3/3 under America/New_York.
+
+Design capture: seven initial passes and one fixture navigation race; corrected pending captures passed **2/2 (19.4s)**. All five boards have independently inspected screenshots at 390 px and 360 px. See [upload-sync-fidelity.md](upload-sync-fidelity.md) for differences and the existing WHR-45 formatting follow-up.
+
+The macOS browser sandbox launch limitation was resolved using a local Docker Chromium runner and an isolated fixture Postgres database. These are contract-fake client checks, not real storage/credit or Android smoke acceptance. Earl’s phone smoke remains pending.
