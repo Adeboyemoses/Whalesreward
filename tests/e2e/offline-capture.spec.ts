@@ -181,7 +181,7 @@ test("I-23 quota failure keeps the draft and photo without a partial saved sale"
     page.getByText(/storage|space|save failed|could not save/i).first(),
   ).toBeVisible();
   await expect(page.getByLabel("Amount in naira", { exact: true })).toHaveValue(
-    "20000.01",
+    "20,000.01",
   );
   await expect(
     page.getByRole("button", { name: "Retake", exact: true }),
@@ -344,7 +344,7 @@ test("I-24 denied camera keeps the form and cannot claim a saved photo or sale",
       .first(),
   ).toBeVisible();
   await expect(page.getByLabel("Amount in naira", { exact: true })).toHaveValue(
-    "20000.01",
+    "20,000.01",
   );
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
   expect(await rows(page)).toEqual([]);
