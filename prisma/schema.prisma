@@ -7,6 +7,12 @@ datasource db {
 }
 
 model AuthUser {
+  last_sign_in_at DateTime? @db.Timestamptz(6)
+  created_by_user_id String? @db.Uuid
+  auth_user AuthUser? @relation("auth_userToauth_user", fields: [created_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_auth_user AuthUser[] @relation("auth_userToauth_user")
+  admin_access_event admin_access_event[]
+  mutation_receipt mutation_receipt[]
   id                                       String                  @id @db.Uuid
   created_at                               DateTime                @default(now()) @db.Timestamptz(6)
   kind                                     String
@@ -64,6 +70,9 @@ model Attendant {
 }
 
 model Admin {
+  verification_generation BigInt @default(0)
+  reset_generation BigInt @default(0)
+  mail_request mail_request[]
   id                                          String                   @id @db.Uuid
   created_at                                  DateTime                 @default(now()) @db.Timestamptz(6)
   user_id                                     String                   @db.Uuid
@@ -134,6 +143,9 @@ model RolePermission {
 }
 
 model AuthSession {
+  access_scope String @default("full")
+  last_activity_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  auth_request_dedup auth_request_dedup[]
   id                     String          @id @db.Uuid
   created_at             DateTime        @default(now()) @db.Timestamptz(6)
   user_id                String          @db.Uuid
@@ -158,6 +170,11 @@ model AuthSession {
 }
 
 model VerificationChallenge {
+  issuance_generation BigInt?
+  mail_request_id String? @db.Uuid
+  target_key_version String?
+  mail_request_mail_request_challenge_idToverification_challenge    mail_request[]           @relation("mail_request_challenge_idToverification_challenge")
+  mail_request_verification_challenge_mail_request_idTomail_request mail_request?            @relation("verification_challenge_mail_request_idTomail_request", fields: [mail_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   id                                         String                   @id @db.Uuid
   created_at                                 DateTime                 @default(now()) @db.Timestamptz(6)
   user_id                                    String?                  @db.Uuid
@@ -837,4 +854,89 @@ model SyncValidation {
   campaignEligible Boolean @map("campaign_eligible")
   evaluatedAt DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
   @@map("sync_validation")
+}
+
+
+model admin_access_event {
+  id            String    @id @db.Uuid
+  created_at    DateTime  @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  target_type   String
+  target_id     String    @db.Uuid
+  action        String
+  actor_user_id String?   @db.Uuid
+  reason        String
+  before_values Json?
+  after_values  Json?
+  auth_user     AuthUser? @relation(fields: [actor_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+
+model admin_reset_work {
+  id            String   @id @db.Uuid
+  created_at    DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  target_digest String
+  cursor_id     String?  @db.Uuid
+  completed     Boolean  @default(false)
+}
+
+
+model auth_request_dedup {
+  scope_digest    String
+  operation_kind  String
+  request_key     String       @db.Uuid
+  request_hmac    String
+  key_version     String
+  session_id      String?      @db.Uuid
+  expires_at      DateTime     @db.Timestamptz(6)
+  tombstone_until DateTime     @db.Timestamptz(6)
+  auth_session    AuthSession? @relation(fields: [session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([scope_digest, operation_kind, request_key])
+}
+
+
+model mail_request {
+  id                                                                          String                  @id @db.Uuid
+  created_at                                                                  DateTime                @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  admin_id                                                                    String                  @db.Uuid
+  purpose                                                                     String
+  generation                                                                  BigInt?
+  operation_id                                                                String                  @db.Uuid
+  target_digest                                                               String
+  target_key_version                                                          String
+  destination_email                                                           String
+  status                                                                      String                  @default("pending")
+  challenge_id                                                                String?                 @db.Uuid
+  lease_nonce                                                                 String?
+  lease_until                                                                 DateTime?               @db.Timestamptz(6)
+  fencing_version                                                             BigInt                  @default(0)
+  attempts                                                                    Int                     @default(0)
+  sent_at                                                                     DateTime?               @db.Timestamptz(6)
+  failure_code                                                                String?
+  admin                                                                       Admin                   @relation(fields: [admin_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  verification_challenge_mail_request_challenge_idToverification_challenge    VerificationChallenge?  @relation("mail_request_challenge_idToverification_challenge", fields: [challenge_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  verification_challenge_verification_challenge_mail_request_idTomail_request VerificationChallenge[] @relation("verification_challenge_mail_request_idTomail_request")
+
+  @@unique([admin_id, purpose, operation_id])
+  @@index([status, created_at], map: "mail_request_work")
+}
+
+
+model mutation_receipt {
+  actor_user_id      String   @db.Uuid
+  operation_kind     String
+  operation_id       String   @db.Uuid
+  request_digest     String
+  digest_key_version String
+  result_snapshot    Json
+  applied_at         DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  auth_user          AuthUser @relation(fields: [actor_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([actor_user_id, operation_kind, operation_id])
+}
+
+
+model security_state {
+  id      Boolean @id @default(true)
+  version BigInt  @default(1)
 }

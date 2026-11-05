@@ -100,3 +100,13 @@ For a broken application deployment, choose the last known-good compatible deplo
 5. Remove unused staging secrets from Bitwarden according to Earl's retention practice. Do not paste them anywhere during cleanup. Record that staging was destroyed so nobody expects the old URL to work.
 
 Production provisioning, a client account, custom domains, live data migration, backup automation and monitoring are outside this work order.
+
+## Admin access and local recovery verification (WO-core-5)
+
+The fictional admin is `ada.williams` (Ada Williams). Credential provisioning is insert-only: the seed reads `WHR_SEED_ADMIN_PASSWORD` only when explicitly supplied, requires 16–1024 characters, never ships a default and never changes an existing credential. Production refuses fictional seeding. The first successful admin sign-in is restricted until a new password is confirmed; this revokes the temporary sessions.
+
+**Earl's staging data change:** supplying the staging admin seed value and running the existing seed job requires Earl's explicit go. This work order implements the capability but does not run that job or alter staging data. Do not put the value in a command transcript, repository or test fixture. An already-provisioned credential cannot be reset by rerunning seed.
+
+WHR-42/43 values in `src/server/modules/admin-access/config.ts` are engineering proposals: 24-hour verification links, 30-minute reset links, 8-hour absolute sessions, 30-minute idle limit and 15-minute first-password sessions. Production authentication/delegation fails closed pending an approved policy. The proposed Operations/Read-only presets are reference-only; custom roles start empty and no preset is automatically provisioned. Owner receives the canonical 28 explicit grants, without a role-name authorization bypass. Legacy `salesView`/`leaderboardView` records remain historical only and authorize no canonical action.
+
+Staging uses the existing no-op mail adapter. It never claims verification mail was queued when delivery is unconfigured, and public recovery still returns the generic response. Locally, Mailpit uses `http://127.0.0.1:8025` (or local-only `MAILPIT_URL`). The bounded worker `jobs/admin-mail.ts` processes durable intents; it generates link secrets only in memory, stores their hashes and fails uncertain sends without reconstructing tokens. To run locally, bundle the job with esbuild (`pnpm exec esbuild jobs/admin-mail.ts --bundle --platform=node --format=esm --packages=external --outfile=jobs/.admin-mail.local.mjs`) and run that output with the ordinary local server configuration, then remove the generated bundle. Never run this against a cloud database from an agent session. No scheduler or provider activation is included.
