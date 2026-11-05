@@ -11,6 +11,7 @@ import { hashPassword } from "better-auth/crypto";
 import {
   dependencies,
   permissionCodes,
+  permissionLabels,
   sensitiveDefaults,
   roleInputSchema,
   roleEditSchema,
@@ -240,15 +241,15 @@ export async function adminWrite(
               if (count <= 1) throw new AuthError("last_owner", 409);
             }
             await db.query(
-              "UPDATE admin SET role_id=$2,version=version+1 WHERE id=$1 AND version=$3",
-              [old.id, p.roleId, p.expectedVersion],
+              "UPDATE admin SET role_id=$2,version=version+1,verification_generation=verification_generation+CASE WHEN $4 THEN 0 ELSE 1 END,reset_generation=reset_generation+CASE WHEN $4 THEN 0 ELSE 1 END WHERE id=$1 AND version=$3",
+              [old.id, p.roleId, p.expectedVersion, p.enabled],
             );
             await db.query(
               "UPDATE auth_user SET enabled=$2,updated_at=clock_timestamp() WHERE id=$1",
               [old.accountId, p.enabled],
             );
             await revoke(db, old.accountId);
-            if (!p.enabled) await invalidateMail(db, old.accountId);
+            if (!p.enabled) await invalidateMail(db, old.accountId, false);
             const user = await userView(db, old.id);
             await audit(
               db,
@@ -355,7 +356,7 @@ export async function adminRead(
       return {
         items: permissionCodes.map((code) => ({
           code,
-          label: code,
+          label: permissionLabels[code],
           requiredView: dependencies[code] ?? null,
           sensitiveOwnerDefault: sensitiveDefaults.includes(code),
         })),
@@ -374,6 +375,7 @@ export async function adminRead(
             action === "assignable-roles",
             actor.is_owner,
             permissionCodes,
+            permissionLabels,
             actor.permissions.filter((p) => ADMIN_POLICY.delegable.includes(p)),
             limit + 1,
             offset,

@@ -9,6 +9,7 @@ import {
   adminUserSchema,
   roleSummarySchema,
   permissionCodes,
+  dependencies,
   type PermissionCode,
 } from "../../../shared/contracts/admin";
 export async function transaction<T>(
@@ -62,10 +63,20 @@ export async function liveAdmin(
   if (!r) throw new AuthError("unauthenticated", 401);
   if (!restricted && (r.access_scope !== "full" || r.must_change_password))
     throw new AuthError("password_change_required", 403);
+  // Legacy/incomplete grants do not become usable without their canonical view.
+  r.permissions = r.permissions.filter(
+    (p) => !dependencies[p] || r.permissions.includes(dependencies[p]!),
+  );
   return r;
 }
 export function permission(actor: LiveAdmin, ...codes: PermissionCode[]) {
-  if (!codes.some((p) => actor.permissions.includes(p)))
+  if (
+    !codes.some(
+      (p) =>
+        actor.permissions.includes(p) &&
+        (!dependencies[p] || actor.permissions.includes(dependencies[p]!)),
+    )
+  )
     throw new AuthError("permission_denied", 403);
 }
 export async function roleView(db: pg.PoolClient, id: string) {

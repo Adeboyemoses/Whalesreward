@@ -54,7 +54,7 @@ export async function signIn(
   ]);
   return transaction(pool, async (db) => {
     await securityLock(db);
-    const scope = hmac(config.secret, "admin-sign-in-scope", username);
+    const scope = hmac(config.secret, "admin-sign-in-scope", "surface");
     const hash = hmac(
       config.secret,
       "admin-sign-in-input",
