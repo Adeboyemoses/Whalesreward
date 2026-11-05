@@ -16,5 +16,6 @@ WO-spec-3b (WHR-61) capture interval and M3 capture review: READY on reviewed gr
 - Client Q-528 confirmation remains pending; Rook should carry P-20 into the read-only product docs.
 - Existing implementation remains P-18 until WO-core-4a; capture decision/evidence checks await WO-core-9. Missing/insufficient evidence never grants credit.
 - No cloud or main action authorized. Runtime full model ID unavailable.
+- Dispatch flag: PR #38 uses 9 reviews (>8 high-tier threshold); round 3 rechecks overlapping status/coverage files after concurrent core closeout #37 merged. No new product scope.
 
-dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
+dispatches=9 prs=1 rounds_max=3 escalations=0 model=unavailable
