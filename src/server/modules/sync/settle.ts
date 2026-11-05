@@ -93,8 +93,8 @@ export async function settle(
   const held = reasons.length > 0;
   const revisionId = newId();
   await db.query(
-    `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,kind,state,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id)
- SELECT $1,id,1,$2,$3,payload_digest,'original',$4,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,$5 FROM purchase WHERE id=$6`,
+    `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,kind,state,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id,decision_actor_id,decision_reason,decided_at)
+ SELECT $1,id,1,$2,$3,payload_digest,'original',$4,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,$5,CASE WHEN $4='accepted' THEN $3::uuid ELSE NULL END,CASE WHEN $4='accepted' THEN 'Validated original sale' ELSE NULL END,CASE WHEN $4='accepted' THEN clock_timestamp() ELSE NULL END FROM purchase WHERE id=$6`,
     [
       revisionId,
       operationId,
@@ -109,8 +109,8 @@ export async function settle(
     holds.push({ kind: "price", reason: "price_uncertain" });
   if (reasons.includes("replaced_card"))
     holds.push({ kind: "card", reason: "replaced_card" });
-  if (reasons.some((r) => !["price_uncertain", "replaced_card"].includes(r)))
-    holds.push({ kind: "date", reason: "capture_date_uncertain" });
+  // M3 amendment: authorization/time policy blocks are separate from holds.
+  // M1 exposes them through held + policy_review_required; reasons stay durable.
   for (const hold of holds)
     await db.query(
       `INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) VALUES($1,$2,$3,'open',$4,$5,1)`,

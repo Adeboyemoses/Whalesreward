@@ -141,7 +141,7 @@ export async function audit(
 ) {
   const { newId } = await import("../../lib/ids");
   await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at) VALUES($1,$2,'attendant',$3,'purchase',$4,$5,'{}',$6,$3,clock_timestamp())`,
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at) VALUES($1,$2,'user',$3,'purchase',$4,$5,'{}',$6,$3,clock_timestamp())`,
     [newId(), userId, action, purchaseId, operationId, JSON.stringify(after)],
   );
 }
