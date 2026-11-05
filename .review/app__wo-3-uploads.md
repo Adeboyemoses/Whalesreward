@@ -2,8 +2,8 @@
 branch: app/wo-3-uploads
 linear: WHR-7
 tier: high
-reviewed_head: a7fc353a4476a2d8a3077f369fcddf0154c052c0
-rounds: 3
+reviewed_head: f13ad2f6afe0632707a76fa5f7e54a15ad1d7694
+rounds: 4
 builder: offline-engineer
 reviewers:
   code-reviewer: PASS
@@ -48,4 +48,7 @@ No schema migration, automatic evidence deletion, cloud operation, history or co
 Earl reaffirmed original-session ownership and the bounded extra review in this session.
 Approval is also recorded on WHR-7, comment 0cea0f42-8e20-4fc3-b9ae-fcb7247833c9.
 WHR-60 is nonblocking per Earl; diagnose before M5 and cover both flows in M1 phone smoke.
-Round 4 is documentation-only; its verdicts are pending and no application/test/dependency edits are authorized.
+Round 4 code/security/integrity reviewers all PASS f13ad2f; no findings, no app/test/dependency delta.
+Their prior application review carries forward; the plan block is unchanged.
+New PR #36 at staging 2404344 conflicts in STATUS and coverage, outside this approved review.
+Those conflicts are unresolved; no merge or READY is claimed and final green CI remains required.
