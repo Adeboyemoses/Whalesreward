@@ -12,7 +12,7 @@ export const cardCode = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}$/);
+  .regex(new RegExp(`^[${CARD_ALPHABET}]{7}$`));
 export const lookupSchema = z.discriminatedUnion("source", [
   z
     .object({

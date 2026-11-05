@@ -160,7 +160,6 @@ export function createSyncService({
     },
     async submit(token: string | undefined, input: OriginalSale) {
       const sale = parsed(originalSaleSchema, input);
-      calculation(sale);
       const hash = payloadDigest(sale);
       const inserted = await transaction(pool, async (db) => {
         const auth = await authority(db, token);
@@ -178,6 +177,7 @@ export function createSyncService({
             throw new SyncError("operation_conflict", 409);
           return { id: existing.id, created: false };
         }
+        calculation(sale);
         const ctx = (
           await db.query<Context>(
             `SELECT c.attendant_id,c.assignment_id,c.seller_name,c.seller_username,p.id AS pump_id,p.station_id,p.product_id,pr.unit,pr.code AS product_code FROM capture_context c JOIN assignment a ON a.id=c.assignment_id AND a.attendant_id=c.attendant_id JOIN pump p ON p.id=a.pump_id JOIN product pr ON pr.id=p.product_id WHERE c.id=$1 AND c.attendant_id=$2 AND c.assignment_id=$3`,
@@ -194,8 +194,13 @@ export function createSyncService({
           throw new SyncError("medium_invalid", 422);
         const price = (
           await db.query(
-            "SELECT 1 FROM product_price_version WHERE id=$1 AND station_id=$2 AND product_id=$3",
-            [sale.priceVersionId, ctx.station_id, ctx.product_id],
+            "SELECT 1 FROM product_price_version WHERE id=$1 AND station_id=$2 AND product_id=$3 AND quantity_precision=$4",
+            [
+              sale.priceVersionId,
+              ctx.station_id,
+              ctx.product_id,
+              sale.quantityPrecision,
+            ],
           )
         ).rowCount;
         if (!price) throw new SyncError("calculation_invalid", 422);
@@ -318,7 +323,7 @@ export function createSyncService({
           maxBytes: SYNC_LIMITS.maxBytes,
         };
       } catch {
-        throw new SyncError("storage_unavailable", 503);
+        throw new SyncError("temporarily_unavailable", 503);
       }
     },
     async finalize(
