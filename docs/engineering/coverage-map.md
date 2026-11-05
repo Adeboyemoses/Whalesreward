@@ -24,7 +24,7 @@ WHR-54/55/56 track reconciliation/upload proof, launch/start/timing changes and 
 
 P-20 refines P-18 in M1/M3, the data model and I-45a: capture interval [S, min(R, original offlineExpiresAt)] and evidence-backed capture review with sales AND dateReview. Documentation reaches READY on this branch's reviewed green staging merge; the merged PR and three verdicts are recorded on [WHR-61](https://linear.app/phaneum/issue/WHR-61). Q-528 remains pending. No application code, implementation tests or board parity are claimed.
 
-WO-core-4a must verify late receipt, changes after versus at/before U, exact expiry, immutable bounds on retry/recovery, and receipt-based upload deadlines. WO-core-9 must verify capture confirm/cancel, insufficient evidence, permission conjunction/revocation, Domain replay, stale/concurrent guards, independent holds and retained resolutions. Existing tests below predate P-20 and do not establish this refinement. S03/S06/S07 remain visual inputs only; no capture-review board is invented.
+WO-core-4a must verify late receipt, changes after versus at/before U, exact expiry, immutable bounds on retry/recovery, and receipt-based upload deadlines. WO-core-9 must verify capture confirm/cancel, insufficient evidence, permission conjunction/revocation, Domain replay, stale/concurrent guards, independent holds and retained resolutions. WO-core-4a adds the capped-policy implementation tests below; capture review remains WO-core-9. S03/S06/S07 remain visual inputs only; no capture-review board is invented.
 
 ## Invariants
 
@@ -34,10 +34,10 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 |---|---|---|---|---|
 | I-01 | Each attendant has a personal account: name, unique username, password and a permanent sys… | WO-core-3 (server) | attendant-auth.test.ts: personal credentials/context; attendant-auth.spec.ts: real sign-in | verified; READY on green staging merge |
 | I-02 | Sign-in, account switching and customer registration need connectivity | WO-app-2 (client); WO-core-3 (server) | tests/e2e/offline-capture.spec.ts (handover; client scope); see authentication coverage below | building |
-| I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | WO-app-2 (client); WO-core-3 (server); WO-core-4 (server); WO-spec-3b (spec only) | src/client/offline/window.test.ts; offline-capture.spec.ts (24h, rollback, restart); see authentication coverage below; sync-sales.test.ts: exact24h write/read boundary; P-20 downstream checks above, not implemented | building |
+| I-03 | Offline capture is allowed for 24 hours after the last successful online sign-in | WO-app-2 (client); WO-core-3 (server); WO-core-4 (server); WO-spec-3b (spec only); WO-core-4a | src/client/offline/window.test.ts; offline-capture.spec.ts (24h, rollback, restart); see authentication coverage below; sync-sales.test.ts: exact24h write/read boundary; P-20 capped capture interval (capture-policy.test.ts); Monday outage, expiry microseconds and unchanged v1 hold replay (sync-sales.test.ts) | building |
 | I-04 | An account writes only for its authorized station and pump | WO-core-3 (server) | see authentication coverage below | todo |
 | I-05 | Pump reassignment is done by an authorized admin | WO-core-3 (server) | see authentication coverage below | todo |
-| I-05a | A queued record from before a reassignment is validated against that account's assignment … | WO-core-4; WO-core-3; WO-spec-3b (spec only) | sync-sales.test.ts: P-18 reauthentication; simultaneous assignment/price/campaign conditions; P-20 downstream checks above, not implemented | on-staging (server slice; effective on reviewed green merge) |
+| I-05a | A queued record from before a reassignment is validated against that account's assignment … | WO-core-4; WO-core-3; WO-spec-3b (spec only); WO-core-4a | sync-sales.test.ts: P-18 reauthentication; simultaneous assignment/price/campaign conditions; P-20 capped capture interval (capture-policy.test.ts); Monday outage, expiry microseconds and unchanged v1 hold replay (sync-sales.test.ts) | on-staging (server slice; effective on reviewed green merge) |
 | I-06 | Logout offers upload-first when connected | WO-app-2 (client); WO-core-3 (server); WO-core-4 (server) | offline-capture.spec.ts (handover, cross-tab); client.test.ts (failed revocation); see authentication coverage below; sync-sales.test.ts: foreign account read/upload/finalize isolation | building |
 | I-07 | Admin users, roles and permissions are separate from attendant accounts | WO-spec-4 (spec only); WO-spec-3b (spec only) | Not implemented; P-20 downstream checks above, not implemented | todo |
 | I-08 | At least one active Owner always exists | | | todo |
@@ -55,16 +55,16 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-20 | PDF print sheets and Excel registers are generated from the reserved codes | | | todo |
 | I-21 | Card replacement keeps the customer and retires the old card atomically | | | todo |
 | I-21a | Before replacing a lost card, the admin verifies a code sent to the registered phone (thro… | | | todo |
-| I-22 | Every sale has a client-generated operation ID | WO-core-4; WO-spec-3b (spec only) | sync-sales.test.ts: lost-response retry; changed original content; concurrent finalize; changed finalize body; P-20 downstream checks above, not implemented | on-staging (effective on reviewed green merge) |
+| I-22 | Every sale has a client-generated operation ID | WO-core-4; WO-spec-3b (spec only); WO-core-4a | sync-sales.test.ts: lost-response retry; changed original content; concurrent finalize; changed finalize body; P-20 capped capture interval (capture-policy.test.ts); Monday outage, expiry microseconds and unchanged v1 hold replay (sync-sales.test.ts) | on-staging (effective on reviewed green merge) |
 | I-23 | The sale and its photo blob are saved atomically in IndexedDB before the phone shows "Save… | WO-app-2 (client) | offline-capture.spec.ts (offline restart, quota); client.test.ts (atomic save) | on-staging |
 | I-24 | Photos come from the live in-app camera only | WO-app-2 (client) | offline-capture.spec.ts (denied camera); client.test.ts (photo digest) | on-staging |
 | I-25 | Uploads go to a unique staging path through a short-lived signed permission scoped to that… | WO-core-4 | sync-sales.test.ts: adversarial evidence; invalid/oversized decode; expired permission; real MinIO CORS; storage.test.ts | on-staging (server; deployed Spaces smoke pending) |
-| I-26 | Credit needs: resolved customer, complete details, validated photo, price checks and eligi… | WO-core-4; WO-spec-3b (spec only) | sync-sales.test.ts: concurrent finalize; revoked during storage; failed final-object write; P-18 mixed conditions; P-20 downstream checks above, not implemented | on-staging (effective on reviewed green merge) |
+| I-26 | Credit needs: resolved customer, complete details, validated photo, price checks and eligi… | WO-core-4; WO-spec-3b (spec only); WO-core-4a | sync-sales.test.ts: concurrent finalize; revoked during storage; failed final-object write; P-18 mixed conditions; P-20 capped capture interval (capture-policy.test.ts); Monday outage, expiry microseconds and unchanged v1 hold replay (sync-sales.test.ts) | on-staging (effective on reviewed green merge) |
 | I-27 | A definitive "customer not found" cancels the record with a reason | WO-core-4 | sync-sales.test.ts: definitive unknown card; transient lookup failure | on-staging (effective on reviewed green merge) |
-| I-28 | Store app capture time and server receipt time separately | WO-core-4; WO-spec-3b (spec only) | sync-sales.test.ts: lost-response retry; reauthentication; transient lookup preserves first receipt; P-20 downstream checks above, not implemented | on-staging (effective on reviewed green merge) |
+| I-28 | Store app capture time and server receipt time separately | WO-core-4; WO-spec-3b (spec only); WO-core-4a | sync-sales.test.ts: lost-response retry; reauthentication; transient lookup preserves first receipt; P-20 capped capture interval (capture-policy.test.ts); Monday outage, expiry microseconds and unchanged v1 hold replay (sync-sales.test.ts) | on-staging (effective on reviewed green merge) |
 | I-29 | Amount entry is the default; Quantity entry is available | WO-app-2 (client); WO-spec-4 (spec only) | client.test.ts (exact money); offline-capture.spec.ts (gas quantity) | building |
 | I-30 | Liquids offer Bought into: Vehicle, Keg, Three-wheeler, Bike | WO-app-2 (client) | client.test.ts and offline-capture.spec.ts (gas cylinder) | building |
-| I-31 | A sale is held for price review, with zero credit, only when its captured rate is an unres… | WO-core-4; WO-spec-3b (spec only) | sync-sales.test.ts: uniform history/precision-only changes; price boundary holds zero credit through retry; P-20 downstream checks above, not implemented | on-staging (price hold; resolution remains later scope) |
+| I-31 | A sale is held for price review, with zero credit, only when its captured rate is an unres… | WO-core-4; WO-spec-3b (spec only); WO-core-4a | sync-sales.test.ts: uniform history/precision-only changes; price boundary holds zero credit through retry; P-20 capped capture interval (capture-policy.test.ts); Monday outage, expiry microseconds and unchanged v1 hold replay (sync-sales.test.ts) | on-staging (price hold; resolution remains later scope) |
 | I-32 | Price activation is immediate on server confirmation, one price per product for the statio… | WO-spec-4 (spec only) | Not implemented | todo |
 | I-33 | A sale uploaded against a card replaced before upload is held for card-eligibility review … | | | todo |
 | I-34 | A sale with an unreliable capture date is held until an admin records an evidence-supporte… | WO-spec-3a (spec only); WO-spec-4 (spec only); WO-spec-3b (spec only) | Not implemented; P-20 downstream checks above, not implemented | todo |
@@ -79,7 +79,7 @@ WO-spec-2 / WHR-40 specifies M2 interfaces in `contracts/m2.md` and supporting m
 | I-43 | Rank by exact qualifying spend | WO-spec-4 (spec only) | Not implemented | todo |
 | I-44 | All-time totals are kept separate from campaign-qualifying totals | WO-spec-4 (spec only) | Not implemented | todo |
 | I-45 | Purchase cutoff, upload grace period and photo retention are configurable, versioned and a… | WO-spec-4 (spec only) | Not implemented | todo |
-| I-45a | Which clock decides what | WO-spec-3a (spec only); WO-spec-4 (spec only); WO-spec-3b (spec only) | Not implemented; P-20 downstream checks above, not implemented | todo |
+| I-45a | Which clock decides what | WO-spec-3a (spec only); WO-spec-4 (spec only); WO-spec-3b (spec only); WO-core-4a | capture-policy.test.ts: P-20 capped capture interval, campaign bounds and receipt deadline; sync-sales.test.ts: Monday outage and exact expiry | building (M1 capped interval; M3 review and M4 finalization remain) |
 | I-46 | Finalization happens only after cutoff and grace have passed and all holds and reconciliat… | WO-spec-4 (spec only); WO-spec-3b (spec only) | Not implemented; P-20 downstream checks above, not implemented | todo |
 | I-47 | Prize distribution stays manual | WO-spec-4 (spec only) | Not implemented | todo |
 | I-48 | Photos live in private Spaces buckets per environment, under random paths with no names or… | WO-core-4 (upload/finalize) | storage.test.ts: Spaces virtual host/signing; sync-sales.test.ts: real MinIO immutable evidence | building (private upload/finalize implemented; admin signed reads and deployed smoke remain) |
@@ -214,3 +214,16 @@ WO-core-4 review regressions: exact PostgreSQL microsecond price/campaign/assign
 ## WO-core-4 accepted closeout, 5 November 2026
 
 Earl accepted WHR-6 explicitly. PR #36 merged at 2404344 with green CI and independent code/security/integrity PASS. Its backend coverage and named verification above are accepted; no additional board parity or physical-phone coverage is claimed. P-20 is a separate follow-up in WHR-62, dependent on WHR-61, and M3 capture review remains WO-core-9.
+
+## WO-core-4a capped capture policy (WHR-62)
+
+P-20 evaluates price, assignment/revocation and campaign history over the closed interval [S, min(R, original offlineExpiresAt)] using exact microseconds. Actual first receipt still decides the upload deadline. New settlements store policy version 2; existing held version-1 results remain unchanged. No migration or backfill is included. Implementation reaches READY on the reviewed green staging merge; final EM output and PR are recorded on WHR-62.
+
+| Behavior | Named verification | Scope |
+|---|---|---|
+| Late delivery with fresh same-account upload authority; in-window price/assignment holds | `sync-sales.test.ts`: P-20 Monday 07:00 capture with Tuesday 09:05 receipt and fresh upload authority | I-03, I-05a, I-26, I-28, I-31 |
+| Closed interval and exact PostgreSQL microseconds | `sync-sales.test.ts`: P-20 PostgreSQL price boundary at original expiry microseconds; `capture-policy.test.ts`: P-20 capped capture interval | I-05a, I-31, I-45a |
+| Existing held result preserved through retry and reauthentication | `sync-sales.test.ts`: P-20 existing v1 expiry-only hold survives retry and reauthentication unchanged | I-22, I-26, I-28 |
+| Campaign purchase bounds use U; upload deadline uses R; invalid bounds fail closed | `capture-policy.test.ts`: P-20 capped capture interval | I-45a |
+
+M3 capture review remains WO-core-9. Q-528 client confirmation, physical-phone acceptance and deployed Spaces smoke remain distinct; no additional board parity is claimed.
