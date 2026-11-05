@@ -817,3 +817,24 @@ model AuthRateBucket {
   @@index([updated_at], map: "auth_rate_bucket_updated")
   @@map("auth_rate_bucket")
 }
+
+/// M1 durable finalize replay; foreign keys and immutable guards in reviewed SQL.
+model SyncFinalizeOperation {
+  purchaseId String @map("purchase_id") @db.Uuid
+  operationId String @map("operation_id") @db.Uuid
+  payloadDigest String @map("payload_digest")
+  uploadId String @map("upload_id") @db.Uuid
+  expectedVersion Int @map("expected_version")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  @@id([purchaseId, operationId])
+  @@map("sync_finalize_operation")
+}
+model SyncValidation {
+  purchaseId String @id @map("purchase_id") @db.Uuid
+  policyVersion Int @map("policy_version")
+  reasons Json
+  campaignEligible Boolean @map("campaign_eligible")
+  evaluatedAt DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
+  @@map("sync_validation")
+}
