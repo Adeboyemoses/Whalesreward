@@ -1,21 +1,22 @@
 # lane:core
-WO-core-1d (WHR-53) contract/data-model review routing: READY on reviewed green staging merge, 2026-11-05
+WO-core-4 (WHR-6): BUILD, 5 November 2026
 
 ## In flight
-- WHR-53 adds high-tier enforcement for docs/engineering/contracts/* and data-model.md; unrelated routing stays unchanged. Named review self-tests cover both paths and ordinary engineering docs. Independent code/security/integrity review and green CI required; final merged PR and EM self-test counts are linked on WHR-53.
-- WHR-28 FIX is READY: [PR #32](https://github.com/Adeboyemoses/Whalesreward/pull/32) merged at 1e69ff9 with all five CI checks green. Managed pg/bucket alignment, ~$32 estimate, CORS, live-secret warning, ingress trust and Earl-only credential steps documented. EM unit80/typecheck/lint/build PASS; three regressions fail on old config and pass fixed. Independent reviews PASS.
-- WHR-4 ACCEPTED and Done: authentication PR #30; accepted closeout #32 merged green. Existing backend verification remains on WHR-4 and coverage map.
+- Earl accepted WHR-28 FIX and WO-core-1d (WHR-53). Accepted closeout takes effect when this docs-only PR merges; both Linear issues then move to Done.
+- WHR-28 FIX: merged PR #32 (1e69ff9), managed cluster/bucket alignment, CORS and safe console instructions. Independent code/security/integrity PASS and five CI checks green. EM unit80/typecheck/lint/build PASS.
+- WHR-53: merged PR #33 (c7ede84), contracts/data model route high; review self-test44/44, guard94/94, unit80/typecheck/lint/build PASS, independent code/security/integrity PASS and five CI checks green.
+- Approved WO-core-4 begins against M1 plus WO-spec-3a: card lookup, durable sync, private staged evidence and exactly-once credit. P-18 stays in one server policy module. Plan committed before backend/test dispatch; independent three-role high-tier review follows.
 
 ## Next
-- STOP at READY; no further work order authorized.
-- Earl runs console/credential and phone banner steps in docs/ops/staging.md. WHR-58 requires provider assurance that do-connecting-ip overwrites client input before enabling trust; setting remains empty until then.
+- Finish only WO-core-4, paste named real-PostgreSQL/adversarial storage results, merge green staging PR and stop at READY.
 
 ## Earl's gos
-- 2026-11-05: “Earl accepted WO-core-3 (WHR-4); close it.”
-- 2026-11-05: “Take it to READY. Then WO-core-1d (WHR-53) to READY. Then stop. No cloud operations.”
+- 2026-11-05: “Earl accepted the WHR-28 FIX and WO-core-1d (WHR-53); close both.”
+- 2026-11-05: “Take it to READY with the named tests' output pasted, then stop.”
 
 ## Risks
-- No cloud or staging data operations performed. Header assurance pending WHR-58; shared unknown-IP bucket remains. No phone acceptance or complete photo-storage invariant claimed.
-- Runtime model ID unavailable. Metrics cover both authorized fixes; four dispatches per PR.
+- WHR-58 provider ingress overwrite assurance remains separate; trusted header stays empty until confirmed.
+- Acceptance is not permission for cloud-resource or staging-data changes; no such operations performed.
+- Runtime model ID unavailable. Metrics at closeout preparation, before WO-core-4 implementation.
 
-dispatches=8 prs=2 rounds_max=1 escalations=0 model=unavailable
+dispatches=0 prs=1 rounds_max=0 escalations=0 model=unavailable

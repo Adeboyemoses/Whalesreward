@@ -193,3 +193,7 @@ The FIX aligns the managed `pg` cluster and private bucket with Rook's console r
 ## WO-core-1d review-routing enforcement (WHR-53)
 
 `bash scripts/review/test-review.sh` verifies contract and data-model files route high and unrelated engineering documentation preserves its prior tier. `bash .codex/hooks/test-guard.sh` guards the existing command protections. Operational status: READY on reviewed green staging merge; final self-test counts and merged PR are recorded on WHR-53. No product invariant or board status changes: this work closes the documentation review-routing gap raised in Rook's WHR-46 comment.
+
+## Accepted operational closeout, 5 November 2026
+
+Earl accepted WHR-28 FIX and WO-core-1d (WHR-53) explicitly. WHR-28 source/runbook FIX is accepted through merged PR #32; WHR-53 routing enforcement is accepted through merged PR #33 (review44/44, guard94/94, five CI checks green, independent code/security/integrity PASS). This records acceptance of those delivered slices, not new cloud operations, completed I-48, or full board parity. WHR-58 provider assurance remains separate. Work orders move to Done after this docs-only closeout merges.
