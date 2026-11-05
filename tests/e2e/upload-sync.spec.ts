@@ -341,6 +341,39 @@ test("I-25 rejected immutable photo stays available for support without replacem
   expect((await rows(page))[0]!.original).toEqual(original.original);
   expect(fake.sync.records.size).toBe(1);
   expect([...fake.sync.records.values()][0]!.credits).toBe(0);
+  const receiptUrl = page.url();
+  const rejected = (await rows(page))[0]!;
+  const writeCalls = () =>
+    fake.sync.calls.filter(
+      (call) =>
+        call.path.endsWith("/finalize") || call.path.startsWith("/storage/"),
+    );
+  const writesBefore = writeCalls().length;
+  const readsBefore = fake.sync.calls.filter((call) =>
+    call.path.includes("/by-operation/"),
+  ).length;
+  await page.goto("/attendant/account");
+  await page.goto(receiptUrl);
+  await expect
+    .poll(
+      () =>
+        fake.sync.calls.filter((call) => call.path.includes("/by-operation/"))
+          .length,
+    )
+    .toBeGreaterThan(readsBefore);
+  // Allow two foreground timer passes after the receipt's authoritative refresh.
+  await page.waitForTimeout(2200);
+  await expect(
+    page.getByRole("heading", { name: "Needs attention", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/manager/i).first()).toBeVisible();
+  const reopened = (await rows(page))[0]!;
+  expect(reopened.state).toBe("needs_attention");
+  expect(reopened.lastErrorCode).toBe("photo_invalid");
+  expect(reopened.original).toEqual(original.original);
+  expect(reopened.photoBlob).toEqual(original.photoBlob);
+  expect(reopened.finalizeRequest).toEqual(rejected.finalizeRequest);
+  expect(writeCalls()).toHaveLength(writesBefore);
 });
 
 for (const leave of ["Stay signed in", "Account navigation"] as const) {

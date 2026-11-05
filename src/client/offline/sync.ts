@@ -165,6 +165,9 @@ export class SaleSynchronizer {
         );
       const status = parsed.data;
       const terminal = ["credited", "held", "cancelled"].includes(status.state);
+      // A nonterminal read cannot undo a definitive rejection of the immutable
+      // original/photo. Only an authoritative terminal outcome resolves it.
+      const needsAttention = row.state === "needs_attention" && !terminal;
       const previous = row.serverStatus;
       // A status read can succeed while the same upload/finalize keeps failing.
       // Reset backoff only for actual forward progress, never just a newer version.
@@ -179,19 +182,28 @@ export class SaleSynchronizer {
         serverStatus: status,
         purchaseId: status.purchaseId,
         serverVersion: status.version,
-        state: status.state === "received" ? "submitting" : status.state,
-        lastErrorCode: null,
-        attempts: terminal || progressed ? 0 : row.attempts,
-        nextAttemptAt: terminal
-          ? status.state === "held"
-            ? new Date(this.d.now() + 30000).toISOString()
-            : null
-          : result.retryAfterMs
-            ? new Date(this.d.now() + result.retryAfterMs).toISOString()
-            : null,
+        state: needsAttention
+          ? "needs_attention"
+          : status.state === "received"
+            ? "submitting"
+            : status.state,
+        lastErrorCode: needsAttention ? row.lastErrorCode : null,
+        attempts:
+          !needsAttention && (terminal || progressed) ? 0 : row.attempts,
+        nextAttemptAt: needsAttention
+          ? null
+          : terminal
+            ? status.state === "held"
+              ? new Date(this.d.now() + 30000).toISOString()
+              : null
+            : result.retryAfterMs
+              ? new Date(this.d.now() + result.retryAfterMs).toISOString()
+              : null,
       });
       return (
-        terminal || (result.retryAfterMs !== null && result.retryAfterMs > 0)
+        needsAttention ||
+        terminal ||
+        (result.retryAfterMs !== null && result.retryAfterMs > 0)
       );
     };
     try {

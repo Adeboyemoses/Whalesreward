@@ -332,4 +332,42 @@ describe("durable sync", () => {
       );
     },
   );
+  it("preserves a permanently rejected photo across receipt refresh and retry until an authoritative terminal outcome", async () => {
+    const original = await save();
+    api.finalizeSale = async () => {
+      api.calls.push("finalize");
+      throw new ClientError("photo_invalid", "Photo rejected", 422);
+    };
+    await client.retryUploads();
+    const rejected = (await client.ownSale(original.operationId))!;
+    expect(rejected.state).toBe("needs_attention");
+    const writes = api.calls.filter((call) => call !== "status");
+    await client.refreshSale(original.operationId);
+    await client.retryUploads();
+    advance();
+    await client.retryUploads();
+    const refreshed = (await client.ownSale(original.operationId))!;
+    expect(refreshed.state).toBe("needs_attention");
+    expect(refreshed.lastErrorCode).toBe("photo_invalid");
+    expect(api.calls.filter((call) => call !== "status")).toEqual(writes);
+    expect(refreshed.original).toEqual(original.original);
+    expect(refreshed.photoBlob.size).toBe(original.photoBlob.size);
+    expect(refreshed.finalizeRequest).toEqual(rejected.finalizeRequest);
+    const status = api.statuses.get(original.operationId)!;
+    api.statuses.set(original.operationId, {
+      ...status,
+      version: status.version + 1,
+      state: "cancelled",
+      cancellationReason: "invalid_purchase",
+      pendingReason: null,
+    });
+    await client.refreshSale(original.operationId);
+    const resolved = (await client.ownSale(original.operationId))!;
+    expect(resolved.state).toBe("cancelled");
+    expect(resolved.lastErrorCode).toBeNull();
+    expect(resolved.original).toEqual(original.original);
+    expect(resolved.photoBlob.size).toBe(original.photoBlob.size);
+    expect(resolved.finalizeRequest).toEqual(rejected.finalizeRequest);
+    expect(api.calls.filter((call) => call !== "status")).toEqual(writes);
+  });
 });
