@@ -69,7 +69,7 @@ describe("P-18 bounded capture policy", () => {
       "capture_history_incomplete",
     );
   });
-  it("preserves assignment uncertainty and exact offline expiry", () => {
+  it("preserves assignment uncertainty but expiry alone is not revocation", () => {
     const f = fixture();
     f.assignment.effectiveUntil = at(2);
     expect(evaluateCapturePolicy(f).reasons).toContain(
@@ -77,9 +77,7 @@ describe("P-18 bounded capture policy", () => {
     );
     f.assignment.effectiveUntil = null;
     f.offlineExpiresAt = at(2);
-    expect(evaluateCapturePolicy(f).reasons).toContain(
-      "capture_authorization_unresolved",
-    );
+    expect(evaluateCapturePolicy(f).reasons).toEqual([]);
   });
   it("returns every independent varying answer", () => {
     const f = fixture();
@@ -191,4 +189,130 @@ it("P-18 preserves sign-in, revocation, offline and campaign microsecond bounds"
   });
   f.settings[0]!.uploadDeadline = "1793836800123899";
   expect(evaluateCapturePolicy(f).campaignEligible).toBe(false);
+});
+
+describe("P-20 capped capture interval", () => {
+  const capped = () => ({ ...fixture(), receivedAt: at(27) });
+  it("accepts receipt after the original 24-hour expiry", () => {
+    expect(evaluateCapturePolicy(capped()).reasons).toEqual([]);
+  });
+  it.each([-1n, 0n, 1n])(
+    "compares price, assignment, revocation and settings at U %+s microseconds",
+    (offset) => {
+      const boundary = (BigInt(at(25)) + offset).toString();
+      const reason = offset <= 0n;
+      const price = capped();
+      price.prices.push({
+        effectiveFrom: boundary,
+        rateKobo: "110000",
+        currency: "NGN",
+      });
+      expect(evaluateCapturePolicy(price).reasons).toEqual(
+        reason ? ["price_uncertain"] : [],
+      );
+      const assignment = capped();
+      assignment.assignment = {
+        ...assignment.assignment,
+        effectiveUntil: boundary,
+      };
+      expect(evaluateCapturePolicy(assignment).reasons).toEqual(
+        reason ? ["capture_authorization_unresolved"] : [],
+      );
+      const revoked = { ...capped(), contextRevokedAt: boundary };
+      expect(evaluateCapturePolicy(revoked).reasons).toEqual(
+        reason ? ["capture_authorization_unresolved"] : [],
+      );
+      const settings = capped();
+      settings.settings = [
+        {
+          effectiveFrom: at(0),
+          campaignId: "campaign",
+          purchaseStart: at(0),
+          purchaseCutoff: at(30),
+          uploadDeadline: at(32),
+        },
+        {
+          effectiveFrom: boundary,
+          campaignId: "campaign",
+          purchaseStart: at(0),
+          purchaseCutoff: at(31),
+          uploadDeadline: at(32),
+        },
+      ];
+      expect(evaluateCapturePolicy(settings).reasons).toEqual(
+        reason ? ["capture_time_unresolved"] : [],
+      );
+    },
+  );
+  it.each([-1n, 0n, 1n])(
+    "uses U for inclusive campaign cutoff and R for upload deadline %+s microseconds",
+    (offset) => {
+      const f = capped();
+      f.settings = [
+        {
+          effectiveFrom: at(0),
+          campaignId: "campaign",
+          purchaseStart: at(0),
+          purchaseCutoff: (BigInt(at(25)) + offset).toString(),
+          uploadDeadline: at(27),
+        },
+      ];
+      expect(evaluateCapturePolicy(f)).toEqual({
+        reasons: offset < 0n ? ["capture_time_unresolved"] : [],
+        campaignEligible: offset >= 0n,
+      });
+      f.settings[0]!.uploadDeadline = (BigInt(at(27)) - 1n).toString();
+      expect(evaluateCapturePolicy(f).campaignEligible).toBe(false);
+    },
+  );
+  it.each([-1n, 0n, 1n])(
+    "uses U for campaign start %+s microseconds",
+    (offset) => {
+      const f = capped();
+      f.settings = [
+        {
+          effectiveFrom: at(0),
+          campaignId: "campaign",
+          purchaseStart: (BigInt(at(25)) + offset).toString(),
+          purchaseCutoff: at(30),
+          uploadDeadline: at(32),
+        },
+      ];
+      expect(evaluateCapturePolicy(f)).toEqual({
+        reasons: offset <= 0n ? ["capture_time_unresolved"] : [],
+        campaignEligible: false,
+      });
+    },
+  );
+  it("fails closed when original expiry precedes sign-in even if receipt follows it", () => {
+    const f = capped();
+    f.offlineExpiresAt = at(0);
+    expect(evaluateCapturePolicy(f)).toEqual({
+      reasons: ["capture_history_incomplete"],
+      campaignEligible: false,
+    });
+  });
+  it("missing price or campaign anchor cannot establish eligibility", () => {
+    const f = capped();
+    f.settings = [
+      {
+        effectiveFrom: at(0),
+        campaignId: "campaign",
+        purchaseStart: at(0),
+        purchaseCutoff: at(30),
+        uploadDeadline: at(32),
+      },
+    ];
+    f.prices = [];
+    expect(evaluateCapturePolicy(f)).toEqual({
+      reasons: ["capture_history_incomplete"],
+      campaignEligible: false,
+    });
+    f.prices = fixture().prices;
+    f.settings[0]!.effectiveFrom = at(2);
+    expect(evaluateCapturePolicy(f)).toEqual({
+      reasons: ["capture_history_incomplete"],
+      campaignEligible: false,
+    });
+  });
 });

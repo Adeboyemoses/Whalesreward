@@ -1,5 +1,5 @@
-/** P-18 is provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
-export const CAPTURE_POLICY_VERSION = 1;
+/** P-20 refines P-18; provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
+export const CAPTURE_POLICY_VERSION = 2;
 /** Exact integer epoch microseconds from PostgreSQL EXTRACT, never a JS Date. */
 export type TrustedMicros = string;
 const micros = (value: TrustedMicros): bigint => BigInt(value);
@@ -40,19 +40,21 @@ export function evaluateCapturePolicy(
 ): CapturePolicyResult {
   const reasons = new Set<string>();
   const s = micros(input.signedInAt),
-    r = micros(input.receivedAt);
-  if (r < s)
+    r = micros(input.receivedAt),
+    expiry = micros(input.offlineExpiresAt);
+  // Receipt can follow reauthentication; capture remains bounded by its original context.
+  const u = r < expiry ? r : expiry;
+  if (u < s)
     return { reasons: ["capture_history_incomplete"], campaignEligible: false };
   if (
     micros(input.assignment.effectiveFrom) > s ||
     (input.assignment.effectiveUntil !== null &&
-      micros(input.assignment.effectiveUntil) <= r) ||
-    (input.contextRevokedAt !== null && micros(input.contextRevokedAt) <= r) ||
-    micros(input.offlineExpiresAt) <= r
+      micros(input.assignment.effectiveUntil) <= u) ||
+    (input.contextRevokedAt !== null && micros(input.contextRevokedAt) <= u)
   )
     reasons.add("capture_authorization_unresolved");
   const prices = input.prices
-    .filter((p) => micros(p.effectiveFrom) <= r)
+    .filter((p) => micros(p.effectiveFrom) <= u)
     .sort((a, b) => compare(a.effectiveFrom, b.effectiveFrom));
   const anchor = prices.findLastIndex((p) => micros(p.effectiveFrom) <= s);
   if (anchor < 0) reasons.add("capture_history_incomplete");
@@ -65,7 +67,7 @@ export function evaluateCapturePolicy(
   )
     reasons.add("price_uncertain");
   const settings = input.settings
-    .filter((p) => micros(p.effectiveFrom) <= r)
+    .filter((p) => micros(p.effectiveFrom) <= u)
     .sort((a, b) => compare(a.effectiveFrom, b.effectiveFrom));
   let campaignEligible = false;
   if (settings.length) {
@@ -87,14 +89,14 @@ export function evaluateCapturePolicy(
         if (
           v.purchaseStart &&
           s < micros(v.purchaseStart) &&
-          micros(v.purchaseStart) <= r
+          micros(v.purchaseStart) <= u
         )
           reasons.add("capture_time_unresolved");
         // Purchase cutoff is inclusive; any later instant crosses the end.
         if (
           v.purchaseCutoff &&
           s <= micros(v.purchaseCutoff) &&
-          micros(v.purchaseCutoff) < r
+          micros(v.purchaseCutoff) < u
         )
           reasons.add("capture_time_unresolved");
       }
@@ -104,9 +106,9 @@ export function evaluateCapturePolicy(
         !!initial.purchaseCutoff &&
         !!initial.uploadDeadline &&
         s >= micros(initial.purchaseStart) &&
-        r <= micros(initial.purchaseCutoff) &&
+        u <= micros(initial.purchaseCutoff) &&
         r <= micros(initial.uploadDeadline) &&
-        !reasons.has("capture_time_unresolved");
+        reasons.size === 0;
     }
   }
   return { reasons: [...reasons], campaignEligible };
