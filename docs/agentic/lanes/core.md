@@ -17,6 +17,7 @@ WO-core-1e (WHR-63) feature/records separation: READY on green records-PR merge,
 ## Risks
 - No product code, migration, cloud or staging-data changes. Q-528 and WHR-58 remain separate.
 - Renamed task as requested. Running-turn model switching was unavailable; builder used requested gpt-6.1-sol with medium role reasoning, reviewers gpt-6.1-sol with high role reasoning; EM runtime model remains unverified.
-- Eight feature dispatches (not over high-tier flag); session includes two closeout reviews and one READY-records review.
+- WHR-60 stayed in lane:app: fix #45 (e7999cc) and records #46 merged before refreshing #44. Earlier browser failures remain documented on WHR-60; final CI must pass before this records merge.
+- Eight feature dispatches (not over high-tier flag); session includes two closeout reviews and two READY-records reviews.
 
-dispatches=11 prs=3 rounds_max=2 escalations=0 model=unavailable
+dispatches=12 prs=3 rounds_max=2 escalations=0 model=unavailable

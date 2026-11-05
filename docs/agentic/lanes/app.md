@@ -1,26 +1,23 @@
 # lane:app
-WO-app-0 (WHR-33) M0/M1 briefs and smoke runbooks: ACCEPTED since 2026-11-05
-WO-app-2 (WHR-5) Offline capture: READY on reviewed green staging merge, 2026-11-04
+WO-app-3a (WHR-60) Upload-failure browser tests: READY since 2026-11-05
+WO-app-3 (WHR-7) and WO-app-2 (WHR-5): READY; Earl's phone smoke pending
 
 ## In flight
-- WO-app-0 accepted documentation closeout; PRs #2 and #9 already merged. Mark WHR-33 Done after the reviewed closeout merges.
-- `app/wo-2-offline`: typed M1 HTTP adapter/test fake, Dexie v1 atomic account partitions, 24-hour/rollback lock, live camera/QR, static attendant screens and Workbox shell cache.
-- EM: typecheck/lint/build, 74 unit tests, 32 Playwright checks and 3 time tests per timezone pass. Independent fidelity: 11 boards at 390/360 px in `docs/qa/offline-capture-fidelity.md`.
-- WO-app-1 accepted and closed: PR #24 merged, WHR-2 Done; implementation #12 and wrapping #20.
+- [Feature PR #45](https://github.com/Adeboyemoses/Whalesreward/pull/45) merged into staging at e7999cc after two consecutive full green CI runs. The two fixtures wait for the original account/operation's durable photo failure and released lease before navigation.
+- Root cause: fixture navigation interrupted failure bookkeeping. Unchanged production lease recovery passed on both browser profiles at about 60.2 seconds, retaining the sale/photo and crediting once.
+- Verification: 80/80 local repeats (two cases × two profiles × 20, two workers, zero retries); EM full browser 68 passed/4 existing skips, unit135, typecheck/lint/build PASS. Independent code/security/integrity PASS, round1; evidence validates.
+- CI: [first pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/1), [second pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/2). Both browser suites68 passed plus storage1, no flaky cases.
+- This separate records PR updates only STATUS, coverage and the app lane after the feature merge.
 
 ## Next
-- STOP at READY. Earl runs `docs/qa/smoke-2026-11-04-offline-capture.md` only after WO-core-3 merges.
-- Real session/sign-in endpoints belong to WO-core-3; uploading and crediting to WO-app-3/WO-core-4. No further scope started.
+- STOP at READY. Earl reads docs/qa/upload-failure-browser-diagnosis.md and WHR-60 verification; no next work order starts here.
+- Existing M1 phone/Spaces smoke remains docs/qa/smoke-2026-11-05-upload-sync.md. WHR-5 and WHR-7 are not accepted by this test-only work.
 
 ## Earl's gos
-- 2026-11-05: “Accept WO-app-0 (WHR-33)”. Documentation acceptance only; phone runbooks remain unexecuted drafts.
-- 2026-11-04: “Earl accepted WO-app-1 (WHR-2); close it.”
-- 2026-11-04: “Work order: WO-app-2 (WHR-5), offline capture.” Build against M1 typed adapter and test fake; “Take it to READY with Playwright green, then stop: Earl's phone smoke test waits until WO-core-3 merges.”
+- 2026-11-05: “Work order: WO-app-3a (WHR-60), stabilize the upload-failure browser tests. Determine test vs product cause first; never shorten LEASE_MS or add sleeps or runner retries. Take it to READY, then stop.”
 
 ## Risks
-- Automated contract fixtures do not prove real authentication, Android camera readability, storage eviction or TalkBack behavior; phone acceptance pending.
-- WHR-45 quantity display drift remains separate. No upload-first completion in this capture-only order; UI explains pending sales.
-- Browser storage is not encrypted or a server backup; no automatic deletion implemented.
-- Dispatch flag: offline-capture PR exceeds 8 dispatches for deterministic handover/review fixes, runtime staging integration and a final documentation-only base reconciliation.
+- No production code, lease duration, runner retries or sleeps changed. Physical Android and deployed Spaces acceptance remain pending; WHR-45 stays separate.
+- Local macOS Chromium startup is sandbox-blocked; browser evidence came from an isolated local Linux container and GitHub CI.
 
-dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
+dispatches=5 prs=2 rounds_max=1 escalations=0 model=unknown
