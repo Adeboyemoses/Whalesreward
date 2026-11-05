@@ -227,3 +227,7 @@ P-20 evaluates price, assignment/revocation and campaign history over the closed
 | Campaign purchase bounds use U; upload deadline uses R; invalid bounds fail closed | `capture-policy.test.ts`: P-20 capped capture interval | I-45a |
 
 M3 capture review remains WO-core-9. Q-528 client confirmation, physical-phone acceptance and deployed Spaces smoke remain distinct; no additional board parity is claimed.
+
+## WO-core-4a accepted closeout (WHR-62), 5 November 2026
+
+Earl accepted P-20 implementation in PR #39 (a1e674c). The named capped-interval, microsecond and unchanged-held-replay tests above are accepted: unit108, integration104, browser36 with4 existing conditional skips, time3 per timezone, and all five CI checks passed. No new product coverage or board parity is claimed by this records-only closeout.
