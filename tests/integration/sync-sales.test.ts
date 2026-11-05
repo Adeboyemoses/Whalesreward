@@ -14,7 +14,6 @@ import {
   newSession,
   changePrice,
   campaign,
-  fixtureId,
   sha256,
 } from "../helpers/sync-fixture";
 
@@ -526,5 +525,90 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
     expect(
       (await service.status(f.token, f.original.operationId)).photoValidated,
     ).toBe(false);
+  });
+  it("I-25 expired upload permission requires a new operation and a new staging key", async () => {
+    const f = await syncFixture(pool, jpeg),
+      submitted = await service.submit(f.token, f.original);
+    const operationId = newId(),
+      oldKey = `staging/${newId()}/${newId()}`;
+    await pool.query(
+      "INSERT INTO photo_asset(id,purchase_id,upload_operation_id,state,staging_key,staging_expires_at,expected_digest,expected_bytes) VALUES($1,$2,$3,'staged',$4,clock_timestamp()-interval '1 second',$5,$6)",
+      [
+        newId(),
+        submitted.status.purchaseId,
+        operationId,
+        oldKey,
+        f.original.photo.sha256,
+        jpeg.length,
+      ],
+    );
+    await expect(
+      service.uploadPermission(f.token, submitted.status.purchaseId, {
+        operationId,
+        ...f.original.photo,
+      }),
+    ).rejects.toMatchObject({ code: "upload_permission_expired", status: 409 });
+    const next = await service.uploadPermission(
+      f.token,
+      submitted.status.purchaseId,
+      { operationId: newId(), ...f.original.photo },
+    );
+    expect(new URL(next.url).pathname).not.toContain(oldKey);
+    await put(next.url, next.headers, jpeg);
+    expect(
+      (
+        await service.finalize(f.token, submitted.status.purchaseId, {
+          operationId: newId(),
+          uploadId: next.uploadId,
+          expectedVersion: submitted.status.version,
+        })
+      ).state,
+    ).toBe("credited");
+  });
+  it("I-27/I-28 transient lookup failure preserves the first durable receipt for retry", async () => {
+    const f = await syncFixture(pool, jpeg);
+    let fail = true;
+    const failingPool = new Proxy(pool, {
+      get(target, key) {
+        if (key === "connect")
+          return async () => {
+            const client = await target.connect();
+            return new Proxy(client, {
+              get(db, member) {
+                if (member === "query")
+                  return (...args: unknown[]) => {
+                    if (
+                      fail &&
+                      typeof args[0] === "string" &&
+                      args[0].includes("SELECT c.id AS card_id")
+                    ) {
+                      fail = false;
+                      throw new Error("Fictional transient lookup outage");
+                    }
+                    return Reflect.apply(db.query, db, args);
+                  };
+                const value = Reflect.get(db, member);
+                return typeof value === "function" ? value.bind(db) : value;
+              },
+            });
+          };
+        const value = Reflect.get(target, key);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    await expect(
+      createSyncService({ pool: failingPool, storage }).submit(
+        f.token,
+        f.original,
+      ),
+    ).rejects.toThrow("Fictional transient lookup outage");
+    const pending = await service.status(f.token, f.original.operationId);
+    expect(pending.state).toBe("received");
+    expect(pending.pendingReason).toBe("lookup_pending");
+    expect(pending.credited).toBe(false);
+    const retry = await service.submit(f.token, f.original);
+    expect(retry.created).toBe(false);
+    expect(retry.status.serverReceivedAt).toBe(pending.serverReceivedAt);
+    expect(retry.status.state).toBe("photo_pending");
   });
 });
