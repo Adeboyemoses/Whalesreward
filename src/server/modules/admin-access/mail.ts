@@ -160,10 +160,13 @@ export async function processMail(
   send: (message: EmailMessage) => Promise<{ delivered: boolean }> = (
     message,
   ) =>
-    sendEmail(message, {
-      adapter: config.delivery ?? "mailpit",
-      mailpitUrl: config.mailpitUrl,
-    }),
+    sendEmail(
+      message,
+      config.email ?? {
+        adapter: config.delivery ?? "mailpit",
+        mailpitUrl: config.mailpitUrl,
+      },
+    ),
 ) {
   // A processed step can advance lookup/cleanup without sending a message.
   // Only exhaustion returns false, so the bounded job can reach later work.

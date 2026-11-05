@@ -8,6 +8,8 @@
 !next.config.ts
 !tsconfig.json
 !postcss.config.mjs
+!jobs/
+!jobs/admin-mail.ts
 !src/
 !src/**
 !public/
