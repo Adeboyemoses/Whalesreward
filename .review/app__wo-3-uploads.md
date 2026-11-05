@@ -55,3 +55,7 @@ Only the three named shared records were reset byte-for-byte to staging a1e674c;
 Round 5 code/security/integrity reviewers all PASS d06883b; zero findings; clean unchanged worktree.
 All three reset files match staging exactly; prior application reviews carry forward.
 READY records will follow in a separate PR after the feature merges with green CI and evidence.
+
+Staging advanced through PR40 during CI; base integration c11fc20 takes its three shared records unchanged.
+Those files are now absent from base...head; no reviewed feature path changed, and validation remains PASS.
+Incoming server/contract/dependency files belong solely to already-merged staging PRs, not this feature diff.
