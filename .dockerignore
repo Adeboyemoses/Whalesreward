@@ -11,8 +11,6 @@
 !jobs/
 !jobs/admin-mail.ts
 !src/
-!jobs/
-!jobs/admin-mail.ts
 !src/**
 !public/
 !public/**
