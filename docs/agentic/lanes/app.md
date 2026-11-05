@@ -1,24 +1,23 @@
 # lane:app
-WO-app-3 (WHR-7) Uploads, retries and synced receipt: READY since 2026-11-05
-WO-app-2 (WHR-5) Offline capture: READY; Earl's phone smoke pending
+WO-app-3a (WHR-60) Upload-failure browser tests: READY since 2026-11-05
+WO-app-3 (WHR-7) and WO-app-2 (WHR-5): READY; Earl's phone smoke pending
 
 ## In flight
-- [PR #35](https://github.com/Adeboyemoses/Whalesreward/pull/35) merged into staging at f969d95 with all five checks green. Typed M1 uploads, durable retries and leases, authoritative fuel/gas receipts, mixed holds and cancellable upload-first logout are delivered.
-- EM final combined-base checks: typecheck/lint/build and 135 unit tests pass; GitHub integration and browser suites green. Independent parity: five boards at 390/360 px, ten screenshots. Feature evidence: .review/app__wo-3-uploads.md.
-- This separate READY records PR updates the lane, STATUS and coverage only. No acceptance or next work order is inferred.
+- [Feature PR #45](https://github.com/Adeboyemoses/Whalesreward/pull/45) merged into staging at e7999cc after two consecutive full green CI runs. The two fixtures wait for the original account/operation's durable photo failure and released lease before navigation.
+- Root cause: fixture navigation interrupted failure bookkeeping. Unchanged production lease recovery passed on both browser profiles at about 60.2 seconds, retaining the sale/photo and crediting once.
+- Verification: 80/80 local repeats (two cases × two profiles × 20, two workers, zero retries); EM full browser 68 passed/4 existing skips, unit135, typecheck/lint/build PASS. Independent code/security/integrity PASS, round1; evidence validates.
+- CI: [first pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/1), [second pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/2). Both browser suites68 passed plus storage1, no flaky cases.
+- This separate records PR updates only STATUS, coverage and the app lane after the feature merge.
 
 ## Next
-- STOP at READY. Earl follows docs/qa/smoke-2026-11-05-upload-sync.md on staging HTTPS with real Spaces; adb reverse is the fallback. Include partial photo failure and expired upload permission manually.
-- WHR-5 stays READY until Earl's phone smoke. WHR-60 must be diagnosed before the M5 station pilot.
+- STOP at READY. Earl reads docs/qa/upload-failure-browser-diagnosis.md and WHR-60 verification; no next work order starts here.
+- Existing M1 phone/Spaces smoke remains docs/qa/smoke-2026-11-05-upload-sync.md. WHR-5 and WHR-7 are not accepted by this test-only work.
 
 ## Earl's gos
-- 2026-11-05: “approve WHR-7”; “Take it to READY, then stop.”
-- 2026-11-05: “WO-app-2 (WHR-5) stays READY until Earl's phone smoke.”
-- 2026-11-05: approved documentation-only extra reviews; final direction reset shared records to origin/staging, merge green, then write the READY records PR. Approval and exact review scopes are recorded in feature evidence and WHR-7.
+- 2026-11-05: “Work order: WO-app-3a (WHR-60), stabilize the upload-failure browser tests. Determine test vs product cause first; never shorten LEASE_MS or add sleeps or runner retries. Take it to READY, then stop.”
 
 ## Risks
-- Physical Android and deployed Spaces acceptance remain pending; fixtures and CI do not prove camera readability, eviction or TalkBack. Server endpoints are now delivered by WO-core-4; no cloud operation was performed here.
-- WHR-60 browser navigation/lease timing follow-up is nonblocking by Earl's decision, due before M5. WHR-45 quantity trailing-zero display remains separate.
-- Feature dispatch flag: 22 exceeds 8; builders/fixes and five review rounds, including two explicitly approved documentation rounds. READY records add two independent low-tier review rounds, including preserved concurrent core closeout.
+- No production code, lease duration, runner retries or sleeps changed. Physical Android and deployed Spaces acceptance remain pending; WHR-45 stays separate.
+- Local macOS Chromium startup is sandbox-blocked; browser evidence came from an isolated local Linux container and GitHub CI.
 
-dispatches=24 prs=2 rounds_max=5 escalations=2 model=unknown
+dispatches=5 prs=2 rounds_max=1 escalations=0 model=unknown
