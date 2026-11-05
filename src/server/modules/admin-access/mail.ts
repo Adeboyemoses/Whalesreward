@@ -17,7 +17,11 @@ export const targetDigest = (config: AdminConfig, email: string) =>
 export function deliveryConfigured(config: AdminConfig) {
   return !config.production && config.delivery !== "noop";
 }
-export async function invalidateMail(db: pg.PoolClient, userId: string) {
+export async function invalidateMail(
+  db: pg.PoolClient,
+  userId: string,
+  advanceGeneration = true,
+) {
   await db.query(
     "UPDATE verification_challenge SET revoked_at=clock_timestamp(),version=version+1 WHERE user_id=$1 AND purpose IN ('verify_email','reset_password') AND consumed_at IS NULL AND revoked_at IS NULL",
     [userId],
@@ -26,10 +30,11 @@ export async function invalidateMail(db: pg.PoolClient, userId: string) {
     "UPDATE mail_request SET status='superseded',fencing_version=fencing_version+1 WHERE admin_id=(SELECT id FROM admin WHERE user_id=$1) AND purpose<>'reset_notice' AND status IN ('pending','sending')",
     [userId],
   );
-  await db.query(
-    "UPDATE admin SET verification_generation=verification_generation+1,reset_generation=reset_generation+1,version=version+1 WHERE user_id=$1",
-    [userId],
-  );
+  if (advanceGeneration)
+    await db.query(
+      "UPDATE admin SET verification_generation=verification_generation+1,reset_generation=reset_generation+1,version=version+1 WHERE user_id=$1",
+      [userId],
+    );
 }
 export async function enqueue(
   db: pg.PoolClient,
@@ -281,7 +286,7 @@ async function challenge(
 ) {
   const c = (
     await db.query(
-      `SELECT c.*,a.id AS admin_id,a.email_normalized,a.email_verified_at FROM verification_challenge c JOIN auth_user u ON u.id=c.user_id JOIN admin a ON a.user_id=u.id JOIN mail_request m ON m.id=c.mail_request_id WHERE c.secret_hash=$1 AND c.purpose=$2 AND u.enabled AND u.kind='admin' AND c.consumed_at IS NULL AND c.revoked_at IS NULL AND c.expires_at>clock_timestamp() AND c.attempts<c.max_attempts AND c.issuance_generation=CASE WHEN c.purpose='verify_email' THEN a.verification_generation ELSE a.reset_generation END AND m.challenge_id=c.id AND m.status IN ('sending','sent') FOR UPDATE OF c,a,u`,
+      `SELECT c.*,a.id AS admin_id,a.email_normalized,a.email_verified_at FROM verification_challenge c JOIN auth_user u ON u.id=c.user_id JOIN admin a ON a.user_id=u.id JOIN mail_request m ON m.id=c.mail_request_id WHERE c.secret_hash=$1 AND c.purpose=$2 AND u.enabled AND u.kind='admin' AND c.consumed_at IS NULL AND c.revoked_at IS NULL AND c.expires_at>clock_timestamp() AND c.attempts<c.max_attempts AND c.issuance_generation=CASE WHEN c.purpose='verify_email' THEN a.verification_generation ELSE a.reset_generation END AND m.challenge_id=c.id AND m.status='sent' FOR UPDATE OF c,a,u`,
       [digest(token), purpose],
     )
   ).rows[0];
