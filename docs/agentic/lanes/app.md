@@ -4,8 +4,8 @@ WO-app-2 (WHR-5) Offline capture: READY; Earl's phone smoke pending
 
 ## In flight
 - app/wo-3-uploads: typed M1 submit/permission/PUT/finalize/status, durable leases and backoff, original/photo retention, authoritative receipts and holds, pending uploads and cancellable upload-first sign-out.
-- EM checks: typecheck/lint/build, 106 unit tests, 68 browser passes (4 existing staging-only skips), 3 time tests per timezone. Independent five-board fidelity at 390/360 px; ten screenshots.
-- Four first-round P1s fixed: storage403 versus session denial, backoff reset, delayed logout after cancellation, hidden cancellation reason. Final code/security/integrity evidence: .review/app__wo-3-uploads.md.
+- EM checks: typecheck/lint/build, 107 unit tests, 68 browser passes (4 existing staging-only skips), 3 time tests per timezone. Independent five-board fidelity at 390/360 px; ten screenshots.
+- Four first-round P1s fixed: storage403 versus session denial, backoff reset, delayed logout after cancellation, hidden cancellation reason. Second-round photo-rejection refresh fix retains Needs attention. Final code/security/integrity evidence: .review/app__wo-3-uploads.md.
 - WO-app-0 accepted closeout PR #31 merged; WO-app-1 accepted closeout #24 merged. WHR-5 remains READY.
 
 ## Next
@@ -20,6 +20,6 @@ WO-app-2 (WHR-5) Offline capture: READY; Earl's phone smoke pending
 ## Risks
 - Real storage validation/credit and physical Android acceptance remain pending. Contract fixtures do not prove server enforcement, camera readability, eviction or TalkBack.
 - WHR-45 quantity trailing-zero presentation remains unchanged. No auto deletion or browser-storage backup claim.
-- Dispatch flag: 12 exceeds the high-tier flag of 8 (three builders, targeted fixes and two independent review rounds).
+- Dispatch flag: 16 exceeds the high-tier flag of 8 (three builders, targeted fixes and three independent review rounds).
 
-dispatches=12 prs=1 rounds_max=2 escalations=0 model=unknown
+dispatches=16 prs=1 rounds_max=3 escalations=0 model=unknown

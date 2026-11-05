@@ -198,7 +198,7 @@ The FIX aligns the managed `pg` cluster and private bucket with Rook's console r
 
 Client scope reaches READY on the reviewed green staging merge of app/wo-3-uploads. Earl explicitly approved WHR-7 on 5 November 2026 and directed contract-shaped fakes behind the typed adapter, stopping at READY. WHR-5 remains READY pending Earl's phone smoke; no acceptance is inferred.
 
-EM verification: typecheck, lint, 106 unit tests, production build, 68 passing Playwright checks with four existing staging-only skips, and 3 time tests under each timezone. Independent report [upload-sync-fidelity.md](../qa/upload-sync-fidelity.md) covers A04/A08/A23/A14/A16 at 390/360 px, ten screenshots. The eight capture scenarios have passing evidence after a fixture-only timing correction. Existing WHR-45 formatting drift remains accepted and tracked. Runbook: [smoke-2026-11-05-upload-sync.md](../qa/smoke-2026-11-05-upload-sync.md).
+EM verification: typecheck, lint, 107 unit tests, production build, 68 passing Playwright checks with four existing staging-only skips, and 3 time tests under each timezone. Independent report [upload-sync-fidelity.md](../qa/upload-sync-fidelity.md) covers A04/A08/A23/A14/A16 at 390/360 px, ten screenshots. The eight capture scenarios have passing evidence after a fixture-only timing correction. Existing WHR-45 formatting drift remains accepted and tracked. Runbook: [smoke-2026-11-05-upload-sync.md](../qa/smoke-2026-11-05-upload-sync.md).
 
 | Client responsibility | Evidence | Status |
 |---|---|---|
