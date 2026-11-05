@@ -1,23 +1,21 @@
 # lane:app
-WO-app-3a (WHR-60) Upload-failure browser tests: READY since 2026-11-05
-WO-app-3 (WHR-7) and WO-app-2 (WHR-5): READY; Earl's phone smoke pending
+WO-app-3b (WHR-65), WO-app-3 (WHR-7), WO-app-2 (WHR-5): ACCEPTED by Earl on 2026-11-05
 
 ## In flight
-- [Feature PR #45](https://github.com/Adeboyemoses/Whalesreward/pull/45) merged into staging at e7999cc after two consecutive full green CI runs. The two fixtures wait for the original account/operation's durable photo failure and released lease before navigation.
-- Root cause: fixture navigation interrupted failure bookkeeping. Unchanged production lease recovery passed on both browser profiles at about 60.2 seconds, retaining the sale/photo and crediting once.
-- Verification: 80/80 local repeats (two cases × two profiles × 20, two workers, zero retries); EM full browser 68 passed/4 existing skips, unit135, typecheck/lint/build PASS. Independent code/security/integrity PASS, round1; evidence validates.
-- CI: [first pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/1), [second pass](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/2). Both browser suites68 passed plus storage1, no flaky cases.
-- This separate records PR updates only STATUS, coverage and the app lane after the feature merge.
+- [Closeout PR #52](https://github.com/Adeboyemoses/Whalesreward/pull/52) records all three acceptances; Linear Done after its reviewed green staging merge. M1 phone exit accepted; no new work order.
+- Implementations: offline capture [#28](https://github.com/Adeboyemoses/Whalesreward/pull/28), uploads [#35](https://github.com/Adeboyemoses/Whalesreward/pull/35), phone fixes [#49](https://github.com/Adeboyemoses/Whalesreward/pull/49). Feature deployed at d3481fc6e39dabe8ab5e087ee581b91d891f56ed; health matched, db ok.
+- Phone feature: code/security/integrity PASS round2; EM typecheck/lint/build, unit164, browser94/4 existing skips/zero retries. Final feature CI integration129, time3+3, browser94 plus storage1, no flaky cases; six-board parity/12 screenshots. Original 24-hour/revocation checks remain equally strict; generic fallback1200ms.
+- Baseline staging 3G Save4145.2ms/next2021.9ms; reported1–3minute wait not reproduced. No deployed after-timings claimed. Rook records Earl's Samsung S25 acceptance (20:36UTC): lag gone, faster capture, quick offline response, sale reference visible; no saved numeric results.
 
 ## Next
-- STOP at READY. Earl reads docs/qa/upload-failure-browser-diagnosis.md and WHR-60 verification; no next work order starts here.
-- Existing M1 phone/Spaces smoke remains docs/qa/smoke-2026-11-05-upload-sync.md. WHR-5 and WHR-7 are not accepted by this test-only work.
+- STOP after closeout. Runbooks: docs/qa/smoke-2026-11-05-phone-stall.md, smoke-2026-11-05-upload-sync.md and smoke-2026-11-04-offline-capture.md. WHR-60 remains READY, outside this closure.
 
 ## Earl's gos
-- 2026-11-05: “Work order: WO-app-3a (WHR-60), stabilize the upload-failure browser tests. Determine test vs product cause first; never shorten LEASE_MS or add sleeps or runner retries. Take it to READY, then stop.”
+- 2026-11-05: measure before changes; preserve strict24-hour/revocation checks; no Computer Use for after-timings.
+- 2026-11-05: “Earl accepted the phone rerun (see WHR-65). Close WO-app-3b (WHR-65), WO-app-3 (WHR-7) and WO-app-2 (WHR-5) through close-session, then stop.” Supersedes READY-only instruction and pending-physical-acceptance caveat.
 
 ## Risks
-- No production code, lease duration, runner retries or sleeps changed. Physical Android and deployed Spaces acceptance remain pending; WHR-45 stays separate.
-- Local macOS Chromium startup is sandbox-blocked; browser evidence came from an isolated local Linux container and GitHub CI.
+- WHR-67: separate existing handover-fixture navigation race; later combined CI clean. WHR-45 presentation drift remains separate.
+- Dispatch flag: feature14 exceeds high-tier flag8; two feature review rounds within cap3. Four docs-only records reviews (READY, acceptance, two concurrent merges) bring session total18; no open findings. Model identity unavailable.
 
-dispatches=5 prs=2 rounds_max=1 escalations=0 model=unknown
+dispatches=18 prs=2 rounds_max=4 escalations=0 model=unknown

@@ -17,7 +17,7 @@ The tests hold requests with explicit release promises and release them in clean
 
 `tests/e2e/phone-smoke.spec.ts` covers local-first display followed by a delayed authoritative revocation, sticky expiry despite delayed success, cross-account stale response, two-second save/next with pending upload, offline/3G, stalled RSC, actual service-worker fallback, browser events/request outcomes, exact amount/quantity semantics, and pending/assigned/credited references for PMS and gas. Upload-reference tests wait for durable failure bookkeeping before full navigation, preserving the WHR-60 fixture rule.
 
-Final integrated results and independent board fidelity remain pending.
+Independent board fidelity is recorded in `tests/design-parity/phone-smoke/REPORT.md`; final EM verification follows below.
 
 # Integrated verification
 
@@ -38,3 +38,14 @@ Local test command: `docker exec -w /app -e DATABASE_URL=postgresql://postgres@w
 Review found that CDP network throttling does not delay the route-fulfilled fake lookup, so the earlier 3G browser test did not prove Save was independent of a repeated online card lookup. A new test resolves the customer and photo normally, then holds every subsequent lookup response indefinitely while remaining online. It asserts Save→receipt and Record next→empty form each within two seconds without waiting for a lookup request to start. It also verifies the exact original account/context/card/spend, retained customer, photo digest and durable original/photo after reset, with no falsely credited receipt or server-shaped record. The gate and paused PUT release in `finally`.
 
 RED on unchanged `f2865f44`: **0 passed, 2 failed**, both desktop and attendant receipt-visible assertions timed out at 2000ms while every later lookup remained held. Only then was builder fix `5559123` applied. GREEN with `5559123`, identical test and two workers: **2 passed, 0 failed (36.4s)**, no skips or retries. Both Save and next retain the end-to-end two-second assertions. The repeated lookup remains live in the background so late authoritative denial is still consumed; builder unit tests cover those denial responses. This is local browser evidence, not a new staging measurement. Typecheck and lint passed for the test change. No screenshots were rerun for this logic-only fix.
+
+## Final EM verification
+
+[Feature PR #49](https://github.com/Adeboyemoses/Whalesreward/pull/49) merged into staging at `d3481fc6e39dabe8ab5e087ee581b91d891f56ed` on 5 November 2026. Code, security and integrity reviewers all passed round 2 at `59362ad`; the evidence validator passed. Subsequent staging merges changed unrelated core/admin files and records; the phone feature files stayed unchanged.
+
+- Reviewed phone head: typecheck, lint, 159 unit tests, build, 3 timezone tests in each timezone and full browser 94 passed / 4 existing conditional skips / 0 retries (7.2m).
+- Final combined admin base: typecheck, lint, 164 unit tests (26 files), build and full browser 94 passed / 4 existing conditional skips / 0 retries (6.3m). The two new core migrations applied only to the disposable local test database for this check. The final records-only base update changed no application or test source.
+- [Final CI](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42094998766): all required checks green; integration 129, 3 timezone tests in each timezone, browser 94 passed / 4 existing conditional skips / no flaky cases, storage 1. Independent fidelity: 6 passed, 12 screenshots and line-box measurements at 390/360 px. Guard self-tests 94 passed.
+- The first CI run retried one existing handover fixture after its sign-in navigation collided with the app's navigation. [WHR-67](https://linear.app/phaneum/issue/WHR-67) tracks that P2 follow-up separately. The later two combined CI runs were clean. No sleeps or increased runner retries were added.
+
+Actual staging health reported the feature version and `db: ok` after deployment. No deployed after-performance marks are claimed. `phone-stall-baseline.md` records the instruction against Computer Use timings, Rook's successful Samsung rerun report and Earl's subsequent explicit acceptance/closeout instruction for WHR-65, WHR-7 and WHR-5.

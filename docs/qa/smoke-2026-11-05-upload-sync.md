@@ -1,5 +1,7 @@
 # WO-app-3 upload and receipt smoke
 
+Accepted by Earl on 5 November 2026 as part of the M1 phone exit. Earl explicitly authorized closing WHR-5, WHR-7 and WHR-65 after his Samsung rerun; [closeout PR #52](https://github.com/Adeboyemoses/Whalesreward/pull/52). This supersedes earlier pending-acceptance notes below. The phone rerun record and limits are in [the phone-stall runbook](smoke-2026-11-05-phone-stall.md#accepted-phone-rerun-and-closeout-5-november-2026); no numeric after-timing results are claimed.
+
 Status: READY on reviewed green staging merge of app/wo-3-uploads. Earl approved WHR-7 on 5 November 2026. WHR-5 remains READY pending its phone smoke.
 
 Automated verification uses the contract-shaped fake through the typed adapter. It does not prove real server credit or physical Android operation. Full M1 phone exit requires WO-core-3/4 endpoints and the deployed staging HTTPS app with real private Spaces storage.

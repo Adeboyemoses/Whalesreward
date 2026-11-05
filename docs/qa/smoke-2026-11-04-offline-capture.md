@@ -1,5 +1,7 @@
 # Phone smoke runbook: WO-app-2 — 4 November 2026
 
+Accepted by Earl on 5 November 2026 as part of the M1 phone exit. Earl explicitly authorized closing WHR-5, WHR-7 and WHR-65 after his Samsung rerun; [closeout PR #52](https://github.com/Adeboyemoses/Whalesreward/pull/52). This supersedes earlier pending-acceptance notes below. The phone rerun record and limits are in [the phone-stall runbook](smoke-2026-11-05-phone-stall.md#accepted-phone-rerun-and-closeout-5-november-2026); no numeric after-timing results are claimed.
+
 Written before implementation for WHR-5. Execute only after WO-core-3 merges and the real session/sign-in endpoints are available. Earl requested READY with automated Playwright evidence first; phone acceptance remains pending. Test-only contract fakes do not establish real authentication or device acceptance.
 
 ## Phone setup
