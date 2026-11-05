@@ -1,23 +1,19 @@
 # lane:core
-WO-core-4 (WHR-6) sync and evidence: READY on reviewed green staging merge and verification handoff, 5 November 2026
+WO-core-4 (WHR-6) sync and evidence: ACCEPTED by Earl, 5 November 2026
 
 ## In flight
-- Implementation PR and pasted final EM output are linked on WHR-6. High-tier plan/evidence: .review/core__wo-4-sync.md. READY takes effect only after independent code/security/integrity PASS and all CI gates green; then move WHR-6 In Review and stop.
-- M1 lookup, durable originals/receipt, bounded private upload, immutable validated final evidence and atomic accepted revision/audit. P-18 has one server policy module with exact PostgreSQL microsecond comparisons.
-- Named real PostgreSQL/MinIO tests cover lost response, concurrent finalize, adversarial staging overwrite and mixed uncertainty. Chromium Blob test verifies signed byte length with Content-Type-only CORS. Full verification counts/output belong to WHR-6.
-- Round1 fixes: signed upload size, exact P-18 timestamps, finalize-key scope and bounded captured-rate validation. Independent regressions reproduced failures first.
-- WHR-28 FIX and WHR-53 ACCEPTED/Done through green closeout #34 (7b0c3ab). WHR-59 resolved from existing M3 text: durable policy blocks separate from holds, M1 policy_review_required.
+- Implementation [PR #36](https://github.com/Adeboyemoses/Whalesreward/pull/36) merged at 2404344 with five green CI checks and independent code/security/integrity PASS. Named verification is on WHR-6; this documentation closeout makes it Done after its green staging merge.
+- Approved WO-core-4a (WHR-62) waits for WO-spec-3b (WHR-61) to merge. Its P-20 interval refinement is separate from acceptance of WO-core-4.
 
 ## Next
-- STOP at READY; no next work order.
-- Earl's live Spaces/phone smoke: docs/qa/smoke-2026-11-05-core-sync.md; upload UI remains WO-app-3. No cloud-resource or staging-data changes performed.
+- After WHR-61 merges: implement WHR-62, verify and independently review, merge into staging, post READY and stop.
 
 ## Earl's gos
-- 2026-11-05: “Earl accepted the WHR-28 FIX and WO-core-1d (WHR-53); close both.”
-- 2026-11-05: “Take it to READY with the named tests' output pasted, then stop.”
+- 2026-11-05: “Earl accepted WO-core-4 (WHR-6); close it.”
+- 2026-11-05: “Wait until WO-spec-3b (WHR-61) is merged into staging, then implement it, take it to READY and stop.”
 
 ## Risks
-- Actual authenticated Spaces PUT/finalize is not claimed by MinIO/signing/browser tests. WHR-58 remains separate. P-18/Q-528 is still the approved build default; uncertain intervals retain zero credit.
-- Core sync dispatch flag:10>8, including independent regressions and second-round reviews. Two rounds remain within cap3. Session total includes closeout reviewer; runtime model ID unavailable.
+- Q-528 client confirmation remains pending. M3 capture review belongs to WO-core-9. Actual Spaces/physical-phone smoke remains distinct from automated MinIO and browser tests.
+- WHR-58 remains separate. No cloud-resource or staging-data changes.
 
-dispatches=11 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
