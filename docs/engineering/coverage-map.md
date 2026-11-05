@@ -270,6 +270,8 @@ Additional named regressions in `admin-access-adversarial.test.ts`: `I-07/I-10 a
 
 B01/B08–B18, M01/M02 and H01–H10 have backend support only. Admin board rows remain `todo` for WO-app-4 screen implementation/parity; no UI acceptance claimed. WHR-42/43 defaults remain proposed and centrally configured; production auth/delegation closed, staging no-op mail, automatic presets disabled. No live provider or cloud/staging-data operations. This separate records PR follows the feature merge; stop at READY after its green merge. WHR-63 is ACCEPTED/Done through #48 (82dfe65).
 
+WO-core-5 (WHR-8) accepted by Earl on 5 November 2026. Feature #50 and READY records #51 are merged; the closeout records acceptance of the existing I-07–I-13 and I-41 tests above, with no new implementation or board parity claim.
+
 ## WO-app-3b phone-smoke ACCEPTED (WHR-65)
 
 [PR #49](https://github.com/Adeboyemoses/Whalesreward/pull/49) merged and deployed at `d3481fc6e39dabe8ab5e087ee581b91d891f56ed`; health matched with db ok. Code/security/integrity PASS round2. These scoped regressions preserve the original strict rules; they do not mark broader board rows complete.
