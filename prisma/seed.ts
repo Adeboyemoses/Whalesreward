@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import pg from "pg";
-import { seedAttendantCredentials } from "./seed-auth.mjs";
+import {
+  seedAttendantCredentials,
+  seedAdminCredentials,
+} from "./seed-auth.mjs";
 
 if (process.env.WHR_ENV === "production")
   throw new Error("Fictional fixtures are unavailable in production");
@@ -14,6 +17,7 @@ try {
     await readFile(new URL("./fixtures.sql", import.meta.url), "utf8"),
   );
   await seedAttendantCredentials(db);
+  await seedAdminCredentials(db);
   await db.query("COMMIT");
   console.info(
     "Fictional station, pump, staff, customer and card fixtures seeded.",
