@@ -39,6 +39,7 @@ Full browser result is recorded in docs/qa/smoke-2026-11-05-upload-sync.md and o
 Independent fidelity report covers five boards at 390/360 px; ten screenshots, no new blockers.
 WHR-45 is the existing accepted quantity trailing-zero presentation follow-up.
 WHR-60 tracks a P2 browser fixture race: full navigation can precede failed PUT lease release.
-One rerun had 66 passes/2 failures/4 skips; unchanged targeted cases passed both projects.
+Final-head full runs had 66 passes/2 timing failures/4 skips (partial PUT and expired PUT).
+Both last-failed cases passed unchanged on their first targeted rerun attempt.
 M1 fake responses remain test-only; real upload endpoints and Android acceptance remain pending.
 No schema migration, automatic evidence deletion, cloud operation, history or correction work.
