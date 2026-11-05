@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import type { OutboxRow } from "../../src/client/types";
 
 export async function signIn(page: Page, username = "grace.okon") {
   await page.goto("/attendant/sign-in");
@@ -56,13 +57,11 @@ export async function rows(page: Page) {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    const records = await new Promise<Array<Record<string, unknown>>>(
-      (resolve, reject) => {
-        const request = db.transaction("outbox").objectStore("outbox").getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      },
-    );
+    const records = await new Promise<OutboxRow[]>((resolve, reject) => {
+      const request = db.transaction("outbox").objectStore("outbox").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
     db.close();
     return Promise.all(
       records.map(async (row) => {
@@ -87,7 +86,7 @@ export async function rows(page: Page) {
 export async function save(page: Page) {
   await page.getByRole("button", { name: /^Save sale(?: on phone)?$/ }).click();
   await expect(
-    page.getByRole("heading", { name: "Saved on phone", exact: true }),
+    page.getByRole("heading", { name: /^(Saved on phone|Upload pending)$/ }),
   ).toBeVisible();
 }
 

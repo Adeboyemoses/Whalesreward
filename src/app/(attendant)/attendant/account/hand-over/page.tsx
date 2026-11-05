@@ -1,7 +1,8 @@
 "use client";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CloudUpload, UserRound } from "lucide-react";
+import { needsUpload } from "@/client/offline/sync-status";
 import { Button, Notice } from "@/ui";
 import {
   AccessGate,
@@ -15,39 +16,97 @@ import {
 } from "../../_components/runtime";
 function Handover() {
   const { client, state, online } = useAttendant();
-  const observedCount = useOwnCount();
-  const [confirmedCount, setConfirmedCount] = useState<number | null>(null);
-  const count = confirmedCount ?? observedCount;
+  const count = useOwnCount();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const uploadFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const flight = useRef(false);
   const session = state!.session!;
+  const mounted = useRef(false);
+  const logoutIntent = useRef(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      logoutIntent.current += 1;
+    };
+  }, []);
+  function staySignedIn() {
+    logoutIntent.current += 1;
+    setUploading(false);
+    go(router, "/attendant/account");
+  }
   async function signOut() {
     if (!client || flight.current) return;
     flight.current = true;
+    uploadFlight.current = false;
+    setUploading(false);
+    const intent = ++logoutIntent.current;
+    const stillHere = () => mounted.current && logoutIntent.current === intent;
+    const accountId = session.account.id;
+    const contextId = session.captureContextId;
+    const current = () =>
+      stillHere() &&
+      client.getState().session?.account.id === accountId &&
+      client.getState().session?.captureContextId === contextId;
     setBusy(true);
     setError(null);
     try {
-      const pending = (await client.ownSales()).filter(
-        (row) => !["credited", "held", "cancelled"].includes(row.state),
-      ).length;
+      const pending = (await client.ownSales()).filter(needsUpload).length;
+      if (!current()) return;
       if (pending !== count) {
-        setConfirmedCount(pending);
         setError(
           "The pending count changed. Check the sales still on this phone, then confirm sign-out again.",
         );
         return;
       }
+      if (!current()) return;
       await client.signOut();
-      go(router, "/attendant/sign-in", true);
+      if (stillHere()) go(router, "/attendant/sign-in", true);
     } catch (e) {
-      if (client.getState().access === "signed_out")
+      if (stillHere() && client.getState().access === "signed_out")
         go(router, "/attendant/sign-in", true);
-      else setError(message(e));
+      else if (current()) setError(message(e));
     } finally {
-      setBusy(false);
-      flight.current = false;
+      if (current()) setBusy(false);
+      if (stillHere()) flight.current = false;
+    }
+  }
+  async function uploadFirst() {
+    if (!client || uploadFlight.current || flight.current || !online) return;
+    uploadFlight.current = true;
+    const intent = ++logoutIntent.current;
+    const stillHere = () => mounted.current && logoutIntent.current === intent;
+    setUploading(true);
+    setError(null);
+    const accountId = session.account.id;
+    const contextId = session.captureContextId;
+    const current = () =>
+      stillHere() &&
+      client.getState().access === "active" &&
+      client.getState().session?.account.id === accountId &&
+      client.getState().session?.captureContextId === contextId;
+    try {
+      await client.retryUploads();
+      if (!current()) return;
+      const pending = (await client.ownSales()).filter(needsUpload).length;
+      if (!current()) return;
+      if (pending) {
+        setError(
+          "Some sales are still pending. Uploads will retry while you stay signed in, respecting any retry delay. You can also sign out and leave them on this phone.",
+        );
+        return;
+      }
+      if (!current()) return;
+      await client.signOut();
+      if (stillHere()) go(router, "/attendant/sign-in", true);
+    } catch (e) {
+      if (current()) setError(message(e));
+    } finally {
+      if (stillHere()) uploadFlight.current = false;
+      if (current()) setUploading(false);
     }
   }
   return (
@@ -59,12 +118,18 @@ function Handover() {
         <>
           {count !== 0 && (
             <>
-              <Button cta disabled icon={<CloudUpload aria-hidden />}>
-                Upload, then sign out
+              <Button
+                cta
+                loading={uploading}
+                disabled={!online || count === null || busy}
+                icon={<CloudUpload aria-hidden />}
+                onClick={() => void uploadFirst()}
+              >
+                {uploading ? "Uploading…" : "Upload, then sign out"}
               </Button>
               <p className="wr-help">
                 {online
-                  ? "Uploads are not available yet. Keep these sales on this phone."
+                  ? "Sign-out follows confirmed upload. Sales held for review are not credited."
                   : "Connect to the internet to upload. Sales stay on this phone."}
               </p>
             </>
@@ -82,11 +147,7 @@ function Handover() {
                 ? "Sign out"
                 : "Sign out with pending sales"}
           </Button>
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => go(router, "/attendant/account")}
-          >
+          <Button variant="ghost" disabled={busy} onClick={staySignedIn}>
             Stay signed in
           </Button>
         </>
