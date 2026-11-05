@@ -31,6 +31,36 @@ export const permissionCodes = [
   "roles",
 ] as const;
 export type PermissionCode = (typeof permissionCodes)[number];
+export const permissionLabels: Record<PermissionCode, string> = {
+  overview: "View overview",
+  sales: "View sales and meter photos",
+  corrections: "Approve late corrections",
+  duplicates: "Resolve duplicate flags",
+  priceReview: "Resolve offline price mismatches",
+  queueRecovery: "Recover stranded sales",
+  cardEligibility: "Review replaced-card purchases",
+  dateReview: "Verify sale dates",
+  giveawayFinalize: "Finalize giveaway results",
+  giveawayRevise: "Revise finalized results",
+  customers: "View customers",
+  recovery: "Change customer phones and replace cards",
+  managerRecovery: "Approve exceptional customer recovery",
+  leaderboards: "View leaderboards",
+  reports: "View reports",
+  reportExport: "Export reports",
+  cards: "View loyalty-card batches",
+  cardGenerate: "Generate batches",
+  cardExport: "Export PDF/Excel batches",
+  cardPrint: "Mark batches Printed",
+  cardActivate: "Activate batches",
+  attendants: "Manage attendant accounts and assignments",
+  pumps: "Manage station pumps and pump-side assignment",
+  prices: "Change product price and precision",
+  settings: "Change campaign/retention settings",
+  audit: "View audit history",
+  users: "Manage admin users",
+  roles: "Define roles and permissions",
+};
 export const permissionSchema = z.enum(permissionCodes);
 export const dependencies: Partial<Record<PermissionCode, PermissionCode>> = {
   corrections: "sales",
