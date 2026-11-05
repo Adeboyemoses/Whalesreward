@@ -88,6 +88,38 @@ async function creditCount(purchaseId: string) {
   );
   return result.rows[0].count;
 }
+async function exactReceipt<T>(
+  stationId: string,
+  receivedAt: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const name = `sync_test_receipt_${newId().replaceAll("-", "")}`;
+  await pool.query(
+    `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.station_id::text=TG_ARGV[0] THEN NEW.server_received_at=TG_ARGV[1]::timestamptz; END IF; RETURN NEW; END $$`,
+  );
+  try {
+    await pool.query(
+      `CREATE TRIGGER ${name} BEFORE INSERT ON purchase FOR EACH ROW EXECUTE FUNCTION ${name}('${stationId}','${receivedAt}')`,
+    );
+    return await run();
+  } finally {
+    await pool.query(`DROP TRIGGER IF EXISTS ${name} ON purchase`);
+    await pool.query(`DROP FUNCTION ${name}()`);
+  }
+}
+async function exactCaptureContext(
+  f: Awaited<ReturnType<typeof syncFixture>>,
+  signedInAt: string,
+  assignmentId = f.assignmentId,
+) {
+  const contextId = newId();
+  await pool.query(
+    "INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest) SELECT $1,attendant_id,$4,$2::timestamptz,$2::timestamptz+interval '24 hours',seller_name,seller_username,device_binding_digest FROM capture_context WHERE id=$3",
+    [contextId, signedInAt, f.contextId, assignmentId],
+  );
+  f.original.captureContextId = contextId;
+  f.original.assignmentId = assignmentId;
+}
 describe("M1 real PostgreSQL and MinIO sync", () => {
   beforeAll(async () => {
     await pool.query(
@@ -210,11 +242,11 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
       )
     ).rows[0];
     const before = await storage.read(asset.final_key, 8 * 1024 * 1024);
-    const replacement = await sharp({
-      create: { width: 40, height: 30, channels: 3, background: "#000000" },
-    })
-      .jpeg()
-      .toBuffer();
+    const replacement = Buffer.from(jpeg);
+    replacement[replacement.length - 1] =
+      replacement[replacement.length - 1]! ^ 1;
+    expect(replacement.length).toBe(jpeg.length);
+    expect(sha256(replacement)).not.toBe(sha256(jpeg));
     await put(p.upload.url, p.upload.headers, replacement);
     expect(await storage.read(asset.final_key, 8 * 1024 * 1024)).toEqual(
       before,
@@ -405,7 +437,7 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
     await expect(
       service.finalize(f.token, submitted.status.purchaseId, request),
     ).rejects.toMatchObject({ code: "storage_unavailable", status: 503 });
-    await put(upload.url, upload.headers, Buffer.from("wrong"));
+    await put(upload.url, upload.headers, Buffer.alloc(jpeg.length, 0));
     await expect(
       service.finalize(f.token, submitted.status.purchaseId, request),
     ).rejects.toMatchObject({ code: "photo_invalid", status: 422 });
@@ -756,5 +788,210 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
         )
       ).rows[0].count,
     ).toBe(0);
+  });
+  it("I-25 signed PUT rejects wrong byte lengths before storage and requires no manual Content-Length header", async () => {
+    const f = await syncFixture(pool, jpeg),
+      p = await prepared(f);
+    expect(
+      Object.keys(p.upload.headers).map((x) => x.toLowerCase()),
+    ).not.toContain("content-length");
+    const oversized = await fetch(p.upload.url, {
+      method: "PUT",
+      headers: p.upload.headers,
+      body: new Uint8Array(8 * 1024 * 1024 + 1),
+    });
+    expect(oversized.status).toBe(403);
+    const wrongSize = await fetch(p.upload.url, {
+      method: "PUT",
+      headers: p.upload.headers,
+      body: new Uint8Array(jpeg.length + 1),
+    });
+    expect(wrongSize.status).toBe(403);
+    expect(
+      new URL(p.upload.url).searchParams.get("X-Amz-SignedHeaders"),
+    ).toContain("content-length");
+    // Fetch computes Content-Length from the body; browsers forbid setting it manually.
+    await put(p.upload.url, p.upload.headers, jpeg);
+    expect(
+      (
+        await service.finalize(
+          f.token,
+          p.submitted.status.purchaseId,
+          p.finalize,
+        )
+      ).state,
+    ).toBe("credited");
+  });
+  it("I-22 finalize operation IDs are scoped per purchase for one originating account", async () => {
+    const f = await syncFixture(pool, jpeg),
+      first = await prepared(f);
+    const second = await prepared({
+      ...f,
+      original: { ...f.original, operationId: newId() },
+    });
+    const operationId = newId();
+    const request1 = { ...first.finalize, operationId },
+      request2 = { ...second.finalize, operationId };
+    const one = await service.finalize(
+      f.token,
+      first.submitted.status.purchaseId,
+      request1,
+    );
+    const two = await service.finalize(
+      f.token,
+      second.submitted.status.purchaseId,
+      request2,
+    );
+    expect(one.state).toBe("credited");
+    expect(two.state).toBe("credited");
+    expect(two.currentRevisionId).not.toBe(one.currentRevisionId);
+    expect(
+      (await service.finalize(f.token, one.purchaseId, request1))
+        .currentRevisionId,
+    ).toBe(one.currentRevisionId);
+    expect(
+      (await service.finalize(f.token, two.purchaseId, request2))
+        .currentRevisionId,
+    ).toBe(two.currentRevisionId);
+    expect(await creditCount(one.purchaseId)).toBe(1);
+    expect(await creditCount(two.purchaseId)).toBe(1);
+  });
+  it("I-29 a fabricated captured rate with valid arithmetic returns a bounded calculation error", async () => {
+    const f = await syncFixture(pool, jpeg);
+    await expect(
+      service.submit(f.token, {
+        ...f.original,
+        rateKobo: "110000",
+        entry: {
+          basis: "amount",
+          enteredAmountKobo: "2200000",
+          amountKobo: "2200000",
+          quantity: "20",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "calculation_invalid", status: 422 });
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM purchase WHERE operation_id=$1",
+          [f.original.operationId],
+        )
+      ).rows[0].count,
+    ).toBe(0);
+  });
+  it("P-18 PostgreSQL microsecond price activation before durable receipt holds zero credit", async () => {
+    const f = await syncFixture(pool, jpeg);
+    const second = new Date(Date.now() - 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, "");
+    const receipt = `${second}.123900Z`,
+      activation = `${second}.123100Z`;
+    await pool.query(
+      "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,2,110000,'NGN',2,$4,$5,'Fictional submillisecond activation')",
+      [
+        newId(),
+        f.stationId,
+        "019a5000-0000-7000-8000-000000000009",
+        activation,
+        "019a5000-0000-7000-8000-000000000005",
+      ],
+    );
+    const p = await exactReceipt(f.stationId, receipt, () => prepared(f));
+    const final = await service.finalize(
+      f.token,
+      p.submitted.status.purchaseId,
+      p.finalize,
+    );
+    expect(final.state).toBe("held");
+    expect(final.holds).toContainEqual({
+      kind: "price",
+      reasonCode: "price_uncertain",
+    });
+    expect(await creditCount(final.purchaseId)).toBe(0);
+  });
+  it("P-18 PostgreSQL microsecond campaign cutoff between capturing sign-in and receipt holds zero credit", async () => {
+    const f = await syncFixture(pool, jpeg);
+    const second = new Date(Date.now() - 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, "");
+    const signedIn = `${second}.123100Z`,
+      receipt = `${second}.123900Z`,
+      cutoff = `${second}.123500Z`;
+    await exactCaptureContext(f, signedIn);
+    const campaignId = newId();
+    await pool.query(
+      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional precision campaign',1,false)",
+      [campaignId, f.stationId],
+    );
+    await pool.query(
+      "INSERT INTO settings_version(id,station_id,campaign_id,version,purchase_start,purchase_cutoff,upload_deadline,timezone,effective_from,actor_id,reason) VALUES($1,$2,$3,1,$4,$5,$6,'Africa/Lagos',$4,$7,'Fictional precise cutoff')",
+      [
+        newId(),
+        f.stationId,
+        campaignId,
+        f.start,
+        cutoff,
+        new Date(Date.now() + 60000),
+        "019a5000-0000-7000-8000-000000000005",
+      ],
+    );
+    const p = await exactReceipt(f.stationId, receipt, () => prepared(f));
+    const final = await service.finalize(
+      f.token,
+      p.submitted.status.purchaseId,
+      p.finalize,
+    );
+    expect(final.state).toBe("held");
+    expect(final.pendingReason).toBe("policy_review_required");
+    expect(
+      (
+        await pool.query(
+          "SELECT reasons FROM sync_validation WHERE purchase_id=$1",
+          [final.purchaseId],
+        )
+      ).rows[0].reasons,
+    ).toContain("capture_time_unresolved");
+    expect(await creditCount(final.purchaseId)).toBe(0);
+  });
+  it("P-18 PostgreSQL microsecond assignment start after capturing sign-in remains unresolved", async () => {
+    const f = await syncFixture(pool, jpeg);
+    const second = new Date(Date.now() - 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, "");
+    const signedIn = `${second}.123100Z`,
+      receipt = `${second}.123900Z`,
+      activation = `${second}.123500Z`;
+    await pool.query("UPDATE assignment SET effective_until=$2 WHERE id=$1", [
+      f.assignmentId,
+      signedIn,
+    ]);
+    const next = newId();
+    await pool.query(
+      "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,changed_by,reason) VALUES($1,$2,$3,2,$4,$5,'Fictional precise reassignment')",
+      [
+        next,
+        f.attendantId,
+        f.pumpId,
+        activation,
+        "019a5000-0000-7000-8000-000000000005",
+      ],
+    );
+    await exactCaptureContext(f, signedIn, next);
+    const p = await exactReceipt(f.stationId, receipt, () => prepared(f));
+    const final = await service.finalize(
+      f.token,
+      p.submitted.status.purchaseId,
+      p.finalize,
+    );
+    expect(final.state).toBe("held");
+    expect(
+      (
+        await pool.query(
+          "SELECT reasons FROM sync_validation WHERE purchase_id=$1",
+          [final.purchaseId],
+        )
+      ).rows[0].reasons,
+    ).toContain("capture_authorization_unresolved");
+    expect(await creditCount(final.purchaseId)).toBe(0);
   });
 });
