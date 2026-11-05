@@ -10,8 +10,8 @@ reviewers:
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 19
-escalation: Earl approved one extra documentation-only review round on 2026-11-05 for 1205c45 and 0e899b1 against a7fc353; any application-code, test or dependency change voids approval.
+dispatches: 22
+escalation: Earl approved on 2026-11-05 a final documentation-only round resetting STATUS.md, docs/engineering/coverage-map.md and docs/agentic/lanes/app.md to origin/staging; any app/test/dependency change voids it. Earlier round4 exception remains recorded below.
 plan:
   goal: Upload queued sales safely and display credit only from validated authoritative server status.
   files: src/client/**, src/app/(attendant)/**, src/ui/**, src/styles/**, tests/fixtures/**, tests/e2e/**, tests/design-parity/**, docs/briefs/**, docs/qa/**, docs/engineering/coverage-map.md, docs/agentic/lanes/app.md, STATUS.md
@@ -50,5 +50,7 @@ Approval is also recorded on WHR-7, comment 0cea0f42-8e20-4fc3-b9ae-fcb7247833c9
 WHR-60 is nonblocking per Earl; diagnose before M5 and cover both flows in M1 phone smoke.
 Round 4 code/security/integrity reviewers all PASS f13ad2f; no findings, no app/test/dependency delta.
 Their prior application review carries forward; the plan block is unchanged.
-New PR #36 at staging 2404344 conflicts in STATUS and coverage, outside this approved review.
-Those conflicts are unresolved; no merge or READY is claimed and final green CI remains required.
+Earl replaced the conflict-resolution scope on 2026-11-05 (WHR-7 comment 27a527fb-af09-4d13-b6b5-083bc7e20ef5).
+Only the three named shared records were reset byte-for-byte to staging a1e674c; no other non-evidence file changed.
+One final documentation-only round is authorized; verdicts are pending.
+READY records will follow in a separate PR after the feature merges with green CI and evidence.
