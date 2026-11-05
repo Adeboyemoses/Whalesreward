@@ -620,10 +620,14 @@ export class AttendantClient {
         "medium_required",
         "Choose what the fuel was bought into.",
       );
-    // Revalidate online at save as well: reconnecting must not promote an offline cache hint.
-    const customer = this.online()
-      ? await this.lookup(code)
-      : input.customerCache;
+    // Keep the online check live: lookup consumes any late authority denial and
+    // locks its originating context. Capture persists the displayed hint without
+    // waiting for transport; only sync's server response decides card acceptance.
+    if (this.online())
+      void this.lookup(code).catch(() => {
+        /* Lookup handles authority denials; the saved row remains retryable. */
+      });
+    const customer = input.customerCache;
     const p = draft.session.price;
     const rate = parseKobo(p.rateKobo);
     const amount =
