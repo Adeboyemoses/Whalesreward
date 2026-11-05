@@ -1,7 +1,7 @@
 ---
 branch: app/wo-3-ready
 linear: WHR-7
-tier: low
+tier: docs
 reviewed_head: 6b8c7c76c08ee7086ee34b14a1ae3717e8569b40
 rounds: 2
 builder: em
@@ -27,3 +27,8 @@ Stop at READY; no next work order, main promotion or cloud action.
 
 Initial records CI hit the known WHR60 partial-photo fixture; recorded on WHR60 and rerun unchanged.
 No test was disabled or requirement bypassed; final CI must be green before merge.
+
+PR43 defines shared-record PRs as docs-only; routing has reported docs for this PR from the start.
+The former voluntary low label is corrected to docs to identify this records PR, not a feature PR.
+Both independent code-review PASS verdicts and all CI requirements are retained; no required review is waived.
+The clean PR43 base merge changes none of the three reviewed records.
