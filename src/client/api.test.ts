@@ -14,6 +14,52 @@ function reply(data: unknown) {
   );
 }
 describe("M1 typed HTTP adapter", () => {
+  it("reports transport failure without turning an HTTP revocation into an offline result", async () => {
+    const outcome = vi.fn();
+    const unavailable = new HttpAttendantApi(
+      async () => {
+        throw new TypeError("connection lost");
+      },
+      () => outcome,
+    );
+    await expect(unavailable.session()).rejects.toMatchObject({
+      code: "network_unavailable",
+    });
+    expect(outcome).toHaveBeenLastCalledWith(false);
+    const revoked = new HttpAttendantApi(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "unauthenticated",
+              message: "Sign in",
+              retryable: false,
+            },
+          }),
+          { status: 401 },
+        ),
+      () => outcome,
+    );
+    await expect(revoked.session()).rejects.toMatchObject({
+      code: "unauthenticated",
+    });
+    expect(outcome).toHaveBeenLastCalledWith(true);
+  });
+  it("does not announce offline when a caller cancels an upload request", async () => {
+    const outcome = vi.fn();
+    const controller = new AbortController();
+    const api = new HttpAttendantApi(
+      async () => {
+        controller.abort();
+        throw new DOMException("Cancelled", "AbortError");
+      },
+      () => outcome,
+    );
+    await expect(
+      api.saleStatus(uuidv7(), controller.signal),
+    ).rejects.toMatchObject({ code: "network_unavailable" });
+    expect(outcome).not.toHaveBeenCalled();
+  });
   it("uses no-store same-origin cookie transport and a sign-in idempotency key", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(reply(session));
     const api = new HttpAttendantApi(fetcher);

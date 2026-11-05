@@ -16,6 +16,7 @@ import {
 } from "@/client/offline/client";
 import { needsUpload } from "@/client/offline/sync-status";
 import { registerAttendantWorker } from "@/client/sw/register";
+import { connection, probeConnection } from "@/client/offline/connection";
 import { AppHeader, BottomNav, Notice, Button } from "@/ui";
 import type { NavLabel } from "@/ui/navigation";
 
@@ -48,14 +49,15 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
     const client = getAttendantClient();
     let active = true;
     let initialized = false;
+    let probing = false;
     const update = () => {
-      if (active && initialized)
-        setRuntime({
-          client,
-          state: client.getState(),
-          online: navigator.onLine,
+      if (active)
+        setRuntime((previous) => ({
+          client: initialized ? client : previous.client,
+          state: initialized ? client.getState() : previous.state,
+          online: connection.isOnline(),
           error: null,
-        });
+        }));
     };
     const fail = (error: unknown) => {
       initialized = true;
@@ -63,22 +65,26 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
         setRuntime({
           client,
           state: client.getState(),
-          online: navigator.onLine,
+          online: connection.isOnline(),
           error: message(error),
         });
     };
     const unsubscribe = client.subscribe(update);
+    const unsubscribeConnection = connection.subscribe(update);
+    connection.browserChanged();
+    update();
     const stopSync = client.startForegroundSync();
     void (async () => {
       await client.initialize();
-      // An already-online launch is not an online event. Validate its session
-      // before starting a new draft; offline launch stays entirely local.
-      if (navigator.onLine) await client.refresh();
+      // Publish only after the durable local window has been checked. The server
+      // request remains live in the background and any denial still locks it.
       initialized = true;
       update();
+      if (navigator.onLine) void client.refresh().then(update, fail);
       void registerAttendantWorker().catch(fail);
     })().catch(fail);
     const network = () => {
+      connection.browserChanged();
       update();
       if (navigator.onLine) void client.refresh().then(update, fail);
       else void client.checkAccess().then(update, fail);
@@ -93,6 +99,17 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
     };
     const timer = window.setInterval(() => {
       void client.checkAccess().then(update, fail);
+      if (navigator.onLine && !connection.isOnline() && !probing) {
+        probing = true;
+        void probeConnection()
+          .then(() => {
+            if (active && connection.isOnline())
+              void client.refresh().then(update, fail);
+          })
+          .finally(() => {
+            probing = false;
+          });
+      }
     }, 1000);
     window.addEventListener("online", network);
     window.addEventListener("offline", network);
@@ -100,6 +117,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
       unsubscribe();
+      unsubscribeConnection();
       stopSync();
       clearInterval(timer);
       window.removeEventListener("online", network);
@@ -118,6 +136,19 @@ export function go(
   href: string,
   replace = false,
 ) {
+  const capturePath = /^\/attendant\/sale(?:\/[^/]+\/recorded)?\/?$/;
+  const destination = new URL(href, window.location.href);
+  if (
+    destination.origin === window.location.origin &&
+    capturePath.test(window.location.pathname) &&
+    capturePath.test(destination.pathname)
+  ) {
+    // Both URLs render the same client capture shell. Next's native history
+    // integration updates usePathname without waiting for an RSC request.
+    if (replace) window.history.replaceState(null, "", href);
+    else window.history.pushState(null, "", href);
+    return;
+  }
   if (!navigator.onLine) {
     if (replace) window.location.replace(href);
     else window.location.assign(href);

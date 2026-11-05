@@ -71,6 +71,11 @@ export function Receipt({
   const summary = (
     <KeyValueList
       items={[
+        {
+          label: "Sale reference",
+          value: status?.saleCode ?? "Reference after upload",
+          mono: !!status,
+        },
         { label: "Customer", value: customerName },
         { label: "Card", value: sale.cardCode, mono: true },
         { label: "Recorded by", value: capture.sellerName },
@@ -142,7 +147,13 @@ export function Receipt({
           <ListRow
             name={customerName}
             amount={formatNaira(parseKobo(sale.entry.amountKobo))}
-            metadata={`${formatQuantity(sale.entry.quantity, sale.unit, sale.quantityPrecision)} · ${mediumName[sale.medium]} · Sale ${status.saleCode}`}
+            metadata={`${formatQuantity(sale.entry.quantity, sale.unit, sale.quantityPrecision)} · ${mediumName[sale.medium]}`}
+            description={
+              <>
+                Sale reference:{" "}
+                <span className="wr-mono">{status.saleCode}</span>
+              </>
+            }
             status={presentation.label}
             tone="held"
             href={`/attendant/sale/${encodeURIComponent(operationId)}/recorded`}

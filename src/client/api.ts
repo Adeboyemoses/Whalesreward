@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { connection } from "./offline/connection";
 import {
   ClientError,
   lookupSchema,
@@ -45,6 +46,7 @@ export interface AttendantApi {
 export class HttpAttendantApi implements AttendantApi {
   constructor(
     private readonly transport: typeof fetch = (...args) => fetch(...args),
+    private readonly beginRequest = connection.beginRequest,
   ) {}
   private async request<T>(
     path: string,
@@ -55,6 +57,7 @@ export class HttpAttendantApi implements AttendantApi {
     metadata?: { retryAfterMs: number | null },
   ): Promise<T> {
     let response: Response;
+    const outcome = this.beginRequest();
     try {
       response = await this.transport(path, {
         method: body === undefined ? "GET" : "POST",
@@ -71,11 +74,16 @@ export class HttpAttendantApi implements AttendantApi {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch {
+      // Local pause/sign-out cancellation says nothing about connectivity.
+      if (!signal?.aborted) outcome(false);
       throw new ClientError(
         "network_unavailable",
         "Could not connect. Check your connection and try again.",
       );
     }
+    // Even a denial or server error proves transport worked. Authorization below
+    // still consumes the original response; no short connectivity deadline aborts it.
+    outcome(true);
     const retryAfterMs = readRetryAfter(response);
     if (metadata) metadata.retryAfterMs = retryAfterMs;
     if (response.status === 204 && schema === null) return undefined as T;

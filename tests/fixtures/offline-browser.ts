@@ -33,16 +33,18 @@ export async function fillSale(
         exact: true,
       })
       .click();
-  await page
-    .getByLabel(
-      options.quantity
-        ? options.gas
-          ? "Kilograms"
-          : "Litres"
-        : "Amount in naira",
-      { exact: true },
-    )
-    .fill(options.value ?? "20000.01");
+  const entry = page.getByLabel(
+    options.quantity
+      ? options.gas
+        ? "Kilograms"
+        : "Litres"
+      : "Amount in naira",
+    { exact: true },
+  );
+  // Focus restores raw amount text; wait for that React render before select-all.
+  await entry.focus();
+  await expect(entry).not.toHaveValue(/,/);
+  await entry.fill(options.value ?? "20000.01");
   await page.getByRole("button", { name: /^Take meter photo/ }).click();
   await page.getByRole("button", { name: "Take photo", exact: true }).click();
   await expect(

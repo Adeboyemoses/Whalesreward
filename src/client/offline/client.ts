@@ -14,6 +14,7 @@ import {
 } from "../types";
 import { CaptureDatabase, type Installation } from "./db";
 import { SaleSynchronizer } from "./sync";
+import { connection } from "./connection";
 import {
   advanceWindow,
   requestDuration,
@@ -64,13 +65,14 @@ export class AttendantClient {
     }),
     private online: () => boolean = () =>
       typeof navigator === "undefined" || navigator.onLine,
+    private reachable: () => boolean = online,
   ) {
     this.synchronizer = new SaleSynchronizer({
       api,
       db,
       now: () => this.clock().wall,
       authorize: async (readOnly) => {
-        if (!this.online())
+        if (!this.reachable())
           throw new ClientError("offline", "Uploads pause while offline.");
         const state = await this.checkAccess();
         if (!state.session || (!readOnly && state.access !== "active"))
@@ -507,7 +509,7 @@ export class AttendantClient {
   ): Promise<Lookup | null> {
     const session = await this.active();
     const code = normalizeCardCode(value);
-    if (!this.online()) {
+    if (!this.reachable()) {
       return this.db.transaction(
         "r",
         this.db.meta,
@@ -599,7 +601,7 @@ export class AttendantClient {
       );
     const code = normalizeCardCode(input.cardCode);
     if (
-      this.online() &&
+      this.reachable() &&
       (!input.customerCache || input.customerCache.cardCode !== code)
     )
       throw new ClientError(
@@ -618,10 +620,14 @@ export class AttendantClient {
         "medium_required",
         "Choose what the fuel was bought into.",
       );
-    // Revalidate online at save as well: reconnecting must not promote an offline cache hint.
-    const customer = this.online()
-      ? await this.lookup(code)
-      : input.customerCache;
+    // Keep the online check live: lookup consumes any late authority denial and
+    // locks its originating context. Capture persists the displayed hint without
+    // waiting for transport; only sync's server response decides card acceptance.
+    if (this.online())
+      void this.lookup(code).catch(() => {
+        /* Lookup handles authority denials; the saved row remains retryable. */
+      });
+    const customer = input.customerCache;
     const p = draft.session.price;
     const rate = parseKobo(p.rateKobo);
     const amount =
@@ -819,5 +825,11 @@ function canonicalQuantity(value: string, precision: number) {
 }
 let singleton: AttendantClient | undefined;
 export function getAttendantClient() {
-  return (singleton ??= new AttendantClient());
+  return (singleton ??= new AttendantClient(
+    undefined,
+    undefined,
+    undefined,
+    connection.browserOnline,
+    connection.isOnline,
+  ));
 }

@@ -33,6 +33,7 @@ import {
 } from "../_components/runtime";
 import { Camera } from "../_components/camera";
 import { Receipt } from "../_components/receipt";
+import { formatAmountInput } from "../_components/amount-input";
 function Sale() {
   const { client, state, online } = useAttendant();
   const router = useRouter();
@@ -44,6 +45,7 @@ function Sale() {
   const [finding, setFinding] = useState(false);
   const [basis, setBasis] = useState<"amount" | "quantity">("amount");
   const [value, setValue] = useState("");
+  const [valueFocused, setValueFocused] = useState(false);
   const [medium, setMedium] = useState<Medium | "">("");
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
@@ -323,6 +325,7 @@ function Sale() {
               if (next !== basis) {
                 setBasis(next as "amount" | "quantity");
                 setValue("");
+                setValueFocused(false);
               }
             }}
           />
@@ -356,7 +359,13 @@ function Sale() {
           label={basis === "amount" ? "Amount (₦)" : unitLabel}
           aria-label={basis === "amount" ? "Amount in naira" : unitLabel}
           inputMode="decimal"
-          value={value}
+          value={
+            basis === "amount" && !valueFocused
+              ? formatAmountInput(value)
+              : value
+          }
+          onFocus={() => setValueFocused(true)}
+          onBlur={() => setValueFocused(false)}
           onChange={(event) => setValue(event.target.value)}
           placeholder={basis === "amount" ? "0.00" : "0"}
           prefix={basis === "amount" ? "₦" : undefined}
@@ -418,11 +427,15 @@ function Sale() {
 }
 export default function SalePage() {
   const pathname = usePathname();
-  const offlineReceipt =
+  const recordedOperationId =
     pathname.match(/^\/attendant\/sale\/([^/]+)\/recorded\/?$/)?.[1] ?? null;
   return (
     <AccessGate>
-      {offlineReceipt ? <Receipt operationId={offlineReceipt} /> : <Sale />}
+      {recordedOperationId ? (
+        <Receipt operationId={recordedOperationId} />
+      ) : (
+        <Sale />
+      )}
     </AccessGate>
   );
 }

@@ -153,7 +153,18 @@ function Uploads() {
                     metadata={`${formatQuantity(row.original.entry.quantity, row.original.unit, row.original.quantityPrecision)} · ${mediumName[row.original.medium]} · ${formatTime(row.original.appCapturedAt)}`}
                     status={presentation.label}
                     tone={presentation.tone}
-                    description={presentation.description}
+                    description={
+                      <>
+                        {presentation.description}
+                        {status && (
+                          <>
+                            <br />
+                            Sale reference:{" "}
+                            <span className="wr-mono">{status.saleCode}</span>
+                          </>
+                        )}
+                      </>
+                    }
                     href={`/attendant/uploads/${encodeURIComponent(row.operationId)}`}
                   />
                 );
@@ -188,7 +199,18 @@ function Uploads() {
                       )}
                       status={presentation.label}
                       tone={presentation.tone}
-                      description={presentation.description}
+                      description={
+                        <>
+                          {presentation.description}
+                          {status && (
+                            <>
+                              <br />
+                              Sale reference:{" "}
+                              <span className="wr-mono">{status.saleCode}</span>
+                            </>
+                          )}
+                        </>
+                      }
                       href={`/attendant/uploads/${encodeURIComponent(row.operationId)}`}
                     />
                   );

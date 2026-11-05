@@ -79,6 +79,116 @@ async function input(): Promise<CaptureInput> {
   };
 }
 describe("durable account partition", () => {
+  it("saves an already resolved online sale without waiting for another card lookup", async () => {
+    const draft = await client.beginCapture();
+    const form = await input();
+    const entered = deferred<void>();
+    const held = deferred<NonNullable<CaptureInput["customerCache"]>>();
+    let lookups = 0;
+    api.lookup = () => {
+      lookups++;
+      entered.resolve();
+      return held.promise;
+    };
+    let saved: Awaited<ReturnType<AttendantClient["saveCapture"]>> | undefined;
+    const saving = client.saveCapture(draft, form).then((row) => {
+      saved = row;
+      return row;
+    });
+    try {
+      await entered.promise;
+      await expect
+        .poll(() => saved?.operationId, { timeout: 1000 })
+        .toBe(draft.operationId);
+      expect(lookups).toBe(1);
+      expect(saved!.original.cardCode).toBe(form.cardCode);
+      expect(saved!.customerCache).toEqual(form.customerCache);
+      expect(saved!.photoDigest).toBe(form.photo.sha256);
+      expect(saved!.photoBlob.size).toBe(form.photo.blob.size);
+      expect(saved!.state).toBe("saved");
+      expect(saved!.serverStatus).toBeNull();
+      expect(await db.outbox.count()).toBe(1);
+    } finally {
+      held.resolve(form.customerCache!);
+      await saving;
+    }
+  });
+  it.each([
+    "unauthenticated",
+    "permission_denied",
+    "assignment_unavailable",
+  ] as const)(
+    "a delayed Save-time lookup %s locks capture and keeps the saved original/photo",
+    async (code) => {
+      const draft = await client.beginCapture();
+      const form = await input();
+      const entered = deferred<void>();
+      const release = deferred<void>();
+      api.lookup = async () => {
+        entered.resolve();
+        await release.promise;
+        throw new ClientError(code, "Revoked");
+      };
+      try {
+        const saved = await client.saveCapture(draft, form);
+        await entered.promise;
+        expect(client.getState().access).toBe("active");
+        release.resolve();
+        await expect.poll(() => client.getState().access).toBe("expired");
+        await expect(client.beginCapture()).rejects.toMatchObject({
+          code: "access_expired",
+        });
+        // A successful response for this same context never clears the denial.
+        await client.refresh();
+        expect(client.getState().access).toBe("expired");
+        const retained = await db.outbox.get([
+          saved.originatingAccountId,
+          saved.operationId,
+        ]);
+        expect(retained?.original).toEqual(saved.original);
+        expect(retained?.photoDigest).toBe(saved.photoDigest);
+        expect(retained?.photoBlob.size).toBe(saved.photoBlob.size);
+        expect(retained?.state).toBe("saved");
+        expect(retained?.serverStatus).toBeNull();
+      } finally {
+        release.resolve();
+      }
+    },
+  );
+  it("an inferred outage permits local pending capture but never suppresses browser-online revocation checks", async () => {
+    const local = new AttendantClient(
+      api,
+      new CaptureDatabase(db.name),
+      () => ({ wall: now, mono, runtimeId: "outage-tab" }),
+      () => true,
+      () => false,
+    );
+    open.push(local);
+    await local.initialize();
+    const form = await input();
+    api.lookup = async () => {
+      throw new Error("Lookup must stay local while unreachable");
+    };
+    expect(await local.lookup("A7K3M9Y")).toBeNull();
+    const saved = await local.saveCapture(await local.beginCapture(), {
+      ...form,
+      cardCode: "A7K3M9Y",
+      customerCache: null,
+    });
+    expect(saved.original.entry.amountKobo).toBe("2000000");
+    let revalidations = 0;
+    api.session = async () => {
+      revalidations++;
+      throw new ClientError("unauthenticated", "Revoked");
+    };
+    await local.refresh();
+    expect(revalidations).toBe(1);
+    expect(local.getState().access).toBe("expired");
+    await expect(local.beginCapture()).rejects.toMatchObject({
+      code: "access_expired",
+    });
+    expect(await db.outbox.count()).toBe(1);
+  });
   it("atomically stores original, attribution and photo, with exact money and same-ID replay", async () => {
     const draft = await client.beginCapture();
     const form = await input();
