@@ -8,6 +8,9 @@ import {
   handleAuth,
   COOKIE as ATTENDANT_COOKIE,
 } from "../../src/server/modules/auth/http";
+import { processMail } from "../../src/server/modules/admin-access/mail";
+import { adminConfig } from "../../src/server/modules/admin-access/config";
+import { digest } from "../../src/server/modules/auth/crypto";
 import { handleAdmin } from "../../src/server/modules/admin-access/http";
 
 const origin = "https://station.example.test";
@@ -60,13 +63,16 @@ async function call(
     key?: string;
     query?: string;
     origin?: string;
+    ip?: string;
   } = {},
 ) {
   const method =
     options.method ?? (options.body === undefined ? "GET" : "POST");
   const headers = new Headers({
     origin: options.origin ?? origin,
-    "x-test-ip": `10.20.${Math.floor(ipCounter / 250)}.${(ipCounter++ % 250) + 1}`,
+    "x-test-ip":
+      options.ip ??
+      `10.20.${Math.floor(ipCounter / 250)}.${(ipCounter++ % 250) + 1}`,
   });
   if (options.cookie) headers.set("cookie", options.cookie);
   if (options.body !== undefined)
@@ -145,6 +151,41 @@ async function account(
     roleId,
     cookie: await login(username),
   };
+}
+async function mailFor(email: string, subject: string) {
+  let token: string | undefined;
+  let found = false;
+  for (let attempt = 0; attempt < 60 && !found; attempt++) {
+    const result = await processMail(pool, adminConfig(), async (message) => {
+      if (message.to === email && message.subject === subject) {
+        found = true;
+        token = message.text.match(/#token=([a-zA-Z0-9_-]+)/)?.[1];
+      }
+      return { delivered: true };
+    });
+    if (!result.processed && found) break;
+  }
+  expect(found, `Expected fictional ${subject} delivery`).toBe(true);
+  return token;
+}
+async function verification(actor: Awaited<ReturnType<typeof account>>) {
+  const version = (
+    await pool.query("SELECT version FROM admin WHERE id=$1", [actor.adminId])
+  ).rows[0].version;
+  const requested = await call("verification-requests", {
+    cookie: ownerCookie,
+    target: actor.adminId,
+    body: { operationId: newId(), expectedVersion: version },
+  });
+  expect(requested.response.status, JSON.stringify(requested.body)).toBe(202);
+  return (await mailFor(actor.email, "Verify your email"))!;
+}
+async function reset(actor: Awaited<ReturnType<typeof account>>) {
+  const requested = await call("password-reset-requests", {
+    body: { email: actor.email },
+  });
+  expect(requested.response.status).toBe(202);
+  return (await mailFor(actor.email, "Reset your password"))!;
 }
 const reason = "Fictional access test";
 
@@ -534,6 +575,250 @@ describe("independent M2 admin access adversarial checks", () => {
     });
     expect(edited.response.status).toBe(409);
     expect(edited.body.error.code).toBe("protected_owner");
+  });
+
+  it("I-12 public recovery responses and same-key dedup reveal no account state", async () => {
+    const verified = await account(await role([]), { verified: true });
+    const unverified = await account(await role([]));
+    const bodies = [];
+    for (const email of [
+      verified.email,
+      unverified.email,
+      "absent@example.com",
+    ]) {
+      const result = await call("password-reset-requests", { body: { email } });
+      expect(result.response.status).toBe(202);
+      bodies.push(result.body.data);
+    }
+    expect(bodies[0]).toEqual(bodies[1]);
+    expect(bodies[1]).toEqual(bodies[2]);
+    const key = newId(),
+      ip = "10.99.1.1";
+    const before = Number(
+      (await pool.query("SELECT count(*) AS n FROM admin_reset_work")).rows[0]
+        .n,
+    );
+    for (const email of [verified.email, verified.email, unverified.email])
+      expect(
+        (await call("password-reset-requests", { body: { email }, key, ip }))
+          .response.status,
+      ).toBe(202);
+    expect(
+      Number(
+        (await pool.query("SELECT count(*) AS n FROM admin_reset_work")).rows[0]
+          .n,
+      ) - before,
+    ).toBe(1);
+  });
+
+  it("I-12 verification inspect is read-only, purpose-bound and concurrent consumption succeeds once", async () => {
+    const actor = await account(await role([]));
+    const token = await verification(actor);
+    const before = (
+      await pool.query(
+        "SELECT consumed_at FROM verification_challenge WHERE secret_hash=$1",
+        [digest(token)],
+      )
+    ).rows[0];
+    expect(before.consumed_at).toBeNull();
+    for (let i = 0; i < 2; i++) {
+      const inspected = await call("email-verification-inspect", {
+        body: { token },
+      });
+      expect(inspected.response.status).toBe(200);
+      expect(inspected.body.data.email).toBe(actor.email);
+    }
+    expect(
+      (
+        await pool.query("SELECT email_verified_at FROM admin WHERE id=$1", [
+          actor.adminId,
+        ])
+      ).rows[0].email_verified_at,
+    ).toBeNull();
+    const wrongPurpose = await call("password-reset-inspect", {
+      body: { token },
+    });
+    expect(wrongPurpose.response.status).toBe(422);
+    expect(wrongPurpose.body.error.code).toBe("link_unavailable");
+    const consumed = await Promise.all(
+      [1, 2].map(() => call("email-verification-confirm", { body: { token } })),
+    );
+    expect(
+      consumed.filter((result) => result.response.status === 200),
+    ).toHaveLength(1);
+    expect(
+      consumed.filter(
+        (result) => result.body.error?.code === "link_unavailable",
+      ),
+    ).toHaveLength(1);
+    expect(
+      (await call("email-verification-inspect", { body: { token } })).response
+        .status,
+    ).toBe(422);
+    const serialized = JSON.stringify(
+      (
+        await pool.query(
+          "SELECT to_jsonb(c) AS row FROM verification_challenge c WHERE user_id=$1",
+          [actor.userId],
+        )
+      ).rows,
+    );
+    expect(serialized).not.toContain(token);
+  });
+
+  it("I-12 resend invalidates earlier links and current address and expiry remain authoritative", async () => {
+    const actor = await account(await role([]));
+    const first = await verification(actor);
+    const second = await verification(actor);
+    expect(
+      (await call("email-verification-confirm", { body: { token: first } }))
+        .body.error.code,
+    ).toBe("link_unavailable");
+    await pool.query("UPDATE admin SET email_normalized=$2 WHERE id=$1", [
+      actor.adminId,
+      `changed.${newId()}@example.com`,
+    ]);
+    expect(
+      (await call("email-verification-inspect", { body: { token: second } }))
+        .body.error.code,
+    ).toBe("link_unavailable");
+    const expiring = await account(await role([]));
+    const expiredToken = await verification(expiring);
+    await pool.query(
+      "UPDATE verification_challenge SET expires_at=clock_timestamp() WHERE secret_hash=$1",
+      [digest(expiredToken)],
+    );
+    for (const action of [
+      "email-verification-inspect",
+      "email-verification-confirm",
+    ])
+      expect(
+        (await call(action, { body: { token: expiredToken } })).body.error.code,
+      ).toBe("link_unavailable");
+  });
+
+  it("I-12 reset consumes once, revokes every session and queues a secret-free security notification", async () => {
+    const actor = await account(await role([]), { verified: true });
+    const secondSession = await login(actor.username);
+    const token = await reset(actor);
+    const nextPassword = randomBytes(24).toString("hex");
+    const input = {
+      token,
+      newPassword: nextPassword,
+      confirmPassword: nextPassword,
+    };
+    const results = await Promise.all(
+      [1, 2].map(() => call("password-reset-confirm", { body: input })),
+    );
+    expect(
+      results.filter((result) => result.response.status === 200),
+    ).toHaveLength(1);
+    expect(
+      results.filter(
+        (result) => result.body.error?.code === "link_unavailable",
+      ),
+    ).toHaveLength(1);
+    for (const cookie of [actor.cookie, secondSession])
+      expect((await call("session", { cookie })).response.status).toBe(401);
+    expect(
+      results.find((result) => result.response.status === 200)!.cookie,
+    ).toBeUndefined();
+    await login(actor.username, nextPassword);
+    expect(
+      await mailFor(actor.email, "Your password was changed"),
+    ).toBeUndefined();
+    const audit = JSON.stringify(
+      (
+        await pool.query(
+          "SELECT * FROM admin_access_event WHERE target_id=$1",
+          [actor.adminId],
+        )
+      ).rows,
+    );
+    for (const privateValue of [actor.email, password, nextPassword, token])
+      expect(audit).not.toContain(privateValue);
+    const invalid = await call("password-reset-confirm", {
+      body: { token, newPassword: "short", confirmPassword: "mismatch" },
+    });
+    expect(invalid.body.error.code).toBe("link_unavailable");
+  });
+
+  it("I-12 uncertain mail delivery revokes its challenge and cannot be reconstructed on retry", async () => {
+    const actor = await account(await role([]));
+    expect(
+      (
+        await call("verification-requests", {
+          cookie: ownerCookie,
+          target: actor.adminId,
+          body: { operationId: newId(), expectedVersion: 1 },
+        })
+      ).response.status,
+    ).toBe(202);
+    let uncertainToken: string | undefined;
+    for (let attempt = 0; attempt < 60 && !uncertainToken; attempt++)
+      await processMail(pool, adminConfig(), async (message) => {
+        if (message.to === actor.email) {
+          uncertainToken = message.text.match(/#token=([a-zA-Z0-9_-]+)/)?.[1];
+          throw new Error(
+            "Fictional provider disconnected after accepting message",
+          );
+        }
+        return { delivered: true };
+      });
+    expect(uncertainToken).toBeTruthy();
+    expect(
+      (
+        await call("email-verification-confirm", {
+          body: { token: uncertainToken },
+        })
+      ).body.error.code,
+    ).toBe("link_unavailable");
+    let repeated = false;
+    await processMail(pool, adminConfig(), async (message) => {
+      if (message.to === actor.email) repeated = true;
+      return { delivered: true };
+    });
+    expect(repeated).toBe(false);
+    const row = (
+      await pool.query(
+        "SELECT status,failure_code FROM mail_request WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 1",
+        [actor.adminId],
+      )
+    ).rows[0];
+    expect(row).toMatchObject({
+      status: "failed",
+      failure_code: "delivery_failed",
+    });
+  });
+
+  it("I-09/I-12 disabling then reenabling an admin never restores its old recovery link", async () => {
+    const actor = await account(await role([]), { verified: true });
+    const token = await reset(actor);
+    for (const enabled of [false, true]) {
+      const version = (
+        await pool.query("SELECT version FROM admin WHERE id=$1", [
+          actor.adminId,
+        ])
+      ).rows[0].version;
+      const result = await call("users-access", {
+        cookie: ownerCookie,
+        target: actor.adminId,
+        method: "PATCH",
+        body: {
+          operationId: newId(),
+          expectedVersion: version,
+          roleId: actor.roleId,
+          expectedRoleVersion: 1,
+          enabled,
+          reason,
+        },
+      });
+      expect(result.response.status, JSON.stringify(result.body)).toBe(200);
+      expect(
+        (await call("password-reset-inspect", { body: { token } })).body.error
+          .code,
+      ).toBe("link_unavailable");
+    }
   });
 
   it("I-08 two concurrent Owner self-demotions leave exactly one active Owner", async () => {
