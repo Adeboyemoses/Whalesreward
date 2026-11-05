@@ -1,4 +1,9 @@
-export type EmailMessage = { to: string; subject: string; text: string };
+export type EmailMessage = {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+};
 export type EmailOptions = { adapter: "noop" | "mailpit"; mailpitUrl?: string };
 /** Mailpit is local only. No provider SDK or real delivery activation exists. */
 export async function sendEmail(
@@ -23,6 +28,7 @@ export async function sendEmail(
       To: [{ Email: message.to }],
       Subject: message.subject,
       Text: message.text,
+      HTML: message.html,
     }),
     signal: AbortSignal.timeout(10000),
   });

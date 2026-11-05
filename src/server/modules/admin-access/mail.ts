@@ -10,6 +10,7 @@ import { resetMessage } from "../../../shared/contracts/admin";
 import { ADMIN_POLICY, type AdminConfig } from "./config";
 import { transaction, audit, revoke } from "./repo";
 import { validatePassword } from "./sessions";
+import { accessEmail } from "./templates";
 type Purpose = "verify_email" | "reset_password";
 export const targetDigest = (config: AdminConfig, email: string) =>
   hmac(config.secret, "admin-email-v1", email);
@@ -245,22 +246,15 @@ export async function processMail(
   if (!task) return { processed: false };
   let delivered = false;
   try {
-    const path =
-      task.purpose === "verify_email" ? "verify-email" : "reset-password";
     delivered = (
-      await send({
-        to: task.email,
-        subject:
-          task.purpose === "reset_notice"
-            ? "Your password was changed"
-            : task.purpose === "verify_email"
-              ? "Verify your email"
-              : "Reset your password",
-        text:
-          task.purpose === "reset_notice"
-            ? "Your Whales Rewards password was changed. Contact your station owner if you did not make this change."
-            : `${config.origin}/admin/${path}#token=${task.token}`,
-      })
+      await send(
+        accessEmail({
+          purpose: task.purpose,
+          email: task.email,
+          origin: config.origin,
+          token: task.token,
+        }),
+      )
     ).delivered;
   } catch {
     /* Provider details never enter logs/audit. */
