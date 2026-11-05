@@ -27,17 +27,26 @@ rank() { case "$1" in docs) echo 0;; low) echo 1;; medium) echo 2;; high) echo 3
 routing="$(bash "$here/required-reviewers.sh" "$base...$head")" || { echo "validate-evidence: routing failed" >&2; exit 2; }
 need_tier="$(printf '%s\n' "$routing" | sed -n 's/^tier=//p')"
 need_reviewers="$(printf '%s\n' "$routing" | sed -n 's/^reviewers=//p')"
-if [ "$need_tier" = "docs" ]; then
-  echo "validate-evidence: docs-only change, no evidence needed"; exit 0
-fi
-
 # 2. The evidence file at head.
 safe="$(printf '%s' "$branch" | sed 's#/#__#g')"
 path=".review/$safe.md"
 if ! body="$(git show "$head:$path" 2>/dev/null)"; then
+  if [ "$need_tier" = "docs" ]; then
+    echo "validate-evidence: docs-only change, no evidence needed"; exit 0
+  fi
   echo "validate-evidence: FAIL: $path is missing at $head (tier $need_tier needs evidence)" >&2
   printf '%s\n' "$routing" | sed -n 's/^# /  /p' >&2
   exit 1
+fi
+
+# Docs-only routing may still carry evidence that explicitly raises the tier.
+if [ "$need_tier" = "docs" ]; then
+  declared_tier="$(printf '%s\n' "$body" | awk 'NR==1 && $0!="---"{exit} NR==1{next} $0=="---"{exit} /^tier:/ {sub(/^tier:[ ]*/,""); sub(/[ ]+#.*$/,""); print; exit}')"
+  if [ "$(rank "$declared_tier")" -lt 1 ]; then
+    echo "validate-evidence: docs-only change, no evidence needed"; exit 0
+  fi
+  need_reviewers="code-reviewer"
+  [ "$declared_tier" = "medium" ] && need_reviewers="code-reviewer security-reviewer"
 fi
 
 front="$(printf '%s\n' "$body" | awk 'NR==1 && $0!="---"{exit} NR==1{next} $0=="---"{exit} {print}')"
@@ -76,6 +85,13 @@ ev_branch="$(val branch)"
 ev_tier="$(val tier)"
 if [ "$(rank "$ev_tier")" -lt 1 ]; then err "tier '$ev_tier' is not low, medium or high"
 elif [ "$(rank "$ev_tier")" -lt "$(rank "$need_tier")" ]; then err "tier $ev_tier is below the computed minimum $need_tier"; fi
+# A feature PR cannot bundle shared READY/close records. Disable rename detection
+# so both the old and new paths count, including removals and renames out of records.
+if [ "$(rank "$ev_tier")" -ge 1 ]; then
+  records="$(git -c core.quotePath=false diff --no-renames --name-only "$base...$head" -- \
+    STATUS.md docs/engineering/coverage-map.md ':(glob)docs/agentic/lanes/*.md')"
+  [ -z "$records" ] || err "feature PR must not change shared records: $(echo $records); the EM updates them in a separate docs-only READY or close records PR after the feature PR merges"
+fi
 # The evidence may raise the tier: required reviewers follow the higher tier.
 if [ "$ev_tier" = "high" ]; then need_reviewers="code-reviewer security-reviewer integrity-reviewer"; fi
 

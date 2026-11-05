@@ -5,6 +5,8 @@ description: "Use when a Whales Rewards branch is ready for review: compute the 
 
 # Review and evidence
 
+A feature PR never changes `STATUS.md`, `docs/engineering/coverage-map.md` or `docs/agentic/lanes/*.md`; the EM updates them only in the READY or close records PR after the feature PR merges.
+
 1. `git diff --stat origin/staging...<branch>`: check for stray files, `node_modules`, stale-base deletions.
 2. `bash scripts/review/required-reviewers.sh origin/staging...<branch>` → tier, reviewers, round cap. You may raise the tier; never lower it.
 3. Re-run the gates yourself in the builder's worktree and keep the last lines of output.

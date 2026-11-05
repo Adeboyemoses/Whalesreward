@@ -70,9 +70,11 @@ Until a staging environment exists on DigitalOcean (milestone M5), "on staging" 
 
 ## Slice rules
 
+- A feature PR never changes `STATUS.md`, `docs/engineering/coverage-map.md` or `docs/agentic/lanes/*.md`; the EM updates them only in the READY or close records PR after the feature PR merges.
+
 - **One PR per coherent slice**, not one per issue.
 - **Saved plan (high tier).** Before dispatching the builder, commit the `plan:` block (goal, files, approach, tests, risks; one line each, 15 lines at most) in `.review/<branch>.md`. Reviewers check the diff against it.
 - **Escape-to-test.** A fix for a bug that escaped (found in Earl's smoke test or after merge) ships with a test that fails without the fix, plus a one-line gotcha in the agent file that should have caught it. The PR body says `escape: <where found> · <test name>`.
-- **Invariant-to-test.** A PR that implements an invariant from `docs/engineering/invariants.md` names its test in the coverage map.
+- **Invariant-to-test.** When a PR implements an invariant from `docs/engineering/invariants.md`, its subsequent records PR names the test in the coverage map.
 - **Dispatch count.** One subagent call (builder, reviewer or test-engineer, including re-runs) is one dispatch. Record `dispatches: N` in the evidence. Flag a PR in the lane file when it passes 4 dispatches (low and medium) or 8 (high).
 - **Smoke runbook first.** For user-facing work orders, write `docs/qa/smoke-<date>-<slug>.md` at the start: numbered steps Earl can follow on a phone, each with the expected result and the board ID it should match.

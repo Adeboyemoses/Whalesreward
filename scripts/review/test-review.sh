@@ -168,7 +168,8 @@ else bad "valid high evidence should pass: $(bash scripts/review/validate-eviden
 git branch high-plan-case
 git checkout -q staging
 echo updated-on-staging >> README.md
-git add README.md && git commit -qm unrelated-staging-change
+echo staging-record > STATUS.md
+git add README.md STATUS.md && git commit -qm unrelated-staging-change
 git checkout -q core/WHR-21-accept
 git merge -q --no-edit staging || exit 2
 out="$(bash scripts/review/validate-evidence.sh --base staging --head HEAD --branch core/WHR-21-accept 2>&1)"
@@ -204,6 +205,54 @@ git checkout -q -b docs/WHR-30-notes base-ref
 mkdir -p docs && echo note > docs/x.md && git add docs && git commit -qm docs
 bash scripts/review/validate-evidence.sh --base base-ref --head HEAD --branch docs/WHR-30-notes >/dev/null 2>&1
 [ $? -eq 0 ] && ok || bad "docs-only should pass without evidence"
+
+# Shared records belong in a separate docs-only READY or close PR.
+git checkout -q -b records-fixture base-ref
+mkdir -p docs/engineering docs/agentic/lanes
+echo old > STATUS.md
+echo old > docs/engineering/coverage-map.md
+echo old > docs/agentic/lanes/core.md
+git add STATUS.md docs/engineering/coverage-map.md docs/agentic/lanes/core.md
+git commit -qm records-fixture
+git branch records-base
+
+record_case=0
+expect_record_rejection() { # operation path [docs-only]
+  record_case=$((record_case + 1))
+  git checkout -q -b "records-case-$record_case" records-base
+  case "$1" in
+    update) echo updated >> "$2"; git add "$2";;
+    remove) git rm -q "$2";;
+    rename) git mv "$2" docs/archived-record.md;;
+  esac
+  if [ "${3:-}" != docs-only ]; then
+    mkdir -p src/ui
+    echo 'export const label = "Ready"' > src/ui/Label.tsx
+    git add src/ui/Label.tsx
+  fi
+  git commit -qm record-change
+  code_sha="$(git rev-parse --short HEAD)"
+  write_ev low "  code-reviewer: PASS" "{P0-OPEN: 0, SEC-HIGH-OPEN: 0}" ""
+  out="$(bash scripts/review/validate-evidence.sh --base records-base --head HEAD --branch app/WHR-10-ui 2>&1)"
+  status=$?
+  [ "$status" -eq 1 ] && printf '%s\n' "$out" | grep -Fq "feature PR must not change shared records: $2" && ok || bad "$1 $2 with feature evidence should fail clearly: $out"
+}
+expect_record_rejection update STATUS.md
+expect_record_rejection update docs/engineering/coverage-map.md
+expect_record_rejection update docs/agentic/lanes/core.md
+expect_record_rejection remove STATUS.md
+expect_record_rejection rename docs/agentic/lanes/core.md
+expect_record_rejection update docs/engineering/coverage-map.md docs-only
+
+# All three shared record categories remain allowed without feature evidence.
+git checkout -q -b docs/records records-base
+echo ready >> STATUS.md
+echo ready >> docs/engineering/coverage-map.md
+echo ready >> docs/agentic/lanes/core.md
+git add STATUS.md docs/engineering/coverage-map.md docs/agentic/lanes/core.md
+git commit -qm ready-records
+out="$(bash scripts/review/validate-evidence.sh --base records-base --head HEAD --branch docs/records 2>&1)"
+[ $? -eq 0 ] && ok || bad "docs-only records should pass: $out"
 
 echo "review gate self-test: $pass passed, $failn failed"
 [ "$failn" -eq 0 ]
