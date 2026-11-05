@@ -51,3 +51,5 @@ The macOS browser sandbox launch limitation was resolved using a local Docker Ch
 EM gates: typecheck, lint, unit tests, production build and timezone tests passed. The browser gate ran with two workers inside the local Linux runner, using the same source with separate Linux dependencies/build output and an isolated fictional fixture database. No cloud operation occurred.
 
 Permanent-error regression: after photo_invalid, leave and reopen the receipt. Needs attention and manager help remain, the original/photo/finalize request remain intact, and manual/foreground retries issue no new write. An authoritative terminal result may resolve the state. This is covered by sync.test.ts and the browser rejected-photo scenario.
+
+Final-head browser note: full runs had 66 passes, two timing-sensitive failures and four existing staging-only skips. Both last-failed cases passed unchanged on the first targeted rerun attempt. WHR-60 tracks synchronizing the partial-upload and expired-PUT fixtures before full navigation; no tests were disabled. GitHub CI must be green before the staging merge.

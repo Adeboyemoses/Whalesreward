@@ -198,7 +198,7 @@ The FIX aligns the managed `pg` cluster and private bucket with Rook's console r
 
 Client scope reaches READY on the reviewed green staging merge of app/wo-3-uploads. Earl explicitly approved WHR-7 on 5 November 2026 and directed contract-shaped fakes behind the typed adapter, stopping at READY. WHR-5 remains READY pending Earl's phone smoke; no acceptance is inferred.
 
-EM verification: typecheck, lint, 107 unit tests, production build, 68 passing Playwright checks with four existing staging-only skips, and 3 time tests under each timezone. Independent report [upload-sync-fidelity.md](../qa/upload-sync-fidelity.md) covers A04/A08/A23/A14/A16 at 390/360 px, ten screenshots. The eight capture scenarios have passing evidence after a fixture-only timing correction. Existing WHR-45 formatting drift remains accepted and tracked. Runbook: [smoke-2026-11-05-upload-sync.md](../qa/smoke-2026-11-05-upload-sync.md).
+EM verification: typecheck, lint, 107 unit tests, production build, 66 passing Playwright checks plus two unchanged targeted rerun passes, with four existing staging-only skips (WHR-60 tracks the timing flakes), and 3 time tests under each timezone. Independent report [upload-sync-fidelity.md](../qa/upload-sync-fidelity.md) covers A04/A08/A23/A14/A16 at 390/360 px, ten screenshots. The eight capture scenarios have passing evidence after a fixture-only timing correction. Existing WHR-45 formatting drift remains accepted and tracked. Runbook: [smoke-2026-11-05-upload-sync.md](../qa/smoke-2026-11-05-upload-sync.md).
 
 | Client responsibility | Evidence | Status |
 |---|---|---|
@@ -208,3 +208,6 @@ EM verification: typecheck, lint, 107 unit tests, production build, 68 passing P
 | Preserve atomic originals and evidence, generic-only HTTP cache; I-23/I-49/I-50 | retained offline-capture.spec.ts, sync.test.ts, sync-api.test.ts | on-staging on reviewed merge |
 
 Broader invariant and board rows remain building where real upload endpoint validation, server credit/review or physical phone acceptance is still required. These tests demonstrate client behavior against M1, not server exactly-once enforcement or private production storage. WO-core-4 supplies those endpoints. No blob purge, history, correction or cloud work is included.
+## Accepted operational closeout, 5 November 2026
+
+Earl accepted WHR-28 FIX and WO-core-1d (WHR-53) explicitly. WHR-28 source/runbook FIX is accepted through merged PR #32; WHR-53 routing enforcement is accepted through merged PR #33 (review44/44, guard94/94, five CI checks green, independent code/security/integrity PASS). This records acceptance of those delivered slices, not new cloud operations, completed I-48, or full board parity. WHR-58 provider assurance remains separate. Work orders move to Done after this docs-only closeout merges.
