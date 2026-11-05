@@ -61,7 +61,12 @@ export function adminConfig(): AdminConfig {
   const raw = process.env.WHR_ADMIN_RECEIPT_KEYS;
   let receiptKeys: Record<string, string> | undefined;
   if (raw) {
-    const parsed: unknown = JSON.parse(raw);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error("Receipt key configuration unavailable");
+    }
     if (
       !parsed ||
       typeof parsed !== "object" ||
