@@ -24,7 +24,7 @@ p1:
   - fixed Stay signed in and navigation cancel delayed logout intent
   - fixed cancelled rows show their authoritative reason
   - fixed nonterminal receipt refresh preserves permanent photo rejection
-tickets: [WHR-45]
+tickets: [WHR-45, WHR-60]
 ---
 
 Offline, frontend and test-engineer builders worked in isolated worktrees.
@@ -38,5 +38,7 @@ EM typecheck/lint/build and 107 unit tests pass; time suites pass 3 UTC and 3 Am
 Full browser result is recorded in docs/qa/smoke-2026-11-05-upload-sync.md and on WHR-7.
 Independent fidelity report covers five boards at 390/360 px; ten screenshots, no new blockers.
 WHR-45 is the existing accepted quantity trailing-zero presentation follow-up.
+WHR-60 tracks a P2 browser fixture race: full navigation can precede failed PUT lease release.
+One rerun had 66 passes/2 failures/4 skips; unchanged targeted cases passed both projects.
 M1 fake responses remain test-only; real upload endpoints and Android acceptance remain pending.
 No schema migration, automatic evidence deletion, cloud operation, history or correction work.
