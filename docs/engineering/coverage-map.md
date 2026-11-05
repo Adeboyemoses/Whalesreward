@@ -127,11 +127,11 @@ Earl accepted WO-core-2 on 4 November 2026. Database constraints and pure helper
 | Row | Boards | Work order | Parity check | Status |
 |---|---|---|---|---|
 | Attendant 1 · Sign in and account | A01 A26 A12 A13 | WO-app-2, WO-core-3 | offline-capture-fidelity.md (client); upload-sync.spec.ts (upload-first behavior only) | building |
-| Attendant 2 · Record a sale (online) | A02 A24 A03 A04 | WO-app-2, WO-app-3 | offline-capture-fidelity.md (A02/A24/A03); upload-sync-fidelity.md (A04) | on-staging; phone smoke pending |
+| Attendant 2 · Record a sale (online) | A02 A24 A03 A04 | WO-app-2, WO-app-3 | offline-capture-fidelity.md (A02/A24/A03); upload-sync-fidelity.md (A04) | accepted M1 phone scope; see closeout below |
 | Attendant 3 · Offline sale and uploads | A27 A05 A08 A23 A14 | WO-app-2, WO-app-3, WO-app-8 | offline-capture-fidelity.md (A27/A05); upload-sync-fidelity.md (A08/A23/A14) | on-staging; price resolution remains later scope |
 | Attendant 4 · Register a customer | A06 A25 A07 | WO-app-6 | | todo |
 | Attendant 5 · History and own correction | A09 A10 A11 | WO-app-7 | | todo |
-| Attendant 6 · Cooking gas sale | A15 A16 | WO-app-2, WO-app-3 | offline-capture-fidelity.md (A15); upload-sync-fidelity.md (A16) | on-staging; phone smoke pending |
+| Attendant 6 · Cooking gas sale | A15 A16 | WO-app-2, WO-app-3 | offline-capture-fidelity.md (A15); upload-sync-fidelity.md (A16) | accepted M1 phone scope; see closeout below |
 | Attendant 7 · Pump reassignment | A17 | WO-app-5 | | todo |
 | Attendant 8 · Offline access expired | A18 | WO-app-2 | offline-capture-fidelity.md; offline-capture.spec.ts | on-staging |
 | Attendant 9 · Admin-assisted recovery | A19 A20 A21 A22 | WO-app-9 | | todo |
@@ -270,19 +270,27 @@ Additional named regressions in `admin-access-adversarial.test.ts`: `I-07/I-10 a
 
 B01/B08–B18, M01/M02 and H01–H10 have backend support only. Admin board rows remain `todo` for WO-app-4 screen implementation/parity; no UI acceptance claimed. WHR-42/43 defaults remain proposed and centrally configured; production auth/delegation closed, staging no-op mail, automatic presets disabled. No live provider or cloud/staging-data operations. This separate records PR follows the feature merge; stop at READY after its green merge. WHR-63 is ACCEPTED/Done through #48 (82dfe65).
 
-## WO-app-3b phone-smoke READY (WHR-65)
+## WO-app-3b phone-smoke ACCEPTED (WHR-65)
 
 [PR #49](https://github.com/Adeboyemoses/Whalesreward/pull/49) merged and deployed at `d3481fc6e39dabe8ab5e087ee581b91d891f56ed`; health matched with db ok. Code/security/integrity PASS round2. These scoped regressions preserve the original strict rules; they do not mark broader board rows complete.
 
 | Invariant / boards | Evidence | Status |
 |---|---|---|
-| I-03, I-09: original 24-hour boundary and revocation | `tests/e2e/phone-smoke.spec.ts`: delayed revocation, exact expiry despite late success; `src/client/offline/client.test.ts`: late auth/permission/assignment denial retains original/photo and sticky lock | on-staging; READY |
-| I-06: account/context partition | `phone-smoke.spec.ts`: stale cross-account session response; retained upload/handover suite | on-staging; READY |
-| I-23: durable atomic capture independent of network | `phone-smoke.spec.ts`: held repeated lookup, stalled RSC, pending upload, two-second Save/next on 3G/offline; original/photo retained | on-staging; READY |
-| I-29: exact money and quantity | `phone-smoke.spec.ts`: PMS/gas blur/refocus and exact2000001kobo original; unchanged quantity semantics | on-staging; READY |
-| I-26: authoritative credit/reference | `phone-smoke.spec.ts`: pending, assigned and credited PMS/gas references; no false Synced or local credit | on-staging; READY |
-| I-49: generic-only shell cache | `phone-smoke.spec.ts`: actual service-worker stalled headers/body fallback;1200ms deadline; no API/personal cache | on-staging; READY |
+| I-03, I-09: original 24-hour boundary and revocation | `tests/e2e/phone-smoke.spec.ts`: delayed revocation, exact expiry despite late success; `src/client/offline/client.test.ts`: late auth/permission/assignment denial retains original/photo and sticky lock | on-staging; accepted WHR-65 scope |
+| I-06: account/context partition | `phone-smoke.spec.ts`: stale cross-account session response; retained upload/handover suite | on-staging; accepted WHR-65 scope |
+| I-23: durable atomic capture independent of network | `phone-smoke.spec.ts`: held repeated lookup, stalled RSC, pending upload, two-second Save/next on 3G/offline; original/photo retained | on-staging; accepted WHR-65 scope |
+| I-29: exact money and quantity | `phone-smoke.spec.ts`: PMS/gas blur/refocus and exact2000001kobo original; unchanged quantity semantics | on-staging; accepted WHR-65 scope |
+| I-26: authoritative credit/reference | `phone-smoke.spec.ts`: pending, assigned and credited PMS/gas references; no false Synced or local credit | on-staging; accepted WHR-65 scope |
+| I-49: generic-only shell cache | `phone-smoke.spec.ts`: actual service-worker stalled headers/body fallback;1200ms deadline; no API/personal cache | on-staging; accepted WHR-65 scope |
 | I-02, I-04, I-50: preserved capture/context/evidence boundaries | `phone-smoke.spec.ts`: original account/context/card/spend/photo digest retained after delayed lookup and next sale; existing offline/upload suites retained | on-staging; regression coverage |
 | A02, A03, A04, A05, A08, A16 | `tests/design-parity/phone-smoke/REPORT.md`: independent six-board comparison,12 screenshots at390/360px;48px targets/no overflow | scoped fidelity verified; existing WHR-45 differences separate |
 
-Final EM typecheck/lint/build and unit164 passed; browser94 passed/4 existing skips/zero retries. [Final CI](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42094998766): integration129, time3+3, browser94/4 existing skips/no flaky cases, storage1. [Baseline](../qa/phone-stall-baseline.md) measured real staging before edits: Save4145.2ms, next2021.9ms; the reported1–3minute wait was not reproduced. No deployed after-timings claimed. Earl/Rook superseded desktop after-timing work and instructed READY without Computer Use, with “physical Samsung acceptance pending Earl's rerun”. Rook's subsequent20:36UTC WHR-65 comment reports Earl's successful Samsung rerun without saved numeric timings. This session records that report and stops at READY; it does not close M1 or other work orders. [Runbook](../qa/smoke-2026-11-05-phone-stall.md). WHR-67 remains separate.
+Final EM typecheck/lint/build and unit164 passed; browser94 passed/4 existing skips/zero retries. [Final CI](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42094998766): integration129, time3+3, browser94/4 existing skips/no flaky cases, storage1. [Baseline](../qa/phone-stall-baseline.md) measured real staging before edits: Save4145.2ms, next2021.9ms; the reported1–3minute wait was not reproduced. No deployed after-timings claimed. Earl/Rook superseded desktop after-timing work; no further Computer Use. Rook's20:36UTC WHR-65 comment reports Earl's successful Samsung rerun without saved numeric timings. Earl subsequently explicitly authorized closing WHR-65, WHR-7 and WHR-5. [Runbook](../qa/smoke-2026-11-05-phone-stall.md). WHR-67 remains separate.
+
+## M1 app acceptance closeout (WHR-5, WHR-7, WHR-65)
+
+Earl accepted the Samsung rerun and explicitly instructed closure of all three work orders on5November2026. [Closeout PR #52](https://github.com/Adeboyemoses/Whalesreward/pull/52) follows merged feature PRs#28/#35/#49; Linear Done follows its reviewed green staging merge. M1 phone exit is accepted. This supersedes historical READY/pending-phone notes for these work orders; test/parity reports retain their original measurement scope. No new implementation, numeric after-timing or broader future board coverage is claimed.
+
+- WO-app-2 accepted scope: I-02/I-03/I-06/I-23/I-24/I-29/I-30/I-49/I-50 client capture boundaries; `offline-capture.spec.ts`, `client.test.ts`, `window.test.ts`;11-board `docs/qa/offline-capture-fidelity.md` (A01/A26/A12/A13/A02/A24/A03/A27/A05/A15/A18).
+- WO-app-3 accepted scope: I-06/I-22/I-23/I-26/I-27 and retained I-48/I-49/I-50 boundaries; `upload-sync.spec.ts`, `sync.test.ts`, `sync-api.test.ts`; five-board `docs/qa/upload-sync-fidelity.md` (A04/A08/A23/A16/A14 held state). Later review-resolution/history/correction scope remains deferred.
+- WO-app-3b accepted scope: the invariant and six-board regressions above; final combined evidence in `docs/qa/phone-smoke-regressions.md`. Original24-hour/revocation rules unchanged. WHR-45 and WHR-67 remain separate; WHR-60 is not closed by this record.

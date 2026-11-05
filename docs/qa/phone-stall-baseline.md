@@ -1,6 +1,6 @@
 # Phone-stall baseline investigation
 
-Part of WHR-65. Status: READY under Earl’s explicit handoff instruction below. The deployed baseline was measured before application edits. The reported 1–3 minute duration was not reproduced; the baseline client exceeded the two-second target under 3G as measured below.
+Part of WHR-65. Status: ACCEPTED by Earl; closeout under the instruction below. The deployed baseline was measured before application edits. The reported 1–3 minute duration was not reproduced; the baseline client exceeded the two-second target under 3G as measured below.
 
 ## Deployed observations, 5 November 2026
 
@@ -42,7 +42,7 @@ The cold reload visibly displayed “Checking access…” before the form. Sess
 - EM: 135 unit tests passed, 22 files.
 - Test-engineer: isolated Linux production build and four migrations passed; disposable local browser infrastructure prepared. No production, server or test source changes.
 
-The smoke runbook is `docs/qa/smoke-2026-11-05-phone-stall.md`. The original plan called for repeated desktop measurements after deployment; the READY handoff instruction below supersedes that requirement.
+The smoke runbook is `docs/qa/smoke-2026-11-05-phone-stall.md`. The original plan called for repeated desktop measurements after deployment; the accepted closeout instruction below supersedes that requirement.
 
 ## Implemented cause and verification
 
@@ -54,8 +54,10 @@ The other changes publish the checked durable session before background revalida
 
 The final combined verification is recorded in `phone-smoke-regressions.md`. The service-worker deadline is distinct from cold hydration: one controlled local test committed its fallback document within two seconds but displayed the complete receipt at 2250.3 ms. Save and next-sale retain their two-second end-to-end assertions.
 
-## READY handoff scope, 5 November 2026
+## Accepted phone rerun and closeout, 5 November 2026
 
-Earl instructed this session to post READY with deployed commit `d3481fc6e39dabe8ab5e087ee581b91d891f56ed` and the handoff caveat **“physical Samsung acceptance pending Earl's rerun”**, then stop. Rook's 20:21 UTC comment on [WHR-65](https://linear.app/phaneum/issue/WHR-65) supersedes the desktop after-timing requirement: do not use Computer Use for timings. No deployed after-performance marks or numeric Samsung timings are claimed. Automated Save/next assertions remain two seconds; Rook's M1 Phone Test page uses a separate three-second physical acceptance threshold for steps 8, 9, 10, 16 and 22.
+Earl explicitly instructed: “Earl accepted the phone rerun (see WHR-65). Close WO-app-3b (WHR-65), WO-app-3 (WHR-7) and WO-app-2 (WHR-5) through close-session, then stop.” This supersedes the earlier READY-only instruction and its “physical Samsung acceptance pending Earl's rerun” caveat.
 
-A subsequent 20:36 UTC comment on WHR-65 reports Earl's Samsung S25 acceptance: lag gone, faster capture, quick offline response and visible sale reference. It explicitly says results were not stored on the M1 Phone Test page; the in-session acceptance is the record. This is reported human acceptance, not an instrumented timing result. This session preserves the requested READY handoff and stops; it does not close WHR-65, WHR-5 or WHR-7 or declare M1 closed.
+Rook's 20:36 UTC comment on [WHR-65](https://linear.app/phaneum/issue/WHR-65) records Earl's Samsung S25 acceptance after PR #49: lag gone, faster capture, quick offline response and visible sale reference. Results were not stored on the M1 Phone Test page; Earl's in-session acceptance is the record. No numeric Samsung or deployed after-performance timings are claimed. Rook's prior instruction against Computer Use timings remains in force. Automated Save/next assertions remain two seconds; the separate M1 Phone Test page uses a three-second physical acceptance threshold.
+
+Deployed feature commit: `d3481fc6e39dabe8ab5e087ee581b91d891f56ed`, verified by health with `db: ok`. [Closeout PR #52](https://github.com/Adeboyemoses/Whalesreward/pull/52) records acceptance of all three work orders and the M1 phone exit; Linear moves them to Done after its reviewed green staging merge. No additional implementation or work order starts here.
