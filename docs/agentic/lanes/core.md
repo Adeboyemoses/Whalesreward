@@ -1,22 +1,21 @@
 # lane:core
-WO-core-4 (WHR-6): BUILD, 5 November 2026
+WO-core-4a (WHR-62) capped capture policy: READY on reviewed green staging merge, 5 November 2026
 
 ## In flight
-- Earl accepted WHR-28 FIX and WO-core-1d (WHR-53). Accepted closeout takes effect when this docs-only PR merges; both Linear issues then move to Done.
-- WHR-28 FIX: merged PR #32 (1e69ff9), managed cluster/bucket alignment, CORS and safe console instructions. Independent code/security/integrity PASS and five CI checks green. EM unit80/typecheck/lint/build PASS.
-- WHR-53: merged PR #33 (c7ede84), contracts/data model route high; review self-test44/44, guard94/94, unit80/typecheck/lint/build PASS, independent code/security/integrity PASS and five CI checks green.
-- Approved WO-core-4 begins against M1 plus WO-spec-3a: card lookup, durable sync, private staged evidence and exactly-once credit. P-18 stays in one server policy module. Plan committed before backend/test dispatch; independent three-role high-tier review follows.
+- WHR-6 ACCEPTED/Done: implementation #36, documentation closeout [#37](https://github.com/Adeboyemoses/Whalesreward/pull/37), merge 2b65d9b; all five CI checks green and independent code-reviewer PASS.
+- WHR-62 started only after dependency [#38](https://github.com/Adeboyemoses/Whalesreward/pull/38) merged at 5304f34. P-20 caps exact capture history at original offline expiry, keeps receipt-based upload deadlines and stores policy version 2 only for new settlements.
+- Named tests cover Monday outage, in-window holds, exact expiry microseconds and unchanged v1 held replay. Final EM verification, implementation PR and independent code/security/integrity verdicts are posted on WHR-62; evidence: .review/core__wo-4a-capture.md.
 
 ## Next
-- Finish only WO-core-4, paste named real-PostgreSQL/adversarial storage results, merge green staging PR and stop at READY.
+- STOP at READY after green staging merge and pasted verification. Earl reads the results; no next work order starts.
+- M3 capture review belongs to WO-core-9; no silent hold re-evaluation or backfill.
 
 ## Earl's gos
-- 2026-11-05: “Earl accepted the WHR-28 FIX and WO-core-1d (WHR-53); close both.”
-- 2026-11-05: “Take it to READY with the named tests' output pasted, then stop.”
+- 2026-11-05: “Earl accepted WO-core-4 (WHR-6); close it.”
+- 2026-11-05: “Wait until WO-spec-3b (WHR-61) is merged into staging, then implement it, take it to READY and stop.”
 
 ## Risks
-- WHR-58 provider ingress overwrite assurance remains separate; trusted header stays empty until confirmed.
-- Acceptance is not permission for cloud-resource or staging-data changes; no such operations performed.
-- Runtime model ID unavailable. Metrics at closeout preparation, before WO-core-4 implementation.
+- Q-528 client confirmation remains pending. WHR-58 remains separate. Automated local evidence does not claim physical-phone or live Spaces acceptance.
+- No cloud-resource, staging-data or main-branch operations.
 
-dispatches=0 prs=1 rounds_max=0 escalations=0 model=unavailable
+dispatches=5 prs=2 rounds_max=1 escalations=0 model=unavailable
