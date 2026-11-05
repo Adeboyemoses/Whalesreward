@@ -19,7 +19,7 @@ plan:
   risks: stale auth responses must never unlock access; original 24-hour anchor and queue ownership persist; no API caching or false credit; no server changes
 invariants: [I-02, I-03, I-04, I-06, I-09, I-23, I-26, I-29, I-49, I-50]
 p1: ["fixed Save-time lookup wait by retaining the request in the background with late-denial handling"]
-tickets: []
+tickets: [WHR-67]
 ---
 Measured staging before edits: 3G Save 4145.2 ms, next sale 2021.9 ms; session wait 2029.2 ms. The reported 1–3 minute duration was not reproduced.
 Local state now renders after durable access checks; authority requests continue in the background. Generic navigation fallback is 1200 ms, including stalled bodies. Capture navigation uses the shared client shell.
@@ -29,3 +29,5 @@ Frontend-engineer built amount/reference views; test-engineer supplied regressio
 EM final head: typecheck, lint, 159 unit tests, production build, three timezone tests in each timezone PASS. Full browser: 94 passed, four existing conditional skips, zero retries (7.2m). Guard self-tests: 94 passed.
 All three reviewers passed round 2 at reviewed_head. Worktree was clean and head unchanged after each review round. Dispatch count exceeds the high-tier flag and is recorded for the READY lane handoff.
 After-deployment performance marks and final READY records follow the green staging merge; physical Samsung acceptance remains Earl's rerun. No server, shared contract, lease duration, cloud resource, or production change.
+
+First CI passed all five checks but retried one existing handover fixture after competing sign-in navigations; P2 follow-up WHR-67 records it. An unrelated staging records update was merged without application/test changes; evidence remains valid.
