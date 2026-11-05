@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { hashPassword } from "better-auth/crypto";
 import { v7 } from "uuid";
 
@@ -50,4 +51,22 @@ export async function seedAdminCredentials(db, env = process.env) {
       await hashPassword(password),
     ],
   );
+}
+
+/** Configure only the initial INSERT, never an UPDATE of an existing admin.
+ * Call inside the seed transaction; the private setting expires on commit/rollback.
+ * @param {import("pg").Client} db
+ * @param {Record<string, string | undefined>} env
+ */
+export async function configureAdminSeedEmail(db, env = process.env) {
+  const raw = env.WHR_SEED_ADMIN_EMAIL;
+  const email = raw?.trim().toLowerCase();
+  if (
+    raw !== undefined &&
+    (env.WHR_ENV !== "staging" || !z.email().max(254).safeParse(email).success)
+  )
+    throw new Error("Staging admin email configuration is invalid");
+  await db.query("SELECT set_config('whr.seed_admin_email',$1,true)", [
+    email ?? "",
+  ]);
 }

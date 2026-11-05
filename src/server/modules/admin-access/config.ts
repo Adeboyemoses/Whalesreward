@@ -1,3 +1,4 @@
+import { emailConfig, type EmailOptions } from "../../adapters/email-config";
 import {
   permissionCodes,
   type PermissionCode,
@@ -52,7 +53,8 @@ export type AdminConfig = {
   origin: string;
   trustedIpHeader?: string;
   production?: boolean;
-  delivery?: "mailpit" | "noop";
+  delivery?: EmailOptions["adapter"];
+  email?: EmailOptions;
   mailpitUrl?: string;
   receiptKeys?: Record<string, string>;
   receiptKeyVersion?: string;
@@ -84,6 +86,7 @@ export function adminConfig(): AdminConfig {
   const receiptKeyVersion = process.env.WHR_ADMIN_RECEIPT_KEY_VERSION ?? "v1";
   if (receiptKeys && !receiptKeys[receiptKeyVersion])
     throw new Error("Current receipt key unavailable");
+  const email = emailConfig();
   return {
     ...authConfig(),
     receiptKeys,
@@ -91,7 +94,8 @@ export function adminConfig(): AdminConfig {
     production:
       process.env.WHR_ENV === "production" ||
       (!process.env.WHR_ENV && process.env.NODE_ENV === "production"),
-    delivery: process.env.WHR_ENV === "staging" ? "noop" : "mailpit",
+    delivery: email.adapter,
+    email,
     mailpitUrl: process.env.MAILPIT_URL ?? "http://127.0.0.1:8025",
   };
 }
