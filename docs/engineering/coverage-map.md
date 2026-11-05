@@ -242,3 +242,7 @@ EM final combined-base checks: typecheck, lint, 135 unit tests and production bu
 | Retained original/evidence and generic-only cache | offline-capture.spec.ts, sync.test.ts, sync-api.test.ts | I-23/I-48/I-49/I-50 client boundaries |
 
 READY is not acceptance. [Phone runbook](../qa/smoke-2026-11-05-upload-sync.md): staging HTTPS with actual private Spaces is primary, adb reverse fallback. Earl must manually cover partial photo failure and expired upload permission. WHR-60 is nonblocking by Earl's decision and must be diagnosed before M5; WHR-45 presentation drift remains separate. WO-core-4 endpoints are delivered, but this client fixture suite does not prove deployed storage or physical Android behavior. WHR-5 stays READY pending Earl's phone smoke. Stop; no next app work order.
+
+## WO-core-4a accepted closeout (WHR-62), 5 November 2026
+
+Earl accepted P-20 implementation in PR #39 (a1e674c). The named capped-interval, microsecond and unchanged-held-replay tests above are accepted: unit108, integration104, browser36 with4 existing conditional skips, time3 per timezone, and all five CI checks passed. No new product coverage or board parity is claimed by this records-only closeout.

@@ -19,6 +19,6 @@ WO-app-2 (WHR-5) Offline capture: READY; Earl's phone smoke pending
 ## Risks
 - Physical Android and deployed Spaces acceptance remain pending; fixtures and CI do not prove camera readability, eviction or TalkBack. Server endpoints are now delivered by WO-core-4; no cloud operation was performed here.
 - WHR-60 browser navigation/lease timing follow-up is nonblocking by Earl's decision, due before M5. WHR-45 quantity trailing-zero display remains separate.
-- Feature dispatch flag: 22 exceeds 8; builders/fixes and five review rounds, including two explicitly approved documentation rounds. READY records add one independent low-tier review.
+- Feature dispatch flag: 22 exceeds 8; builders/fixes and five review rounds, including two explicitly approved documentation rounds. READY records add two independent low-tier review rounds, including preserved concurrent core closeout.
 
-dispatches=23 prs=2 rounds_max=5 escalations=2 model=unknown
+dispatches=24 prs=2 rounds_max=5 escalations=2 model=unknown
