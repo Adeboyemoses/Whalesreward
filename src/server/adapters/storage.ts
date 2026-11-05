@@ -9,6 +9,7 @@ export interface EvidenceStorage {
   signPut(
     key: string,
     expiresAt: Date,
+    expectedBytes: number,
   ): Promise<{ url: string; headers: Record<string, string> }>;
   read(key: string, maxBytes: number): Promise<Buffer>;
   writeFinal(key: string, bytes: Buffer): Promise<void>;
@@ -58,20 +59,27 @@ export function createStorage(config: StorageConfig): EvidenceStorage {
     responseChecksumValidation: "WHEN_REQUIRED",
   });
   return {
-    async signPut(key, expiresAt) {
+    async signPut(key, expiresAt, expectedBytes) {
+      if (
+        !Number.isSafeInteger(expectedBytes) ||
+        expectedBytes <= 0 ||
+        expectedBytes > SYNC_LIMITS.maxBytes
+      )
+        throw new Error("Invalid upload byte limit");
       if (!key.startsWith("staging/"))
         throw new Error("Only staging writes may be signed");
       const command = new PutObjectCommand({
         Bucket: config.bucket,
         Key: key,
         ContentType: "image/jpeg",
+        ContentLength: expectedBytes,
       });
       const signed = await getSignedUrl(client, command, {
         expiresIn: SYNC_LIMITS.uploadSeconds,
         signingDate: new Date(
           expiresAt.getTime() - SYNC_LIMITS.uploadSeconds * 1000,
         ),
-        signableHeaders: new Set(["content-type"]),
+        signableHeaders: new Set(["content-type", "content-length"]),
       });
       return { url: signed, headers: { "Content-Type": "image/jpeg" } };
     },

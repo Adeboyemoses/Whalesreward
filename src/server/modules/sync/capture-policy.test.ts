@@ -3,7 +3,8 @@ import {
   evaluateCapturePolicy,
   type CapturePolicyInput,
 } from "./capture-policy";
-const at = (hours: number) => new Date(Date.UTC(2026, 10, 5, hours));
+const at = (hours: number) =>
+  (BigInt(Date.UTC(2026, 10, 5, hours)) * 1000n).toString();
 const fixture = (): CapturePolicyInput => ({
   signedInAt: at(1),
   receivedAt: at(2),
@@ -137,4 +138,57 @@ describe("P-18 bounded capture policy", () => {
     f.settings[0]!.uploadDeadline = at(1);
     expect(evaluateCapturePolicy(f).campaignEligible).toBe(false);
   });
+});
+
+// Every bound can carry all six PostgreSQL fractional digits. These intervals
+// intentionally fit inside ONE JS millisecond and must not collapse together.
+it("P-18 preserves price and authorization changes within a millisecond", () => {
+  const f = fixture();
+  f.signedInAt = "1793836800123000";
+  f.receivedAt = "1793836800123900";
+  f.prices = [
+    { effectiveFrom: "1793836800122000", rateKobo: "100000", currency: "NGN" },
+    { effectiveFrom: "1793836800123100", rateKobo: "110000", currency: "NGN" },
+  ];
+  f.assignment.effectiveFrom = "1793836800122000";
+  f.assignment.effectiveUntil = "1793836800123800";
+  expect(evaluateCapturePolicy(f).reasons).toEqual([
+    "capture_authorization_unresolved",
+    "price_uncertain",
+  ]);
+});
+it("P-18 preserves sign-in, revocation, offline and campaign microsecond bounds", () => {
+  const f = fixture();
+  f.signedInAt = "1793836800123100";
+  f.receivedAt = "1793836800123900";
+  f.prices = [
+    { effectiveFrom: "1793836800123000", rateKobo: "100000", currency: "NGN" },
+  ];
+  f.assignment.effectiveFrom = "1793836800123200";
+  f.contextRevokedAt = "1793836800123800";
+  f.offlineExpiresAt = "1793836800123900";
+  f.settings = [
+    {
+      effectiveFrom: "1793836800123000",
+      campaignId: "campaign",
+      purchaseStart: "1793836800123500",
+      purchaseCutoff: "1793836800123600",
+      uploadDeadline: "1793836800123900",
+    },
+  ];
+  expect(evaluateCapturePolicy(f).reasons).toEqual([
+    "capture_authorization_unresolved",
+    "capture_time_unresolved",
+  ]);
+  f.assignment.effectiveFrom = "1793836800123000";
+  f.contextRevokedAt = null;
+  f.offlineExpiresAt = "1793836800123901";
+  f.settings[0]!.purchaseStart = "1793836800123100";
+  f.settings[0]!.purchaseCutoff = "1793836800123900";
+  expect(evaluateCapturePolicy(f)).toEqual({
+    reasons: [],
+    campaignEligible: true,
+  });
+  f.settings[0]!.uploadDeadline = "1793836800123899";
+  expect(evaluateCapturePolicy(f).campaignEligible).toBe(false);
 });

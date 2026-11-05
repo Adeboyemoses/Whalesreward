@@ -1,23 +1,31 @@
 /** P-18 is provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
 export const CAPTURE_POLICY_VERSION = 1;
+/** Exact integer epoch microseconds from PostgreSQL EXTRACT, never a JS Date. */
+export type TrustedMicros = string;
+const micros = (value: TrustedMicros): bigint => BigInt(value);
+const compare = (a: TrustedMicros, b: TrustedMicros) =>
+  micros(a) < micros(b) ? -1 : micros(a) > micros(b) ? 1 : 0;
 export type PriceHistory = {
-  effectiveFrom: Date;
+  effectiveFrom: TrustedMicros;
   rateKobo: string;
   currency: string;
 };
 export type CampaignHistory = {
-  effectiveFrom: Date;
-  purchaseStart: Date | null;
-  purchaseCutoff: Date | null;
-  uploadDeadline: Date | null;
+  effectiveFrom: TrustedMicros;
+  purchaseStart: TrustedMicros | null;
+  purchaseCutoff: TrustedMicros | null;
+  uploadDeadline: TrustedMicros | null;
   campaignId: string | null;
 };
 export type CapturePolicyInput = {
-  signedInAt: Date;
-  receivedAt: Date;
-  offlineExpiresAt: Date;
-  contextRevokedAt: Date | null;
-  assignment: { effectiveFrom: Date; effectiveUntil: Date | null };
+  signedInAt: TrustedMicros;
+  receivedAt: TrustedMicros;
+  offlineExpiresAt: TrustedMicros;
+  contextRevokedAt: TrustedMicros | null;
+  assignment: {
+    effectiveFrom: TrustedMicros;
+    effectiveUntil: TrustedMicros | null;
+  };
   rateKobo: string;
   currency: string;
   prices: PriceHistory[];
@@ -31,23 +39,22 @@ export function evaluateCapturePolicy(
   input: CapturePolicyInput,
 ): CapturePolicyResult {
   const reasons = new Set<string>();
-  const s = input.signedInAt.getTime(),
-    r = input.receivedAt.getTime();
-  if (!Number.isFinite(s) || !Number.isFinite(r) || r < s)
+  const s = micros(input.signedInAt),
+    r = micros(input.receivedAt);
+  if (r < s)
     return { reasons: ["capture_history_incomplete"], campaignEligible: false };
   if (
-    input.assignment.effectiveFrom.getTime() > s ||
+    micros(input.assignment.effectiveFrom) > s ||
     (input.assignment.effectiveUntil !== null &&
-      input.assignment.effectiveUntil.getTime() <= r) ||
-    (input.contextRevokedAt !== null &&
-      input.contextRevokedAt.getTime() <= r) ||
-    input.offlineExpiresAt.getTime() <= r
+      micros(input.assignment.effectiveUntil) <= r) ||
+    (input.contextRevokedAt !== null && micros(input.contextRevokedAt) <= r) ||
+    micros(input.offlineExpiresAt) <= r
   )
     reasons.add("capture_authorization_unresolved");
   const prices = input.prices
-    .filter((p) => p.effectiveFrom.getTime() <= r)
-    .sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime());
-  const anchor = prices.findLastIndex((p) => p.effectiveFrom.getTime() <= s);
+    .filter((p) => micros(p.effectiveFrom) <= r)
+    .sort((a, b) => compare(a.effectiveFrom, b.effectiveFrom));
+  const anchor = prices.findLastIndex((p) => micros(p.effectiveFrom) <= s);
   if (anchor < 0) reasons.add("capture_history_incomplete");
   else if (
     prices
@@ -58,11 +65,11 @@ export function evaluateCapturePolicy(
   )
     reasons.add("price_uncertain");
   const settings = input.settings
-    .filter((p) => p.effectiveFrom.getTime() <= r)
-    .sort((a, b) => a.effectiveFrom.getTime() - b.effectiveFrom.getTime());
+    .filter((p) => micros(p.effectiveFrom) <= r)
+    .sort((a, b) => compare(a.effectiveFrom, b.effectiveFrom));
   let campaignEligible = false;
   if (settings.length) {
-    const index = settings.findLastIndex((p) => p.effectiveFrom.getTime() <= s);
+    const index = settings.findLastIndex((p) => micros(p.effectiveFrom) <= s);
     if (index < 0) reasons.add("capture_history_incomplete");
     else {
       const applicable = settings.slice(index);
@@ -79,15 +86,15 @@ export function evaluateCapturePolicy(
       for (const v of applicable) {
         if (
           v.purchaseStart &&
-          s < v.purchaseStart.getTime() &&
-          v.purchaseStart.getTime() <= r
+          s < micros(v.purchaseStart) &&
+          micros(v.purchaseStart) <= r
         )
           reasons.add("capture_time_unresolved");
         // Purchase cutoff is inclusive; any later instant crosses the end.
         if (
           v.purchaseCutoff &&
-          s <= v.purchaseCutoff.getTime() &&
-          v.purchaseCutoff.getTime() < r
+          s <= micros(v.purchaseCutoff) &&
+          micros(v.purchaseCutoff) < r
         )
           reasons.add("capture_time_unresolved");
       }
@@ -96,9 +103,9 @@ export function evaluateCapturePolicy(
         !!initial.purchaseStart &&
         !!initial.purchaseCutoff &&
         !!initial.uploadDeadline &&
-        s >= initial.purchaseStart.getTime() &&
-        r <= initial.purchaseCutoff.getTime() &&
-        r <= initial.uploadDeadline.getTime() &&
+        s >= micros(initial.purchaseStart) &&
+        r <= micros(initial.purchaseCutoff) &&
+        r <= micros(initial.uploadDeadline) &&
         !reasons.has("capture_time_unresolved");
     }
   }

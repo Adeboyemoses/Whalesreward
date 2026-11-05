@@ -17,31 +17,39 @@ export async function settle(
 ) {
   const ctx = (
     await db.query<{
-      signed_in_at: Date;
-      offline_expires_at: Date;
-      revoked_at: Date | null;
-      effective_from: Date;
-      effective_until: Date | null;
+      signed_in_at: string;
+      received_at: string;
+      offline_expires_at: string;
+      revoked_at: string | null;
+      effective_from: string;
+      effective_until: string | null;
     }>(
-      `SELECT c.signed_in_at,c.offline_expires_at,c.revoked_at,a.effective_from,a.effective_until FROM capture_context c JOIN assignment a ON a.id=c.assignment_id WHERE c.id=$1 AND c.attendant_id=$2 AND a.id=$3 FOR SHARE OF c,a`,
-      [p.capture_context_id, p.originating_attendant_id, p.assignment_id],
+      `SELECT (EXTRACT(EPOCH FROM c.signed_in_at)*1000000)::bigint::text AS signed_in_at,
+ (EXTRACT(EPOCH FROM p.server_received_at)*1000000)::bigint::text AS received_at,
+ (EXTRACT(EPOCH FROM c.offline_expires_at)*1000000)::bigint::text AS offline_expires_at,
+ (EXTRACT(EPOCH FROM c.revoked_at)*1000000)::bigint::text AS revoked_at,
+ (EXTRACT(EPOCH FROM a.effective_from)*1000000)::bigint::text AS effective_from,
+ (EXTRACT(EPOCH FROM a.effective_until)*1000000)::bigint::text AS effective_until
+ FROM capture_context c JOIN assignment a ON a.id=c.assignment_id JOIN purchase p ON p.id=$4
+ WHERE c.id=$1 AND c.attendant_id=$2 AND a.id=$3 FOR SHARE OF c,a`,
+      [p.capture_context_id, p.originating_attendant_id, p.assignment_id, p.id],
     )
   ).rows[0]!;
   const prices = (
     await db.query<PriceHistory>(
-      `SELECT effective_from AS "effectiveFrom",rate_kobo::text AS "rateKobo",currency FROM product_price_version WHERE station_id=$1 AND product_id=$2 AND effective_from<=$3 ORDER BY effective_from`,
-      [p.station_id, p.product_id, p.server_received_at],
+      `SELECT (EXTRACT(EPOCH FROM effective_from)*1000000)::bigint::text AS "effectiveFrom",rate_kobo::text AS "rateKobo",currency FROM product_price_version WHERE station_id=$1 AND product_id=$2 AND effective_from<=(SELECT server_received_at FROM purchase WHERE id=$3) ORDER BY effective_from`,
+      [p.station_id, p.product_id, p.id],
     )
   ).rows;
   const settings = (
     await db.query<CampaignHistory>(
-      `SELECT effective_from AS "effectiveFrom",purchase_start AS "purchaseStart",purchase_cutoff AS "purchaseCutoff",upload_deadline AS "uploadDeadline",campaign_id AS "campaignId" FROM settings_version WHERE station_id=$1 AND effective_from<=$2 ORDER BY effective_from`,
-      [p.station_id, p.server_received_at],
+      `SELECT (EXTRACT(EPOCH FROM effective_from)*1000000)::bigint::text AS "effectiveFrom",(EXTRACT(EPOCH FROM purchase_start)*1000000)::bigint::text AS "purchaseStart",(EXTRACT(EPOCH FROM purchase_cutoff)*1000000)::bigint::text AS "purchaseCutoff",(EXTRACT(EPOCH FROM upload_deadline)*1000000)::bigint::text AS "uploadDeadline",campaign_id AS "campaignId" FROM settings_version WHERE station_id=$1 AND effective_from<=(SELECT server_received_at FROM purchase WHERE id=$2) ORDER BY effective_from`,
+      [p.station_id, p.id],
     )
   ).rows;
   const policy = evaluateCapturePolicy({
     signedInAt: ctx.signed_in_at,
-    receivedAt: p.server_received_at,
+    receivedAt: ctx.received_at,
     offlineExpiresAt: ctx.offline_expires_at,
     contextRevokedAt: ctx.revoked_at,
     assignment: {
@@ -66,24 +74,27 @@ export async function settle(
     );
   if (!card || !p.customer_id)
     policy.reasons.push("capture_history_incomplete");
-  const links = (
+  const historical = (
     await db.query<{
-      linked_at: Date;
-      ended_at: Date | null;
       customer_id: string;
+      linked_before_signin: boolean;
+      ends_after_receipt: boolean;
     }>(
-      "SELECT linked_at,ended_at,customer_id FROM card_customer_link WHERE card_id=$1 ORDER BY linked_at FOR SHARE",
-      [p.card_id],
+      `SELECT l.customer_id,l.linked_at<=c.signed_in_at AS linked_before_signin,
+       (l.ended_at IS NULL OR l.ended_at>p.server_received_at) AS ends_after_receipt
+       FROM card_customer_link l JOIN purchase p ON p.id=$2
+       JOIN capture_context c ON c.id=p.capture_context_id
+       WHERE l.card_id=$1 AND l.linked_at<=p.server_received_at ORDER BY l.linked_at FOR SHARE OF l`,
+      [p.card_id, p.id],
     )
   ).rows;
-  const historical = links.filter((l) => l.linked_at <= p.server_received_at);
   if (
     historical.some((l) => l.customer_id !== p.customer_id) ||
     !historical.some(
       (l) =>
         l.customer_id === p.customer_id &&
-        l.linked_at <= ctx.signed_in_at &&
-        (l.ended_at === null || l.ended_at > p.server_received_at),
+        l.linked_before_signin &&
+        l.ends_after_receipt,
     )
   ) {
     if (!policy.reasons.includes("replaced_card"))
@@ -97,7 +108,7 @@ export async function settle(
  SELECT $1,id,1,$2,$3,payload_digest,'original',$4,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,$5,CASE WHEN $4='accepted' THEN $3::uuid ELSE NULL END,CASE WHEN $4='accepted' THEN 'Validated original sale' ELSE NULL END,CASE WHEN $4='accepted' THEN clock_timestamp() ELSE NULL END FROM purchase WHERE id=$6`,
     [
       revisionId,
-      operationId,
+      p.operation_id,
       userId,
       held ? "proposed" : "accepted",
       assetId,

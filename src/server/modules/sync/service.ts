@@ -93,8 +93,8 @@ export function createSyncService({
       if (p.status !== "received") return view(db, p);
       const linked = (
         await db.query<{ card_id: string; customer_id: string }>(
-          `SELECT c.id AS card_id,l.customer_id FROM card c JOIN card_customer_link l ON l.card_id=c.id WHERE c.code=$1 AND l.linked_at<=$2 ORDER BY l.linked_at DESC LIMIT 1`,
-          [p.card_code, p.server_received_at],
+          `SELECT c.id AS card_id,l.customer_id FROM card c JOIN card_customer_link l ON l.card_id=c.id WHERE c.code=$1 AND l.linked_at<=(SELECT server_received_at FROM purchase WHERE id=$2) ORDER BY l.linked_at DESC LIMIT 1`,
+          [p.card_code, p.id],
         )
       ).rows[0];
       const next = linked ? "photo_pending" : "cancelled";
@@ -194,12 +194,14 @@ export function createSyncService({
           throw new SyncError("medium_invalid", 422);
         const price = (
           await db.query(
-            "SELECT 1 FROM product_price_version WHERE id=$1 AND station_id=$2 AND product_id=$3 AND quantity_precision=$4",
+            "SELECT 1 FROM product_price_version WHERE id=$1 AND station_id=$2 AND product_id=$3 AND quantity_precision=$4 AND rate_kobo=$5 AND currency=$6",
             [
               sale.priceVersionId,
               ctx.station_id,
               ctx.product_id,
               sale.quantityPrecision,
+              sale.rateKobo,
+              sale.currency,
             ],
           )
         ).rowCount;
@@ -314,6 +316,7 @@ export function createSyncService({
         const signed = await storage.signPut(
           asset.staging_key,
           asset.staging_expires_at,
+          body.bytes,
         );
         return {
           uploadId: asset.id,
