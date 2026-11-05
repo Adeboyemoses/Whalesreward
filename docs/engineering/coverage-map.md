@@ -241,8 +241,19 @@ EM final combined-base checks: typecheck, lint, 135 unit tests and production bu
 | Handover, upload-first cancellation and expiry | sync.test.ts, upload-sync.spec.ts | I-03/I-06 client boundaries |
 | Retained original/evidence and generic-only cache | offline-capture.spec.ts, sync.test.ts, sync-api.test.ts | I-23/I-48/I-49/I-50 client boundaries |
 
-READY is not acceptance. [Phone runbook](../qa/smoke-2026-11-05-upload-sync.md): staging HTTPS with actual private Spaces is primary, adb reverse fallback. Earl must manually cover partial photo failure and expired upload permission. WHR-60 is nonblocking by Earl's decision and must be diagnosed before M5; WHR-45 presentation drift remains separate. WO-core-4 endpoints are delivered, but this client fixture suite does not prove deployed storage or physical Android behavior. WHR-5 stays READY pending Earl's phone smoke. Stop; no next app work order.
+READY is not acceptance. [Phone runbook](../qa/smoke-2026-11-05-upload-sync.md): staging HTTPS with actual private Spaces is primary, adb reverse fallback. Earl must manually cover partial photo failure and expired upload permission. WHR-60 was subsequently diagnosed and stabilized by WO-app-3a (see below); WHR-45 presentation drift remains separate. WO-core-4 endpoints are delivered, but this client fixture suite does not prove deployed storage or physical Android behavior. WHR-5 stays READY pending Earl's phone smoke. Stop; no next app work order.
 
 ## WO-core-4a accepted closeout (WHR-62), 5 November 2026
 
 Earl accepted P-20 implementation in PR #39 (a1e674c). The named capped-interval, microsecond and unchanged-held-replay tests above are accepted: unit108, integration104, browser36 with4 existing conditional skips, time3 per timezone, and all five CI checks passed. No new product coverage or board parity is claimed by this records-only closeout.
+
+## WO-app-3a upload-failure browser verification READY (WHR-60)
+
+[PR #45](https://github.com/Adeboyemoses/Whalesreward/pull/45) merged at e7999cc. This test-only follow-up stabilizes the existing I-25 evidence/permission checks while preserving I-22/I-26 original-sale and credit assertions. No board or production behavior changed.
+
+| Existing browser test in upload-sync.spec.ts | Verification |
+|---|---|
+| I-25 partial photo failure retains evidence and retry uses the original sale | Durable photo failure and lease release before navigation; 20 consecutive passes on each profile |
+| I-25 expired storage PUT permission preserves the signed-in account and resumes safely | Same original account/operation synchronization; 20 consecutive passes on each profile |
+
+Local Linux: 80/80 repeats, two workers, zero failures/skips/retries. EM full browser: 68 passed, four existing staging-only skips, zero retries; unit135, typecheck/lint/build PASS. Independent code/security/integrity PASS in round1. [CI pass1](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/1) and [CI pass2](https://github.com/Adeboyemoses/Whalesreward/actions/runs/42054766711/attempts/2) each passed68 browser cases plus storage1 without flaky cases. [Diagnosis](../qa/upload-failure-browser-diagnosis.md) records the baseline9pass/3fail and natural60-second lease recovery on both profiles. On-staging, READY; physical-phone and deployed Spaces acceptance remain pending. No new invariant implementation or screen parity claimed.
