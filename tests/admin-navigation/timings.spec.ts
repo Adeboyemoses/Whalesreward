@@ -23,7 +23,12 @@ for (const profile of [
   }) => {
     test.setTimeout(180000);
     const f = await fixture();
-    const events: { kind: string; at: number; discarded?: boolean }[] = [];
+    const events: {
+      kind: string;
+      at: number;
+      discarded?: boolean;
+      screen?: string;
+    }[] = [];
     try {
       await f.db.query(
         "UPDATE auth_user SET must_change_password=false WHERE id=$1",
@@ -38,6 +43,12 @@ for (const profile of [
         const send = (kind: string) =>
           (window as unknown as { navTiming(v: unknown): void }).navTiming({
             kind,
+            screen: location.pathname
+              .split("/")
+              .filter(Boolean)
+              .slice(1)
+              .map((v, i) => (i === 0 ? v : "detail"))
+              .join("-"),
             at: performance.timeOrigin + performance.now(),
             discarded: (document as Document & { wasDiscarded?: boolean })
               .wasDiscarded,
@@ -110,6 +121,14 @@ for (const profile of [
         action: () => Promise<unknown>,
         readiness: () => Promise<void>,
       ) {
+        const expectedScreen = (
+          {
+            "tab-return": "users",
+            "user-open": "users-detail",
+            "section-change": "roles",
+            "role-open": "roles-detail",
+          } as Record<string, string>
+        )[operation];
         const from = events.length;
         const start = await page.evaluate(
           () => performance.timeOrigin + performance.now(),
@@ -117,7 +136,16 @@ for (const profile of [
         await action();
         await readiness();
         await expect
-          .poll(() => events.slice(from).some((e) => e.kind === "visible"))
+          .poll(() =>
+            events
+              .slice(from)
+              .some(
+                (e) =>
+                  e.kind === "visible" &&
+                  e.at >= start &&
+                  e.screen === expectedScreen,
+              ),
+          )
           .toBe(true);
         const captured = events.slice(from);
         const trigger =
@@ -125,7 +153,10 @@ for (const profile of [
             (e) => e.kind === (operation === "tab-return" ? "focus" : "click"),
           )?.at ?? start;
         const end = captured.find(
-          (e) => e.kind === "visible" && e.at >= trigger,
+          (e) =>
+            e.kind === "visible" &&
+            e.at >= trigger &&
+            e.screen === expectedScreen,
         )!.at;
         const blank = captured.find((e) => e.kind === "blank");
         samples.push({
@@ -134,6 +165,7 @@ for (const profile of [
           blankMs: blank ? +(end - blank.at).toFixed(1) : 0,
           documents: captured.filter((e) => e.kind === "document").length,
           discarded: captured.some((e) => e.discarded),
+          marks: captured,
         });
       }
       for (let repeat = 0; repeat < 3; repeat++) {
