@@ -39,6 +39,21 @@ async function shot(page: Page, board: string) {
   });
 }
 
+async function phoneCheck(page: Page, slug: string) {
+  const original = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  for (const button of await page.getByRole("button").all()) {
+    const box = await button.boundingBox();
+    if (box) expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  await shot(page, `mobile-${slug}`);
+  await page.setViewportSize(original);
+}
 // Secrets and recipient links must never enter retained browser artifacts.
 test.use({ trace: "off", video: "off", screenshot: "off" });
 test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recovery and revocation on real Postgres and Mailpit", async ({
@@ -82,6 +97,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await shot(page, "H08-SensitivePermissions");
     await page.goto("/admin/roles/new");
     await shot(page, "H06-CreateRole");
+    await phoneCheck(page, "role-editor");
     await page
       .getByLabel("Role name", { exact: true })
       .fill(`Smoke ${secondName}`);
@@ -97,6 +113,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       .getByRole("button", { name: "Review role", exact: true })
       .click();
     await shot(page, "H10-ReviewRoleChange");
+    await phoneCheck(page, "role-review");
     await page
       .getByRole("button", { name: "Keep editing", exact: true })
       .click();
@@ -115,8 +132,10 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     expect(role).toBeTruthy();
     await page.goto("/admin/users");
     await shot(page, "H01-Users");
+    await phoneCheck(page, "users");
     await page.goto("/admin/users/new");
     await shot(page, "H02-CreateUser");
+    await phoneCheck(page, "create-user");
     await page.getByLabel("Full name", { exact: true }).fill("Grace Okon");
     await page.getByLabel("Username", { exact: true }).fill(secondName);
     await page.getByLabel("Email address", { exact: true }).fill(email);
@@ -232,6 +251,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
         .locator("xpath=following-sibling::dd[1]"),
     ).toHaveText("1");
     await shot(page, "H10-ReviewRoleChange");
+    await phoneCheck(page, "role-review");
 
     await signIn(landing, secondName, temporary);
     await expect(landing).toHaveURL(/first-password/);
@@ -281,6 +301,18 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     });
     const freshReset = await mailLink(email, "Reset", reset.link);
     await page.goto(reset.link);
+    await expect(
+      page.getByRole("heading", {
+        name: "This link is unavailable",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.goto(freshReset.link);
+    await expect(
+      page.getByLabel("New password", { exact: true }),
+    ).toBeVisible();
+    await page.goBack();
+    await page.goForward();
     await expect(
       page.getByRole("heading", {
         name: "This link is unavailable",
