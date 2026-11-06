@@ -267,9 +267,11 @@ test("I-07 healthy focus refresh keeps a draft but route changes clear credentia
     await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
       "Grace Okon",
     );
-    await expect(
-      page.getByLabel("Temporary password", { exact: true }),
-    ).toHaveValue(f.password);
+    expect(
+      (await page
+        .getByLabel("Temporary password", { exact: true })
+        .inputValue()) === f.password,
+    ).toBe(true);
     await page
       .getByRole("link", { name: "Roles & permissions", exact: true })
       .first()
@@ -278,9 +280,13 @@ test("I-07 healthy focus refresh keeps a draft but route changes clear credentia
       page.getByRole("heading", { name: "Roles & permissions", exact: true }),
     ).toBeVisible();
     await page.goBack();
-    await expect(
-      page.getByLabel("Temporary password", { exact: true }),
-    ).toHaveValue("");
+    expect(
+      (
+        await page
+          .getByLabel("Temporary password", { exact: true })
+          .inputValue()
+      ).length,
+    ).toBe(0);
     await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("");
   } finally {
     await f.db.end();
