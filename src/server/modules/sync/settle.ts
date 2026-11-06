@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { lockPriceHistory } from "../../lib/price-history-lock";
 import { newId } from "../../lib/ids";
 import {
   evaluateCapturePolicy,
@@ -15,6 +16,9 @@ export async function settle(
   operationId: string,
   assetId: string,
 ) {
+  // A price activation may already have sampled an in-interval effective time
+  // while still uncommitted. Wait before opening the history query snapshot.
+  await lockPriceHistory(db, p.station_id, p.product_id, "read");
   const ctx = (
     await db.query<{
       signed_in_at: string;

@@ -216,7 +216,7 @@ export async function revoke(db: pg.PoolClient, userId: string) {
 export async function receipt<T>(
   db: pg.PoolClient,
   config: AdminConfig,
-  actor: LiveAdmin,
+  actor: Pick<LiveAdmin, "user_id">,
   kind: string,
   input: { operationId: string; [key: string]: unknown },
   run: () => Promise<T>,
