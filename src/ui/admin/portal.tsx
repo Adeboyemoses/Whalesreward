@@ -1,6 +1,13 @@
 "use client";
-import { useEffect, useState, useRef, type FormEvent } from "react";
-import { Button, TextField, AdminShell } from "@/ui";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import {
+  useEffect,
+  useState,
+  useRef,
+  type FormEvent,
+  type ComponentProps,
+} from "react";
+import { Button, TextField, AdminShell, Brand } from "@/ui";
 import {
   adminRequest as api,
   AdminError,
@@ -147,14 +154,17 @@ export function AdminPortal({ path }: { path: string[] }) {
   return (
     <div className="wr-root wr-auth">
       <section className="wr-auth-hero">
-        <strong>Whales Rewards</strong>
+        <Brand surface="Whales Energy" />
         <div>
           <h2>Admin portal</h2>
           <p>
             Review sales, manage customers and cards, and finalise the giveaway
             for Station 01.
           </p>
-          <p>Whales Energy · Station 01</p>
+          <div className="wr-row">
+            <span className="wr-pill wr-sm wr-offline">Whales Energy</span>
+            <span className="wr-pill wr-sm wr-offline">Station 01</span>
+          </div>
         </div>
         <small>
           Whales Rewards is operated by Whales Energy, a Whales Empire brand.
@@ -340,10 +350,10 @@ function Entry({
                 autoComplete="username"
                 required
               />
-              <TextField
+              <PasswordField
                 label="Password"
                 name="password"
-                type="password"
+
                 autoComplete="current-password"
                 required
               />
@@ -352,6 +362,14 @@ function Entry({
               </Button>
               {link("forgot-password", "Forgot password?")}
               <p>Recovery needs a verified email.</p>
+              <div className="wr-notice">
+                <ShieldCheck size={20} aria-hidden="true" />
+                <div>
+                  Sign in with your username. Password recovery uses the
+                  verified email on your account and never reveals whether an
+                  account exists.
+                </div>
+              </div>
             </>
           )}
           {route === "forgot-password" && (
@@ -389,19 +407,19 @@ function Entry({
             (route === "first-password" || route === "reset-password") && (
               <>
                 <p>{session?.account.name ?? email}</p>
-                <TextField
+                <PasswordField
                   label="New password"
                   name="newPassword"
-                  type="password"
+
                   minLength={12}
                   maxLength={1024}
                   autoComplete="new-password"
                   required
                 />
-                <TextField
+                <PasswordField
                   label="Confirm new password"
                   name="confirmPassword"
-                  type="password"
+
                   minLength={12}
                   maxLength={1024}
                   autoComplete="new-password"
@@ -920,11 +938,11 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                             required
                             maxLength={254}
                           />
-                          <TextField
+                          <PasswordField
                             label="Temporary password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            type="password"
+
                             autoComplete="new-password"
                             minLength={12}
                             maxLength={1024}
@@ -1038,5 +1056,25 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         )}
       </section>
     </>
+  );
+}
+
+function PasswordField(props: ComponentProps<typeof TextField>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <TextField
+      {...props}
+      type={shown ? "text" : "password"}
+      action={
+        <Button
+          variant="secondary"
+          aria-label={shown ? "Hide password" : "Show password"}
+          aria-pressed={shown}
+          onClick={() => setShown(!shown)}
+        >
+          {shown ? <EyeOff size={20} /> : <Eye size={20} />}
+        </Button>
+      }
+    />
   );
 }
