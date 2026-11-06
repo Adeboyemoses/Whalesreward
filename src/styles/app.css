@@ -394,3 +394,86 @@ body {
 .wr-capture-shell .wr-kv-row dd {
   min-width: 0;
 }
+/* Admin access follows the entry and management boards; phone controls retain the shared 48px height. */
+.wr-admin-access-tabs {
+  display: flex;
+  gap: var(--space-4);
+  margin-block: var(--space-4);
+}
+.wr-admin-access-card {
+  background: var(--surface-000);
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  margin-block: 24px;
+}
+.wr-admin-access-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.wr-admin-access-summary {
+  padding: 24px;
+  background: var(--surface-100);
+  margin-block: 24px;
+}
+.wr-admin-access-table {
+  overflow-x: auto;
+}
+.wr-admin-permission {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+}
+.wr-admin-permission input {
+  width: 20px;
+  height: 20px;
+}
+.wr-admin-access-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.wr-admin-access-card dd {
+  margin: 0 0 16px;
+}
+.wr-auth {
+  min-height: 100dvh;
+}
+.wr-auth form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.wr-auth .wr-input,
+.wr-auth .wr-btn {
+  min-height: 48px;
+}
+.wr-auth-hero h2 {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 44px;
+}
+@media (max-width: 899px) {
+  .wr-admin-access-columns {
+    grid-template-columns: 1fr;
+  }
+  .wr-auth {
+    display: block;
+  }
+  .wr-auth-hero {
+    display: none;
+  }
+  .wr-auth-form {
+    min-height: 100dvh;
+    padding: 24px;
+  }
+  .wr-admin-access-card {
+    padding: 16px;
+  }
+  .wr-admin-access-card .wr-input,
+  .wr-admin-access-card .wr-btn {
+    min-height: 48px;
+  }
+}
