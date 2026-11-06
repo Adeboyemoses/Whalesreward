@@ -200,7 +200,7 @@ export function cursorId(secret: string, scope: string, cursor?: string) {
       throw new Error();
     const value = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (
-      value.scope !== scope ||
+      value.scope !== hmac(secret, "station-cursor-scope-v1", scope) ||
       typeof value.id !== "string" ||
       !/^[0-9a-f-]{36}$/.test(value.id)
     )
@@ -211,9 +211,12 @@ export function cursorId(secret: string, scope: string, cursor?: string) {
   }
 }
 export function nextCursor(secret: string, scope: string, id: string) {
-  const payload = Buffer.from(JSON.stringify({ scope, id })).toString(
-    "base64url",
-  );
+  const payload = Buffer.from(
+    JSON.stringify({
+      scope: hmac(secret, "station-cursor-scope-v1", scope),
+      id,
+    }),
+  ).toString("base64url");
   return `${payload}.${hmac(secret, "station-cursor-v1", payload)}`;
 }
 // Display sequences are allocated under the security lock. Gaps after rollback are harmless.

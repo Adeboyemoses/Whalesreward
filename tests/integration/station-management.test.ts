@@ -390,6 +390,101 @@ describe("M2 station and assignment management", () => {
       ).rows[0].auth_version,
     ).toBe(before);
   });
+  it.each(["embedded\tcontrol", "trailing-control\n", "embedded\u0000control"])(
+    "provisioned and replacement credentials reject un-signable controls: %j",
+    async (badPassword) => {
+      const input = {
+        operationId: newId(),
+        name: "Grace Test",
+        username: `control.${randomBytes(5).toString("hex")}`,
+        password: badPassword,
+        pumpId: id(14),
+        expectedPumpVersion: 1,
+      };
+      const denied = await call("attendants-create", input);
+      expect(denied.response.status).toBe(400);
+      expect(
+        (
+          await pool.query(
+            "SELECT 1 FROM auth_user WHERE username_normalized=$1",
+            [input.username],
+          )
+        ).rowCount,
+      ).toBe(0);
+      const f = await create();
+      const restricted = await auth("sign-in", {
+        username: f.input.username,
+        password,
+        deviceId: newId(),
+      });
+      expect(restricted.response.status).toBe(200);
+      const changed = await auth(
+        "first-password",
+        {
+          operationId: newId(),
+          currentPassword: password,
+          newPassword: badPassword,
+          confirmPassword: badPassword,
+        },
+        restricted.cookie,
+      );
+      expect(changed.response.status).toBe(400);
+      // Denial preserves the current usable credential and its restricted session.
+      expect(
+        (await auth("session", undefined, restricted.cookie)).response.status,
+      ).toBe(200);
+      const usable = "  € usable password 漢  ";
+      const accepted = await auth(
+        "first-password",
+        {
+          operationId: newId(),
+          currentPassword: password,
+          newPassword: usable,
+          confirmPassword: usable,
+        },
+        restricted.cookie,
+      );
+      expect(accepted.response.status).toBe(204);
+      const fresh = await auth("sign-in", {
+        username: f.input.username,
+        password: usable,
+        deviceId: newId(),
+      });
+      expect(fresh.response.status).toBe(200);
+      expect(fresh.body.data).toHaveProperty("captureContextId");
+    },
+  );
+  it.each(["漢".repeat(120), "\\".repeat(120)])(
+    "valid maximum-length search pagination roundtrips within cursor bounds: %j",
+    async (query) => {
+      const first = await create(query),
+        second = await create(query);
+      const page = await call("attendants-search", {
+        query,
+        pumpId: id(14),
+        limit: 1,
+      });
+      expect(page.response.status).toBe(200);
+      expect(page.body.data.nextCursor.length).toBeLessThanOrEqual(512);
+      const next = await call("attendants-search", {
+        query,
+        pumpId: id(14),
+        limit: 1,
+        cursor: page.body.data.nextCursor,
+      });
+      expect(next.response.status, JSON.stringify(next.body)).toBe(200);
+      expect(
+        new Set([page.body.data.items[0].id, next.body.data.items[0].id]),
+      ).toEqual(new Set([first.attendant.id, second.attendant.id]));
+      const other = await call("attendants-search", {
+        query: "Other",
+        pumpId: id(14),
+        limit: 1,
+        cursor: page.body.data.nextCursor,
+      });
+      expect(other.response.status).toBe(400);
+    },
+  );
   it("I-05 concurrent reassignments close one interval; fresh sign-in acknowledges new pump without rewriting old context", async () => {
     const f = await create();
     await pool.query(

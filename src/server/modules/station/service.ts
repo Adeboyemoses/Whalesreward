@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { lockPriceHistory } from "../../lib/price-history-lock";
 import { hashPassword } from "better-auth/crypto";
 import { newId } from "../../lib/ids";
 import {
@@ -136,6 +137,7 @@ export async function stationWrite(
               await db.query("SELECT id FROM product WHERE code=$1", [targetId])
             ).rows[0];
             if (!product) throw new AuthError("not_found", 404);
+            await lockPriceHistory(db, station, product.id, "write");
             const old = await currentPrice(db, station, product.id);
             if ((old?.version ?? null) !== parsed.expectedVersion)
               throw new AuthError("version_conflict", 409);

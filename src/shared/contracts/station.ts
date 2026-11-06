@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { authId } from "./auth";
+import { authId, attendantPasswordSchema } from "./auth";
 import { pageSchema } from "./admin";
 const name = z
   .string()
@@ -38,7 +38,7 @@ export const createAttendantSchema = z.strictObject({
     .trim()
     .toLowerCase()
     .regex(/^[a-z0-9._-]{3,40}$/),
-  password: z.string().max(1024),
+  password: attendantPasswordSchema,
   pumpId: authId,
   expectedPumpVersion: version,
 });
@@ -52,9 +52,9 @@ export const assignAttendantSchema = z.strictObject({
 });
 export const firstAttendantPasswordSchema = z.strictObject({
   operationId: authId,
-  currentPassword: z.string().min(1).max(1024),
-  newPassword: z.string().max(1024),
-  confirmPassword: z.string().max(1024),
+  currentPassword: attendantPasswordSchema.min(1),
+  newPassword: attendantPasswordSchema,
+  confirmPassword: attendantPasswordSchema,
 });
 export const productSchema = z.strictObject({
   id: authId,

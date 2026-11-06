@@ -4,9 +4,19 @@ const text = z
   .string()
   .min(1)
   .regex(/^[^\u0000-\u001f\u007f]*$/);
+// Passwords are exact (never trimmed). Every credential we provision must also
+// be accepted at sign-in; an unanchored control test avoids JS $ matching before
+// a trailing newline. Keep the legacy sign-in length range at 1..1024.
+export const attendantPasswordSchema = z
+  .string()
+  .max(1024)
+  .refine(
+    (value) => !/[\u0000-\u001f\u007f]/.test(value),
+    "Control characters are not supported in passwords",
+  );
 export const signInSchema = z.strictObject({
   username: text.max(64),
-  password: text.max(1024),
+  password: attendantPasswordSchema.min(1),
   deviceId: authId,
 });
 export const signOutSchema = z.strictObject({});
