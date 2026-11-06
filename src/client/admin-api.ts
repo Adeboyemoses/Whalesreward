@@ -1,3 +1,5 @@
+import { v7 } from "uuid";
+export const adminOperationId = () => v7();
 const messages: Record<string, string> = {
   last_owner: "At least one active Owner must remain.",
   delegation_denied:

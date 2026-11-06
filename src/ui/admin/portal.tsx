@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { Button, TextField, AdminShell } from "@/ui";
-import { adminRequest as api, AdminError } from "@/client/admin-api";
+import {
+  adminRequest as api,
+  AdminError,
+  adminOperationId,
+} from "@/client/admin-api";
 import {
   type AdminUser,
   type RoleSummary,
@@ -216,7 +220,7 @@ function Entry({
     const f = new FormData(form);
     setBusy(true);
     setError("");
-    if (!key.current) key.current = crypto.randomUUID();
+    if (!key.current) key.current = adminOperationId();
     try {
       if (route === "sign-in" || route === "first-password") {
         const s = await api<Session>(
@@ -571,7 +575,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       setError("Select a current role.");
       return;
     }
-    key.current = crypto.randomUUID();
+    key.current = adminOperationId();
     frozen.current = rolesMode
       ? {
           operationId: key.current,
@@ -646,7 +650,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
     setError("");
     try {
       await api("users/" + user.id + "/verification-requests", {
-        operationId: crypto.randomUUID(),
+        operationId: adminOperationId(),
         expectedVersion: user.version,
       });
       setNotice(
