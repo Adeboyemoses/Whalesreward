@@ -45,7 +45,7 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 | T-12 | Attendant pages are static client shells reading Dexie and the session endpoint; no server-rendered personal data | 2026-11-04 |
 | T-14 | Confirm T-13: one Better Auth user with `kind`, separate profiles and revocable database sessions behind attendant wrappers; recovery grants remain separate and deferred. Supersedes T-13 proposal | 2026-11-05 (WO-core-3 plan) |
 
-| T-15 | Staging transactional email uses Zoho CPaaS EU behind the email adapter, environment-only credentials/sender and exact test-recipient allowlist; local Mailpit and production activation gates remain | Earl, 2026-11-05; WHR-66 |
+| T-17 | Supersedes T-15: staging uses Zoho CPaaS US; allow only exact US/EU send URLs, accept HTTP 200/201 with EM_104, require a raw token and emit safe failure/startup codes; production remains disabled pending WHR-42 | Earl, 2026-11-06; WHR-73 direct API evidence |
 
 | T-16 | Run bounded admin-mail polling inside the existing web process with explicit provider opt-in, durable message leases and graceful shutdown; no extra paid component | EM choice delegated by Earl, 2026-11-06; WHR-68 |
 
