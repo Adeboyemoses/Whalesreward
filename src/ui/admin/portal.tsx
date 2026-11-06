@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState, useRef, type FormEvent } from "react";
 import { Button, TextField, AdminShell } from "@/ui";
-import { adminRequest as api, AdminError } from "@/client/admin-api";
+import {
+  adminRequest as api,
+  AdminError,
+  adminOperationId,
+} from "@/client/admin-api";
 import {
   type AdminUser,
   type RoleSummary,
@@ -86,6 +90,35 @@ export function AdminPortal({ path }: { path: string[] }) {
         </div>
       );
     const grants = session.permissions ?? [];
+    if (!route && grants.includes("roles") && !grants.includes("users")) {
+      return (
+        <div className="wr-root wr-admin">
+          {link("roles", "Roles & permissions")}
+          {link("sign-out", "Sign out")}
+        </div>
+      );
+    }
+    if (!route && !grants.includes("users") && !grants.includes("roles")) {
+      return (
+        <div className="wr-root wr-admin wr-admin-access-card">
+          <h1 className="wr-page-title">
+            {grants.length ? "Your portal access" : "No portal access"}
+          </h1>
+          <p>{session.account.name}</p>
+          <p>
+            {grants.length
+              ? "Your current role permits the sections below. These sections will become available when their screens are delivered."
+              : "Your account has no granted permissions. Contact the portal owner."}
+          </p>
+          <ul>
+            {grants.map((p) => (
+              <li key={p}>{permissionLabels[p]}</li>
+            ))}
+          </ul>
+          {link("sign-out", "Sign out")}
+        </div>
+      );
+    }
     return (
       <AdminShell
         station={session.station?.name ?? ""}
@@ -187,7 +220,7 @@ function Entry({
     const f = new FormData(form);
     setBusy(true);
     setError("");
-    if (!key.current) key.current = crypto.randomUUID();
+    if (!key.current) key.current = adminOperationId();
     try {
       if (route === "sign-in" || route === "first-password") {
         const s = await api<Session>(
@@ -203,6 +236,7 @@ function Entry({
           route === "sign-in" ? key.current : undefined,
         );
         form.reset();
+        // A full navigation discards all credential and account drafts.
         location.assign(
           s.state === "password_change_required"
             ? "/admin/first-password"
@@ -216,6 +250,8 @@ function Entry({
           key.current,
         );
         form.reset();
+        // Full navigation discards the private recovery address.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         location.assign("/admin/forgot-password/sent");
       } else if (route === "sign-out") {
         await api("sign-out", {}, "POST", key.current);
@@ -539,7 +575,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       setError("Select a current role.");
       return;
     }
-    key.current = crypto.randomUUID();
+    key.current = adminOperationId();
     frozen.current = rolesMode
       ? {
           operationId: key.current,
@@ -582,6 +618,8 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       setPassword("");
       frozen.current = null;
       const target = "user" in result ? result.user : result;
+      // Full navigation discards credential drafts and the previous account snapshot.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       location.assign("/admin/" + kind + "/" + target.id);
     } catch (e) {
       const err = e as AdminError;
@@ -597,6 +635,10 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         frozen.current = null;
         key.current = "";
         setPassword("");
+        if (err.code === "version_conflict") {
+          await load();
+          setError(err.message);
+        }
       }
     } finally {
       setBusy(false);
@@ -608,7 +650,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
     setError("");
     try {
       await api("users/" + user.id + "/verification-requests", {
-        operationId: crypto.randomUUID(),
+        operationId: adminOperationId(),
         expectedVersion: user.version,
       });
       setNotice(
@@ -802,7 +844,9 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                   </Button>
                   <Button
                     variant="secondary"
-                    disabled={busy}
+                    disabled={
+                      busy || error.startsWith("Connection interrupted")
+                    }
                     onClick={() => {
                       setReview(false);
                       frozen.current = null;

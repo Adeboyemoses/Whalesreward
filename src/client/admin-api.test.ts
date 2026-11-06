@@ -29,3 +29,11 @@ it("network failure is an uncertain result without request details", async () =>
   await expect(adminRequest("users", {})).rejects.toBeInstanceOf(AdminError);
   vi.unstubAllGlobals();
 });
+
+it("issues operation keys accepted by the server UUIDv7 contract", async () => {
+  const { adminOperationId } = await import("./admin-api");
+  const { authId } = await import("../shared/contracts/auth");
+  const keys = Array.from({ length: 10 }, () => adminOperationId());
+  expect(keys.every((key) => authId.safeParse(key).success)).toBe(true);
+  expect(new Set(keys).size).toBe(keys.length);
+});
