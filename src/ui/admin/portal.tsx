@@ -590,10 +590,16 @@ function Entry({
                 Signing out ends this session on this device and clears any
                 unsaved drafts.
               </p>
-              <Button type="submit" loading={busy}>
-                Sign out
-              </Button>
-              {!error && link("", "Stay signed in")}
+              <div className="wr-admin-entry-actions">
+                <Button type="submit" loading={busy}>
+                  Sign out
+                </Button>
+                {!error && (
+                  <Link className="wr-btn wr-btn-secondary" href="/admin">
+                    Stay signed in
+                  </Link>
+                )}
+              </div>
             </>
           )}
           {unavailable && (
@@ -604,7 +610,12 @@ function Entry({
                   : "The link may have expired, been used or been replaced."}
               </div>
               {route === "reset-password" ? (
-                link("forgot-password", "Request a new link")
+                <Link
+                  className="wr-btn wr-btn-primary"
+                  href="/admin/forgot-password"
+                >
+                  Request a new link
+                </Link>
               ) : (
                 <p>Ask the portal owner to resend verification.</p>
               )}
@@ -625,11 +636,24 @@ function Entry({
           )}
         </>
       )}
-      {route !== "sign-in" &&
-        link(
-          "sign-in",
-          route === "signed-out" ? "Sign in again" : "Return to sign in",
-        )}
+      {route !== "sign-in" && route !== "sign-out" && (
+        <Link
+          className={
+            "wr-btn " +
+            (route === "signed-out" ||
+            (route === "verify-email" && (done || unavailable))
+              ? "wr-btn-primary"
+              : "wr-btn-ghost")
+          }
+          href="/admin/sign-in"
+        >
+          {route === "signed-out"
+            ? "Sign in again"
+            : route === "first-password"
+              ? "Back to sign in"
+              : "Return to sign in"}
+        </Link>
+      )}
     </form>
   );
 }
