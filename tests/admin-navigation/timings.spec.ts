@@ -40,9 +40,11 @@ for (const profile of [
         events.push(event);
       });
       await context.addInitScript(() => {
+        const documentId = crypto.randomUUID();
         const send = (kind: string) =>
           (window as unknown as { navTiming(v: unknown): void }).navTiming({
             kind,
+            documentId,
             screen: location.pathname
               .split("/")
               .filter(Boolean)
@@ -235,6 +237,12 @@ for (const profile of [
         JSON.stringify(
           {
             profile,
+            fixture: {
+              admins: (await f.db.query("SELECT count(*) FROM admin")).rows[0]
+                .count,
+              roles: (await f.db.query("SELECT count(*) FROM role")).rows[0]
+                .count,
+            },
             source: process.env.WHR_TIMING_SOURCE ?? "6072636",
             browser: "local Linux Chromium",
             samples,
