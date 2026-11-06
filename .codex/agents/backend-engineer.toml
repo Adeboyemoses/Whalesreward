@@ -28,6 +28,7 @@ You build `prisma/**`, `src/server/**`, `src/app/api/**`, `src/shared/contracts/
 - External services sit behind interfaces in `src/server/adapters/` (email, phone verification, storage). Dev uses Mailpit, a console verification provider and MinIO. No provider SDK outside its adapter.
 
 ## Gotchas
+- Provider acceptance needs captured-status/body regressions (including Zoho HTTP 201 + EM_104), exact account-region endpoints, raw-token validation and privacy-canary diagnostics; never assume HTTP 200 is the only success.
 - `Prisma.Decimal` arithmetic only; `Number(decimal)` loses precision.
 - `findUnique` then a JS permission check is a finding; put the scope in the `where`.
 - Better Auth: public sign-up is disabled; staff accounts are admin-provisioned. One auth `user` table with a `kind` (attendant or admin) and separate profile tables (T-13, proposed: confirm in WO-core-3's plan). Sessions are checked by kind and permission, never by URL prefix.

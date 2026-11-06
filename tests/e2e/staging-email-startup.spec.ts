@@ -47,7 +47,8 @@ for (const allowlist of ["", "ada@example.com"]) {
         );
       });
       expect(exitCode).toBe(1);
-      expect(output).toContain("Email configuration is invalid");
+      expect(output).toContain('"event":"email.config_invalid"');
+      expect(output).toContain('"setting":"EMAIL_ALLOWED_RECIPIENTS"');
       expect(output).not.toContain("ada@example.com");
     } finally {
       clearTimeout(timer);
@@ -55,3 +56,62 @@ for (const allowlist of ["", "ada@example.com"]) {
     }
   });
 }
+
+test("compiled staging server rejects a prefixed token with only safe diagnostics", async () => {
+  const canary = "Zoho-enczapikey fictional-startup-canary";
+  const child = spawn(
+    process.execPath,
+    [
+      require.resolve("next/dist/bin/next"),
+      "start",
+      "--hostname",
+      "127.0.0.1",
+      "--port",
+      "0",
+    ],
+    {
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+        WHR_ENV: "staging",
+        EMAIL_PROVIDER: "zoho_cpaas",
+        ZOHO_CPAAS_API_URL: "https://cpaas.zoho.com/v1.1/email",
+        ZOHO_CPAAS_TOKEN: canary,
+        EMAIL_FROM: "sender@example.com",
+        EMAIL_ALLOWED_RECIPIENTS: "ada@example.com",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  let output = "";
+  child.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+      timer = setTimeout(
+        () => reject(new Error("Prefixed token did not stop startup")),
+        10000,
+      );
+    });
+    expect(code).toBe(1);
+    expect(output).toContain('"event":"email.config_invalid"');
+    expect(output).toContain('"reason":"token_has_prefix"');
+    expect(output).toContain('"setting":"ZOHO_CPAAS_TOKEN"');
+    for (const privateValue of [
+      canary,
+      "sender@example.com",
+      "ada@example.com",
+    ])
+      expect(output).not.toContain(privateValue);
+  } finally {
+    clearTimeout(timer);
+    if (child.exitCode === null) child.kill("SIGKILL");
+  }
+});
