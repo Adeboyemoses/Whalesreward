@@ -199,3 +199,90 @@ test("I-09 returning visibility revalidates access without waiting for a focus e
     await f.db.end();
   }
 });
+
+test("I-07 a pending user detail keeps its list context and inline loading state", async ({
+  page,
+}) => {
+  const f = await ready(page);
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  let started!: () => void;
+  const request = new Promise<void>((r) => {
+    started = r;
+  });
+  try {
+    await page.route(`**/api/admin/users/${f.adminId}`, async (route) => {
+      const response = await route.fetch();
+      started();
+      await gate;
+      await route.fulfill({ response });
+    });
+    await page.evaluate(() =>
+      Object.assign(window, { __adminDocumentSentinel: true }),
+    );
+    await page
+      .getByRole("row")
+      .filter({ hasText: f.username })
+      .getByRole("link", { name: "Manage", exact: true })
+      .click();
+    await request;
+    await expect(
+      page.getByRole("heading", { name: "Portal users", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Loading details…", { exact: true }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => "__adminDocumentSentinel" in window)).toBe(
+      true,
+    );
+    release();
+    await expect(
+      page.getByRole("heading", { name: /^Manage admin user/ }),
+    ).toBeVisible();
+  } finally {
+    release();
+    await f.db.end();
+  }
+});
+
+test("I-07 healthy focus refresh keeps a draft but route changes clear credential drafts", async ({
+  page,
+}) => {
+  const f = await ready(page);
+  try {
+    await page.getByRole("link", { name: "Create user", exact: true }).click();
+    await page.getByLabel("Full name", { exact: true }).fill("Grace Okon");
+    await page
+      .getByLabel("Temporary password", { exact: true })
+      .fill(f.password);
+    const refreshed = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/admin/session") &&
+        r.request().method() === "GET",
+    );
+    await returnToTab(page);
+    await refreshed;
+    await expect(page.getByLabel("Full name", { exact: true })).toHaveValue(
+      "Grace Okon",
+    );
+    await expect(
+      page.getByLabel("Temporary password", { exact: true }),
+    ).toHaveValue(f.password);
+    await page
+      .getByRole("link", { name: "Roles & permissions", exact: true })
+      .first()
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Roles & permissions", exact: true }),
+    ).toBeVisible();
+    await page.goBack();
+    await expect(
+      page.getByLabel("Temporary password", { exact: true }),
+    ).toHaveValue("");
+    await expect(page.getByLabel("Full name", { exact: true })).toHaveValue("");
+  } finally {
+    await f.db.end();
+  }
+});
