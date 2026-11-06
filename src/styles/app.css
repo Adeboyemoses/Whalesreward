@@ -562,3 +562,29 @@ body {
     min-height: 48px;
   }
 }
+.wr-auth-hero .wr-brand-surface {
+  display: block;
+  font-size: 13px;
+  line-height: 20px;
+}
+.wr-admin-recovery-row,
+.wr-admin-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wr-admin-recovery-row {
+  justify-content: space-between;
+  font-size: 14px;
+}
+.wr-admin-confirm-actions > .wr-btn {
+  width: auto;
+  flex: none;
+}
+.wr-admin-access-tabs.wr-segments .wr-segment {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+}
