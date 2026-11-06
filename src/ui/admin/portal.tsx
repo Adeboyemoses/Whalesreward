@@ -69,7 +69,8 @@ export function AdminPortal({ path }: { path: string[] }) {
         if (!live) return;
         if (
           s.state === "password_change_required" &&
-          route !== "first-password"
+          route !== "first-password" &&
+          route !== "sign-out"
         ) {
           location.replace("/admin/first-password");
           return;
@@ -214,32 +215,56 @@ function Entry({
     );
   const token = useRef(""),
     key = useRef("");
+  const tokenVersion = useRef(0);
   useEffect(() => {
     if (!["verify-email", "reset-password"].includes(route)) return;
-    token.current =
-      new URLSearchParams(location.hash.slice(1)).get("token") ??
-      new URL(location.href).searchParams.get("token") ??
-      "";
-    history.replaceState(null, "", location.pathname);
-    if (!token.current) {
-      setUnavailable(true);
-      setInspecting(false);
-      return;
-    }
-    void api<{ email: string }>(
-      route === "verify-email"
-        ? "email-verification/inspect"
-        : "password-reset/inspect",
-      { token: token.current },
-    )
-      .then((v) => setEmail(v.email))
-      .catch((e) => {
-        if (e instanceof AdminError && e.code === "link_unavailable")
-          setUnavailable(true);
-        else setError(e.message);
-      })
-      .finally(() => setInspecting(false));
+    const inspect = () => {
+      const version = ++tokenVersion.current;
+      token.current =
+        new URLSearchParams(location.hash.slice(1)).get("token") ??
+        new URL(location.href).searchParams.get("token") ??
+        "";
+      window.history.replaceState(null, "", location.pathname);
+      setDone(false);
+      setUnavailable(false);
+      setEmail("");
+      setError("");
+      setBusy(false);
+      setInspecting(true);
+      if (!token.current) {
+        setUnavailable(true);
+        setInspecting(false);
+        return;
+      }
+      void api<{ email: string }>(
+        route === "verify-email"
+          ? "email-verification/inspect"
+          : "password-reset/inspect",
+        { token: token.current },
+      )
+        .then((v) => {
+          if (version === tokenVersion.current) setEmail(v.email);
+        })
+        .catch((e) => {
+          if (version !== tokenVersion.current) return;
+          if (e instanceof AdminError && e.code === "link_unavailable")
+            setUnavailable(true);
+          else setError(e.message);
+        })
+        .finally(() => {
+          if (version === tokenVersion.current) setInspecting(false);
+        });
+    };
+    const start = window.setTimeout(inspect, 0);
+    window.addEventListener("hashchange", inspect);
+    window.addEventListener("popstate", inspect);
     return () => {
+      window.clearTimeout(start);
+      window.removeEventListener("hashchange", inspect);
+      window.removeEventListener("popstate", inspect);
+      // This ref is a request-generation counter, not a DOM ref.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      tokenVersion.current++;
       token.current = "";
     };
   }, [route]);
@@ -247,6 +272,7 @@ function Entry({
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
+    const submittedTokenVersion = tokenVersion.current;
     setBusy(true);
     setError("");
     if (!key.current) key.current = adminOperationId();
@@ -298,12 +324,14 @@ function Entry({
                 confirmPassword: f.get("confirmPassword"),
               },
         );
+        if (submittedTokenVersion !== tokenVersion.current) return;
         token.current = "";
         form.reset();
         if (route === "reset-password") location.replace("/admin/sign-in");
         else setDone(true);
       }
     } catch (e) {
+      if (submittedTokenVersion !== tokenVersion.current) return;
       const err = e as AdminError;
       setError(err.message);
       if (err.status) {
@@ -394,8 +422,12 @@ function Entry({
               <Button type="submit" loading={busy}>
                 Sign in
               </Button>
-              {link("forgot-password", "Forgot password?")}
-              <p>Recovery needs a verified email.</p>
+              <div className="wr-admin-recovery-row">
+                {link("forgot-password", "Forgot password?")}
+                <span className="wr-muted">
+                  Recovery needs a verified email.
+                </span>
+              </div>
               <div className="wr-notice">
                 <ShieldCheck size={20} aria-hidden="true" />
                 <div>
@@ -611,6 +643,9 @@ function Management({ path, session }: { path: string[]; session: Session }) {
     [roleId, setRoleId] = useState(""),
     [enabled, setEnabled] = useState(true),
     [permissions, setPermissions] = useState<PermissionCode[]>([]);
+  const [reviewPermissions, setReviewPermissions] = useState<PermissionCode[]>(
+    [],
+  );
   const key = useRef("");
   const frozen = useRef<Record<string, unknown> | null>(null);
   async function load(next?: string) {
@@ -719,6 +754,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
             enabled,
             reason,
           };
+    setReviewPermissions([...permissions]);
     setReview(true);
   }
   async function confirm() {
@@ -1049,27 +1085,71 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                         )}
                       </>
                     )}
+                    {rolesMode && (
+                      <>
+                        <dt>Permitted actions</dt>
+                        <dd>
+                          <ul>
+                            {reviewPermissions.map((code) => (
+                              <li key={code}>{permissionLabels[code]}</li>
+                            ))}
+                          </ul>
+                        </dd>
+                        {!isNew && (
+                          <>
+                            <dt>Affected users</dt>
+                            <dd>{role?.userCount ?? "0"}</dd>
+                            <dt>Added permissions</dt>
+                            <dd>
+                              <ul>
+                                {reviewPermissions
+                                  .filter(
+                                    (code) => !role?.permissions.includes(code),
+                                  )
+                                  .map((code) => (
+                                    <li key={code}>{permissionLabels[code]}</li>
+                                  ))}
+                              </ul>
+                            </dd>
+                            <dt>Removed permissions</dt>
+                            <dd>
+                              <ul>
+                                {(role?.permissions ?? [])
+                                  .filter(
+                                    (code) => !reviewPermissions.includes(code),
+                                  )
+                                  .map((code) => (
+                                    <li key={code}>{permissionLabels[code]}</li>
+                                  ))}
+                              </ul>
+                            </dd>
+                          </>
+                        )}
+                      </>
+                    )}
                     <dt>Reason</dt>
                     <dd>{reason}</dd>
                     <dt>Recorded by</dt>
                     <dd>{session.account.name}</dd>
                   </dl>
-                  <Button onClick={() => void confirm()} loading={busy}>
-                    Confirm change
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={
-                      busy || error.startsWith("Connection interrupted")
-                    }
-                    onClick={() => {
-                      setReview(false);
-                      frozen.current = null;
-                    }}
-                  >
-                    Keep editing
-                  </Button>
-                  {link(kind, "Cancel")}
+                  <div className="wr-admin-confirm-actions">
+                    <Button onClick={() => void confirm()} loading={busy}>
+                      Confirm change
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={
+                        busy || error.startsWith("Connection interrupted")
+                      }
+                      onClick={() => {
+                        setReview(false);
+                        frozen.current = null;
+                      }}
+                    >
+                      Keep editing
+                    </Button>
+                    {link(kind, "Cancel")}
+                  </div>
                 </>
               ) : (
                 <form onSubmit={prepare}>
