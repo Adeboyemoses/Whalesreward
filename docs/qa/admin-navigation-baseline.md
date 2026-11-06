@@ -1,12 +1,12 @@
 # Admin navigation baseline — WO-app-4a
 
-Before implementation, 6 November 2026. Deployed health endpoint returned `ok: true`, `db: ok`, version `60726369233367fd2b0e5f5c8abe44279e94144c`.
+Historical staging observation before Earl’s local-only measurement decision, 6 November 2026. Deployed health endpoint returned `ok: true`, `db: ok`, version `60726369233367fd2b0e5f5c8abe44279e94144c`.
 
 The browser-control host was unavailable, so the EM used native Chrome accessibility controls. Two existing staging admin tabs were present. Returning to the users tab visibly showed **Loading account…**; it subsequently redirected to sign-in because the session had expired. The second existing admin tab was also signed out. No credential, cookie, token or account data was read or exported, and no staging mutation was performed. Earl was asked to sign in privately before protected timing samples.
 
 One tab's existing DevTools configuration showed iPhone 16 emulation (393×852) and built-in 3G throttling. This is an observed pre-existing setting, not an unthrottled timing sample. Do not mix it into an unlabelled before/after comparison.
 
-## Required samples
+## Historical pending-staging checkpoint (superseded)
 
 | Operation | Before | After | Target |
 |---|---|---|---|
@@ -24,3 +24,11 @@ Historical checkpoint only: the staging-before hold below was superseded by Earl
 ## Superseding measurement decision — 6 November 2026
 
 Earl explicitly declined agent operation of a live staging Owner session. Both baseline and result will instead be measured on the local stack with generated fictional accounts, Playwright and Chrome DevTools Protocol network throttling: approximately 150 ms RTT to model the staging network, plus a clearly configured Fast 3G worst case. Record the exact latency and throughput values alongside repeated samples for tab return, user detail, role detail and section navigation. Earl alone confirms the deployed behavior after merge. The earlier staging observations remain historical and are not the timing baseline. No further live-session Computer Use is authorized or planned.
+
+## Current local comparison
+
+The unchanged-source timing baseline is now captured in `tests/admin-navigation/BEFORE.md`, with all three samples per operation and raw numeric timelines. Measured application source: `6072636`. The implemented AFTER capture uses UI source `4e87ed7` against the same admin-access runtime and matched fixture counts. See the final comparison under `tests/admin-navigation/` for the complete result and method limitations.
+
+At the 150 ms CDP latency profile, median tab return changed from 482.2 ms to 0.9 ms; user detail from 842.2 to 322.2 ms; role detail from 690.4 to 329.9 ms; section change from 672.1 to 161.1 ms. All AFTER operations stayed in one document, and tab return had no measured content-readiness gap. In the 562.5 ms / 200,000 Bps down / 93,750 Bps up stress profile, full user/role readiness remains approximately 1.18–1.66 seconds: this is an explicit miss of one second under that aggressive profile, not an unconditional speed claim. The 150 ms profile meets the stated tab-return/detail targets. Neither profile measures actual staging RTT or deployed performance; Earl confirms staging himself.
+
+Current staging-base station/offboarding changes merged after timing capture add unrelated APIs/specifications; the only admin-access repository change narrows a TypeScript actor type. The measured admin users/roles/session behavior remains unchanged. Final integrated-head gates are recorded separately from the captured timing source.
