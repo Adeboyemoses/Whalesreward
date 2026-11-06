@@ -1,20 +1,21 @@
 # lane:app
-WO-app-4 (WHR-9) Admin access screens: READY since 2026-11-06 (effective on green records merge)
+WO-app-4 (WHR-9) Admin access screens: ACCEPTED by Earl on 2026-11-06
 
 ## In flight
-- Feature [PR #60](https://github.com/Adeboyemoses/Whalesreward/pull/60) delivers admin entry, first password, sign-out, email verification/recovery, users and roles on WO-core-5 APIs. Server remains the only permission authority.
-- Independent code/security/integrity PASS round 2 at 66980288; evidence validator PASS. EM typecheck/lint/build, 189 unit tests, Linux browser 100 with 4 existing staging-only skips / no retries, real PostgreSQL/Mailpit 4 PASS. No server/schema or cloud/staging-data changes.
-- Independent report: tests/design-parity/admin-access/REPORT.md; 32 sanitized captures, 24 boards accounted for. H07 is permission reference only; no Reports dashboard claim.
+- Documentation closeout records Earl's accepted staging smoke; WHR-9 moves to Done after this reviewed green staging merge.
+- Feature [#60](https://github.com/Adeboyemoses/Whalesreward/pull/60), 429f07b, and READY records [#61](https://github.com/Adeboyemoses/Whalesreward/pull/61), 8217d86, are merged. Server remains the sole permission authority.
+- WHR-9's acceptance comment confirms Admin Access Test run r-20261106-115321 has no failed or blocked steps: verification/reset mail through Zoho CPaaS US and corrected last-Owner/delegation checks passed. This supersedes earlier pending-inbox and failed-first-run notes for WO-app-4.
+- Existing evidence retained: three reviewers PASS round 2; EM unit 189, browser 100 with four existing staging-only skips/no retries, real PostgreSQL/Mailpit four PASS, typecheck/lint/build PASS; 24 board inputs and 32 sanitized captures in tests/design-parity/admin-access/REPORT.md. No new behavior or parity claim in this closeout.
 
 ## Next
-- STOP at READY. Earl runs docs/qa/smoke-2026-11-06-admin-access.md using a second fictional admin created through the normal UI with a privately supplied exact-allowlisted inbox. Sending never verifies ownership; recipient confirms, then tests reset/revocation.
-- Actual staging inbox acceptance remains pending. No acceptance or Done transition is implied.
+- STOP after closeout. No next work order selected.
 
 ## Earl's gos
-- 2026-11-06: “Work order: WO-app-4 (WHR-9), the admin access screens, on WO-core-5's API.” “Write the staging smoke runbook first; it must include creating a second test admin with an allowlisted inbox. Take it to READY, then stop.” Explicit session go recorded on WHR-9; its approval line was not edited.
+- 2026-11-06: “[app] Earl accepted the admin access smoke (see WHR-9). Close WO-app-4 (WHR-9) through close-session, then stop.”
 
 ## Risks
-- WHR-69 tracks nonblocking role-picker pagination, history/record presentation. WHR-70 tracks inherited core email-template fidelity. D06 proposals remain centrally configured; no policy or provider selection changed.
-- Dispatch flag: 14 feature dispatches exceed high-tier flag 8; two formal feature review rounds within cap 3. One independent records review brings session total 15. Runtime model identity unavailable.
+- WHR-69/70 remain separate nonblocking presentation/pagination and inherited email-template fidelity follow-ups. H07 remains a permission reference; actual Reports scope is not accepted here.
+- WHR-68/73 closure belongs to lane:core; this session does not change those issues, cloud resources or staging data.
+- Prior build session exceeded its high-tier dispatch flag (14 feature dispatches, 15 including READY records; two feature rounds). This documentation closeout has two independent review dispatches, including the concurrent shared-record merge resolution. Runtime model identity unavailable.
 
-dispatches=15 prs=2 rounds_max=2 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
