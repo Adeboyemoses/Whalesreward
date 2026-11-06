@@ -174,8 +174,17 @@ export async function audit(
   after: unknown,
 ) {
   await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6,$7,$8,clock_timestamp())`,
-    [newId(), actor, action, type, target, before, after, auditText(reason)],
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6::jsonb,$7::jsonb,$8,clock_timestamp())`,
+    [
+      newId(),
+      actor,
+      action,
+      type,
+      target,
+      JSON.stringify(before),
+      JSON.stringify(after),
+      auditText(reason),
+    ],
   );
 }
 export function cursorId(secret: string, scope: string, cursor?: string) {

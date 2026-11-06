@@ -39,7 +39,7 @@ export function cookieToken(request: Request): string | undefined {
 function cookie(value: string, expiry?: string) {
   return `${COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; ${expiry ? `Expires=${new Date(expiry).toUTCString()}` : "Max-Age=0"}`;
 }
-async function body(request: Request): Promise<unknown> {
+async function body(request: Request, ceiling = 8192): Promise<unknown> {
   if (
     request.headers.get("content-type")?.split(";")[0]?.trim() !==
     "application/json"
@@ -54,9 +54,12 @@ async function body(request: Request): Promise<unknown> {
       const next = await reader.read();
       if (next.done) break;
       length += next.value.length;
-      if (length > 8192) {
+      if (length > ceiling) {
         await reader.cancel();
-        throw new AuthError("invalid_request", 400);
+        throw new AuthError(
+          ceiling === 32768 ? "request_too_large" : "invalid_request",
+          ceiling === 32768 ? 413 : 400,
+        );
       }
       chunks.push(next.value);
     }
@@ -111,7 +114,7 @@ export async function handleAuth(
         pool,
         config,
         cookieToken(request),
-        await body(request),
+        await body(request, 32768),
         ip,
       );
       headers.set("Set-Cookie", cookie(""));
