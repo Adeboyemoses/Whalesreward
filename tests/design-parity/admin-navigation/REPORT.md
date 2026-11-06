@@ -1,6 +1,6 @@
 # Admin navigation focused design fidelity — WHR-75
 
-Independent test-engineer check, 6 November 2026, using the design-fidelity-check skill. Runtime source: `a628e2f` (navigation implementation `4e87ed7`, plus accepted core station/offboarding base). Local Linux Chromium, Node 26.12.0, device scale 2, 1440 × 1000 and 390 × 1000 CSS px. Fresh local database `whr_admin_nav_parity_final`, all seven migrations and fictional seed. Two sequential viewport fixtures add one unverified Owner each; captures therefore contain two and three admins respectively, one Owner role. No live staging access occurred.
+Independent test-engineer check, 6 November 2026, using the design-fidelity-check skill. Runtime source: `71e13e4` (final mutation/view-generation fix `6c0915c`, plus accepted core station/offboarding base). Local Linux Chromium, Node 26.12.0, device scale 2, 1440 × 1000 and 390 × 1000 CSS px. Fresh local database `whr_admin_nav_parity_review`, all seven migrations and fictional seed. Two sequential viewport fixtures add one unverified Owner each; captures therefore contain two and three admins respectively, one Owner role. No live staging access occurred.
 
 Opened all four source PNG boards beside their desktop and phone captures. This is a focused regression comparison with the previously accepted [admin-access report](../admin-access/REPORT.md), not a new exact-pixel claim or a repeat of all 24 boards. The approved desktop board has no mobile counterpart; 390 px checks responsive fallback. Screenshots are in [screenshots](screenshots/). Password inputs are asserted empty, automatic failure screenshots/video/traces disabled. All displayed accounts are fictional.
 
@@ -22,8 +22,10 @@ After merging the accepted base and applying migration seven, default admin acce
 ```sh
 git archive HEAD | docker exec -i whr-admin-navigation-tests tar -xf - -C /verify
 docker exec -w /verify -e DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_nav_test whr-admin-navigation-tests pnpm test:e2e tests/e2e/admin-navigation.spec.ts tests/e2e/admin-access.spec.ts --project desktop --workers=1 --retries=0
-docker exec -w /verify -e DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_nav_parity_final whr-admin-navigation-tests pnpm exec playwright test -c tests/design-parity/admin-navigation/playwright.config.ts
+docker exec -w /verify -e DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_nav_parity_review whr-admin-navigation-tests pnpm exec playwright test -c tests/design-parity/admin-navigation/playwright.config.ts
 docker exec -w /verify -e WHR_ADMIN_TEST_DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_browser_nav_final -e WHR_ADMIN_TEST_ROOT_DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_dev -e MAILPIT_URL=http://mailpit:8025 whr-admin-navigation-tests pnpm exec playwright test -c tests/admin-access/admin-access.config.ts
 ```
 
 For exact parity fixture cardinalities, create a fresh local database, deploy migrations and seed before capture. Reusing the named database adds fictional fixtures. Compose credentials above are public local fixture credentials. Performance evidence is separately frozen to measured source `4e87ed7` in [the comparison](../../admin-navigation/COMPARISON.md); no timing claim is made about this later merged base or deployed staging.
+
+Final review correction rerun: new Mailpit mutation/verification races **5 passed (9.3 s)**, default navigation/access/mutation subset **14 passed (14.9 s)**, existing dedicated Mailpit auth/recipient **4 passed (25.8 s)**, all zero failed/skipped on runtime `6c0915c` / test merge `71e13e4`. Full review-regression methodology and commands are in [review regression evidence](../../admin-navigation/mutations/REVIEW-REGRESSIONS.md). The captures below were refreshed on this source; no new layout difference from the inherited table was found.

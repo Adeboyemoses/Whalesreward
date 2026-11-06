@@ -17,3 +17,25 @@ Runtime `44a101f`, final split tests: ordinary CI subset **14 passed, 0 failed, 
 Extending verification departure to the same record exposed a remaining view-lifetime bug. After a successful queue acknowledgement, hold either Resend POST or its follow-up GET; click Back to user; release the response. Both reopen `/verification-sent`. Mail suite: **3 passed, 2 failed, 0 skipped (18.3 s)**. Sent to the frontend builder; no production code edited by the test engineer.
 
 A clean rerun of the final five-case default file directly on frozen `d184a3c` confirms **5 failed, 0 passed, 0 skipped**. It excludes all mail prerequisites and preparatory fixture/assertion mistakes.
+
+## Final fix and rerun
+
+Runtime fix `6c0915c`, merged test source `71e13e4`: ordinary default subset **14 passed, 0 failed, 0 skipped (14.9 s)**; dedicated new Mailpit continuation suite **5 passed, 0 failed, 0 skipped (9.3 s)**. Local typecheck/lint passed. Tests prove two sequential real saves each with incremented database versions, one immutable history row per reason and no document reload; secondary warnings preserve the editor and cannot invent role choices; late PATCH/send/follow-up callbacks cannot rewrite another route or the same record's Back destination; queued acknowledgement survives its own suffix transition, while direct reload says delivery without fabricating a new queue acknowledgement.
+
+The last fixes change mutation completion, secondary-error presentation and the verification view suffix only. No new performance measurement was made. Existing BEFORE/AFTER evidence remains explicitly measured on `6072636` / `4e87ed7`; it is not a claim about this later head or deployed staging.
+
+### Reproduce
+
+Use the retained named Linux runner and local Compose services. The mutation database has seven migrations. For a fresh run, create a separate local database and deploy migrations before these tests; the tests add fictional records without deleting prior history. Public local fixture credentials only:
+
+```sh
+git archive HEAD | docker exec -i whr-admin-navigation-tests tar -xf - -C /verify
+docker exec -w /verify -e DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_nav_mutations whr-admin-navigation-tests pnpm test:e2e tests/e2e/admin-navigation-mutations.spec.ts tests/e2e/admin-navigation.spec.ts tests/e2e/admin-access.spec.ts --project desktop --workers=1 --retries=0
+docker exec -w /verify -e DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_nav_mutations -e MAILPIT_URL=http://mailpit:8025 whr-admin-navigation-tests pnpm exec playwright test -c tests/admin-navigation/mutations/playwright.config.ts
+docker exec -w /verify -e WHR_ADMIN_TEST_DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_browser_nav_review_final -e WHR_ADMIN_TEST_ROOT_DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_dev -e MAILPIT_URL=http://mailpit:8025 whr-admin-navigation-tests pnpm exec playwright test -c tests/admin-access/admin-access.config.ts
+docker exec -w /verify -e DATABASE_URL=postgresql://whr:whr@host.docker.internal:5433/whr_admin_nav_parity_review whr-admin-navigation-tests pnpm exec playwright test -c tests/design-parity/admin-navigation/playwright.config.ts
+```
+
+The existing dedicated suite creates its own isolated local database with its migration ledger; do not pre-apply Prisma migrations to that fresh database. Parity uses a fresh seeded local database for two then three admins/one Owner role. Do not replace any of these URLs with staging or production.
+
+Final unchanged existing auth/recipient Mailpit suite: **4 passed, 0 failed, 0 skipped (25.8 s)** on `6c0915c`. Focused H01/H04/H05/H08 desktop/phone parity recapture: **2 passed, 0 failed, 0 skipped (6.6 s)**, eight screenshots updated and independently inspected against the read-only boards/prior comparison. No new visual regression; inherited WO-app-4 limitations remain. See [focused parity report](../../design-parity/admin-navigation/REPORT.md). All requested regression evidence is now complete; EM owns final full-head gates and independent review.
