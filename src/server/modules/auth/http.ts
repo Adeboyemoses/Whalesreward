@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { adminConfig } from "../admin-access/config";
 import { firstPassword } from "./first-password";
 import { isIP } from "node:net";
 import {
@@ -112,7 +113,7 @@ export async function handleAuth(
     if (action === "first-password") {
       await firstPassword(
         pool,
-        config,
+        adminConfig(),
         cookieToken(request),
         await body(request, 32768),
         ip,

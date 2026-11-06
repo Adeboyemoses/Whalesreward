@@ -147,15 +147,13 @@ export async function stationWrite(
               throw new AuthError("no_change", 409);
             const id = newId();
             // Clock resolution is microseconds in PostgreSQL. Never fabricate an activation time.
-            const row = (
-              await db.query(
-                "SELECT clock_timestamp() AS now,($1::timestamptz IS NULL OR clock_timestamp()>$1::timestamptz) AS later",
-                [old?.effective_from ?? null],
-              )
-            ).rows[0];
-            if (!row.later) throw new AuthError("temporarily_unavailable", 503);
+            const boundary = await trustedBoundary(
+              db,
+              "product_price_version",
+              old?.id,
+            );
             await db.query(
-              "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,$4,$5,$6,$7,clock_timestamp(),$8,$9)",
+              "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
               [
                 id,
                 station,
@@ -164,6 +162,7 @@ export async function stationWrite(
                 parsed.rateKobo,
                 parsed.currency,
                 parsed.quantityPrecision,
+                boundary,
                 actor.admin_id,
                 parsed.reason,
               ],
@@ -291,20 +290,7 @@ export async function stationWrite(
             );
             if (old?.pump_id === pump.id) throw new AuthError("no_change", 409);
             // Keep the actual boundary as a PostgreSQL timestamp, not a millisecond Date.
-            let boundary: string | undefined;
-            for (let i = 0; i < 3; i++) {
-              const r = (
-                await db.query(
-                  "SELECT clock_timestamp()::text AS boundary,($1::uuid IS NULL OR clock_timestamp()>(SELECT effective_from FROM assignment WHERE id=$1)) AS later",
-                  [old?.id ?? null],
-                )
-              ).rows[0];
-              if (r.later) {
-                boundary = r.boundary;
-                break;
-              }
-            }
-            if (!boundary) throw new AuthError("temporarily_unavailable", 503);
+            const boundary = await trustedBoundary(db, "assignment", old?.id);
             if (old)
               await db.query(
                 "UPDATE assignment SET effective_until=$2 WHERE id=$1 AND effective_until IS NULL",
@@ -349,12 +335,7 @@ export async function stationWrite(
                 version: (old?.assignment_version ?? 0) + 1,
               },
             );
-            const {
-              attendantId: _a,
-              staffCode: _s,
-              attendantName: _n,
-              ...change
-            } = await eventView(db, id);
+            const change = assignmentChange(await eventView(db, id));
             return {
               attendant: await attendantView(db, a.id, station),
               change,
@@ -517,13 +498,7 @@ export async function stationRead(
       else {
         const event = await eventView(db, row.id);
         if (action === "attendants-assignments") {
-          const {
-            attendantId: _a,
-            staffCode: _s,
-            attendantName: _n,
-            ...change
-          } = event;
-          items.push(change);
+          items.push(assignmentChange(event));
         } else items.push(event);
       }
     }
@@ -535,4 +510,33 @@ export async function stationRead(
           : null,
     };
   });
+}
+
+async function trustedBoundary(
+  db: pg.PoolClient,
+  table: "assignment" | "product_price_version",
+  previous?: string,
+) {
+  for (let i = 0; i < 3; i++) {
+    const r = (
+      await db.query(
+        `WITH trusted_now AS MATERIALIZED (SELECT clock_timestamp() AS t) SELECT t::text AS boundary,($1::uuid IS NULL OR t>(SELECT effective_from FROM ${table} WHERE id=$1)) AS later FROM trusted_now`,
+        [previous ?? null],
+      )
+    ).rows[0];
+    if (r.later) return r.boundary as string;
+  }
+  throw new AuthError("temporarily_unavailable", 503);
+}
+function assignmentChange(event: Awaited<ReturnType<typeof eventView>>) {
+  return {
+    id: event.id,
+    version: event.version,
+    fromPumpId: event.fromPumpId,
+    toPumpId: event.toPumpId,
+    actor: event.actor,
+    reason: event.reason,
+    effectiveFrom: event.effectiveFrom,
+    effectiveUntil: event.effectiveUntil,
+  };
 }

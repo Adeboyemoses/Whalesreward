@@ -1,4 +1,5 @@
 import type pg from "pg";
+import type { AdminConfig } from "../admin-access/config";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { firstAttendantPasswordSchema } from "../../../shared/contracts/station";
 import { requireSession, securityLock } from "../../lib/authz";
@@ -9,7 +10,7 @@ import { AuthError } from "./errors";
 import { consumeLimits } from "./rate-limit";
 export async function firstPassword(
   pool: pg.Pool,
-  config: { secret: string; origin: string },
+  config: AdminConfig,
   token: string | undefined,
   input: unknown,
   ip: string,

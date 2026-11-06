@@ -1,7 +1,15 @@
 import { readFile, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
-import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
+import {
+  beforeAll,
+  beforeEach,
+  afterAll,
+  describe,
+  it,
+  expect,
+  vi,
+} from "vitest";
 import { newId } from "../../src/server/lib/ids";
 import { digest, sessionSecret } from "../../src/server/modules/auth/crypto";
 import { stationWrite } from "../../src/server/modules/station/service";
@@ -115,6 +123,10 @@ describe("M2 station and assignment management", () => {
       "INSERT INTO auth_session(id,user_id,secret_verifier,expires_at,auth_version,last_online_sign_in_at) VALUES($1,$2,$3,clock_timestamp()+interval '1 hour',1,clock_timestamp())",
       [session, id(2), digest(token)],
     );
+  });
+  // Each acceptance case has an independent request budget in this isolated schema.
+  beforeEach(async () => {
+    await pool.query("DELETE FROM auth_rate_bucket");
   });
   afterAll(async () => {
     await pool?.end();
@@ -313,6 +325,70 @@ describe("M2 station and assignment management", () => {
     ).rows;
     expect(JSON.stringify(receipt)).not.toContain(next);
     expect(JSON.stringify(receipt)).not.toContain(password);
+  });
+  it("first password accepts bounded multibyte credentials, rejects bad proof and oversized bodies without exposing secrets", async () => {
+    const oldPassword = "€".repeat(1024),
+      newPassword = "漢".repeat(1024);
+    const input = {
+      operationId: newId(),
+      name: "Grace Test",
+      username: `unicode.${randomBytes(5).toString("hex")}`,
+      password: oldPassword,
+      pumpId: id(14),
+      expectedPumpVersion: 1,
+    };
+    const created = await call("attendants-create", input);
+    expect(created.response.status).toBe(201);
+    const login = await auth("sign-in", {
+      username: input.username,
+      password: oldPassword,
+      deviceId: newId(),
+    });
+    expect(login.response.status).toBe(200);
+    const change = {
+      operationId: newId(),
+      currentPassword: oldPassword,
+      newPassword,
+      confirmPassword: newPassword,
+    };
+    const bad = await auth(
+      "first-password",
+      { ...change, currentPassword: "wrong fictional password" },
+      login.cookie,
+    );
+    expect(bad.response.status).toBe(401);
+    expect(
+      (
+        await auth(
+          "first-password",
+          { ...change, extra: "x".repeat(33000) },
+          login.cookie,
+        )
+      ).response.status,
+    ).toBe(413);
+    const result = await auth("first-password", change, login.cookie);
+    expect(result.response.status).toBe(204);
+    const fresh = await auth("sign-in", {
+      username: input.username,
+      password: newPassword,
+      deviceId: newId(),
+    });
+    expect(fresh.response.status).toBe(200);
+    const before = (
+      await pool.query("SELECT auth_version FROM auth_user WHERE id=$1", [
+        created.body.data.accountId,
+      ])
+    ).rows[0].auth_version;
+    expect(
+      (await auth("first-password", change, fresh.cookie)).response.status,
+    ).toBe(204);
+    expect(
+      (
+        await pool.query("SELECT auth_version FROM auth_user WHERE id=$1", [
+          created.body.data.accountId,
+        ])
+      ).rows[0].auth_version,
+    ).toBe(before);
   });
   it("I-05 concurrent reassignments close one interval; fresh sign-in acknowledges new pump without rewriting old context", async () => {
     const f = await create();
