@@ -1,0 +1,444 @@
+{
+  "profile": {
+    "name": "fast3g-shaped",
+    "latency": 562.5,
+    "downloadThroughput": 200000,
+    "uploadThroughput": 93750
+  },
+  "source": "6072636",
+  "browser": "local Linux Chromium",
+  "samples": [
+    {
+      "operation": "tab-return",
+      "durationMs": 1815.8,
+      "blankMs": 1814.6,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984428086.9001,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "screen": "users",
+          "at": 1793984428088.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984429902.7,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "user-open",
+      "durationMs": 2949.6,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984429946.8,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "users",
+          "at": 1793984429947.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984429952.3,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "users-detail",
+          "at": 1793984430546.2998,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users-detail",
+          "at": 1793984432896.7,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "section-change",
+      "durationMs": 2394.7,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984435446.3,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "users",
+          "at": 1793984435446.8,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984435450.9,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "roles",
+          "at": 1793984436046.8,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles",
+          "at": 1793984437841.5,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "role-open",
+      "durationMs": 2375.6,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "roles",
+          "at": 1793984437958.5,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "roles",
+          "at": 1793984437959,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles",
+          "at": 1793984437967.8,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "roles-detail",
+          "at": 1793984438555.9,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles-detail",
+          "at": 1793984440334.6,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "tab-return",
+      "durationMs": 1806.7,
+      "blankMs": 1805.7,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984442923,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "screen": "users",
+          "at": 1793984442924,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984444729.7,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "user-open",
+      "durationMs": 2956.2,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984444808.2,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "users",
+          "at": 1793984444808.7,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984444819.2,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "users-detail",
+          "at": 1793984445403.2,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users-detail",
+          "at": 1793984447764.9,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "section-change",
+      "durationMs": 2358.2,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984450272,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "users",
+          "at": 1793984450272.4,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984450284.9,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "roles",
+          "at": 1793984450864.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles",
+          "at": 1793984452630.6,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "role-open",
+      "durationMs": 2375.5,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "roles",
+          "at": 1793984452760.6,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "roles",
+          "at": 1793984452760.8,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles",
+          "at": 1793984452767.8,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "roles-detail",
+          "at": 1793984453349.5999,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles-detail",
+          "at": 1793984455136.3,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "tab-return",
+      "durationMs": 1818.1,
+      "blankMs": 1817.4,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984457681.2,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "screen": "users",
+          "at": 1793984457681.9,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984459499.3,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "user-open",
+      "durationMs": 2943.5,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984459546.4,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "users",
+          "at": 1793984459546.5,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984459550.2,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "users-detail",
+          "at": 1793984460130.9,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users-detail",
+          "at": 1793984462490,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "section-change",
+      "durationMs": 2367.9,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "users",
+          "at": 1793984465044.4001,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "users",
+          "at": 1793984465045.2002,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "users",
+          "at": 1793984465051.7002,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "roles",
+          "at": 1793984465641.4,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles",
+          "at": 1793984467413.1,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "role-open",
+      "durationMs": 2360.8,
+      "blankMs": 0,
+      "documents": 1,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "screen": "roles",
+          "at": 1793984467556.6,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "screen": "roles",
+          "at": 1793984467556.8,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles",
+          "at": 1793984467570.9,
+          "discarded": false
+        },
+        {
+          "kind": "document",
+          "screen": "roles-detail",
+          "at": 1793984468140.5999,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "screen": "roles-detail",
+          "at": 1793984469917.5999,
+          "discarded": false
+        }
+      ]
+    }
+  ]
+}
