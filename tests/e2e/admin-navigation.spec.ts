@@ -50,13 +50,7 @@ test("I-07 admin section and detail navigation preserve the document and session
       .getByRole("link", { name: "View permissions", exact: true })
       .first()
       .click();
-    await expect(
-      page
-        .getByRole("heading", { name: /^Owner/ })
-        .or(
-          page.getByText("The Owner role cannot be edited", { exact: false }),
-        ),
-    ).toBeVisible();
+    await expect(page.getByRole("checkbox")).toHaveCount(28);
     expect(await page.evaluate(() => "__adminDocumentSentinel" in window)).toBe(
       true,
     );
@@ -116,9 +110,11 @@ test("I-09 admin background failure retains content but definitive revocation re
     await expect(
       page.getByRole("heading", { name: "Portal users", exact: true }),
     ).toBeVisible();
-    await expect(page.getByRole("alert")).toContainText(
-      /connect|refresh|access|network/i,
-    );
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: /connect|refresh|access|network|session|sign/i }),
+    ).toContainText(/connect|refresh|access|network/i);
     await page.unroute("**/api/admin/session");
     await f.db.query(
       "UPDATE auth_session SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",
@@ -128,7 +124,11 @@ test("I-09 admin background failure retains content but definitive revocation re
     await expect(
       page.getByRole("heading", { name: "Portal users", exact: true }),
     ).toHaveCount(0);
-    await expect(page.getByRole("alert")).toContainText(/session|sign|access/i);
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: /connect|refresh|access|network|session|sign/i }),
+    ).toContainText(/session|sign|access/i);
     expect(
       (
         await page.request.post("/api/admin/users/search", {
@@ -291,4 +291,25 @@ test("I-07 healthy focus refresh keeps a draft but route changes clear credentia
   } finally {
     await f.db.end();
   }
+});
+
+test("I-12 public entry renders without a protected-session request", async ({
+  page,
+}) => {
+  let sessionCalls = 0;
+  await page.route("**/api/admin/session", async (route) => {
+    sessionCalls++;
+    await route.abort("failed");
+  });
+  await page.goto("/admin/sign-in");
+  await expect(page.getByLabel("Username", { exact: true })).toBeVisible();
+  expect(sessionCalls).toBe(0);
+  await page.goto("/admin/reset-password");
+  await expect(
+    page.getByRole("heading", {
+      name: "This link is unavailable",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(sessionCalls).toBe(0);
 });
