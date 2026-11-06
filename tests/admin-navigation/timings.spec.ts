@@ -39,7 +39,8 @@ for (const profile of [
           (window as unknown as { navTiming(v: unknown): void }).navTiming({
             kind,
             at: performance.timeOrigin + performance.now(),
-            discarded: document.wasDiscarded,
+            discarded: (document as Document & { wasDiscarded?: boolean })
+              .wasDiscarded,
           });
         let ready = false;
         const check = () => {
