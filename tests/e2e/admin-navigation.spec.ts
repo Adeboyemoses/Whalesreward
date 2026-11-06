@@ -52,8 +52,10 @@ test("I-07 admin section and detail navigation preserve the document and session
       .click();
     await expect(
       page
-        .getByRole("heading", { name: "Edit role", exact: true })
-        .or(page.getByText("Owner role cannot be edited", { exact: false })),
+        .getByRole("heading", { name: /^Owner/ })
+        .or(
+          page.getByText("The Owner role cannot be edited", { exact: false }),
+        ),
     ).toBeVisible();
     expect(await page.evaluate(() => "__adminDocumentSentinel" in window)).toBe(
       true,
