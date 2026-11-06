@@ -56,6 +56,7 @@ for (const profile of [
               .wasDiscarded,
           });
         let ready = false;
+        let lastScreen = "";
         const check = () => {
           const p = location.pathname.split("/").filter(Boolean);
           const h = [...document.querySelectorAll("main h2")];
@@ -74,8 +75,13 @@ for (const profile of [
                   : document.querySelectorAll('input[type="checkbox"]')
                       .length === 28
                 : false;
-          if (exists !== ready) {
+          const screen = p
+            .slice(1)
+            .map((v, i) => (i === 0 ? v : "detail"))
+            .join("-");
+          if (exists !== ready || (exists && screen !== lastScreen)) {
             ready = exists;
+            lastScreen = screen;
             send(exists ? "visible" : "blank");
           }
         };
