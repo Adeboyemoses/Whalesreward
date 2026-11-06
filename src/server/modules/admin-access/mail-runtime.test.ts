@@ -28,6 +28,7 @@ import { startAutomaticAdminMail } from "./mail-runtime";
 import { logger } from "../../lib/logger";
 const globals = globalThis as typeof globalThis & {
   __whrAutomaticAdminMail?: unknown;
+  __whrAutomaticAdminMailStartupLogged?: boolean;
 };
 const saved = {
   SIGTERM: process.rawListeners("SIGTERM"),
@@ -45,12 +46,14 @@ beforeEach(() => {
   process.removeAllListeners("SIGTERM");
   process.removeAllListeners("SIGINT");
   delete globals.__whrAutomaticAdminMail;
+  delete globals.__whrAutomaticAdminMailStartupLogged;
 });
 afterEach(async () => {
   const state = globals.__whrAutomaticAdminMail as
     { loop: { stop(): Promise<void> } } | undefined;
   await state?.loop.stop();
   delete globals.__whrAutomaticAdminMail;
+  delete globals.__whrAutomaticAdminMailStartupLogged;
   process.removeAllListeners("SIGTERM");
   process.removeAllListeners("SIGINT");
   for (const signal of ["SIGTERM", "SIGINT"] as const)
@@ -115,4 +118,32 @@ it("gates native shutdown until an active attempt drains and ignores repeated si
   expect(log).toHaveBeenCalledWith({ event: "email.loop_shutdown", errors: 0 });
   await vi.advanceTimersByTimeAsync(40000);
   expect(fake.next).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  ["provider_unset", undefined, "local", undefined],
+  ["noop", "noop", "local", undefined],
+  ["production", "noop", "production", undefined],
+  ["build_phase", "mailpit", "local", "phase-production-build"],
+])(
+  "logs one disabled startup reason %s without resources",
+  (reason, provider, environment, phase) => {
+    const log = vi.spyOn(logger, "info").mockImplementation(() => {});
+    vi.stubEnv("EMAIL_PROVIDER", provider);
+    vi.stubEnv("WHR_ENV", environment);
+    vi.stubEnv("NEXT_PHASE", phase);
+    startAutomaticAdminMail();
+    startAutomaticAdminMail();
+    expect(log.mock.calls).toEqual([
+      [{ event: "email.loop_disabled", reason }],
+    ]);
+    expect(fake.pool).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);
+it("logs one successful start across repeated registration", () => {
+  const log = vi.spyOn(logger, "info").mockImplementation(() => {});
+  startAutomaticAdminMail();
+  startAutomaticAdminMail();
+  expect(log.mock.calls).toEqual([[{ event: "email.loop_started" }]]);
 });

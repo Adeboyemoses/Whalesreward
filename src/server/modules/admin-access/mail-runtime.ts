@@ -8,6 +8,7 @@ import { createMailLoop, MAIL_LOOP_POLICY, type MailLoop } from "./mail-loop";
 type RuntimeState = { loop: MailLoop; draining: boolean };
 const runtime = globalThis as typeof globalThis & {
   __whrAutomaticAdminMail?: RuntimeState;
+  __whrAutomaticAdminMailStartupLogged?: boolean;
 };
 
 /** Next 16.4.5 installs its native cleanup before instrumentation. Gate those
@@ -49,18 +50,28 @@ function installShutdown(state: RuntimeState) {
 
 /** Explicit provider opt-in, no work during build and one loop across module reloads. */
 export function startAutomaticAdminMail() {
-  if (
-    process.env.NEXT_PHASE === "phase-production-build" ||
-    !process.env.EMAIL_PROVIDER ||
-    process.env.EMAIL_PROVIDER === "noop"
-  )
+  const disabled =
+    process.env.NEXT_PHASE === "phase-production-build"
+      ? "build_phase"
+      : process.env.WHR_ENV === "production" ||
+          (!process.env.WHR_ENV && process.env.NODE_ENV === "production")
+        ? "production"
+        : !process.env.EMAIL_PROVIDER
+          ? "provider_unset"
+          : process.env.EMAIL_PROVIDER === "noop"
+            ? "noop"
+            : undefined;
+  if (disabled) {
+    if (!runtime.__whrAutomaticAdminMailStartupLogged) {
+      runtime.__whrAutomaticAdminMailStartupLogged = true;
+      logger.info({ event: "email.loop_disabled", reason: disabled });
+    }
     return;
+  }
   if (runtime.__whrAutomaticAdminMail)
     return runtime.__whrAutomaticAdminMail.loop;
-  const email = emailConfig();
-  if (email.adapter === "noop") return;
+  emailConfig();
   const config = adminConfig();
-  if (config.production) return;
   if (!process.env.DATABASE_URL)
     throw new Error("Mail worker configuration is invalid");
   // Separate from both request and health pools; outage cannot exhaust their slots.
@@ -86,5 +97,9 @@ export function startAutomaticAdminMail() {
   const state = { loop, draining: false };
   runtime.__whrAutomaticAdminMail = state;
   installShutdown(state);
+  if (!runtime.__whrAutomaticAdminMailStartupLogged) {
+    runtime.__whrAutomaticAdminMailStartupLogged = true;
+    logger.info({ event: "email.loop_started" });
+  }
   return loop;
 }

@@ -255,7 +255,9 @@ describe("independent staging provider delivery safeguards", () => {
     });
     expect(result.revoked_at).not.toBeNull();
     expect(logger.warn).toHaveBeenCalledWith({
-      event: "email.recipient_refused",
+      event: "email.send_failed",
+      reason: "config_invalid",
+      setting: "EMAIL_ALLOWED_RECIPIENTS",
       adapter: "zoho_cpaas",
     });
     expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).not.toContain(

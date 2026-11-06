@@ -9,12 +9,28 @@ export type EmailOptions = {
   from?: string;
   allowedRecipients?: readonly string[];
 };
+export type EmailSetting =
+  | "WHR_ENV"
+  | "EMAIL_PROVIDER"
+  | "ZOHO_CPAAS_API_URL"
+  | "ZOHO_CPAAS_TOKEN"
+  | "EMAIL_FROM"
+  | "EMAIL_ALLOWED_RECIPIENTS"
+  | "MAILPIT_URL";
+/** Carries fixed diagnostics only; never include the rejected value or a cause. */
+export class EmailConfigError extends Error {
+  constructor(
+    readonly setting: EmailSetting,
+    readonly reason: "config_invalid" | "token_has_prefix" = "config_invalid",
+  ) {
+    super("Email configuration is invalid");
+  }
+}
 const address = z.email().max(254);
 export function normalizedEmail(value: string): string | undefined {
   const normalized = value.trim().toLowerCase();
   return address.safeParse(normalized).success ? normalized : undefined;
 }
-const invalid = () => new Error("Email configuration is invalid");
 /** No values in configuration errors: these variables contain private inboxes and credentials. */
 export function emailConfig(
   env: Record<string, string | undefined> = process.env,
@@ -23,33 +39,40 @@ export function emailConfig(
   const production =
     env.WHR_ENV === "production" ||
     (!env.WHR_ENV && env.NODE_ENV === "production");
-  if (production && env.EMAIL_ALLOWED_RECIPIENTS !== undefined) throw invalid();
+  if (production && env.EMAIL_ALLOWED_RECIPIENTS !== undefined)
+    throw new EmailConfigError("EMAIL_ALLOWED_RECIPIENTS");
   const provider =
     env.EMAIL_PROVIDER ?? (staging || production ? "noop" : "mailpit");
-  if (!["noop", "mailpit", "zoho_cpaas"].includes(provider)) throw invalid();
+  if (!["noop", "mailpit", "zoho_cpaas"].includes(provider))
+    throw new EmailConfigError("EMAIL_PROVIDER");
   if (provider === "noop") return { adapter: "noop", staging };
   if (provider === "mailpit") {
-    if (staging || production) throw invalid();
+    if (staging || production) throw new EmailConfigError("EMAIL_PROVIDER");
     return {
       adapter: "mailpit",
       mailpitUrl: env.MAILPIT_URL ?? "http://127.0.0.1:8025",
     };
   }
-  // This work order approves only staging delivery in the EU data centre.
-  if (!staging || env.ZOHO_CPAAS_API_URL !== "https://cpaas.zoho.eu/v1.1/email")
-    throw invalid();
+  if (!staging) throw new EmailConfigError("WHR_ENV");
+  if (
+    ![
+      "https://cpaas.zoho.com/v1.1/email",
+      "https://cpaas.zoho.eu/v1.1/email",
+    ].includes(env.ZOHO_CPAAS_API_URL ?? "")
+  )
+    throw new EmailConfigError("ZOHO_CPAAS_API_URL");
   const token = env.ZOHO_CPAAS_TOKEN;
+  if (token?.trimStart().toLowerCase().startsWith("zoho-enczapikey"))
+    throw new EmailConfigError("ZOHO_CPAAS_TOKEN", "token_has_prefix");
+  if (!token || /\s/.test(token))
+    throw new EmailConfigError("ZOHO_CPAAS_TOKEN");
   const from = normalizedEmail(env.EMAIL_FROM ?? "");
+  if (!from) throw new EmailConfigError("EMAIL_FROM");
   const allowedRecipients = (env.EMAIL_ALLOWED_RECIPIENTS ?? "")
     .split(",")
     .map(normalizedEmail);
-  if (
-    !token ||
-    /\s/.test(token) ||
-    !from ||
-    allowedRecipients.some((item) => !item)
-  )
-    throw invalid();
+  if (allowedRecipients.some((item) => !item))
+    throw new EmailConfigError("EMAIL_ALLOWED_RECIPIENTS");
   return {
     adapter: "zoho_cpaas",
     staging,

@@ -43,7 +43,7 @@ beforeEach(async () => {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No stub port");
   stubUrl = `http://127.0.0.1:${address.port}`;
-  // Transport substitution exists only in tests; production config still permits only EU HTTPS.
+  // Transport substitution exists only in tests; production config still permits only exact US/EU HTTPS.
   vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
     expect(String(url)).toBe("https://cpaas.zoho.eu/v1.1/email");
     return realFetch(stubUrl, init);
@@ -91,7 +91,12 @@ describe("Zoho staging email contract", () => {
     expect(requests).toHaveLength(0);
     expect(log.mock.calls).toEqual(
       Array.from({ length: 4 }, () => [
-        { event: "email.recipient_refused", adapter: "zoho_cpaas" },
+        {
+          event: "email.send_failed",
+          adapter: "zoho_cpaas",
+          reason: "config_invalid",
+          setting: "EMAIL_ALLOWED_RECIPIENTS",
+        },
       ]),
     );
   });

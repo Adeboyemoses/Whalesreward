@@ -1,18 +1,25 @@
 /** Fail startup before serving requests if delivery could escape its approved environment. */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { emailConfig } = await import("./server/adapters/email-config");
+    const { emailConfig, EmailConfigError } =
+      await import("./server/adapters/email-config");
+    const { logger } = await import("./server/lib/logger");
     try {
       emailConfig();
-      if (process.env.NEXT_PHASE !== "phase-production-build") {
-        const { startAutomaticAdminMail } =
-          await import("./server/modules/admin-access/mail-runtime");
-        startAutomaticAdminMail();
-      }
-    } catch {
-      // Next catches instrumentation exceptions and keeps listening. Invalid
-      // delivery configuration must terminate the process, not merely reject requests.
-      console.error("Email configuration is invalid");
+      const { startAutomaticAdminMail } =
+        await import("./server/modules/admin-access/mail-runtime");
+      startAutomaticAdminMail();
+    } catch (error) {
+      // Next catches instrumentation exceptions and keeps listening: terminate explicitly.
+      logger.error(
+        error instanceof EmailConfigError
+          ? {
+              event: "email.config_invalid",
+              reason: error.reason,
+              setting: error.setting,
+            }
+          : { event: "email.startup_failed", reason: "config_invalid" },
+      );
       process.exit(1);
     }
   }
