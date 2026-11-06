@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   Fuel,
@@ -136,7 +137,7 @@ export function Sidebar({
         {items.map((item, index) => {
           const Icon = sidebarIcons[index] ?? Settings;
           return (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               aria-current={active === item.label ? "page" : undefined}
@@ -151,7 +152,7 @@ export function Sidebar({
                   {item.count}
                 </span>
               )}
-            </a>
+            </Link>
           );
         })}
       </nav>
