@@ -16,6 +16,6 @@ WO-app-4 (WHR-9) Admin access screens: ACCEPTED by Earl on 2026-11-06
 ## Risks
 - WHR-69/70 remain separate nonblocking presentation/pagination and inherited email-template fidelity follow-ups. H07 remains a permission reference; actual Reports scope is not accepted here.
 - WHR-68/73 closure belongs to lane:core; this session does not change those issues, cloud resources or staging data.
-- Prior build session exceeded its high-tier dispatch flag (14 feature dispatches, 15 including READY records; two feature rounds). This documentation closeout uses one independent reviewer. Runtime model identity unavailable.
+- Prior build session exceeded its high-tier dispatch flag (14 feature dispatches, 15 including READY records; two feature rounds). This documentation closeout has two independent review dispatches, including the concurrent shared-record merge resolution. Runtime model identity unavailable.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
