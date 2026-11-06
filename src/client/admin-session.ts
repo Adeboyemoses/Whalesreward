@@ -13,6 +13,7 @@ export type AdminState = {
   refreshing: boolean;
   error: string;
   epoch: number;
+  transitionTo: "/admin/sign-in" | "/admin/signed-out" | null;
 };
 export class AdminSessionStore {
   private state: AdminState = {
@@ -21,6 +22,7 @@ export class AdminSessionStore {
     refreshing: false,
     error: "",
     epoch: 0,
+    transitionTo: null,
   };
   private listeners = new Set<() => void>();
   private refreshId = 0;
@@ -38,7 +40,10 @@ export class AdminSessionStore {
     this.state = { ...this.state, ...patch };
     this.listeners.forEach((fn) => fn());
   }
-  clear(message = "Your session ended. Sign in again.") {
+  clear(
+    message = "Your session ended. Sign in again.",
+    transitionTo: AdminState["transitionTo"] = null,
+  ) {
     this.refreshId++;
     this.inFlight = null;
     this.lists.clear();
@@ -47,6 +52,7 @@ export class AdminSessionStore {
       checked: true,
       refreshing: false,
       error: message,
+      transitionTo,
       epoch: this.state.epoch + 1,
     });
   }
@@ -59,8 +65,12 @@ export class AdminSessionStore {
       checked: true,
       refreshing: false,
       error: "",
+      transitionTo: null,
       epoch: this.state.epoch + 1,
     });
+  }
+  finishTransition(path: string) {
+    if (this.state.transitionTo === path) this.publish({ transitionTo: null });
   }
   private authority(s: AdminSession | null) {
     return s
