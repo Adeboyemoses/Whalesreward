@@ -46,7 +46,6 @@ export function AdminPortal({ path }: { path: string[] }) {
   const route = path.join("/");
   const router = useRouter();
   const { session, checked, error, epoch } = useAdminSession();
-  const loading = !checked;
   const management = ![
     "sign-in",
     "first-password",
@@ -57,6 +56,10 @@ export function AdminPortal({ path }: { path: string[] }) {
     "reset-password",
     "verify-email",
   ].includes(route);
+  // Public credentials and recipient flows must not wait for an admin session.
+  const loading =
+    !checked &&
+    (management || route === "first-password" || route === "sign-out");
   useEffect(() => {
     if (session?.state === "password_change_required" && management)
       router.replace("/admin/first-password");
