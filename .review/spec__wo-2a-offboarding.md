@@ -10,7 +10,7 @@ blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
 dispatches: 0
 plan:
   goal: specify assignment-ending offboarding under P-21 without application code
-  files: docs/engineering/contracts/m1.md, docs/engineering/contracts/m2.md, docs/engineering/data-model.md, docs/engineering/decisions/INDEX.md
+  files: docs/engineering/contracts/m1.md, docs/engineering/contracts/m2.md, docs/engineering/contracts/m3.md, docs/engineering/data-model.md, docs/engineering/decisions/INDEX.md
   approach: guarded idempotent assignment end with atomic live-authority revocation and immutable P-20 queue history
   tests: EM typecheck lint unit build and spec consistency checks; independent code security integrity review
   risks: offline phones cannot observe revocation instantly; implementation is separate core work; shared READY records follow in a separate PR
