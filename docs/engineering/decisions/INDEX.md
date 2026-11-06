@@ -47,6 +47,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | T-15 | Staging transactional email uses Zoho CPaaS EU behind the email adapter, environment-only credentials/sender and exact test-recipient allowlist; local Mailpit and production activation gates remain | Earl, 2026-11-05; WHR-66 |
 
+| T-16 | Run bounded admin-mail polling inside the existing web process with explicit provider opt-in, durable message leases and graceful shutdown; no extra paid component | EM choice delegated by Earl, 2026-11-06; WHR-68 |
+
 ## Open product decisions that touch code
 
 D02 (meter settings, halfway rounding; capped capture build default P-20 (refines P-18) awaits Q-528 client confirmation), D05 (other retirement cases), D06 (role matrix, token expiries, providers, loss-of-email process), D07 (photo originals, backups, restore objectives), D08 (field validation), D09 (campaign dates, grace, retention values). See `product-docs/06 Delivery and Handoffs/Design Handoff Readiness.md`. Build them behind configuration or adapters; never invent the client's policy.
