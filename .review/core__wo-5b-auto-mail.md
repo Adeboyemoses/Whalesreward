@@ -13,7 +13,7 @@ blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
 dispatches: 5
 invariants: [I-12, I-41, I-52]
 p1: []
-tickets: []
+tickets: [WHR-71, WHR-72]
 plan:
   goal: Automatically drain queued admin mail within a minute under healthy configured delivery without manual console execution or an extra paid component.
   files: src/instrumentation*, src/server/modules/admin-access/mail*, src/server/adapters/email*, jobs/admin-mail.ts, scripts/deploy/entrypoint*, Dockerfile, package.json, tests/integration/*mail*, tests/e2e/*mail*, docs/ops/staging.md
@@ -30,3 +30,6 @@ Independent tests cover competing loops, expired leases and late acknowledgement
 The compiled-runtime regression verifies health responsiveness and actual SIGTERM drain through the deployment entrypoint.
 No cloud operations or real provider calls; all fixtures and transport tests stay local.
 Technical decision and shared session records are separate PRs.
+
+After concurrent app PRs #60/#61 merged, EM reran the combined head: typecheck/lint/build, 197 unit and 143 PostgreSQL/MinIO tests PASS; final Linux browser run 102 passed/four existing skips.
+WHR-71 tracks slow CI font downloads; two setup attempts were cancelled before tests and fresh runners passed. WHR-72 tracks an inherited app test redirect race observed once in the first combined local run; the unchanged full rerun passed. Neither changes this feature or test retry policy.
