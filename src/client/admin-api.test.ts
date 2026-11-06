@@ -37,3 +37,9 @@ it("issues operation keys accepted by the server UUIDv7 contract", async () => {
   expect(keys.every((key) => authId.safeParse(key).success)).toBe(true);
   expect(new Set(keys).size).toBe(keys.length);
 });
+it("formats trusted instants using the station calendar and readable action labels", async () => {
+  const { adminTime, adminAction } = await import("./admin-display");
+  expect(adminTime("2026-10-21T09:42:00.000Z")).toBe("21 Oct 2026 · 10:42 AM");
+  expect(adminTime("2026-10-20T23:05:00.000Z")).toBe("21 Oct 2026 · 12:05 AM");
+  expect(adminAction("password_changed")).toBe("Password changed");
+});

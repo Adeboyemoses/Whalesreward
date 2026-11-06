@@ -1,4 +1,5 @@
 "use client";
+import { adminTime, adminAction } from "@/client/admin-display";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import {
   useEffect,
@@ -925,6 +926,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                           />
                           <TextField
                             label="Username"
+                            helper="Unique, case-insensitive."
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             pattern="[a-z0-9._-]{3,40}"
@@ -932,6 +934,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                           />
                           <TextField
                             label="Email address"
+                            helper="Verify this address before it can be used for password recovery. The recipient must open the verification link; admins cannot mark it verified manually."
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             type="email"
@@ -940,6 +943,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                           />
                           <PasswordField
                             label="Temporary password"
+                            helper="At least 12 characters. The user must change it on first sign-in. It is never shown again or stored in records."
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
 
@@ -980,6 +984,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                       <label className="wr-field">
                         Role
                         <select
+                          aria-label="Role"
                           className="wr-input"
                           value={roleId}
                           onChange={(e) => setRoleId(e.target.value)}
@@ -1002,6 +1007,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                         <label className="wr-field">
                           Account status
                           <select
+                            aria-label="Account status"
                             className="wr-input"
                             value={String(enabled)}
                             onChange={(e) =>
@@ -1025,7 +1031,12 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                           onChange={(e) => setReason(e.target.value)}
                           required
                           maxLength={1000}
+                          aria-describedby="access-reason-help"
                         />
+                        <small id="access-reason-help" className="wr-help">
+                          Required. Recorded in the access history with your
+                          name and the time.
+                        </small>
                       </label>
                       <Button type="submit">
                         {rolesMode ? "Review role" : "Review user"}
@@ -1045,10 +1056,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         {history.length ? (
           history.map((h) => (
             <p key={h.id}>
-              {new Date(h.occurredAt).toLocaleString("en-GB", {
-                timeZone: "Africa/Lagos",
-              })}{" "}
-              · {h.action} · {h.reason}
+              {adminTime(h.occurredAt)} · {adminAction(h.action)} · {h.reason}
             </p>
           ))
         ) : (
