@@ -26,6 +26,7 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | P-20 | Supersedes P-18 interval/review rule: evaluate [S, min(R, original offlineExpiresAt)] across price, assignment and campaign history; late receipt alone causes no hold. Evidence-backed M3 capture review requires sales AND dateReview, confirms only capture authorization/time blocks or cancels, rerunning all other gates. No boolean or automatic clearing; one server module; Q-528 pending. Retains P-18’s refinement of P-07 | Earl, 5 Nov 2026; [WHR-61](https://linear.app/phaneum/issue/WHR-61), refining WHR-38/WHR-52 |
 | P-19 | Recovered unverified corrections require ordinary late review by sales AND corrections admin distinct from executor and grant authorizer; only that decision clears proposal block, never automatic treatment. Refines P-11 | Earl, 4 Nov 2026; WHR-46 and WHR-52 |
+| P-21 | Offboarding ends the attendant's pump assignment: no active assignment refuses sign-in/capture; ending it revokes all sessions, preserving history and queues under P-20. Extends P-10; retains P-16's excluded disable/reset controls and no pump deactivation. Guarded endpoint and recovery rules are in [M2](../contracts/m2.md#assignment-ending-offboarding--p-21-wo-spec-2a-whr-79); attendant disable is a possible later client addition, not approved scope | Earl, 6 Nov 2026; [WHR-76 decision](https://linear.app/phaneum/issue/WHR-76), [WHR-79](https://linear.app/phaneum/issue/WHR-79) |
 
 ## Technical (this repo)
 
