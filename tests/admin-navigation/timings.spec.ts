@@ -121,8 +121,9 @@ for (const profile of [
           .toBe(true);
         const captured = events.slice(from);
         const trigger =
-          captured.find((e) => e.kind === "click" || e.kind === "focus")?.at ??
-          start;
+          captured.find(
+            (e) => e.kind === (operation === "tab-return" ? "focus" : "click"),
+          )?.at ?? start;
         const end = captured.find(
           (e) => e.kind === "visible" && e.at >= trigger,
         )!.at;
