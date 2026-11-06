@@ -2,6 +2,19 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-spec-2a offboarding specification READY (WHR-79)
+
+[PR #71](https://github.com/Adeboyemoses/Whalesreward/pull/71) merged at 8368f48 with all five CI checks green. Code/security/integrity PASS round 2 at d392a716; round 1's missing M3 audit allowlist is fixed. P-21 extends P-10 while retaining P-16. M1/M2/M3 and the model specify ending an assignment, guarded replay, live-session revocation, non-revealing ready/restricted sign-in denial, typed ending audit, retained history/queues and original P-20 bounds. This is documentation READY awaiting Earl's reading, not acceptance or implemented offboarding coverage.
+
+| Invariants / board inputs | Specification evidence | Status |
+|---|---|---|
+| I-01/I-03/I-04/I-05/I-07/I-09 | M2 assignment/end authority, aggregate+assignment guard, atomic revocation, sign-in/restricted checks and concurrent read/write requirements | spec READY; runtime follow-up WHR-80 |
+| I-05a/I-06/I-22/I-28/I-35/I-36/I-45a | M1/M2 original context/IDs/blobs/receipt preservation; capped [S,U], original-phone scoped recovery and evidence-backed M3 capture review | spec READY; no new implemented tests |
+| I-41 | M2 ending receipt/audit and M3 assignment_ended action, attendant target and five exact typed changes | spec READY; no new implemented tests |
+| A01/A12/A18/A17; D03/F04/F09/F10 | Existing sign-in/handover/assignment inputs; P-16 placeholders remain excluded; no new offboarding board or UI built | specification reference only; no parity claim |
+
+EM verification: typecheck/lint, 248 unit tests, production build and evidence validation PASS; added prose <=120 words, local link targets and diff whitespace PASS. CI integration/browser/storage also passed, without new test cases. Existing runtime coverage/status rows remain unchanged. Required downstream race, replay, history and P-20 boundary cases are listed in M2; WHR-80 is Backlog pending separate implementation approval. Rook should mirror P-21 to product docs and track possible later attendant disable with the client. No decisions are needed for this READY handoff.
+
 ## WO-spec-1 documentation status (WHR-32)
 
 Data-model PR #4 is merged on staging with independent security and integrity PASS verdicts. M1 contracts PR #5 is merged with independent security and integrity PASS verdicts; lane setup and closeout complete when PR #1 merges. These are specification changes only: no invariant implementation or built-screen parity is claimed; test and board statuses remain unchanged.

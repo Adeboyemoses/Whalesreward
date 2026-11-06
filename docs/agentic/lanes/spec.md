@@ -1,20 +1,21 @@
 # lane:spec
-WO-spec-3b (WHR-61) capture interval and M3 capture review: ACCEPTED since 2026-11-05
+WO-spec-2a (WHR-79) attendant offboarding by assignment end: READY since 2026-11-06
 
 ## In flight
-- Earl accepted the specification in [PR #38](https://github.com/Adeboyemoses/Whalesreward/pull/38), merged into staging at 5304f34 with independent code/security/integrity PASS and all five CI checks green.
-- P-20 and the M1/M3/model/I-45a amendments are accepted. This documentation closeout moves WHR-61 to Done after its reviewed green staging merge; the closeout PR is linked from WHR-61.
-- No new implementation or board parity is claimed. WO-core-4a's interval implementation merged separately in PR #39; M3 capture review remains WO-core-9.
+- [Specification PR #71](https://github.com/Adeboyemoses/Whalesreward/pull/71) merged into staging at 8368f48 with all five CI checks green. P-21 records Earl's WHR-76 decision; M1/M2/M3 and the model specify guarded termination, immediate server revocation, immutable queue/history context and P-20 recovery validation.
+- Code/security/integrity PASS round 2 at d392a716; the missing typed audit catalogue from round 1 is fixed. Evidence: `.review/spec__wo-2a-offboarding.md`.
+- EM final head: typecheck, lint, 248 unit tests, production build and evidence validation PASS. New prose <=120 words and local links/whitespace checked. CI integration/browser/storage checks PASS. This separate records PR is linked from WHR-79.
+- Specification only; no offboarding implementation or screen parity claimed. WHR-79 remains In Review awaiting Earl's reading; no acceptance or closure inferred.
 
 ## Next
-- Stop after closure. No new work order is authorized.
+- Stop at READY. Backend follow-up [WHR-80](https://linear.app/phaneum/issue/WHR-80) stays Backlog pending a separate approved core work order.
+- Rook should mirror P-21 into product docs and keep attendant disable as a possible later client addition.
 
 ## Earl's gos
-- 2026-11-05: “[spec] Earl accepted WO-spec-3b (WHR-61); close it, then stop. No new work order.”
+- 2026-11-06: “Work order: WO-spec-2a (WHR-79), attendant offboarding by ending the pump assignment, per Earl's decision on WHR-76. Take it to READY, then stop. Follow AGENTS.md.”
 
 ## Risks
-- Q-528 remains pending client confirmation; acceptance does not settle it.
-- PR #38's nine review dispatches exceeded the high-tier flag because concurrent status/coverage updates required a third review round; all three final verdicts passed. Delivery metrics and verification remain in that PR.
-- Metrics below cover this documentation closeout only. Runtime full model ID unavailable.
+- A disconnected phone cannot observe revocation instantly; it retains originals and locks on observing revocation. Unassigned leavers need scoped original-phone recovery or later authorized reassignment for upload authority; neither grants credit.
+- Q-528 client confirmation remains pending. No new policy, provider or cloud action is authorized. Full runtime model ID unavailable.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=7 prs=2 rounds_max=2 escalations=0 model=unavailable
