@@ -45,7 +45,7 @@ export function AdminPortal({ path }: { path: string[] }) {
     .filter(Boolean);
   const route = path.join("/");
   const router = useRouter();
-  const { session, checked, error, epoch } = useAdminSession();
+  const { session, checked, error, epoch, transitionTo } = useAdminSession();
   const management = ![
     "sign-in",
     "first-password",
@@ -61,6 +61,10 @@ export function AdminPortal({ path }: { path: string[] }) {
     !checked &&
     (management || route === "first-password" || route === "sign-out");
   useEffect(() => {
+    if (transitionTo) {
+      if (pathname !== transitionTo) router.replace(transitionTo);
+      return;
+    }
     if (session?.state === "password_change_required" && management)
       router.replace("/admin/first-password");
     else if (
@@ -69,7 +73,18 @@ export function AdminPortal({ path }: { path: string[] }) {
       !session
     )
       router.replace("/admin/sign-in");
-  }, [session, management, route, checked, error, router]);
+  }, [
+    session,
+    management,
+    route,
+    checked,
+    error,
+    router,
+    transitionTo,
+    pathname,
+  ]);
+  if (transitionTo && pathname !== transitionTo)
+    return <p role="status">Finishing account change…</p>;
   if (management) {
     if (loading) return <p role="status">Loading account…</p>;
     if (!session)
@@ -317,7 +332,7 @@ function Entry({
       } else if (route === "sign-out") {
         await api("sign-out", {}, "POST", key.current);
         if (submittedTokenVersion !== tokenVersion.current) return;
-        store.clear("");
+        store.clear("", "/admin/signed-out");
         router.replace("/admin/signed-out");
       } else {
         await api(
@@ -336,7 +351,7 @@ function Entry({
         token.current = "";
         form.reset();
         if (route === "reset-password") {
-          store.clear("");
+          store.clear("", "/admin/sign-in");
           router.replace("/admin/sign-in");
         } else setDone(true);
       }

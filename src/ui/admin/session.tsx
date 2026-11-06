@@ -26,6 +26,7 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
     };
   }, [store]);
   useEffect(() => {
+    store.finishTransition(path);
     if (
       ![
         "/admin/sign-in",

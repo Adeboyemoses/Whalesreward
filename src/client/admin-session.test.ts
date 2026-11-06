@@ -72,3 +72,25 @@ it("delegation refusal does not log out an otherwise-authorized admin", async ()
   await expect(s.request("roles", {})).rejects.toBeInstanceOf(AdminError);
   expect(s.getSnapshot().session?.account.id).toBe("A");
 });
+
+it("successful server auth transitions clear private memory before exposing their destination", () => {
+  const store = new AdminSessionStore();
+  store.adopt(session());
+  store.lists.set("users", [1]);
+  store.clear("", "/admin/signed-out");
+  expect(store.getSnapshot()).toMatchObject({
+    session: null,
+    transitionTo: "/admin/signed-out",
+  });
+  expect(store.lists.size).toBe(0);
+  store.finishTransition("/admin/sign-in");
+  expect(store.getSnapshot().transitionTo).toBe("/admin/signed-out");
+  store.finishTransition("/admin/signed-out");
+  expect(store.getSnapshot().transitionTo).toBeNull();
+  store.adopt(session());
+  store.clear("", "/admin/sign-in");
+  expect(store.getSnapshot()).toMatchObject({
+    session: null,
+    transitionTo: "/admin/sign-in",
+  });
+});
