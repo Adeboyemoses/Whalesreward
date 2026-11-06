@@ -1,5 +1,8 @@
 "use client";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useAdminSession } from "./session";
+import type { AdminSession as Session } from "@/client/admin-session";
 import { adminTime, adminAction } from "@/client/admin-display";
 import {
   Eye,
@@ -31,18 +34,19 @@ import {
   dependencies,
   sensitiveDefaults,
 } from "@/shared/contracts/admin";
-type Session = {
-  state: string;
-  account: { id: string; name: string; username: string };
-  permissions?: PermissionCode[];
-  role?: RoleSummary;
-  station?: { name: string };
-};
 const link = (href: string, label: string) => (
-  <a href={"/admin/" + href}>{label}</a>
+  <Link href={"/admin/" + href}>{label}</Link>
 );
 export function AdminPortal({ path }: { path: string[] }) {
+  const pathname = usePathname();
+  path = pathname
+    .replace(/^\/admin\/?/, "")
+    .split("/")
+    .filter(Boolean);
   const route = path.join("/");
+  const router = useRouter();
+  const { session, checked, error, epoch } = useAdminSession();
+  const loading = !checked;
   const management = ![
     "sign-in",
     "first-password",
@@ -53,50 +57,16 @@ export function AdminPortal({ path }: { path: string[] }) {
     "reset-password",
     "verify-email",
   ].includes(route);
-  const [session, setSession] = useState<Session | null>(null),
-    [loading, setLoading] = useState(
-      management || route === "first-password" || route === "sign-out",
-    ),
-    [error, setError] = useState("");
   useEffect(() => {
-    if (!management && route !== "first-password" && route !== "sign-out")
-      return;
-    let live = true;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const s = await api<Session>("session");
-        if (!live) return;
-        if (
-          s.state === "password_change_required" &&
-          route !== "first-password" &&
-          route !== "sign-out"
-        ) {
-          location.replace("/admin/first-password");
-          return;
-        }
-        setSession(s);
-      } catch (e) {
-        if (!live) return;
-        setSession(null);
-        if (e instanceof AdminError && e.status === 401)
-          location.replace("/admin/sign-in");
-        setError(e instanceof Error ? e.message : "Unable to load account.");
-      } finally {
-        if (live) setLoading(false);
-      }
-    };
-    void load();
-    const focus = () => {
-      setSession(null);
-      void load();
-    };
-    window.addEventListener("focus", focus);
-    return () => {
-      live = false;
-      window.removeEventListener("focus", focus);
-    };
-  }, [management, route]);
+    if (session?.state === "password_change_required" && management)
+      router.replace("/admin/first-password");
+    else if (
+      (management || route === "first-password" || route === "sign-out") &&
+      checked &&
+      !session
+    )
+      router.replace("/admin/sign-in");
+  }, [session, management, route, checked, error, router]);
   if (management) {
     if (loading) return <p role="status">Loading account…</p>;
     if (!session)
@@ -167,7 +137,12 @@ export function AdminPortal({ path }: { path: string[] }) {
             {session.account.name} · {session.role?.name}
           </span>
         </div>
-        <Management key={route} path={path} session={session} />
+        {error && (
+          <p role="alert" className="wr-notice">
+            {error}
+          </p>
+        )}
+        <Management key={route + ":" + epoch} path={path} session={session} />
       </AdminShell>
     );
   }
@@ -191,7 +166,17 @@ export function AdminPortal({ path }: { path: string[] }) {
         </small>
       </section>
       <section className="wr-auth-form">
-        <Entry route={route} session={session} loading={loading} />
+        {error && (
+          <p role="alert" className="wr-notice">
+            {error}
+          </p>
+        )}
+        <Entry
+          key={route + ":" + epoch}
+          route={route}
+          session={session}
+          loading={loading}
+        />
       </section>
     </div>
   );
@@ -205,6 +190,8 @@ function Entry({
   session: Session | null;
   loading: boolean;
 }) {
+  const { store } = useAdminSession();
+  const router = useRouter();
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [email, setEmail] = useState(""),
@@ -216,6 +203,13 @@ function Entry({
   const token = useRef(""),
     key = useRef("");
   const tokenVersion = useRef(0);
+  useEffect(
+    () => () => {
+      // Invalidate every entry request on unmount.
+      tokenVersion.current++;
+    },
+    [],
+  );
   useEffect(() => {
     if (!["verify-email", "reset-password"].includes(route)) return;
     const inspect = (source: URL) => {
@@ -298,9 +292,10 @@ function Entry({
           "POST",
           route === "sign-in" ? key.current : undefined,
         );
+        if (submittedTokenVersion !== tokenVersion.current) return;
         form.reset();
-        // A full navigation discards all credential and account drafts.
-        location.assign(
+        store.adopt(s);
+        router.push(
           s.state === "password_change_required"
             ? "/admin/first-password"
             : "/admin",
@@ -312,13 +307,15 @@ function Entry({
           "POST",
           key.current,
         );
+        if (submittedTokenVersion !== tokenVersion.current) return;
         form.reset();
-        // Full navigation discards the private recovery address.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        location.assign("/admin/forgot-password/sent");
+        // The route-keyed entry discards the private recovery address.
+        router.push("/admin/forgot-password/sent");
       } else if (route === "sign-out") {
         await api("sign-out", {}, "POST", key.current);
-        location.replace("/admin/signed-out");
+        if (submittedTokenVersion !== tokenVersion.current) return;
+        store.clear("");
+        router.replace("/admin/signed-out");
       } else {
         await api(
           route === "verify-email"
@@ -335,8 +332,10 @@ function Entry({
         if (submittedTokenVersion !== tokenVersion.current) return;
         token.current = "";
         form.reset();
-        if (route === "reset-password") location.replace("/admin/sign-in");
-        else setDone(true);
+        if (route === "reset-password") {
+          store.clear("");
+          router.replace("/admin/sign-in");
+        } else setDone(true);
       }
     } catch (e) {
       if (submittedTokenVersion !== tokenVersion.current) return;
@@ -658,13 +657,23 @@ function Entry({
   );
 }
 function Management({ path, session }: { path: string[]; session: Session }) {
+  const { store } = useAdminSession();
+  const api = store.request;
+  const router = useRouter();
   const rolesMode = path[0] === "roles",
     kind = rolesMode ? "roles" : "users",
     id = path[1],
     isNew = id === "new",
     editing = !!id;
   const allowed = session.permissions?.includes(rolesMode ? "roles" : "users");
-  const [items, setItems] = useState<(AdminUser | RoleSummary)[]>([]),
+  type ListPage = {
+    items: (AdminUser | RoleSummary)[];
+    nextCursor: string | null;
+  };
+  const cached = store.lists.get(kind) as ListPage | undefined;
+  const [items, setItems] = useState<(AdminUser | RoleSummary)[]>(
+      cached?.items ?? [],
+    ),
     [roles, setRoles] = useState<RoleSummary[]>([]),
     [user, setUser] = useState<AdminUser | null>(null),
     [role, setRole] = useState<RoleSummary | null>(null),
@@ -676,7 +685,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
     [busy, setBusy] = useState(false),
     [review, setReview] = useState(false),
     [notice, setNotice] = useState(""),
-    [cursor, setCursor] = useState<string | null>(null);
+    [cursor, setCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [name, setName] = useState(""),
     [username, setUsername] = useState(""),
     [email, setEmail] = useState(""),
@@ -690,73 +699,109 @@ function Management({ path, session }: { path: string[]; session: Session }) {
   );
   const key = useRef("");
   const frozen = useRef<Record<string, unknown> | null>(null);
+  const loadVersion = useRef(0);
   async function load(next?: string) {
+    const version = ++loadVersion.current;
+    const current = () => version === loadVersion.current;
     setLoading(true);
     setError("");
     setReview(false);
     frozen.current = null;
     key.current = "";
     setPassword("");
+    if (!allowed) {
+      setLoading(false);
+      return;
+    }
+    void api<{ items: typeof history }>(
+      "access-history?targetType=" +
+        (rolesMode ? "role" : "admin") +
+        (!isNew && id && id !== "owner" ? "&targetId=" + id : ""),
+    ).then(
+      (h) => {
+        if (current()) setHistory(h.items);
+      },
+      () => {
+        if (current()) setNotice("Access history could not be refreshed.");
+      },
+    );
     try {
-      if (!allowed) return;
       if (editing) {
         if (rolesMode) {
-          let r: RoleSummary;
-          if (id === "owner") {
-            const page = await api<{ items: RoleSummary[] }>("roles?limit=100");
-            const found = page.items.find((v) => v.isOwner);
-            if (!found) throw new Error("Owner role unavailable.");
-            r = found;
-          } else if (isNew) {
-            r = null as unknown as RoleSummary;
-          } else r = await api<RoleSummary>("roles/" + id);
-          if (r) {
-            setRole(r);
-            setName(r.name);
-            setPermissions(r.permissions);
+          if (!isNew) {
+            const r =
+              id === "owner"
+                ? (
+                    await api<{ items: RoleSummary[] }>("roles?limit=100")
+                  ).items.find((v) => v.isOwner)
+                : await api<RoleSummary>("roles/" + id);
+            if (!r) throw new Error("Owner role unavailable.");
+            if (current()) {
+              setRole(r);
+              setName(r.name);
+              setPermissions(r.permissions);
+            }
           }
         } else {
-          const rs = await api<{ items: RoleSummary[] }>(
+          const picker = api<{ items: RoleSummary[] }>(
             "assignable-roles?limit=100",
-          );
-          setRoles(rs.items);
-          if (!isNew) {
+          ).then((rs) => {
+            if (current()) {
+              setRoles(rs.items);
+              if (isNew) setRoleId(rs.items[0]?.id ?? "");
+            }
+          });
+          if (isNew) await picker;
+          else {
+            void picker.catch(() => {
+              if (current()) setNotice("Role choices could not be refreshed.");
+            });
             const u = await api<AdminUser>("users/" + id);
-            setUser(u);
-            setRoleId(u.role.id);
-            setEnabled(u.enabled);
-          } else setRoleId(rs.items[0]?.id ?? "");
+            if (current()) {
+              setUser(u);
+              setRoleId(u.role.id);
+              setEnabled(u.enabled);
+            }
+          }
         }
       } else {
-        const p = rolesMode
-          ? await api<{ items: RoleSummary[]; nextCursor: string | null }>(
+        const page = rolesMode
+          ? await api<ListPage>(
               "roles" + (next ? "?cursor=" + encodeURIComponent(next) : ""),
             )
-          : await api<{ items: AdminUser[]; nextCursor: string | null }>(
-              "users/search",
-              next ? { cursor: next } : {},
-            );
-        setItems((old) => (next ? [...old, ...p.items] : p.items));
-        setCursor(p.nextCursor);
+          : await api<ListPage>("users/search", next ? { cursor: next } : {});
+        if (current()) {
+          const combined = next ? [...items, ...page.items] : page.items;
+          setItems(combined);
+          setCursor(page.nextCursor);
+          store.lists.set(kind, {
+            items: combined,
+            nextCursor: page.nextCursor,
+          });
+        }
       }
-      const h = await api<{ items: typeof history }>(
-        "access-history?targetType=" +
-          (rolesMode ? "role" : "admin") +
-          (!isNew && id && id !== "owner" ? "&targetId=" + id : ""),
-      );
-      setHistory(h.items);
     } catch (e) {
-      setError((e as Error).message);
-      setUser(null);
-      setRole(null);
-      setItems([]);
+      if (current()) {
+        setError((e as Error).message);
+        setUser(null);
+        setRole(null);
+      }
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   }
   useEffect(() => {
-    const start = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(start);
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void load();
+    });
+    return () => {
+      active = false;
+      // A generation counter invalidates requests, not a DOM ref.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      loadVersion.current++;
+    };
+    // The editor is keyed by route and authority epoch. Healthy refresh preserves drafts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const selected = roles.find((v) => v.id === roleId) ?? user?.role;
@@ -812,9 +857,8 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       setPassword("");
       frozen.current = null;
       const target = "user" in result ? result.user : result;
-      // Full navigation discards credential drafts and the previous account snapshot.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      location.assign("/admin/" + kind + "/" + target.id);
+      // The route-keyed editor discards credentials and confirmation drafts.
+      router.push("/admin/" + kind + "/" + target.id);
     } catch (e) {
       const err = e as AdminError;
       setError(err.message);
@@ -823,7 +867,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         setRole(null);
         setItems([]);
         setPassword("");
-        location.replace("/admin/sign-in");
+        router.replace("/admin/sign-in");
       } else if (err.status) {
         setReview(false);
         frozen.current = null;
@@ -896,9 +940,84 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       </p>
     </aside>
   );
+  const listPanel = (
+    <section className="wr-sheet wr-admin-access-card">
+      <h2>{rolesMode ? "Roles & permissions" : "Portal users"}</h2>
+      {link(kind + "/new", rolesMode ? "Create role" : "Create user")}
+      <div className="wr-admin-access-table">
+        <table className="wr-table">
+          <thead>
+            <tr>
+              <th>{rolesMode ? "Role" : "Name / username"}</th>
+              <th>{rolesMode ? "Access" : "Role"}</th>
+              <th>{rolesMode ? "Assigned users" : "Email"}</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>
+                  {item.name}
+                  {"username" in item && (
+                    <p>
+                      {item.username} · {item.adminCode}
+                    </p>
+                  )}
+                </td>
+                <td>
+                  {"role" in item
+                    ? item.role.name
+                    : item.permissions.length + " permitted actions"}
+                </td>
+                <td>
+                  {"email" in item ? (
+                    <>
+                      {item.email ?? "No email recorded"}
+                      <p>{item.emailVerified ? "Verified" : "Unverified"}</p>
+                    </>
+                  ) : (
+                    item.userCount
+                  )}
+                </td>
+                <td>
+                  {"enabled" in item
+                    ? item.enabled
+                      ? "Active"
+                      : "Disabled"
+                    : item.isOwner
+                      ? "Protected Owner"
+                      : "Active"}
+                </td>
+                <td>
+                  {link(
+                    kind + "/" + item.id,
+                    rolesMode ? "View permissions" : "Manage",
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {loading && <p role="status">Refreshing {kind}…</p>}
+      {!items.length && !loading && <p>No {kind} found.</p>}
+      {cursor && <Button onClick={() => void load(cursor)}>Load more</Button>}
+    </section>
+  );
   if (!allowed)
     return <p role="alert">You do not have permission to view this section.</p>;
-  if (loading) return <p role="status">Loading…</p>;
+  if (loading && !items.length) return <p role="status">Loading…</p>;
+  if (loading && editing)
+    return (
+      <>
+        {listPanel}
+        <p role="status" className="wr-notice">
+          Loading details…
+        </p>
+      </>
+    );
   if (!rolesMode && user && (notice || path[2] === "verification-sent"))
     return (
       <>
@@ -1003,406 +1122,346 @@ function Management({ path, session }: { path: string[]; session: Session }) {
           {notice}
         </p>
       )}
-      {!editing ? (
-        <section className="wr-sheet wr-admin-access-card">
-          <h2>{rolesMode ? "Roles & permissions" : "Portal users"}</h2>
-          {link(kind + "/new", rolesMode ? "Create role" : "Create user")}
-          <div className="wr-admin-access-table">
-            <table className="wr-table">
-              <thead>
-                <tr>
-                  <th>{rolesMode ? "Role" : "Name / username"}</th>
-                  <th>{rolesMode ? "Access" : "Role"}</th>
-                  <th>{rolesMode ? "Assigned users" : "Email"}</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      {item.name}
-                      {"username" in item && (
-                        <p>
-                          {item.username} · {item.adminCode}
-                        </p>
-                      )}
-                    </td>
-                    <td>
-                      {"role" in item
-                        ? item.role.name
-                        : item.permissions.length + " permitted actions"}
-                    </td>
-                    <td>
-                      {"email" in item ? (
+      {!editing
+        ? listPanel
+        : (!error || user || role || isNew) && (
+            <div
+              className={
+                rolesMode
+                  ? "wr-admin-role-layout"
+                  : "wr-two-col wr-admin-access-columns"
+              }
+            >
+              <section className="wr-sheet wr-admin-access-card">
+                <h2>
+                  {review
+                    ? "Review access change"
+                    : rolesMode
+                      ? isNew
+                        ? "Create role"
+                        : role?.name
+                      : isNew
+                        ? "Create admin user"
+                        : "Manage admin user"}
+                  <Link
+                    className="wr-btn wr-btn-secondary wr-btn-sm"
+                    href={"/admin/" + kind}
+                  >
+                    {"Back to " + kind}
+                  </Link>
+                </h2>
+                {review ? (
+                  <>
+                    <p>Not saved yet</p>
+                    <dl>
+                      <dt>Change</dt>
+                      <dd>
+                        {isNew ? "Create" : "Update"}{" "}
+                        {rolesMode ? "role" : "admin user"}
+                      </dd>
+                      <dt>Name</dt>
+                      <dd>{name || user?.name}</dd>
+                      {!rolesMode && (
                         <>
-                          {item.email ?? "No email recorded"}
-                          <p>
-                            {item.emailVerified ? "Verified" : "Unverified"}
-                          </p>
+                          <dt>Username</dt>
+                          <dd>{username || user?.username}</dd>
+                          <dt>Email</dt>
+                          <dd>{email || user?.email || "No email recorded"}</dd>
+                          <dt>Role</dt>
+                          <dd>{selected?.name}</dd>
+                          <dt>Status</dt>
+                          <dd>{enabled ? "Active" : "Disabled"}</dd>
+                          {isNew && (
+                            <>
+                              <dt>Temporary password</dt>
+                              <dd>Set · must be changed on first sign-in</dd>
+                            </>
+                          )}
                         </>
-                      ) : (
-                        item.userCount
                       )}
-                    </td>
-                    <td>
-                      {"enabled" in item
-                        ? item.enabled
-                          ? "Active"
-                          : "Disabled"
-                        : item.isOwner
-                          ? "Protected Owner"
-                          : "Active"}
-                    </td>
-                    <td>
-                      {link(
-                        kind + "/" + item.id,
-                        rolesMode ? "View permissions" : "Manage",
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {!items.length && <p>No {kind} found.</p>}
-          {cursor && (
-            <Button onClick={() => void load(cursor)}>Load more</Button>
-          )}
-        </section>
-      ) : (
-        (!error || user || role || isNew) && (
-          <div
-            className={
-              rolesMode
-                ? "wr-admin-role-layout"
-                : "wr-two-col wr-admin-access-columns"
-            }
-          >
-            <section className="wr-sheet wr-admin-access-card">
-              <h2>
-                {review
-                  ? "Review access change"
-                  : rolesMode
-                    ? isNew
-                      ? "Create role"
-                      : role?.name
-                    : isNew
-                      ? "Create admin user"
-                      : "Manage admin user"}
-                <Link
-                  className="wr-btn wr-btn-secondary wr-btn-sm"
-                  href={"/admin/" + kind}
-                >
-                  {"Back to " + kind}
-                </Link>
-              </h2>
-              {review ? (
-                <>
-                  <p>Not saved yet</p>
-                  <dl>
-                    <dt>Change</dt>
-                    <dd>
-                      {isNew ? "Create" : "Update"}{" "}
-                      {rolesMode ? "role" : "admin user"}
-                    </dd>
-                    <dt>Name</dt>
-                    <dd>{name || user?.name}</dd>
-                    {!rolesMode && (
-                      <>
-                        <dt>Username</dt>
-                        <dd>{username || user?.username}</dd>
-                        <dt>Email</dt>
-                        <dd>{email || user?.email || "No email recorded"}</dd>
-                        <dt>Role</dt>
-                        <dd>{selected?.name}</dd>
-                        <dt>Status</dt>
-                        <dd>{enabled ? "Active" : "Disabled"}</dd>
-                        {isNew && (
-                          <>
-                            <dt>Temporary password</dt>
-                            <dd>Set · must be changed on first sign-in</dd>
-                          </>
-                        )}
-                      </>
-                    )}
-                    {rolesMode && (
-                      <>
-                        <dt>Permitted actions</dt>
-                        <dd>
-                          <ul>
-                            {reviewPermissions.map((code) => (
-                              <li key={code}>{permissionLabels[code]}</li>
-                            ))}
-                          </ul>
-                        </dd>
-                        {!isNew && (
-                          <>
-                            <dt>Affected users</dt>
-                            <dd>{role?.userCount ?? "0"}</dd>
-                            <dt>Added permissions</dt>
-                            <dd>
-                              <ul>
-                                {reviewPermissions
-                                  .filter(
-                                    (code) => !role?.permissions.includes(code),
-                                  )
-                                  .map((code) => (
-                                    <li key={code}>{permissionLabels[code]}</li>
-                                  ))}
-                              </ul>
-                            </dd>
-                            <dt>Removed permissions</dt>
-                            <dd>
-                              <ul>
-                                {(role?.permissions ?? [])
-                                  .filter(
-                                    (code) => !reviewPermissions.includes(code),
-                                  )
-                                  .map((code) => (
-                                    <li key={code}>{permissionLabels[code]}</li>
-                                  ))}
-                              </ul>
-                            </dd>
-                          </>
-                        )}
-                      </>
-                    )}
-                    <dt>Reason</dt>
-                    <dd>{reason}</dd>
-                    <dt>Recorded by</dt>
-                    <dd>{session.account.name}</dd>
-                  </dl>
-                  <div className="wr-admin-confirm-actions">
-                    <Button onClick={() => void confirm()} loading={busy}>
-                      Confirm change
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={
-                        busy || error.startsWith("Connection interrupted")
-                      }
-                      onClick={() => {
-                        setReview(false);
-                        frozen.current = null;
-                      }}
-                    >
-                      Keep editing
-                    </Button>
-                    {link(kind, "Cancel")}
-                  </div>
-                </>
-              ) : (
-                <form onSubmit={prepare}>
-                  {rolesMode ? (
-                    <>
-                      <TextField
-                        label="Role name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        maxLength={120}
-                        disabled={immutable}
-                      />
-                      <div className="wr-label">
-                        Permitted actions{" "}
-                        <span className="wr-hint">
-                          New roles start with none. Ticking an action includes
-                          its view permission; unticking a view clears its
-                          actions.
-                        </span>
-                      </div>
-                      {immutable && (
-                        <div className="wr-notice">
-                          <div>
-                            <b>Owner is protected</b> and has every permission.
-                            It cannot be edited or removed, and the last active
-                            Owner cannot be disabled.
-                          </div>
-                        </div>
-                      )}
-                      <div className="wr-admin-permission-grid">
-                        {permissionCodes
-                          .filter((p) => !dependencies[p])
-                          .map((parent) => (
-                            <fieldset key={parent} disabled={immutable}>
-                              <legend>{permissionLabels[parent]}</legend>
-                              {[
-                                parent,
-                                ...permissionCodes.filter(
-                                  (p) => dependencies[p] === parent,
-                                ),
-                              ].map((code) => (
-                                <label
-                                  className="wr-admin-permission"
-                                  key={code}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={permissions.includes(code)}
-                                    onChange={() => toggle(code)}
-                                  />
-                                  {permissionLabels[code]}{" "}
-                                  {sensitiveDefaults.includes(code) && (
-                                    <small className="wr-pill wr-sm wr-pending wr-plain">
-                                      Owner by default
-                                    </small>
-                                  )}
-                                </label>
+                      {rolesMode && (
+                        <>
+                          <dt>Permitted actions</dt>
+                          <dd>
+                            <ul>
+                              {reviewPermissions.map((code) => (
+                                <li key={code}>{permissionLabels[code]}</li>
                               ))}
-                            </fieldset>
-                          ))}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {isNew ? (
-                        <>
-                          <TextField
-                            label="Full name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            maxLength={120}
-                          />
-                          <TextField
-                            label="Username"
-                            helper="Unique, case-insensitive."
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            pattern="[a-z0-9._-]{3,40}"
-                            required
-                          />
-                          <TextField
-                            label="Email address"
-                            helper="Verify this address before it can be used for password recovery. The recipient must open the verification link; admins cannot mark it verified manually."
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            type="email"
-                            required
-                            maxLength={254}
-                          />
-                          <PasswordField
-                            label="Temporary password"
-                            helper="At least 12 characters. The user must change it on first sign-in. It is never shown again or stored in records."
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-
-                            autoComplete="new-password"
-                            minLength={12}
-                            maxLength={1024}
-                            required
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <dl>
-                            <dt>Name</dt>
-                            <dd>{user?.name}</dd>
-                            <dt>Username</dt>
-                            <dd>{user?.username}</dd>
-                            <dt>Permanent ID</dt>
-                            <dd>{user?.adminCode}</dd>
-                            <dt>Email</dt>
-                            <dd>{user?.email ?? "No email recorded"}</dd>
-                            <dt>Email verification</dt>
-                            <dd>
-                              {user?.emailVerified ? "Verified" : "Unverified"}
-                            </dd>
-                          </dl>
-                          {user?.email &&
-                            !user.emailVerified &&
-                            user.enabled && (
-                              <Button
-                                onClick={() => void verify()}
-                                loading={busy}
-                              >
-                                Send verification link
-                              </Button>
-                            )}
+                            </ul>
+                          </dd>
+                          {!isNew && (
+                            <>
+                              <dt>Affected users</dt>
+                              <dd>{role?.userCount ?? "0"}</dd>
+                              <dt>Added permissions</dt>
+                              <dd>
+                                <ul>
+                                  {reviewPermissions
+                                    .filter(
+                                      (code) =>
+                                        !role?.permissions.includes(code),
+                                    )
+                                    .map((code) => (
+                                      <li key={code}>
+                                        {permissionLabels[code]}
+                                      </li>
+                                    ))}
+                                </ul>
+                              </dd>
+                              <dt>Removed permissions</dt>
+                              <dd>
+                                <ul>
+                                  {(role?.permissions ?? [])
+                                    .filter(
+                                      (code) =>
+                                        !reviewPermissions.includes(code),
+                                    )
+                                    .map((code) => (
+                                      <li key={code}>
+                                        {permissionLabels[code]}
+                                      </li>
+                                    ))}
+                                </ul>
+                              </dd>
+                            </>
+                          )}
                         </>
                       )}
-                      <label className="wr-field">
-                        Role
-                        <select
-                          aria-label="Role"
-                          className="wr-input"
-                          value={roleId}
-                          onChange={(e) => setRoleId(e.target.value)}
+                      <dt>Reason</dt>
+                      <dd>{reason}</dd>
+                      <dt>Recorded by</dt>
+                      <dd>{session.account.name}</dd>
+                    </dl>
+                    <div className="wr-admin-confirm-actions">
+                      <Button onClick={() => void confirm()} loading={busy}>
+                        Confirm change
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={
+                          busy || error.startsWith("Connection interrupted")
+                        }
+                        onClick={() => {
+                          setReview(false);
+                          frozen.current = null;
+                        }}
+                      >
+                        Keep editing
+                      </Button>
+                      {link(kind, "Cancel")}
+                    </div>
+                  </>
+                ) : (
+                  <form onSubmit={prepare}>
+                    {rolesMode ? (
+                      <>
+                        <TextField
+                          label="Role name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
                           required
-                        >
-                          {!roles.some((r) => r.id === user?.role.id) &&
-                            user && (
-                              <option value={user.role.id}>
-                                {user.role.name}
-                              </option>
-                            )}
-                          {roles.map((r) => (
-                            <option key={r.id} value={r.id}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {!isNew && (
+                          maxLength={120}
+                          disabled={immutable}
+                        />
+                        <div className="wr-label">
+                          Permitted actions{" "}
+                          <span className="wr-hint">
+                            New roles start with none. Ticking an action
+                            includes its view permission; unticking a view
+                            clears its actions.
+                          </span>
+                        </div>
+                        {immutable && (
+                          <div className="wr-notice">
+                            <div>
+                              <b>Owner is protected</b> and has every
+                              permission. It cannot be edited or removed, and
+                              the last active Owner cannot be disabled.
+                            </div>
+                          </div>
+                        )}
+                        <div className="wr-admin-permission-grid">
+                          {permissionCodes
+                            .filter((p) => !dependencies[p])
+                            .map((parent) => (
+                              <fieldset key={parent} disabled={immutable}>
+                                <legend>{permissionLabels[parent]}</legend>
+                                {[
+                                  parent,
+                                  ...permissionCodes.filter(
+                                    (p) => dependencies[p] === parent,
+                                  ),
+                                ].map((code) => (
+                                  <label
+                                    className="wr-admin-permission"
+                                    key={code}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={permissions.includes(code)}
+                                      onChange={() => toggle(code)}
+                                    />
+                                    {permissionLabels[code]}{" "}
+                                    {sensitiveDefaults.includes(code) && (
+                                      <small className="wr-pill wr-sm wr-pending wr-plain">
+                                        Owner by default
+                                      </small>
+                                    )}
+                                  </label>
+                                ))}
+                              </fieldset>
+                            ))}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {isNew ? (
+                          <>
+                            <TextField
+                              label="Full name"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              required
+                              maxLength={120}
+                            />
+                            <TextField
+                              label="Username"
+                              helper="Unique, case-insensitive."
+                              value={username}
+                              onChange={(e) => setUsername(e.target.value)}
+                              pattern="[a-z0-9._-]{3,40}"
+                              required
+                            />
+                            <TextField
+                              label="Email address"
+                              helper="Verify this address before it can be used for password recovery. The recipient must open the verification link; admins cannot mark it verified manually."
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              type="email"
+                              required
+                              maxLength={254}
+                            />
+                            <PasswordField
+                              label="Temporary password"
+                              helper="At least 12 characters. The user must change it on first sign-in. It is never shown again or stored in records."
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+
+                              autoComplete="new-password"
+                              minLength={12}
+                              maxLength={1024}
+                              required
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <dl>
+                              <dt>Name</dt>
+                              <dd>{user?.name}</dd>
+                              <dt>Username</dt>
+                              <dd>{user?.username}</dd>
+                              <dt>Permanent ID</dt>
+                              <dd>{user?.adminCode}</dd>
+                              <dt>Email</dt>
+                              <dd>{user?.email ?? "No email recorded"}</dd>
+                              <dt>Email verification</dt>
+                              <dd>
+                                {user?.emailVerified
+                                  ? "Verified"
+                                  : "Unverified"}
+                              </dd>
+                            </dl>
+                            {user?.email &&
+                              !user.emailVerified &&
+                              user.enabled && (
+                                <Button
+                                  onClick={() => void verify()}
+                                  loading={busy}
+                                >
+                                  Send verification link
+                                </Button>
+                              )}
+                          </>
+                        )}
                         <label className="wr-field">
-                          Account status
+                          Role
                           <select
-                            aria-label="Account status"
+                            aria-label="Role"
                             className="wr-input"
-                            value={String(enabled)}
-                            onChange={(e) =>
-                              setEnabled(e.target.value === "true")
-                            }
+                            value={roleId}
+                            onChange={(e) => setRoleId(e.target.value)}
+                            required
                           >
-                            <option value="true">Active</option>
-                            <option value="false">Disabled</option>
+                            {!roles.some((r) => r.id === user?.role.id) &&
+                              user && (
+                                <option value={user.role.id}>
+                                  {user.role.name}
+                                </option>
+                              )}
+                            {roles.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                              </option>
+                            ))}
                           </select>
                         </label>
-                      )}
-                    </>
-                  )}
-                  {!immutable && (
-                    <>
-                      <label className="wr-field">
-                        Reason
-                        <textarea
-                          aria-label="Reason"
-                          className="wr-input"
-                          value={reason}
-                          onChange={(e) => setReason(e.target.value)}
-                          required
-                          maxLength={1000}
-                          aria-describedby="access-reason-help"
-                        />
-                        <small id="access-reason-help" className="wr-help">
-                          Required. Recorded in the access history with your
-                          name and the time.
-                        </small>
-                      </label>
-                    </>
-                  )}
-                  <div className="wr-row">
-                    {!immutable && (
-                      <Button type="submit">
-                        {rolesMode ? "Review role" : "Review user"}
-                      </Button>
+                        {!isNew && (
+                          <label className="wr-field">
+                            Account status
+                            <select
+                              aria-label="Account status"
+                              className="wr-input"
+                              value={String(enabled)}
+                              onChange={(e) =>
+                                setEnabled(e.target.value === "true")
+                              }
+                            >
+                              <option value="true">Active</option>
+                              <option value="false">Disabled</option>
+                            </select>
+                          </label>
+                        )}
+                      </>
                     )}
-                    <Link
-                      className="wr-btn wr-btn-ghost"
-                      href={"/admin/" + kind}
-                    >
-                      Cancel
-                    </Link>
-                  </div>
-                </form>
-              )}
-            </section>
-            {!rolesMode && details}
-          </div>
-        )
-      )}
+                    {!immutable && (
+                      <>
+                        <label className="wr-field">
+                          Reason
+                          <textarea
+                            aria-label="Reason"
+                            className="wr-input"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            required
+                            maxLength={1000}
+                            aria-describedby="access-reason-help"
+                          />
+                          <small id="access-reason-help" className="wr-help">
+                            Required. Recorded in the access history with your
+                            name and the time.
+                          </small>
+                        </label>
+                      </>
+                    )}
+                    <div className="wr-row">
+                      {!immutable && (
+                        <Button type="submit">
+                          {rolesMode ? "Review role" : "Review user"}
+                        </Button>
+                      )}
+                      <Link
+                        className="wr-btn wr-btn-ghost"
+                        href={"/admin/" + kind}
+                      >
+                        Cancel
+                      </Link>
+                    </div>
+                  </form>
+                )}
+              </section>
+              {!rolesMode && details}
+            </div>
+          )}
       <section className="wr-sheet wr-admin-access-card">
         <h2>Access history</h2>
         {history.length ? (

@@ -10,5 +10,5 @@ export default async function Page({
   params: Promise<{ path?: string[] }>;
 }) {
   const { path } = await params;
-  return <AdminPortal key={(path ?? []).join("/")} path={path ?? []} />;
+  return <AdminPortal path={path ?? []} />;
 }
