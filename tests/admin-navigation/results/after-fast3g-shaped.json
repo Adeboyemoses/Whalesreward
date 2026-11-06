@@ -1,0 +1,467 @@
+{
+  "profile": {
+    "name": "fast3g-shaped",
+    "latency": 562.5,
+    "downloadThroughput": 200000,
+    "uploadThroughput": 93750
+  },
+  "fixture": {
+    "admins": "12",
+    "roles": "1"
+  },
+  "source": "4e87ed7",
+  "browser": "local Linux Chromium",
+  "samples": [
+    {
+      "operation": "tab-return",
+      "durationMs": 2.4,
+      "blankMs": 0,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985617657.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985617659.5,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "user-open",
+      "durationMs": 1656.6,
+      "blankMs": 1065.9,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985617694.4001,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985617694.7,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985617704.5,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users-detail",
+          "at": 1793985618285.4001,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users-detail",
+          "at": 1793985619351.3,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "section-change",
+      "durationMs": 1184.2,
+      "blankMs": 592.2,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985620465.4001,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985620465.8,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985620470.6,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985621057.8,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985621650,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "role-open",
+      "durationMs": 1187.5,
+      "blankMs": 593.4,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985621843.6,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985621844.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985621855.6,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles-detail",
+          "at": 1793985622438.2,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles-detail",
+          "at": 1793985623031.6,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "tab-return",
+      "durationMs": 3.6,
+      "blankMs": 0,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985624035.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985624038.7,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "user-open",
+      "durationMs": 1201.4,
+      "blankMs": 609.7,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985624057.1,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985624057.5,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985624073.3,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users-detail",
+          "at": 1793985624649.2,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users-detail",
+          "at": 1793985625258.9001,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "section-change",
+      "durationMs": 604.6,
+      "blankMs": 0,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985626295.8,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985626296.2,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985626307.4001,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985626900.8,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "role-open",
+      "durationMs": 1184.6,
+      "blankMs": 593.4,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985627147.7,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985627148.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985627154,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles-detail",
+          "at": 1793985627739.3,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles-detail",
+          "at": 1793985628332.7,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "tab-return",
+      "durationMs": 1.9,
+      "blankMs": 0,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985629334.6,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985629336.5,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "user-open",
+      "durationMs": 1188.3,
+      "blankMs": 605.4,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985629356.9001,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985629357.1,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985629371.2,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users-detail",
+          "at": 1793985629940,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users-detail",
+          "at": 1793985630545.4001,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "section-change",
+      "durationMs": 599.1,
+      "blankMs": 0,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985631608.1,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985631608.4001,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "users",
+          "at": 1793985631625.6,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985632207.5,
+          "discarded": false
+        }
+      ]
+    },
+    {
+      "operation": "role-open",
+      "durationMs": 1181.9,
+      "blankMs": 582.5,
+      "documents": 0,
+      "discarded": false,
+      "marks": [
+        {
+          "kind": "focus",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985632497.5,
+          "discarded": false
+        },
+        {
+          "kind": "click",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985632498,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles",
+          "at": 1793985632503.8,
+          "discarded": false
+        },
+        {
+          "kind": "blank",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles-detail",
+          "at": 1793985633097.4001,
+          "discarded": false
+        },
+        {
+          "kind": "visible",
+          "documentId": "c0c64b88-76f3-47b5-b9ab-3bfdc4276e91",
+          "screen": "roles-detail",
+          "at": 1793985633679.9001,
+          "discarded": false
+        }
+      ]
+    }
+  ]
+}
