@@ -1,21 +1,20 @@
 # lane:app
-WO-app-3b (WHR-65), WO-app-3 (WHR-7), WO-app-2 (WHR-5): ACCEPTED by Earl on 2026-11-05
+WO-app-4 (WHR-9) Admin access screens: READY since 2026-11-06 (effective on green records merge)
 
 ## In flight
-- [Closeout PR #52](https://github.com/Adeboyemoses/Whalesreward/pull/52) records all three acceptances; Linear Done after its reviewed green staging merge. M1 phone exit accepted; no new work order.
-- Implementations: offline capture [#28](https://github.com/Adeboyemoses/Whalesreward/pull/28), uploads [#35](https://github.com/Adeboyemoses/Whalesreward/pull/35), phone fixes [#49](https://github.com/Adeboyemoses/Whalesreward/pull/49). Feature deployed at d3481fc6e39dabe8ab5e087ee581b91d891f56ed; health matched, db ok.
-- Phone feature: code/security/integrity PASS round2; EM typecheck/lint/build, unit164, browser94/4 existing skips/zero retries. Final feature CI integration129, time3+3, browser94 plus storage1, no flaky cases; six-board parity/12 screenshots. Original 24-hour/revocation checks remain equally strict; generic fallback1200ms.
-- Baseline staging 3G Save4145.2ms/next2021.9ms; reported1–3minute wait not reproduced. No deployed after-timings claimed. Rook records Earl's Samsung S25 acceptance (20:36UTC): lag gone, faster capture, quick offline response, sale reference visible; no saved numeric results.
+- Feature [PR #60](https://github.com/Adeboyemoses/Whalesreward/pull/60) delivers admin entry, first password, sign-out, email verification/recovery, users and roles on WO-core-5 APIs. Server remains the only permission authority.
+- Independent code/security/integrity PASS round 2 at 66980288; evidence validator PASS. EM typecheck/lint/build, 189 unit tests, Linux browser 100 with 4 existing staging-only skips / no retries, real PostgreSQL/Mailpit 4 PASS. No server/schema or cloud/staging-data changes.
+- Independent report: tests/design-parity/admin-access/REPORT.md; 32 sanitized captures, 24 boards accounted for. H07 is permission reference only; no Reports dashboard claim.
 
 ## Next
-- STOP after closeout. Runbooks: docs/qa/smoke-2026-11-05-phone-stall.md, smoke-2026-11-05-upload-sync.md and smoke-2026-11-04-offline-capture.md. WHR-60 remains READY, outside this closure.
+- STOP at READY. Earl runs docs/qa/smoke-2026-11-06-admin-access.md using a second fictional admin created through the normal UI with a privately supplied exact-allowlisted inbox. Sending never verifies ownership; recipient confirms, then tests reset/revocation.
+- Actual staging inbox acceptance remains pending. No acceptance or Done transition is implied.
 
 ## Earl's gos
-- 2026-11-05: measure before changes; preserve strict24-hour/revocation checks; no Computer Use for after-timings.
-- 2026-11-05: “Earl accepted the phone rerun (see WHR-65). Close WO-app-3b (WHR-65), WO-app-3 (WHR-7) and WO-app-2 (WHR-5) through close-session, then stop.” Supersedes READY-only instruction and pending-physical-acceptance caveat.
+- 2026-11-06: “Work order: WO-app-4 (WHR-9), the admin access screens, on WO-core-5's API.” “Write the staging smoke runbook first; it must include creating a second test admin with an allowlisted inbox. Take it to READY, then stop.” Explicit session go recorded on WHR-9; its approval line was not edited.
 
 ## Risks
-- WHR-67: separate existing handover-fixture navigation race; later combined CI clean. WHR-45 presentation drift remains separate.
-- Dispatch flag: feature14 exceeds high-tier flag8; two feature review rounds within cap3. Four docs-only records reviews (READY, acceptance, two concurrent merges) bring session total18; no open findings. Model identity unavailable.
+- WHR-69 tracks nonblocking role-picker pagination, history/record presentation. WHR-70 tracks inherited core email-template fidelity. D06 proposals remain centrally configured; no policy or provider selection changed.
+- Dispatch flag: 14 feature dispatches exceed high-tier flag 8; two formal feature review rounds within cap 3. One independent records review brings session total 15. Runtime model identity unavailable.
 
-dispatches=18 prs=2 rounds_max=4 escalations=0 model=unknown
+dispatches=15 prs=2 rounds_max=2 escalations=0 model=unknown
