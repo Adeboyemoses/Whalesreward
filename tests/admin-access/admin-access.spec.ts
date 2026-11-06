@@ -6,6 +6,21 @@ import { v7 } from "uuid";
 import { fixture, signIn, mailLink } from "./admin-access.fixtures";
 
 async function shot(page: Page, board: string) {
+  const heights: Record<string, number> = {
+    "H02-CreateUser": 1070,
+    "H09-ReviewUserChange": 965,
+    "H03-ManageUser": 1215,
+    "H04-UnverifiedUser": 1137,
+    "H06-CreateRole": 1496,
+    "H08-SensitivePermissions": 1637,
+    "M01-VerificationEmail": 983,
+    "M02-PasswordResetEmail": 967,
+  };
+  if (!board.startsWith("mobile-"))
+    await page.setViewportSize({
+      width: board.startsWith("M0") ? 760 : 1440,
+      height: heights[board] ?? 900,
+    });
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready);
   await mkdir("tests/design-parity/admin-access/screenshots", {
@@ -127,7 +142,10 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       .getByRole("button", { name: "Send verification link", exact: true })
       .click();
     await expect(
-      page.getByText("Verification link queued", { exact: false }),
+      page.getByRole("heading", {
+        name: "Verification link queued",
+        exact: true,
+      }),
     ).toBeVisible();
     await shot(page, "B14-VerificationSent");
     const verification = await mailLink(email, "Verify");
@@ -142,7 +160,6 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       verification.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=redacted"),
     );
     await shot(landing, "M01-VerificationEmail");
-    await shot(landing, "B16-VerificationComplete");
     await landing.goto(verification.link);
     await expect(landing).not.toHaveURL(/token=/);
     await expect(
@@ -165,6 +182,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await expect(
       landing.getByRole("heading", { name: "Email verified", exact: true }),
     ).toBeVisible();
+    await shot(landing, "B16-VerificationComplete");
     await landing.goto(verification.link);
     await expect(
       landing.getByRole("heading", {
@@ -247,6 +265,144 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     expect((await page.request.get("/api/admin/session")).status()).toBe(401);
     expect(await context.storageState()).toMatchObject({ origins: [] });
     await recipient.close();
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("admin access remains usable at 390px without horizontal overflow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const route of [
+    "sign-in",
+    "forgot-password",
+    "reset-password",
+    "verify-email",
+    "signed-out",
+  ]) {
+    await page.goto(`/admin/${route}`);
+    await page.waitForLoadState("networkidle");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    const buttons = await page.getByRole("button").all();
+    for (const button of buttons) {
+      const box = await button.boundingBox();
+      if (box) expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    await shot(page, `mobile-${route}`);
+  }
+});
+
+test("I-07 I-08 I-10 server refusals survive user confirmation: last Owner, stale version and delegation", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const f = await fixture();
+  async function first(username: string, password: string) {
+    await signIn(page, username, password);
+    await expect(page).toHaveURL(/first-password/);
+    const next = randomBytes(24).toString("hex");
+    await page.getByLabel("New password", { exact: true }).fill(next);
+    await page.getByLabel("Confirm new password", { exact: true }).fill(next);
+    await page
+      .getByRole("button", { name: "Save and continue", exact: true })
+      .click();
+    await expect(page).not.toHaveURL(/first-password/);
+  }
+  try {
+    await first(f.username, f.password);
+    await f.db.query(
+      "UPDATE auth_user SET enabled=false WHERE id<>$1 AND id IN (SELECT a.user_id FROM admin a JOIN role r ON r.id=a.role_id WHERE r.is_owner=true)",
+      [f.userId],
+    );
+    await page.goto(`/admin/users/${f.adminId}`);
+    await page
+      .getByLabel("Account status", { exact: true })
+      .selectOption("false");
+    await page
+      .getByLabel("Reason", { exact: true })
+      .fill("Fictional last Owner refusal");
+    await page
+      .getByRole("button", { name: "Review user", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm change", exact: true })
+      .click();
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: "At least one active Owner must remain." }),
+    ).toBeVisible();
+    expect(
+      (
+        await f.db.query("SELECT enabled FROM auth_user WHERE id=$1", [
+          f.userId,
+        ])
+      ).rows[0].enabled,
+    ).toBe(true);
+    await page.reload();
+    await page
+      .getByLabel("Account status", { exact: true })
+      .selectOption("false");
+    await page
+      .getByLabel("Reason", { exact: true })
+      .fill("Fictional stale confirmation");
+    await page
+      .getByRole("button", { name: "Review user", exact: true })
+      .click();
+    await f.db.query("UPDATE admin SET version=version+1 WHERE id=$1", [
+      f.adminId,
+    ]);
+    await page
+      .getByRole("button", { name: "Confirm change", exact: true })
+      .click();
+    await expect(
+      page.getByRole("alert").filter({
+        hasText: "This record changed. Reload and review the latest version.",
+      }),
+    ).toBeVisible();
+    const limitedRole = v7();
+    await f.db.query(
+      "INSERT INTO role(id,name,is_owner,enabled,version) VALUES($1,$2,false,true,1)",
+      [limitedRole, `Users ${limitedRole}`],
+    );
+    await f.db.query(
+      "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'users')",
+      [limitedRole],
+    );
+    const limited = await fixture(limitedRole);
+    try {
+      await page.goto("/admin/sign-out");
+      await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      await expect(page).toHaveURL(/signed-out/);
+      await first(limited.username, limited.password);
+      await page.goto(`/admin/users/${f.adminId}`);
+      await page
+        .getByLabel("Account status", { exact: true })
+        .selectOption("false");
+      await page
+        .getByLabel("Reason", { exact: true })
+        .fill("Fictional delegation refusal");
+      await page
+        .getByRole("button", { name: "Review user", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Confirm change", exact: true })
+        .click();
+      await expect(
+        page.getByRole("alert").filter({
+          hasText:
+            "You cannot grant or change access beyond your own authority.",
+        }),
+      ).toBeVisible();
+      expect((await page.request.get("/api/admin/roles")).status()).toBe(403);
+    } finally {
+      await limited.db.end();
+    }
   } finally {
     await f.db.end();
   }

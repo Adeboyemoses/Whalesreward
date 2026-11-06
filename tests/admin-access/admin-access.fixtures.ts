@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { execFileSync } from "node:child_process";
 import type { Page } from "@playwright/test";
-export async function fixture() {
+export async function fixture(roleId?: string) {
   const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await db.connect();
   await db.query(
@@ -18,9 +18,10 @@ export async function fixture() {
     adminId = v7(),
     username = `browser.${userId.slice(-12)}`,
     password = randomBytes(24).toString("hex");
-  const owner = (
-    await db.query("SELECT id FROM role WHERE is_owner=true LIMIT 1")
-  ).rows[0].id;
+  const owner =
+    roleId ??
+    (await db.query("SELECT id FROM role WHERE is_owner=true LIMIT 1")).rows[0]
+      .id;
   await db.query(
     "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'admin',$2,$2,'Ada Williams',true,1,true,now())",
     [userId, username],

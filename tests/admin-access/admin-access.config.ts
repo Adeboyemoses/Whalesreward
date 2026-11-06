@@ -5,7 +5,7 @@ const database =
   "postgresql://whr:whr@127.0.0.1:5433/whr_admin_browser";
 process.env.DATABASE_URL = database;
 process.env.BETTER_AUTH_URL = "http://127.0.0.1:3104";
-process.env.BETTER_AUTH_SECRET = randomBytes(32).toString("hex");
+process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString("hex");
 process.env.WHR_ENV = "local";
 process.env.EMAIL_PROVIDER = "mailpit";
 export default defineConfig({
