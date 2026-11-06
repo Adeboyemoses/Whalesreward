@@ -53,7 +53,7 @@ test("compiled web runtime automatically sends, keeps health responsive and drai
       ),
     );
     await db.query(
-      "UPDATE admin SET verification_generation=1 WHERE admin_code='ADMIN001'",
+      "UPDATE admin SET verification_generation=1,version=version+1 WHERE admin_code='ADMIN001'",
     );
     const target = createHmac("sha256", secret)
       .update(`admin-email-v1\0${inbox}`)
