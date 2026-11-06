@@ -1,12 +1,16 @@
 import type pg from "pg";
 import { APIError } from "better-auth/api";
-import type { SignInInput } from "../../../shared/contracts/auth";
+import type {
+  AttendantSession,
+  RestrictedAttendantSession,
+  SignInInput,
+} from "../../../shared/contracts/auth";
 import { newId } from "../../lib/ids";
 import { attendantAuth } from "../../auth";
 import { AUTH_POLICY } from "./config";
 import { digest, hmac, sessionSecret } from "./crypto";
 import { AuthError } from "./errors";
-import { sessionView, type LiveSession } from "./repo";
+import { sessionView, restrictedSessionView, type LiveSession } from "./repo";
 import { requireSession } from "../../lib/authz";
 import { consumeLimits } from "./rate-limit";
 
@@ -28,12 +32,34 @@ async function transaction<T>(
     db.release();
   }
 }
+type ConfiguredResult = { session: AttendantSession; token: string };
+type HttpResult = {
+  session: AttendantSession | RestrictedAttendantSession;
+  token: string;
+};
+export function signIn(
+  pool: pg.Pool,
+  config: Config,
+  input: SignInInput,
+  key: string,
+  ip: string,
+  restricted?: false,
+): Promise<ConfiguredResult>;
+export function signIn(
+  pool: pg.Pool,
+  config: Config,
+  input: SignInInput,
+  key: string,
+  ip: string,
+  restricted: true,
+): Promise<HttpResult>;
 export async function signIn(
   pool: pg.Pool,
   config: Config,
   input: SignInInput,
   key: string,
   ip: string,
+  restricted = false,
 ) {
   const normalized = input.username.trim().toLowerCase();
   await consumeLimits(pool, config.secret, [
@@ -68,10 +94,48 @@ export async function signIn(
         selected = await requireSession(
           db,
           digest(sessionSecret(config.secret, receipt.session_id)),
+          restricted,
         );
         if (selected.user_id !== userId)
           throw new AuthError("invalid_credentials", 401);
       } else {
+        const u = (
+          await db.query(
+            "SELECT must_change_password,auth_version FROM auth_user WHERE id=$1 AND enabled AND kind='attendant' FOR SHARE",
+            [userId],
+          )
+        ).rows[0];
+        if (!u) throw new AuthError("invalid_credentials", 401);
+        if (u.must_change_password) {
+          if (!restricted) throw new AuthError("password_change_required", 403);
+          const id = newId();
+          const row = (
+            await db.query(
+              "INSERT INTO auth_session(id,user_id,secret_verifier,expires_at,auth_version,last_online_sign_in_at,access_scope) VALUES($1,$2,$3,clock_timestamp()+interval '15 minutes',$4,clock_timestamp(),'first_password') RETURNING *",
+              [
+                id,
+                userId,
+                digest(sessionSecret(config.secret, id)),
+                u.auth_version,
+              ],
+            )
+          ).rows[0];
+          selected = { ...row, must_change_password: true };
+          await db.query(
+            "INSERT INTO attendant_sign_in_request VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '5 minutes',clock_timestamp()+interval '24 hours')",
+            [key, requestHmac, id],
+          );
+          return {
+            id,
+            userId,
+            token: sessionSecret(config.secret, id),
+            createdAt: row.created_at,
+            updatedAt: row.created_at,
+            expiresAt: row.expires_at,
+            ipAddress: "",
+            userAgent: "",
+          };
+        }
         const result = await db.query(
           `SELECT u.id AS user_id,u.auth_version,u.display_name,u.username,a.id AS attendant_id,ag.id AS assignment_id,clock_timestamp() AS now
      FROM auth_user u JOIN attendant a ON a.user_id=u.id
@@ -91,6 +155,8 @@ export async function signIn(
           created_at: now,
           expires_at: new Date(now.getTime() + AUTH_POLICY.sessionMs),
           capture_context_id: contextId,
+          access_scope: "full",
+          must_change_password: false,
         };
         await db.query(
           `INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest)
@@ -158,16 +224,34 @@ export async function signIn(
     }
     if (!selected) throw new Error("Authentication did not create a session");
     return {
-      session: await sessionView(db, selected),
+      session:
+        selected.must_change_password || selected.access_scope !== "full"
+          ? await restrictedSessionView(db, selected)
+          : await sessionView(db, selected),
       token: sessionSecret(config.secret, selected.id),
     };
   });
 }
+export function getSession(
+  pool: pg.Pool,
+  config: Config,
+  token: string | undefined,
+  ip: string,
+  restricted?: false,
+): Promise<AttendantSession>;
+export function getSession(
+  pool: pg.Pool,
+  config: Config,
+  token: string | undefined,
+  ip: string,
+  restricted: true,
+): Promise<AttendantSession | RestrictedAttendantSession>;
 export async function getSession(
   pool: pg.Pool,
   config: Config,
   token: string | undefined,
   ip: string,
+  restricted = false,
 ) {
   await consumeLimits(pool, config.secret, [
     { key: `get:ip:${ip}`, capacity: 120 },
@@ -177,14 +261,17 @@ export async function getSession(
   // one-connection pool must make progress. Recheck live authority in the final
   // read transaction so disable/revoke during throttling cannot leak a response.
   const identity = await transaction(pool, (db) =>
-    requireSession(db, digest(token)),
+    requireSession(db, digest(token), restricted),
   );
   await consumeLimits(pool, config.secret, [
     { key: `get:account:${identity.user_id}`, capacity: 60 },
   ]);
-  return transaction(pool, async (db) =>
-    sessionView(db, await requireSession(db, digest(token))),
-  );
+  return transaction(pool, async (db) => {
+    const live = await requireSession(db, digest(token), restricted);
+    return live.must_change_password || live.access_scope !== "full"
+      ? restrictedSessionView(db, live)
+      : sessionView(db, live);
+  });
 }
 export async function signOut(
   pool: pg.Pool,

@@ -2,6 +2,7 @@ import type pg from "pg";
 import { AuthError } from "./errors";
 import {
   attendantSessionSchema,
+  restrictedAttendantSessionSchema,
   type AttendantSession,
 } from "../../../shared/contracts/auth";
 
@@ -10,14 +11,17 @@ export type LiveSession = {
   user_id: string;
   expires_at: Date;
   created_at: Date;
-  capture_context_id: string;
+  capture_context_id: string | null;
+  access_scope: string;
+  must_change_password: boolean;
 };
 export async function liveSession(
   db: pg.PoolClient,
   verifier: string,
+  restricted = false,
 ): Promise<LiveSession> {
   const result = await db.query<LiveSession>(
-    `SELECT s.id,s.user_id,s.expires_at,s.created_at,s.capture_context_id
+    `SELECT s.id,s.user_id,s.expires_at,s.created_at,s.capture_context_id,s.access_scope,u.must_change_password
  FROM auth_session s JOIN auth_user u ON u.id=s.user_id
  WHERE s.secret_verifier=$1 AND s.revoked_at IS NULL AND s.expires_at>clock_timestamp()
  AND u.enabled AND u.kind='attendant' AND u.auth_version=s.auth_version
@@ -25,12 +29,20 @@ export async function liveSession(
     [verifier],
   );
   if (!result.rows[0]) throw new AuthError("unauthenticated", 401);
+  if (
+    !restricted &&
+    (result.rows[0].access_scope !== "full" ||
+      result.rows[0].must_change_password)
+  )
+    throw new AuthError("password_change_required", 403);
   return result.rows[0];
 }
 export async function sessionView(
   db: pg.PoolClient,
   session: LiveSession,
 ): Promise<AttendantSession> {
+  if (session.access_scope !== "full" || session.must_change_password)
+    throw new AuthError("password_change_required", 403);
   const result = await db.query(
     `SELECT a.id AS attendant_id,a.staff_code,u.display_name,u.username,
  st.id AS station_id,st.code AS station_code,st.name AS station_name,st.timezone,
@@ -81,5 +93,29 @@ export async function sessionView(
     sessionExpiresAt: session.expires_at.toISOString(),
     serverTime: r.now.toISOString(),
     reassignmentRequiresSignIn: r.reassigned,
+  });
+}
+
+export async function restrictedSessionView(
+  db: pg.PoolClient,
+  session: LiveSession,
+) {
+  const r = (
+    await db.query(
+      "SELECT a.id,a.staff_code,u.display_name,u.username,clock_timestamp() AS now FROM attendant a JOIN auth_user u ON u.id=a.user_id WHERE u.id=$1",
+      [session.user_id],
+    )
+  ).rows[0];
+  if (!r) throw new AuthError("unauthenticated", 401);
+  return restrictedAttendantSessionSchema.parse({
+    state: "password_change_required",
+    account: {
+      id: r.id,
+      staffCode: r.staff_code,
+      name: r.display_name,
+      username: r.username,
+    },
+    sessionExpiresAt: session.expires_at.toISOString(),
+    serverTime: r.now.toISOString(),
   });
 }

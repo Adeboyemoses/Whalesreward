@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { adminConfig } from "../admin-access/config";
+import { firstPassword } from "./first-password";
 import { isIP } from "node:net";
 import {
   authId,
@@ -25,7 +28,7 @@ export function clientIp(request: Request, trustedHeader?: string): string {
   const ip = request.headers.get(trustedHeader)?.trim();
   return ip && isIP(ip) ? ip : "unattributed";
 }
-function cookieToken(request: Request): string | undefined {
+export function cookieToken(request: Request): string | undefined {
   const matches = (request.headers.get("cookie") ?? "")
     .split(";")
     .map((s) => s.trim())
@@ -37,7 +40,7 @@ function cookieToken(request: Request): string | undefined {
 function cookie(value: string, expiry?: string) {
   return `${COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; ${expiry ? `Expires=${new Date(expiry).toUTCString()}` : "Max-Age=0"}`;
 }
-async function body(request: Request): Promise<unknown> {
+async function body(request: Request, ceiling = 8192): Promise<unknown> {
   if (
     request.headers.get("content-type")?.split(";")[0]?.trim() !==
     "application/json"
@@ -52,9 +55,12 @@ async function body(request: Request): Promise<unknown> {
       const next = await reader.read();
       if (next.done) break;
       length += next.value.length;
-      if (length > 8192) {
+      if (length > ceiling) {
         await reader.cancel();
-        throw new AuthError("invalid_request", 400);
+        throw new AuthError(
+          ceiling === 32768 ? "request_too_large" : "invalid_request",
+          ceiling === 32768 ? 413 : 400,
+        );
       }
       chunks.push(next.value);
     }
@@ -80,7 +86,7 @@ const messages: Record<string, string> = {
 };
 export async function handleAuth(
   request: Request,
-  action: "sign-in" | "sign-out" | "session",
+  action: "sign-in" | "sign-out" | "session" | "first-password",
 ): Promise<Response> {
   const headers = new Headers({ "Cache-Control": "no-store" });
   const requestId = newId();
@@ -91,13 +97,30 @@ export async function handleAuth(
     if (new URL(request.url).search)
       throw new AuthError("invalid_request", 400);
     if (action === "session") {
-      const session = await getSession(pool, config, cookieToken(request), ip);
+      const session = await getSession(
+        pool,
+        config,
+        cookieToken(request),
+        ip,
+        true,
+      );
       return Response.json(
         { data: session, serverTime: session.serverTime, requestId },
         { headers },
       );
     }
     enforceOrigin(request, config.origin);
+    if (action === "first-password") {
+      await firstPassword(
+        pool,
+        adminConfig(),
+        cookieToken(request),
+        await body(request, 32768),
+        ip,
+      );
+      headers.set("Set-Cookie", cookie(""));
+      return new Response(null, { status: 204, headers });
+    }
     const key = authId.safeParse(request.headers.get("idempotency-key"));
     if (!key.success) throw new AuthError("invalid_request", 400);
     const input = await body(request);
@@ -110,7 +133,7 @@ export async function handleAuth(
     }
     const parsed = signInSchema.safeParse(input);
     if (!parsed.success) throw new AuthError("invalid_request", 400);
-    const result = await signIn(pool, config, parsed.data, key.data, ip);
+    const result = await signIn(pool, config, parsed.data, key.data, ip, true);
     headers.set(
       "Set-Cookie",
       cookie(result.token, result.session.sessionExpiresAt),
@@ -127,7 +150,9 @@ export async function handleAuth(
     const failure =
       error instanceof AuthError
         ? error
-        : new AuthError("temporarily_unavailable", 503);
+        : error instanceof z.ZodError
+          ? new AuthError("invalid_request", 400)
+          : new AuthError("temporarily_unavailable", 503);
     if (failure.retryAfter)
       headers.set("Retry-After", String(failure.retryAfter));
     return Response.json(
