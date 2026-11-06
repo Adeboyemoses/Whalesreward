@@ -1,7 +1,22 @@
+import { mkdir } from "node:fs/promises";
+import type { Page } from "@playwright/test";
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { v7 } from "uuid";
 import { fixture, signIn, mailLink } from "./admin-access.fixtures";
+
+async function shot(page: Page, board: string) {
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => document.fonts.ready);
+  await mkdir("tests/design-parity/admin-access/screenshots", {
+    recursive: true,
+  });
+  await page.screenshot({
+    path: `tests/design-parity/admin-access/screenshots/${board}.built.png`,
+    fullPage: true,
+  });
+}
+
 // Secrets and recipient links must never enter retained browser artifacts.
 test.use({ trace: "off", video: "off", screenshot: "off" });
 test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recovery and revocation on real Postgres and Mailpit", async ({
@@ -16,8 +31,11 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     email = `${secondName}@example.com`,
     temporary = randomBytes(24).toString("hex");
   try {
+    await page.goto("/admin/sign-in");
+    await shot(page, "B01-AdminSignIn");
     await signIn(page, f.username, f.password);
     await expect(page).toHaveURL(/first-password/);
+    await shot(page, "B08-FirstPassword");
     expect(
       (
         await page.request.post("/api/admin/users/search", {
@@ -31,11 +49,17 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await page
       .getByRole("button", { name: "Save and continue", exact: true })
       .click();
+    await expect(page).toHaveURL(/\/admin$/);
     await page.goto("/admin/users");
     await expect(
       page.getByRole("heading", { name: "Admin users & roles", exact: true }),
     ).toBeVisible();
+    await page.goto("/admin/roles");
+    await shot(page, "H05-Roles");
+    await page.goto("/admin/roles/owner");
+    await shot(page, "H08-SensitivePermissions");
     await page.goto("/admin/roles/new");
+    await shot(page, "H06-CreateRole");
     await page
       .getByLabel("Role name", { exact: true })
       .fill(`Smoke ${secondName}`);
@@ -59,14 +83,17 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await page
       .getByRole("button", { name: "Confirm change", exact: true })
       .click();
-    await expect(page).toHaveURL(/\/admin\/roles/);
+    await expect(page).toHaveURL(/\/admin\/roles\/[0-9a-f-]+$/);
     const role = (
       await f.db.query("SELECT id FROM role WHERE name=$1", [
         `Smoke ${secondName}`,
       ])
     ).rows[0];
     expect(role).toBeTruthy();
+    await page.goto("/admin/users");
+    await shot(page, "H01-Users");
     await page.goto("/admin/users/new");
+    await shot(page, "H02-CreateUser");
     await page.getByLabel("Full name", { exact: true }).fill("Grace Okon");
     await page.getByLabel("Username", { exact: true }).fill(secondName);
     await page.getByLabel("Email address", { exact: true }).fill(email);
@@ -81,9 +108,11 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       .getByRole("button", { name: "Review user", exact: true })
       .click();
     expect(await page.getByText(temporary, { exact: true }).count()).toBe(0);
+    await shot(page, "H09-ReviewUserChange");
     await page
       .getByRole("button", { name: "Confirm change", exact: true })
       .click();
+    await expect(page).toHaveURL(/\/admin\/users\/[0-9a-f-]+$/);
     const account = (
       await f.db.query(
         "SELECT a.id,a.user_id,a.email_verified_at FROM admin a WHERE email_normalized=$1",
@@ -91,14 +120,37 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       )
     ).rows[0];
     expect(account.email_verified_at).toBeNull();
+    await page.goto(`/admin/users/${account.id}`);
+    await shot(page, "H04-UnverifiedUser");
+    await page
+      .getByRole("button", { name: "Send verification link", exact: true })
+      .click();
+    await expect(
+      page.getByText("Verification link queued", { exact: false }),
+    ).toBeVisible();
+    await shot(page, "B14-VerificationSent");
     const verification = await mailLink(email, "Verify");
     const recipient = await browser.newContext({
+      viewport: { width: 1440, height: 1000 },
+      deviceScaleFactor: 2,
       baseURL: "http://127.0.0.1:3104",
       trace: "off",
     } as never);
     const landing = await recipient.newPage();
+    await landing.setContent(
+      verification.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=redacted"),
+    );
+    await shot(landing, "M01-VerificationEmail");
+    await shot(landing, "B16-VerificationComplete");
     await landing.goto(verification.link);
     await expect(landing).not.toHaveURL(/token=/);
+    await expect(
+      landing.getByRole("button", {
+        name: "Verify email address",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await shot(landing, "B15-EmailVerification");
     expect(
       (
         await f.db.query("SELECT email_verified_at FROM admin WHERE id=$1", [
@@ -119,6 +171,9 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
         exact: true,
       }),
     ).toBeVisible();
+    await shot(landing, "B17-VerificationExpired");
+    await page.goto(`/admin/users/${account.id}`);
+    await shot(page, "H03-ManageUser");
     await signIn(landing, secondName, temporary);
     await expect(landing).toHaveURL(/first-password/);
     const secondPassword = randomBytes(24).toString("hex");
@@ -131,6 +186,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await landing
       .getByRole("button", { name: "Save and continue", exact: true })
       .click();
+    await expect(landing).not.toHaveURL(/first-password/);
     expect(
       (
         await landing.request.post("/api/admin/users/search", {
@@ -140,6 +196,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       ).status(),
     ).toBe(403);
     await page.goto("/admin/forgot-password");
+    await shot(page, "B10-PasswordRecovery");
     await page.getByLabel("Email address", { exact: true }).fill(email);
     await page
       .getByRole("button", { name: "Send reset link", exact: true })
@@ -147,9 +204,18 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await expect(
       page.getByRole("heading", { name: "Check your email", exact: true }),
     ).toBeVisible();
+    await shot(page, "B11-RecoveryEmailSent");
     const reset = await mailLink(email, "Reset");
+    await landing.setContent(
+      reset.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=redacted"),
+    );
+    await shot(landing, "M02-PasswordResetEmail");
     await page.goto(reset.link);
     await expect(page).not.toHaveURL(/token=/);
+    await expect(
+      page.getByLabel("New password", { exact: true }),
+    ).toBeVisible();
+    await shot(page, "B12-ResetPassword");
     const resetPassword = randomBytes(24).toString("hex");
     await page.getByLabel("New password", { exact: true }).fill(resetPassword);
     await page
@@ -169,11 +235,14 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
         exact: true,
       }),
     ).toBeVisible();
+    await shot(page, "B13-ResetLinkUnavailable");
     await signIn(page, secondName, resetPassword);
     await expect(page).not.toHaveURL(/sign-in/);
     await page.goto("/admin/sign-out");
+    await shot(page, "B09-SignOut");
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page).toHaveURL(/signed-out/);
+    await shot(page, "B18-SignedOut");
     expect((await page.request.get("/api/admin/session")).status()).toBe(401);
     expect(await context.storageState()).toMatchObject({ origins: [] });
     await recipient.close();

@@ -61,7 +61,9 @@ export async function mailLink(email: string, subject: string) {
     env: process.env,
   });
   const messages = await (
-    await fetch("http://127.0.0.1:8025/api/v1/messages")
+    await fetch(
+      `${process.env.MAILPIT_URL ?? "http://127.0.0.1:8025"}/api/v1/messages`,
+    )
   ).json();
   const item = messages.messages.find(
     (m: { To: { Address: string }[]; Subject: string }) =>
@@ -69,7 +71,9 @@ export async function mailLink(email: string, subject: string) {
   );
   if (!item) throw new Error("Expected fictional local message absent");
   const full = await (
-    await fetch(`http://127.0.0.1:8025/api/v1/message/${item.ID}`)
+    await fetch(
+      `${process.env.MAILPIT_URL ?? "http://127.0.0.1:8025"}/api/v1/message/${item.ID}`,
+    )
   ).json();
   const link = full.Text.match(
     /http:\/\/127\.0\.0\.1:3104\/admin\/(?:verify-email|reset-password)#token=[a-zA-Z0-9_-]+/,

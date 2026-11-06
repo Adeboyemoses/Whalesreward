@@ -2,7 +2,9 @@ import pg from "pg";
 import { readFile, readdir } from "node:fs/promises";
 export default async function setup() {
   const root = new pg.Client({
-    connectionString: "postgresql://whr:whr@127.0.0.1:5433/whr_dev",
+    connectionString:
+      process.env.WHR_ADMIN_TEST_ROOT_DATABASE_URL ??
+      "postgresql://whr:whr@127.0.0.1:5433/whr_dev",
   });
   await root.connect();
   if (

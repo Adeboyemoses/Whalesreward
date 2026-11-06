@@ -25,6 +25,7 @@ test("I-07 I-09 I-13 admin browser restriction, role dependency, confirmed acces
     await page
       .getByRole("button", { name: "Save and continue", exact: true })
       .click();
+    await expect(page).toHaveURL(/\/admin$/);
     await page.goto("/admin/roles/new");
     await page
       .getByLabel("Role name", { exact: true })
