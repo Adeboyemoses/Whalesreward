@@ -53,3 +53,18 @@ export const attendantSessionSchema = z.strictObject({
   reassignmentRequiresSignIn: z.boolean(),
 });
 export type AttendantSession = z.infer<typeof attendantSessionSchema>;
+
+export const restrictedAttendantSessionSchema = z.strictObject({
+  state: z.literal("password_change_required"),
+  account: z.strictObject({
+    id: authId,
+    staffCode: text.max(64),
+    name: text.max(120),
+    username: text.max(64),
+  }),
+  sessionExpiresAt: instant,
+  serverTime: instant,
+});
+export type RestrictedAttendantSession = z.infer<
+  typeof restrictedAttendantSessionSchema
+>;
