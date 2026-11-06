@@ -1,6 +1,14 @@
 "use client";
+import Link from "next/link";
 import { adminTime, adminAction } from "@/client/admin-display";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  CircleCheck,
+  TriangleAlert,
+  Mail,
+} from "lucide-react";
 import {
   useEffect,
   useState,
@@ -146,8 +154,18 @@ export function AdminPortal({ path }: { path: string[] }) {
           </>
         }
       >
-        <h1 className="wr-page-title">Admin users & roles</h1>
-        <p className="wr-secondary">Named portal accounts and permissions</p>
+        <div className="wr-pagehead">
+          <div>
+            <div className="wr-eyebrow">Access management</div>
+            <h1 className="wr-page-title">Admin users & roles</h1>
+            <p className="wr-secondary">
+              Named portal accounts and permissions
+            </p>
+          </div>
+          <span className="wr-secondary">
+            {session.account.name} · {session.role?.name}
+          </span>
+        </div>
         <Management key={route} path={path} session={session} />
       </AdminShell>
     );
@@ -332,7 +350,22 @@ function Entry({
         key.current = "";
       }}
     >
+      {(done || route === "signed-out") && (
+        <CircleCheck size={48} aria-hidden="true" />
+      )}
+      {unavailable && <TriangleAlert size={48} aria-hidden="true" />}
+      {route === "forgot-password/sent" && (
+        <Mail size={48} aria-hidden="true" />
+      )}
       <h1 className="wr-page-title">{title}</h1>
+      {route === "signed-out" && (
+        <>
+          <p>This session has ended on this device.</p>
+          <div className="wr-notice">
+            Any unsaved drafts were cleared. Sign in again to continue.
+          </div>
+        </>
+      )}
       {error && (
         <p className="wr-notice" role="alert">
           {error}
@@ -400,16 +433,57 @@ function Entry({
                 If this address belongs to an active account with a verified
                 email, you’ll receive a password-reset link.
               </p>
-              {link("forgot-password", "Request a new link")}
+              <div className="wr-card wr-quiet">
+                <b>What happens next</b>
+                <p>
+                  Open the latest link within its validity window. Older links
+                  stop working as soon as a new one is sent.
+                </p>
+              </div>
+              <Link
+                href="/admin/forgot-password"
+                className="wr-btn wr-btn-secondary"
+              >
+                Request a new link
+              </Link>
+              <small>
+                This response never confirms whether an account exists.
+              </small>
             </>
           )}
           {!unavailable &&
             !done &&
             (route === "first-password" || route === "reset-password") && (
               <>
-                <p>{session?.account.name ?? email}</p>
+                {route === "reset-password" && (
+                  <>
+                    <p>
+                      Use a password different from the current password for
+                      this account.
+                    </p>
+                    <div className="wr-card wr-quiet">
+                      Resetting the account for <b>{email}</b>
+                    </div>
+                  </>
+                )}
+                <p>
+                  {session?.account.name ?? email}
+                  {route === "first-password" && (
+                    <> · {session?.account.username}</>
+                  )}
+                </p>
+                {route === "first-password" && (
+                  <div className="wr-notice">
+                    <ShieldCheck size={20} />
+                    <div>
+                      Set a new password before entering the portal for the
+                      first time. Until then this sign-in can do nothing else.
+                    </div>
+                  </div>
+                )}
                 <PasswordField
                   label="New password"
+                  helper="At least 12 characters and different from the current password."
                   name="newPassword"
 
                   minLength={12}
@@ -438,8 +512,15 @@ function Entry({
             )}
           {route === "verify-email" && !unavailable && !done && (
             <>
-              <p>Address to confirm</p>
-              <p>{email}</p>
+              <p>Confirm this email address for your administrative account.</p>
+              <div className="wr-card wr-quiet">
+                <span>Address to confirm</span>
+                <b>{email}</b>
+              </div>
+              <p>
+                Once verified, you can use this address to recover your
+                password.
+              </p>
               <p>Opening this page alone verifies nothing.</p>
               <Button type="submit" loading={busy} disabled={!email}>
                 Verify email address
@@ -448,7 +529,13 @@ function Entry({
           )}
           {route === "sign-out" && (
             <>
-              <p>{session?.account.name}</p>
+              <p>You’ll return to the sign-in screen.</p>
+              <div className="wr-card wr-quiet">
+                <b>{session?.account.name}</b>
+                <span>
+                  {session?.role?.name} · {session?.account.username}
+                </span>
+              </div>
               <p>
                 Signing out ends this session on this device and clears any
                 unsaved drafts.
@@ -461,7 +548,11 @@ function Entry({
           )}
           {unavailable && (
             <>
-              <p>The link may have expired, been used or been replaced.</p>
+              <div className="wr-notice">
+                {route === "reset-password"
+                  ? "It may have expired or already been used. Request a new reset link to continue."
+                  : "The link may have expired, been used or been replaced."}
+              </div>
               {route === "reset-password" ? (
                 link("forgot-password", "Request a new link")
               ) : (
@@ -471,10 +562,16 @@ function Entry({
           )}
           {done && (
             <p>
+              Your email address is confirmed. You can now use it for password
+              recovery.
+            </p>
+          )}
+          {done && (
+            <div className="wr-notice">
               {route === "verify-email"
                 ? "Verification does not sign you in or change your password."
                 : "Sign in with your new password."}
-            </p>
+            </div>
           )}
         </>
       )}
@@ -677,6 +774,11 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       );
       const u = await api<AdminUser>("users/" + user.id);
       setUser(u);
+      window.history.replaceState(
+        null,
+        "",
+        "/admin/users/" + u.id + "/verification-sent",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -699,7 +801,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
     });
   }
   const details = (
-    <aside className="wr-admin-access-summary">
+    <aside className="wr-card wr-quiet wr-admin-access-summary">
       <h3>Selected role access · {rolesMode ? name : selected?.name}</h3>
       <p>
         {(rolesMode ? permissions : (selected?.permissions ?? [])).length}{" "}
@@ -719,13 +821,96 @@ function Management({ path, session }: { path: string[]; session: Session }) {
   if (!allowed)
     return <p role="alert">You do not have permission to view this section.</p>;
   if (loading) return <p role="status">Loading…</p>;
+  if (!rolesMode && user && (notice || path[2] === "verification-sent"))
+    return (
+      <>
+        <div className="wr-pagehead">
+          <div>
+            <div className="wr-eyebrow">Admin users & roles / Manage user</div>
+            <h2>
+              {notice ? "Verification link queued" : "Verification delivery"}
+            </h2>
+            <p>
+              {user.name} · {user.username}
+            </p>
+          </div>
+          <Link
+            className="wr-btn wr-btn-secondary wr-btn-sm"
+            href={"/admin/users/" + user.id}
+          >
+            Back to user
+          </Link>
+        </div>
+        {notice && (
+          <div className="wr-notice" role="status">
+            {notice} The account holder must open the link and confirm the
+            address. Password recovery stays unavailable until then.
+          </div>
+        )}
+        {error && <p role="alert">{error}</p>}
+        <div className="wr-two-col">
+          <section className="wr-sheet">
+            <h2>Account · {user.emailVerified ? "Verified" : "Unverified"}</h2>
+            <dl className="wr-kv">
+              <dt>Name</dt>
+              <dd>{user.name}</dd>
+              <dt>Username</dt>
+              <dd>{user.username}</dd>
+              <dt>Email</dt>
+              <dd>{user.email ?? "No email recorded"}</dd>
+              <dt>Role</dt>
+              <dd>{user.role.name}</dd>
+              <dt>Status</dt>
+              <dd>{user.enabled ? "Active" : "Disabled"}</dd>
+            </dl>
+          </section>
+          <section className="wr-sheet">
+            <h2>What this does and does not do</h2>
+            <p>
+              <b>Does</b> Sends a single-use link bound to this user and this
+              exact address. Resending invalidates older links.
+            </p>
+            <p>
+              <b>Does not</b> Verify the address, sign the recipient in, or let
+              an admin mark someone else’s email verified.
+            </p>
+            <p>
+              <b>Recorded</b> An audit event with the actor and time; no token
+              is stored in logs.
+            </p>
+            {user.enabled && !user.emailVerified && user.email && (
+              <Button
+                variant="secondary"
+                loading={busy}
+                onClick={() => void verify()}
+              >
+                Resend link
+              </Button>
+            )}
+            {link("users", "All admin users")}
+          </section>
+        </div>
+      </>
+    );
   return (
     <>
-      <nav className="wr-admin-access-tabs">
-        {session.permissions?.includes("users") && link("users", "Admin users")}
-        {session.permissions?.includes("roles") &&
-          link("roles", "Roles & permissions")}
-        {link("sign-out", "Sign out")}
+      <nav className="wr-segments wr-admin-access-tabs">
+        {session.permissions?.includes("users") && (
+          <Link
+            href="/admin/users"
+            className={"wr-segment" + (!rolesMode ? " wr-on" : "")}
+          >
+            Admin users
+          </Link>
+        )}
+        {session.permissions?.includes("roles") && (
+          <Link
+            href="/admin/roles"
+            className={"wr-segment" + (rolesMode ? " wr-on" : "")}
+          >
+            Roles & permissions
+          </Link>
+        )}
       </nav>
       {error && (
         <div role="alert" className="wr-notice">
@@ -741,7 +926,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         </p>
       )}
       {!editing ? (
-        <section className="wr-admin-access-card">
+        <section className="wr-sheet wr-admin-access-card">
           <h2>{rolesMode ? "Roles & permissions" : "Portal users"}</h2>
           {link(kind + "/new", rolesMode ? "Create role" : "Create user")}
           <div className="wr-admin-access-table">
@@ -810,8 +995,14 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         </section>
       ) : (
         (!error || user || role || isNew) && (
-          <div className="wr-admin-access-columns">
-            <section className="wr-admin-access-card">
+          <div
+            className={
+              rolesMode
+                ? "wr-admin-role-layout"
+                : "wr-two-col wr-admin-access-columns"
+            }
+          >
+            <section className="wr-sheet wr-admin-access-card">
               <h2>
                 {review
                   ? "Review access change"
@@ -822,8 +1013,13 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                     : isNew
                       ? "Create admin user"
                       : "Manage admin user"}
+                <Link
+                  className="wr-btn wr-btn-secondary wr-btn-sm"
+                  href={"/admin/" + kind}
+                >
+                  {"Back to " + kind}
+                </Link>
               </h2>
-              {link(kind, "Back to " + kind)}
               {review ? (
                 <>
                   <p>Not saved yet</p>
@@ -887,31 +1083,55 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                         maxLength={120}
                         disabled={immutable}
                       />
-                      {permissionCodes
-                        .filter((p) => !dependencies[p])
-                        .map((parent) => (
-                          <fieldset key={parent} disabled={immutable}>
-                            <legend>{permissionLabels[parent]}</legend>
-                            {[
-                              parent,
-                              ...permissionCodes.filter(
-                                (p) => dependencies[p] === parent,
-                              ),
-                            ].map((code) => (
-                              <label className="wr-admin-permission" key={code}>
-                                <input
-                                  type="checkbox"
-                                  checked={permissions.includes(code)}
-                                  onChange={() => toggle(code)}
-                                />
-                                {permissionLabels[code]}{" "}
-                                {sensitiveDefaults.includes(code) && (
-                                  <small>Owner by default</small>
-                                )}
-                              </label>
-                            ))}
-                          </fieldset>
-                        ))}
+                      <div className="wr-label">
+                        Permitted actions{" "}
+                        <span className="wr-hint">
+                          New roles start with none. Ticking an action includes
+                          its view permission; unticking a view clears its
+                          actions.
+                        </span>
+                      </div>
+                      {immutable && (
+                        <div className="wr-notice">
+                          <div>
+                            <b>Owner is protected</b> and has every permission.
+                            It cannot be edited or removed, and the last active
+                            Owner cannot be disabled.
+                          </div>
+                        </div>
+                      )}
+                      <div className="wr-admin-permission-grid">
+                        {permissionCodes
+                          .filter((p) => !dependencies[p])
+                          .map((parent) => (
+                            <fieldset key={parent} disabled={immutable}>
+                              <legend>{permissionLabels[parent]}</legend>
+                              {[
+                                parent,
+                                ...permissionCodes.filter(
+                                  (p) => dependencies[p] === parent,
+                                ),
+                              ].map((code) => (
+                                <label
+                                  className="wr-admin-permission"
+                                  key={code}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={permissions.includes(code)}
+                                    onChange={() => toggle(code)}
+                                  />
+                                  {permissionLabels[code]}{" "}
+                                  {sensitiveDefaults.includes(code) && (
+                                    <small className="wr-pill wr-sm wr-pending wr-plain">
+                                      Owner by default
+                                    </small>
+                                  )}
+                                </label>
+                              ))}
+                            </fieldset>
+                          ))}
+                      </div>
                     </>
                   ) : (
                     <>
@@ -1026,6 +1246,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                       <label className="wr-field">
                         Reason
                         <textarea
+                          aria-label="Reason"
                           className="wr-input"
                           value={reason}
                           onChange={(e) => setReason(e.target.value)}
@@ -1038,20 +1259,29 @@ function Management({ path, session }: { path: string[]; session: Session }) {
                           name and the time.
                         </small>
                       </label>
+                    </>
+                  )}
+                  <div className="wr-row">
+                    {!immutable && (
                       <Button type="submit">
                         {rolesMode ? "Review role" : "Review user"}
                       </Button>
-                    </>
-                  )}
-                  {link(kind, "Cancel")}
+                    )}
+                    <Link
+                      className="wr-btn wr-btn-ghost"
+                      href={"/admin/" + kind}
+                    >
+                      Cancel
+                    </Link>
+                  </div>
                 </form>
               )}
             </section>
-            {details}
+            {!rolesMode && details}
           </div>
         )
       )}
-      <section className="wr-admin-access-card">
+      <section className="wr-sheet wr-admin-access-card">
         <h2>Access history</h2>
         {history.length ? (
           history.map((h) => (

@@ -487,3 +487,78 @@ body {
   background: var(--surface-inverse);
   color: var(--on-inverse-muted);
 }
+/* Match the access board's shared sheet/quiet surfaces and compact desktop permission grid. */
+.wr-admin-access-card.wr-sheet {
+  padding: var(--space-5);
+  margin-block: var(--space-6);
+}
+.wr-admin-access-tabs.wr-segments {
+  max-width: 420px;
+  gap: 0;
+}
+.wr-admin-access-columns {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: start;
+}
+.wr-admin-access-summary.wr-card {
+  padding: var(--space-4);
+  gap: 10px;
+}
+.wr-admin-access-summary h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.wr-admin-access-summary ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-700);
+}
+.wr-admin-access-card form > .wr-btn,
+.wr-admin-access-card form > a {
+  align-self: start;
+}
+.wr-admin-access-card form {
+  gap: var(--space-4);
+}
+.wr-admin-permission-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.wr-admin-permission-grid fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-md);
+  background: var(--surface-000);
+  min-width: 0;
+}
+.wr-admin-permission-grid legend {
+  font-size: 14px;
+  font-weight: 600;
+}
+.wr-admin-permission-grid .wr-admin-permission {
+  min-height: 28px;
+  font-size: 14px;
+  gap: 10px;
+}
+.wr-admin-permission-grid .wr-admin-permission input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--whale-600);
+  flex: none;
+}
+@media (max-width: 899px) {
+  .wr-admin-access-columns,
+  .wr-admin-permission-grid {
+    grid-template-columns: 1fr;
+  }
+  .wr-admin-permission-grid .wr-admin-permission {
+    min-height: 48px;
+  }
+}
