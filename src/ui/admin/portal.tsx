@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   type FormEvent,
@@ -160,7 +161,11 @@ export function AdminPortal({ path }: { path: string[] }) {
             {error}
           </p>
         )}
-        <Management key={route + ":" + epoch} path={path} session={session} />
+        <Management
+          key={route.replace(/\/verification-sent$/, "") + ":" + epoch}
+          path={path}
+          session={session}
+        />
       </AdminShell>
     );
   }
@@ -703,6 +708,9 @@ function Management({ path, session }: { path: string[]; session: Session }) {
     [busy, setBusy] = useState(false),
     [review, setReview] = useState(false),
     [notice, setNotice] = useState(""),
+    [verificationQueued, setVerificationQueued] = useState(false),
+    [historyWarning, setHistoryWarning] = useState(""),
+    [pickerWarning, setPickerWarning] = useState(""),
     [cursor, setCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [name, setName] = useState(""),
     [username, setUsername] = useState(""),
@@ -718,11 +726,54 @@ function Management({ path, session }: { path: string[]; session: Session }) {
   const key = useRef("");
   const frozen = useRef<Record<string, unknown> | null>(null);
   const loadVersion = useRef(0);
+  const lifetime = useRef(0);
+  const viewVersion = useRef(0);
+  const viewPath = path.join("/");
+  useLayoutEffect(() => {
+    // Same-record delivery/detail navigation preserves the editor, but ends
+    // the previous view's request ownership before any late continuation runs.
+    viewVersion.current++;
+    // This is an explicit view transition, not background session revalidation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBusy(false);
+  }, [viewPath]);
+  const historyVersion = useRef(0);
+  function mutationGuard() {
+    const generation = lifetime.current,
+      view = viewVersion.current,
+      pathname = window.location.pathname,
+      epoch = store.getSnapshot().epoch;
+    return () =>
+      generation === lifetime.current &&
+      view === viewVersion.current &&
+      pathname === window.location.pathname &&
+      epoch === store.getSnapshot().epoch;
+  }
+  async function refreshHistory(active: () => boolean) {
+    const version = ++historyVersion.current;
+    const current = () => active() && version === historyVersion.current;
+    try {
+      const h = await api<{ items: typeof history }>(
+        "access-history?targetType=" +
+          (rolesMode ? "role" : "admin") +
+          (!isNew && id && id !== "owner" ? "&targetId=" + id : ""),
+      );
+      if (current()) {
+        setHistory(h.items);
+        setHistoryWarning("");
+      }
+    } catch {
+      if (current())
+        setHistoryWarning("Access history could not be refreshed.");
+    }
+  }
   async function load(next?: string) {
     const version = ++loadVersion.current;
     const current = () => version === loadVersion.current;
     setLoading(true);
     setError("");
+    setNotice("");
+    setVerificationQueued(false);
     setReview(false);
     frozen.current = null;
     key.current = "";
@@ -731,18 +782,8 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       setLoading(false);
       return;
     }
-    void api<{ items: typeof history }>(
-      "access-history?targetType=" +
-        (rolesMode ? "role" : "admin") +
-        (!isNew && id && id !== "owner" ? "&targetId=" + id : ""),
-    ).then(
-      (h) => {
-        if (current()) setHistory(h.items);
-      },
-      () => {
-        if (current()) setNotice("Access history could not be refreshed.");
-      },
-    );
+    void refreshHistory(current);
+    setPickerWarning("");
     try {
       if (editing) {
         if (rolesMode) {
@@ -772,7 +813,12 @@ function Management({ path, session }: { path: string[]; session: Session }) {
           if (isNew) await picker;
           else {
             void picker.catch(() => {
-              if (current()) setNotice("Role choices could not be refreshed.");
+              if (current()) {
+                setRoles([]);
+                setPickerWarning(
+                  "Role choices could not be refreshed. The current role is shown; reload before selecting another role.",
+                );
+              }
             });
             const u = await api<AdminUser>("users/" + id);
             if (current()) {
@@ -818,6 +864,9 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       // A generation counter invalidates requests, not a DOM ref.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       loadVersion.current++;
+      // Fence mutation continuations across record navigation/unmount too.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      lifetime.current++;
     };
     // The editor is keyed by route and authority epoch. Healthy refresh preserves drafts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -864,6 +913,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
   }
   async function confirm() {
     if (!frozen.current) return;
+    const current = mutationGuard();
     setBusy(true);
     setError("");
     try {
@@ -872,12 +922,35 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         frozen.current,
         isNew ? "POST" : "PATCH",
       );
+      if (!current()) return;
       setPassword("");
       frozen.current = null;
+      key.current = "";
+      setReview(false);
+      setVerificationQueued(false);
+      setReason("");
       const target = "user" in result ? result.user : result;
-      // The route-keyed editor discards credentials and confirmation drafts.
-      router.push("/admin/" + kind + "/" + target.id);
+      // Keep the current record editor, but adopt the authoritative applied version.
+      if ("role" in target) {
+        setUser(target);
+        setRoleId(target.role.id);
+        setEnabled(target.enabled);
+        setRoles((old) =>
+          old.map((r) => (r.id === target.role.id ? target.role : r)),
+        );
+      } else {
+        setRole(target);
+        setName(target.name);
+        setPermissions(target.permissions);
+      }
+      store.lists.delete(kind);
+      if (isNew) router.push("/admin/" + kind + "/" + target.id);
+      else {
+        setNotice("Access change saved.");
+        void refreshHistory(current);
+      }
     } catch (e) {
+      if (!current()) return;
       const err = e as AdminError;
       setError(err.message);
       if (err.status === 401) {
@@ -893,15 +966,16 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         setPassword("");
         if (err.code === "version_conflict") {
           await load();
-          setError(err.message);
+          if (current()) setError(err.message);
         }
       }
     } finally {
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   async function verify() {
     if (!user) return;
+    const current = mutationGuard();
     setBusy(true);
     setError("");
     try {
@@ -909,20 +983,24 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         operationId: adminOperationId(),
         expectedVersion: user.version,
       });
+      if (!current()) return;
+      setVerificationQueued(true);
       setNotice(
         "Verification link queued. Sending does not verify the address or prove delivery.",
       );
       const u = await api<AdminUser>("users/" + user.id);
+      if (!current()) return;
       setUser(u);
+      setBusy(false);
       window.history.replaceState(
         null,
         "",
         "/admin/users/" + u.id + "/verification-sent",
       );
     } catch (e) {
-      setError((e as Error).message);
+      if (current()) setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   function toggle(code: PermissionCode) {
@@ -1036,14 +1114,16 @@ function Management({ path, session }: { path: string[]; session: Session }) {
         </p>
       </>
     );
-  if (!rolesMode && user && (notice || path[2] === "verification-sent"))
+  if (!rolesMode && user && path[2] === "verification-sent")
     return (
       <>
         <div className="wr-pagehead">
           <div>
             <div className="wr-eyebrow">Admin users & roles / Manage user</div>
             <h2>
-              {notice ? "Verification link queued" : "Verification delivery"}
+              {verificationQueued
+                ? "Verification link queued"
+                : "Verification delivery"}
             </h2>
             <p>
               {user.name} · {user.username}
@@ -1056,7 +1136,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
             Back to user
           </Link>
         </div>
-        {notice && (
+        {verificationQueued && notice && (
           <div className="wr-notice" role="status">
             {notice} The account holder must open the link and confirm the
             address. Password recovery stays unavailable until then.
@@ -1127,6 +1207,16 @@ function Management({ path, session }: { path: string[]; session: Session }) {
           </Link>
         )}
       </nav>
+      {historyWarning && (
+        <p role="alert" className="wr-notice">
+          {historyWarning}
+        </p>
+      )}
+      {pickerWarning && (
+        <p role="alert" className="wr-notice">
+          {pickerWarning}
+        </p>
+      )}
       {error && (
         <div role="alert" className="wr-notice">
           {error}{" "}
