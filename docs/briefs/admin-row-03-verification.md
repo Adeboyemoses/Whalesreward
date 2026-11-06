@@ -1,7 +1,7 @@
 # Admin row 03: Email verification, with the verification email
 
 Boards: B14-VerificationSent, M01-VerificationEmail, B15-EmailVerification, B16-VerificationComplete, B17-VerificationExpired   Feature: F12   Invariants: I-07, I-08, I-09, I-10, I-11, I-12, I-13
-Decision note: product-docs/04 UI Design/Admin Portal/Admin Account Recovery Decisions.md (including Hi-fi flow — 4 November 2026).
+Decision note: product-docs/04 UI Design/Admin Portal/Admin Access Screen Decisions.md and Admin Users and Roles Decisions.md (including Hi-fi flow — 4 November 2026).
 
 | Board | Route | Components (src/ui) | Reads (contract) | Writes (contract) | States | Permission |
 |---|---|---|---|---|---|---|
