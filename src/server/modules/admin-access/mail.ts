@@ -177,7 +177,7 @@ export async function processMail(
     // An interrupted sender cannot recover or reconstruct its raw token.
     const stale = (
       await db.query(
-        "SELECT challenge_id FROM mail_request WHERE status='sending' AND lease_until<=clock_timestamp() FOR UPDATE",
+        "SELECT id,challenge_id FROM mail_request WHERE status='sending' AND lease_until<=clock_timestamp() ORDER BY lease_until,id LIMIT 25 FOR UPDATE",
       )
     ).rows;
     progressed ||= stale.length > 0;
@@ -188,7 +188,8 @@ export async function processMail(
           [r.challenge_id],
         );
     await db.query(
-      "UPDATE mail_request SET status='failed',failure_code='delivery_uncertain',fencing_version=fencing_version+1 WHERE status='sending' AND lease_until<=clock_timestamp()",
+      "UPDATE mail_request SET status='failed',failure_code='delivery_uncertain',fencing_version=fencing_version+1 WHERE id=ANY($1::uuid[]) AND status='sending' AND lease_until<=clock_timestamp()",
+      [stale.map((row) => row.id)],
     );
     const m = (
       await db.query(

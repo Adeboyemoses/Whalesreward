@@ -36,4 +36,4 @@ COPY --chown=node:node scripts/deploy/entrypoint.mjs ./scripts/deploy/entrypoint
 USER node
 EXPOSE 8080
 ENTRYPOINT ["node", "scripts/deploy/entrypoint.mjs"]
-CMD ["pnpm", "start", "--hostname", "0.0.0.0", "--port", "8080"]
+CMD ["node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0", "--port", "8080"]
