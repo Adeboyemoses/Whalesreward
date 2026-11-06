@@ -235,3 +235,52 @@ it.each([
     }
   },
 );
+
+it.each([200, 201])(
+  "HTTP %i EM_104 acknowledgement wins over an unrelated diagnostic error code",
+  async (status) => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({ data: [{ code: "EM_104" }], error_code: "TM_3004" }),
+        { status },
+      ),
+    );
+    await expect(sendEmail(message, options())).resolves.toMatchObject({
+      delivered: true,
+    });
+    expect(warn).not.toHaveBeenCalled();
+  },
+);
+
+it("bounds an invalid adapter name rather than logging its private value", async () => {
+  vi.stubEnv("EMAIL_PROVIDER", "private-provider-detail");
+  await sendEmail(message);
+  expect(warn.mock.calls).toEqual([
+    [
+      {
+        event: "email.send_failed",
+        adapter: "unknown",
+        reason: "config_invalid",
+        setting: "EMAIL_PROVIDER",
+      },
+    ],
+  ]);
+  expect(fetch).not.toHaveBeenCalled();
+});
+it("logs only the Mailpit setting name for an unsafe local endpoint", async () => {
+  await sendEmail(message, {
+    adapter: "mailpit",
+    mailpitUrl: "https://example.com/private-provider-detail",
+  });
+  expect(warn.mock.calls).toEqual([
+    [
+      {
+        event: "email.send_failed",
+        adapter: "mailpit",
+        reason: "config_invalid",
+        setting: "MAILPIT_URL",
+      },
+    ],
+  ]);
+  expect(fetch).not.toHaveBeenCalled();
+});

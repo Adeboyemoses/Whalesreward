@@ -204,17 +204,19 @@ export async function sendEmail(
         });
       throw error;
     }
+    if (
+      acceptedStatus &&
+      record(payload) &&
+      Array.isArray(payload.data) &&
+      payload.data.some((item) => record(item) && item.code === "EM_104")
+    )
+      return { delivered: true, adapter } as const;
     const code = providerCode(payload);
     const details = { status, ...(code ? { error_code: code } : {}) };
     if (!acceptedStatus) return failed("http_status", details);
-    if (code) return failed("provider_error", details);
-    if (
-      !record(payload) ||
-      !Array.isArray(payload.data) ||
-      !payload.data.some((item) => record(item) && item.code === "EM_104")
-    )
-      return failed("response_invalid", { status });
-    return { delivered: true, adapter } as const;
+    return code
+      ? failed("provider_error", details)
+      : failed("response_invalid", { status });
   } catch (error) {
     const timeout =
       signal.aborted ||
