@@ -15,6 +15,7 @@ export default defineConfig({
   globalSetup: "./admin-access.setup.ts",
   use: {
     baseURL: process.env.BETTER_AUTH_URL,
+    actionTimeout: 15000,
     viewport: { width: 1440, height: 1000 },
     deviceScaleFactor: 2,
     trace: "off",

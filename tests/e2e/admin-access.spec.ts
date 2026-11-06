@@ -76,7 +76,7 @@ test("I-07 I-09 I-13 admin browser restriction, role dependency, confirmed acces
       page.getByRole("heading", { name: "Admin users & roles", exact: true }),
     ).toBeVisible();
     await f.db.query(
-      "UPDATE auth_session SET revoked_at=now() WHERE user_id=$1",
+      "UPDATE auth_session SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL",
       [f.userId],
     );
     await page.reload();
