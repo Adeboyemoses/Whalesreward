@@ -477,3 +477,13 @@ body {
     min-height: 48px;
   }
 }
+.wr-auth-hero .wr-brand-name {
+  color: var(--on-inverse);
+}
+.wr-auth-hero .wr-brand-surface {
+  color: var(--on-inverse-muted);
+}
+.wr-auth-hero .wr-pill {
+  background: var(--surface-inverse);
+  color: var(--on-inverse-muted);
+}
