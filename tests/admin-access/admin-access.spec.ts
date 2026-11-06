@@ -74,6 +74,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await page
       .getByRole("button", { name: "Review role", exact: true })
       .click();
+    await shot(page, "H10-ReviewRoleChange");
     await page
       .getByRole("button", { name: "Keep editing", exact: true })
       .click();
