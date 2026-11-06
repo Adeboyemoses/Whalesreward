@@ -18,6 +18,6 @@ WO-core-6 (WHR-10) M2 pumps, prices and attendants backend: READY since 2026-11-
 - WHR-77 (high): current attendant UI parses only ready sessions; new-account first-password UI must land before end-to-end use. Backend completion requires fresh sign-in and never issues an early capture context.
 - WHR-78: one reviewer parallel fixture-extension setup collision; serial rerun and unchanged EM parallel178/27 passed. No gate, limiter, time rule or policy relaxed.
 - No cloud/provider or manual staging-data operation; no UI parity or full work-order acceptance. P-20 client Q-528 remains pending.
-- Dispatch flag: feature #68 used9 >8 dispatches; two rounds within cap3. One separate records reviewer makes10 total. Runtime model ID unavailable.
+- Dispatch flag: feature #68 used9 >8 dispatches; two rounds within cap3. Two separate records-review dispatches make11 total. Runtime model ID unavailable.
 
-dispatches=10 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=11 prs=2 rounds_max=2 escalations=0 model=unavailable
