@@ -1,22 +1,20 @@
 # lane:core
-WO-core-5a (WHR-66) staging transactional email: READY on green records merge, 2026-11-05
+WO-core-5a (WHR-66): ACCEPTED; closes on green records merge, 2026-11-06
 
 ## In flight
-- [Feature #55](https://github.com/Adeboyemoses/Whalesreward/pull/55) merged with all five checks green. Guarded Zoho CPaaS EU staging adapter, environment-only private configuration, exact allowlist, test markings, bounded delivery, insert-only seed inbox and bundled worker. Feature excludes shared records.
-- Code/security/integrity PASS round 2 at a9c8efd; evidence `.review/core__wo-5a-zoho-email.md` validates. EM found Next caught the startup error and stayed listening; fixed with process exit 1 and red-to-green unit/compiled-server regressions. No open findings.
-- EM typecheck/lint/build PASS; unit 185, PostgreSQL/MinIO 137, Linux browser 98 passed/4 existing staging-only skips/no retries. amd64 non-root image, local bounded worker and production startup guard PASS. Named tests posted on WHR-66 at READY.
-- T-15 decision [#54](https://github.com/Adeboyemoses/Whalesreward/pull/54) merged; T-14 already confirms authentication. WHR-8 ACCEPTED/Done through closeout [#53](https://github.com/Adeboyemoses/Whalesreward/pull/53), 120ae71.
+- Earl accepted WHR-66. Feature [#55](https://github.com/Adeboyemoses/Whalesreward/pull/55) 9fc4a75, T-15 [#54](https://github.com/Adeboyemoses/Whalesreward/pull/54) d53a468 and READY [#56](https://github.com/Adeboyemoses/Whalesreward/pull/56) 6f1152d are merged with all five checks green. Prior named verification remains on WHR-66: unit 185, PostgreSQL/MinIO 137, browser 98/4 existing skips, typecheck/lint/build and image checks PASS.
+- WHR-68 is BUILD under Earl's explicit session go, recorded on the Backlog issue per work-orders.md approval exception. No approval footer altered and no move to Todo. In-process polling adds no paid component; high-tier plan committed before builder dispatch. Feature excludes shared records.
 
 ## Next
-- Stop at READY with WHR-66 In Review after this records merge. Earl uses docs/ops/staging.md for private configuration and one verification delivery confirmation. No next work order.
+- Close WHR-66 after this records merge. Implement WHR-68 with independent PostgreSQL tests, code/security/integrity review, EM gates and green staging merge; then READY records and stop.
 
 ## Earl's gos
-- 2026-11-05: “Earl accepted WO-core-5 (WHR-8); close it.”
-- 2026-11-05: “Never commit the domain, sender, recipients or token. Take it to READY, then stop. No cloud operations.”
+- 2026-11-06: “Earl accepted WO-core-5a (WHR-66); close it.”
+- 2026-11-06: “Next work order: WO-core-5b (WHR-68), send queued admin emails automatically. Take it to READY, then stop. No cloud operations.”
 
 ## Risks
-- No cloud/provider calls or staging-data changes. Real inbox acceptance pending; seed never backfills an existing inbox. Production activation, WHR-42/43 policy and Q-535 consent remain separate.
-- One existing sync test hit its unchanged 5s timeout during concurrent image/browser work; focused and full isolated reruns passed without changes.
-- Feature dispatch flag 9 > 8; two review rounds within cap 3. Session includes acceptance, decision and READY records reviews. Runtime model ID unavailable.
+- No cloud/provider calls or staging-data changes. WHR-66 acceptance does not claim real inbox receipt; WO-app-4 smoke uses an approved second test admin through the normal create-user flow. Existing seed inbox remains insert-only.
+- Production provider/auth policy activation and Q-535 consent remain separate. Preserve uncertain-send revocation, exact allowlist and private configuration.
+- Earlier feature #55 dispatch flag 9 > 8 remains recorded. Runtime model ID unavailable.
 
-dispatches=13 prs=4 rounds_max=2 escalations=0 model=unavailable
+dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
