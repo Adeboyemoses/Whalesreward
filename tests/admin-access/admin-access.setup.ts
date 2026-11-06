@@ -7,14 +7,17 @@ export default async function setup() {
       "postgresql://whr:whr@127.0.0.1:5433/whr_dev",
   });
   await root.connect();
+  const databaseName = new URL(process.env.DATABASE_URL!).pathname.slice(1);
+  if (!/^whr_admin_browser(?:_[a-z0-9_]+)?$/.test(databaseName))
+    throw new Error("Use an isolated local admin browser database");
   if (
     !(
-      await root.query(
-        "SELECT 1 FROM pg_database WHERE datname='whr_admin_browser'",
-      )
+      await root.query("SELECT 1 FROM pg_database WHERE datname=$1", [
+        databaseName,
+      ])
     ).rowCount
   )
-    await root.query("CREATE DATABASE whr_admin_browser");
+    await root.query(`CREATE DATABASE "${databaseName}"`);
   await root.end();
   const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await db.connect();

@@ -42,7 +42,11 @@ export async function signIn(page: Page, username: string, password: string) {
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
-export async function mailLink(email: string, subject: string) {
+export async function mailLink(
+  email: string,
+  subject: string,
+  previousLink?: string,
+) {
   execFileSync(
     "pnpm",
     [
@@ -66,19 +70,20 @@ export async function mailLink(email: string, subject: string) {
       `${process.env.MAILPIT_URL ?? "http://127.0.0.1:8025"}/api/v1/messages`,
     )
   ).json();
-  const item = messages.messages.find(
+  for (const item of messages.messages.filter(
     (m: { To: { Address: string }[]; Subject: string }) =>
       m.To.some((t) => t.Address === email) && m.Subject.includes(subject),
-  );
-  if (!item) throw new Error("Expected fictional local message absent");
-  const full = await (
-    await fetch(
-      `${process.env.MAILPIT_URL ?? "http://127.0.0.1:8025"}/api/v1/message/${item.ID}`,
-    )
-  ).json();
-  const link = full.Text.match(
-    /http:\/\/127\.0\.0\.1:3104\/admin\/(?:verify-email|reset-password)#token=[a-zA-Z0-9_-]+/,
-  )?.[0];
-  if (!link) throw new Error("Expected local link absent");
-  return { link, html: full.HTML as string };
+  )) {
+    const full = await (
+      await fetch(
+        `${process.env.MAILPIT_URL ?? "http://127.0.0.1:8025"}/api/v1/message/${item.ID}`,
+      )
+    ).json();
+    const link = full.Text.match(
+      /http:\/\/127\.0\.0\.1:3104\/admin\/(?:verify-email|reset-password)#token=[a-zA-Z0-9_-]+/,
+    )?.[0];
+    if (link && link !== previousLink)
+      return { link, html: full.HTML as string };
+  }
+  throw new Error("Expected fresh fictional local message absent");
 }

@@ -6,6 +6,13 @@ import { v7 } from "uuid";
 import { fixture, signIn, mailLink } from "./admin-access.fixtures";
 
 async function shot(page: Page, board: string) {
+  expect(
+    await page
+      .locator('input[type="password"]')
+      .evaluateAll((nodes) =>
+        nodes.every((node) => (node as HTMLInputElement).value === ""),
+      ),
+  ).toBe(true);
   const heights: Record<string, number> = {
     "H02-CreateUser": 1070,
     "H09-ReviewUserChange": 965,
@@ -157,7 +164,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     } as never);
     const landing = await recipient.newPage();
     await landing.setContent(
-      verification.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=redacted"),
+      verification.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=[redacted]"),
     );
     await shot(landing, "M01-VerificationEmail");
     await landing.goto(verification.link);
@@ -193,6 +200,39 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await shot(landing, "B17-VerificationExpired");
     await page.goto(`/admin/users/${account.id}`);
     await shot(page, "H03-ManageUser");
+    await page.goto(`/admin/roles/${role.id}`);
+    await page
+      .getByRole("checkbox", { name: "Export reports", exact: true })
+      .check();
+    await page
+      .getByLabel("Reason", { exact: true })
+      .fill("Fictional export grant review");
+    await page
+      .getByRole("button", { name: "Review role", exact: true })
+      .click();
+    await expect(
+      page.getByText("Affected users", { exact: true }),
+    ).toBeVisible();
+    const review = page
+      .locator("section")
+      .filter({
+        has: page.getByRole("heading", { name: /Review access change/ }),
+      })
+      .first();
+    await expect(
+      review.getByText("View reports", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      review.getByText("Export reports", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator("dt")
+        .filter({ hasText: "Affected users" })
+        .locator("xpath=following-sibling::dd[1]"),
+    ).toHaveText("1");
+    await shot(page, "H10-ReviewRoleChange");
+
     await signIn(landing, secondName, temporary);
     await expect(landing).toHaveURL(/first-password/);
     const secondPassword = randomBytes(24).toString("hex");
@@ -226,7 +266,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     await shot(page, "B11-RecoveryEmailSent");
     const reset = await mailLink(email, "Reset");
     await landing.setContent(
-      reset.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=redacted"),
+      reset.html.replace(/#token=[a-zA-Z0-9_-]+/g, "#token=[redacted]"),
     );
     await shot(landing, "M02-PasswordResetEmail");
     await page.goto(reset.link);
@@ -235,6 +275,23 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
       page.getByLabel("New password", { exact: true }),
     ).toBeVisible();
     await shot(page, "B12-ResetPassword");
+    await page.request.post("/api/admin/password-reset-requests", {
+      headers: { Origin: "http://127.0.0.1:3104", "Idempotency-Key": v7() },
+      data: { email },
+    });
+    const freshReset = await mailLink(email, "Reset", reset.link);
+    await page.goto(reset.link);
+    await expect(
+      page.getByRole("heading", {
+        name: "This link is unavailable",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.goto(freshReset.link);
+    await expect(
+      page.getByLabel("New password", { exact: true }),
+    ).toBeVisible();
+
     const resetPassword = randomBytes(24).toString("hex");
     await page.getByLabel("New password", { exact: true }).fill(resetPassword);
     await page
@@ -247,7 +304,7 @@ test("I-07 I-09 I-12 I-13 named admin first-password, users, verification, recov
     expect((await landing.request.get("/api/admin/session")).status()).toBe(
       401,
     );
-    await page.goto(reset.link);
+    await page.goto(freshReset.link);
     await expect(
       page.getByRole("heading", {
         name: "This link is unavailable",
@@ -403,6 +460,22 @@ test("I-07 I-08 I-10 server refusals survive user confirmation: last Owner, stal
     } finally {
       await limited.db.end();
     }
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-13 restricted first-password session can sign out without entering portal", async ({
+  page,
+}) => {
+  const f = await fixture();
+  try {
+    await signIn(page, f.username, f.password);
+    await expect(page).toHaveURL(/first-password/);
+    await page.goto("/admin/sign-out");
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(page).toHaveURL(/signed-out/);
+    expect((await page.request.get("/api/admin/session")).status()).toBe(401);
   } finally {
     await f.db.end();
   }
