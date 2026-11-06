@@ -112,7 +112,7 @@ test("I-09 admin background failure retains content but definitive revocation re
     ).toBeVisible();
     await expect(
       page
-        .getByRole("alert")
+        .locator('[role="alert"]:not(#__next-route-announcer__)')
         .filter({ hasText: /connect|refresh|access|network|session|sign/i }),
     ).toContainText(/connect|refresh|access|network/i);
     await page.unroute("**/api/admin/session");
@@ -126,7 +126,7 @@ test("I-09 admin background failure retains content but definitive revocation re
     ).toHaveCount(0);
     await expect(
       page
-        .getByRole("alert")
+        .locator('[role="alert"]:not(#__next-route-announcer__)')
         .filter({ hasText: /connect|refresh|access|network|session|sign/i }),
     ).toContainText(/session|sign|access/i);
     expect(
