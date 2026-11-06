@@ -168,3 +168,34 @@ test("I-49 admin navigation does not persist its account or grants in browser st
     await f.db.end();
   }
 });
+
+test("I-09 returning visibility revalidates access without waiting for a focus event", async ({
+  page,
+}) => {
+  const f = await ready(page);
+  let calls = 0;
+  try {
+    await page.route("**/api/admin/session", async (route) => {
+      calls++;
+      await route.continue();
+    });
+    await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "hidden",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        value: "visible",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await expect.poll(() => calls).toBeGreaterThan(0);
+    await expect(
+      page.getByRole("heading", { name: "Portal users", exact: true }),
+    ).toBeVisible();
+  } finally {
+    await f.db.end();
+  }
+});
