@@ -218,11 +218,11 @@ function Entry({
   const tokenVersion = useRef(0);
   useEffect(() => {
     if (!["verify-email", "reset-password"].includes(route)) return;
-    const inspect = () => {
+    const inspect = (source: URL) => {
       const version = ++tokenVersion.current;
       token.current =
-        new URLSearchParams(location.hash.slice(1)).get("token") ??
-        new URL(location.href).searchParams.get("token") ??
+        new URLSearchParams(source.hash.slice(1)).get("token") ??
+        source.searchParams.get("token") ??
         "";
       window.history.replaceState(null, "", location.pathname);
       setDone(false);
@@ -255,13 +255,21 @@ function Entry({
           if (version === tokenVersion.current) setInspecting(false);
         });
     };
-    const start = window.setTimeout(inspect, 0);
-    window.addEventListener("hashchange", inspect);
-    window.addEventListener("popstate", inspect);
+    // Fragment history navigation emits popstate before hashchange. Only the
+    // hashchange handler inspects fragment tokens, using the event URL because
+    // our immediate scrub changes location before another event can run.
+    const hash = (event: HashChangeEvent) => inspect(new URL(event.newURL));
+    const pop = () => {
+      const source = new URL(location.href);
+      if (!source.hash) inspect(source);
+    };
+    const start = window.setTimeout(() => inspect(new URL(location.href)), 0);
+    window.addEventListener("hashchange", hash);
+    window.addEventListener("popstate", pop);
     return () => {
       window.clearTimeout(start);
-      window.removeEventListener("hashchange", inspect);
-      window.removeEventListener("popstate", inspect);
+      window.removeEventListener("hashchange", hash);
+      window.removeEventListener("popstate", pop);
       // This ref is a request-generation counter, not a DOM ref.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       tokenVersion.current++;
@@ -379,11 +387,19 @@ function Entry({
       }}
     >
       {(done || route === "signed-out") && (
-        <CircleCheck size={48} aria-hidden="true" />
+        <div className="wr-result-icon">
+          <CircleCheck aria-hidden="true" />
+        </div>
       )}
-      {unavailable && <TriangleAlert size={48} aria-hidden="true" />}
+      {unavailable && (
+        <div className="wr-result-icon wr-failed">
+          <TriangleAlert aria-hidden="true" />
+        </div>
+      )}
       {route === "forgot-password/sent" && (
-        <Mail size={48} aria-hidden="true" />
+        <div className="wr-result-icon wr-held">
+          <Mail aria-hidden="true" />
+        </div>
       )}
       <h1 className="wr-page-title">{title}</h1>
       {route === "signed-out" && (
@@ -499,7 +515,7 @@ function Entry({
                   </>
                 )}
                 <p>
-                  {session?.account.name ?? email}
+                  {route === "first-password" ? session?.account.name : null}
                   {route === "first-password" && (
                     <> · {session?.account.username}</>
                   )}
@@ -538,7 +554,9 @@ function Entry({
                     : "Reset password"}
                 </Button>
                 <p>
-                  Choose a different password. Resetting ends existing sessions.
+                  Resetting signs you out everywhere, records an audit event and
+                  sends a security notice to this email. You return to sign in;
+                  the reset does not sign you in.
                 </p>
               </>
             )}
