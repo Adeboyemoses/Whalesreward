@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   type FormEvent,
@@ -726,12 +727,27 @@ function Management({ path, session }: { path: string[]; session: Session }) {
   const frozen = useRef<Record<string, unknown> | null>(null);
   const loadVersion = useRef(0);
   const lifetime = useRef(0);
+  const viewVersion = useRef(0);
+  const viewPath = path.join("/");
+  useLayoutEffect(() => {
+    // Same-record delivery/detail navigation preserves the editor, but ends
+    // the previous view's request ownership before any late continuation runs.
+    viewVersion.current++;
+    // This is an explicit view transition, not background session revalidation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBusy(false);
+  }, [viewPath]);
   const historyVersion = useRef(0);
   function mutationGuard() {
     const generation = lifetime.current,
+      view = viewVersion.current,
+      pathname = window.location.pathname,
       epoch = store.getSnapshot().epoch;
     return () =>
-      generation === lifetime.current && epoch === store.getSnapshot().epoch;
+      generation === lifetime.current &&
+      view === viewVersion.current &&
+      pathname === window.location.pathname &&
+      epoch === store.getSnapshot().epoch;
   }
   async function refreshHistory(active: () => boolean) {
     const version = ++historyVersion.current;
@@ -975,6 +991,7 @@ function Management({ path, session }: { path: string[]; session: Session }) {
       const u = await api<AdminUser>("users/" + user.id);
       if (!current()) return;
       setUser(u);
+      setBusy(false);
       window.history.replaceState(
         null,
         "",
