@@ -593,3 +593,14 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
+.wr-admin-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wr-admin-entry-actions > .wr-btn {
+  width: auto;
+  flex: none;
+  min-height: 48px;
+}
