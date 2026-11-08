@@ -1,9 +1,10 @@
 # STATUS.md
-Updated: 2026-11-06
+Updated: 2026-11-09
 
 ## Milestone: M1 phone exit accepted; M2 access, admin navigation and station backend (docs/engineering/roadmap.md)
 
 ## Done this week
+- WO-app-4a / WHR-75: ACCEPTED by Earl on 9 November 2026 after repeating tab-switch/navigation checks on staging: the portal no longer reloads. Feature #73 (6ab8191) and READY records #74 (465a9cd) remain the implementation evidence. This reviewed documentation closeout makes WHR-75 Done after its green merge and supersedes prior pending-acceptance wording below. No new code, timing, parity or cloud claim.
 - WO-app-4a (WHR-75): READY after this records PR's green staging merge. Feature [#73](https://github.com/Adeboyemoses/Whalesreward/pull/73) merged at 6ab8191 with five green checks and independent code/security/integrity PASS round 2. Persistent in-memory admin session, client navigation and inline detail loads preserve content; server authority remains unchanged. EM typecheck/lint/build and 259 unit tests PASS; full browser 130 passed/four existing staging-only skips, zero retries; real local PostgreSQL/Mailpit four + five PASS; focused parity two PASS. CI also passed 130 browser/four existing skips and one storage test with no test retries. Local 150 ms medians: tab 0.9 ms, user 322.2 ms, role 329.9 ms; Fast3G-shaped full detail remains 1.18–1.66 seconds. Timing source and final correctness gates are distinguished in tests/admin-navigation/COMPARISON.md. No live staging session was used. Earl confirms staging with docs/qa/smoke-2026-11-06-admin-navigation.md; WHR-75 stays In Review, not accepted.
 - WO-spec-2a (WHR-79): offboarding specification READY. [PR #71](https://github.com/Adeboyemoses/Whalesreward/pull/71) merged at 8368f48 with all five CI checks green. P-21 records Earl's WHR-76 assignment-ending decision; M1/M2/M3 and the model define guards, revocation, non-revealing sign-in denial, retained queues/history and P-20 recovery. Code/security/integrity PASS round 2; EM typecheck/lint, unit 248, build and evidence/prose/link checks PASS. No runtime implementation or board parity claimed; backend follow-up WHR-80 remains Backlog. This separate records PR completes the READY handoff, leaving WHR-79 In Review for Earl.
 - WO-core-6 (WHR-10): ACCEPTED by Earl within m2.md scope on 6 November 2026; Done after this reviewed closeout merges. M2 backend delivered through [feature #68](https://github.com/Adeboyemoses/Whalesreward/pull/68), c6390ec, all five CI checks green. Pumps, immediate immutable product price/precision, personal attendant provisioning/first-password and assignment/history APIs preserve capture contexts and P-20. Code/security/integrity PASS round2 at3995e55; EM typecheck/lint/build, unit248, PostgreSQL178, named27, timezone3+3, Linux browser104/four existing staging-only skips/zero retries and signed-upload1 PASS. Named output: docs/qa/verification-2026-11-06-station.md. Paused-activation false credit, password compatibility and cursor bounds have failing-before/passing-after regressions. WHR-76 Option A confirms the accepted P-16/M2 boundary; broader edit/status wording was a drafting error. WHR-77 first-password UI, WO-app-5 screen smoke and WHR-79 offboarding remain separate follow-ups, not blockers to the accepted backend closeout. No UI acceptance or new offboarding implementation is claimed.
@@ -39,7 +40,7 @@ Updated: 2026-11-06
 ## In progress
 - lane:spec stops at WO-spec-2a READY pending Earl's reading. No further spec work is started; no acceptance or closure inferred.
 - Core is closing accepted WO-core-6 within m2.md scope through this documentation-only PR. WHR-10 moves to Done after its reviewed green merge; no feature work is in progress.
-- WO-app-4a is READY pending Earl’s own staging smoke; only this separate records merge and READY handoff remain. No next app work order started.
+- App is closing accepted WHR-75; WO-app-5 / WHR-11 starts next under Earl’s explicit go, including WHR-77 first password and P-21 End assignment. Offboarding uses the m2.md contract fake until WHR-80 merges.
 - Earl's one-time setup (docs/agentic/setup.md).
 
 - WO-app-0 (WHR-33): ACCEPTED by Earl on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Six briefs and three draft phone runbooks merged in PRs #2 and #9; documentation closeout takes effect on green staging merge. No app implementation or device verification claimed.
@@ -57,7 +58,7 @@ Updated: 2026-11-06
 
 ## Next up
 - Offboarding implementation is tracked by WHR-80 for a separate approved lane:core work order. Rook should mirror P-21 into product docs and track attendant disable as a possible later client addition; neither changes this spec-only handoff.
-- App stops at WO-app-4a READY. WO-app-5 / WHR-11 is next only after Earl accepts WHR-75, in a later session. WHR-9 is already Done through #67; WHR-60 remains READY separately.
+- App: close accepted WHR-75, then WO-app-5 / WHR-11 to READY and stop. Station/price/attendant screens include WHR-77 and P-21; offboarding stays on the contract fake until WHR-80 merges. WHR-9 is Done through #67; WHR-60 remains separate.
 - Core stops after this accepted WO-core-6 closeout. Next intended work order is WO-core-7 (WHR-12), customers, registration and card batches, only after Earl approves it; currently Backlog with no approval line. No next work order started. WHR-73/68 remain Done through #66; production mail remains gated by WHR-42.
 - WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in stops at READY after PR #30 merges with green CI; Earl reads verification and runs the phone checks; WO-spec-4 (WHR-51) is accepted; lane:spec stops after closing accepted WO-spec-3b (WHR-61); no new work order is authorized.
 
