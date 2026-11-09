@@ -1,22 +1,19 @@
 # lane:app
-WO-app-4a (WHR-75) Admin navigation: READY since 2026-11-06
+WO-app-4a (WHR-75) Admin navigation: ACCEPTED by Earl on 2026-11-09
 
 ## In flight
-- Feature [#73](https://github.com/Adeboyemoses/Whalesreward/pull/73) merged green at 6ab8191; this separate records PR completes READY. Code/security/integrity PASS round 2 at c4486ee. Server remains the permission authority; session/list state stays in layout-scoped memory.
-- EM typecheck/lint/build and 259 unit tests PASS; full Linux browser 130 PASS/four existing staging-only skips, zero retries; local PostgreSQL/Mailpit 4 + 5 PASS. Independent default 14, Mailpit 5 + 4 and focused desktop/390px parity 2 PASS. Evidence: .review/app__wo-4a-admin-navigation.md; reports under tests/admin-navigation/ and tests/design-parity/admin-navigation/.
-- Local matched-fixture BEFORE 6072636 / AFTER 4e87ed7, CDP 150 ms medians: tab 482.2→0.9 ms, user 842.2→322.2 ms, role 690.4→329.9 ms, section 672.1→161.1 ms. AFTER created zero new documents. Final mutation-only review fixes and accepted base merges have separate correctness gates. No deployed timing claim.
-- WO-app-4 / WHR-9 is ACCEPTED/Done through closeout #67. WHR-69/70 remain separate.
+- Earl repeated tab-switch/navigation checks on staging and confirmed the portal no longer reloads (WHR-75 acceptance comment, 9 Nov). This documentation closeout moves WHR-75 to Done after its reviewed green merge.
+- Feature #73 (6ab8191) and READY records #74 (465a9cd) are merged. Three feature reviewers PASS round 2; prior EM unit259/full browser130 plus four existing staging-only skips/Mailpit4+5/typecheck/lint/build and focused parity evidence retained. No new runtime or timing claim.
+- WO-app-4 / WHR-9 remains Done through #67. WHR-69/70/71 remain separate.
 
 ## Next
-- STOP at READY. Earl confirms staging himself with docs/qa/smoke-2026-11-06-admin-navigation.md. WHR-75 stays In Review pending acceptance.
-- WO-app-5 (WHR-11) is next only after Earl accepts WHR-75; no work started.
+- Earl explicitly assigned WO-app-5 / WHR-11 next: station, price and attendant screens, WHR-77 first password and P-21 End assignment. Read m2.md; use the contract fake for offboarding until WHR-80 merges. Write smoke first, take it to READY, then stop.
 
 ## Earl's gos
-- 2026-11-06: “don't use a live staging session. Measure the baseline and the fix locally with fixture accounts and DevTools throttling (~150 ms RTT; Fast 3G worst case), implement, take it to READY, then stop.”
+- 2026-11-09: “Earl accepted WO-app-4a (WHR-75) on staging; close it. Next: WO-app-5 (WHR-11)”.
 
 ## Risks
-- Fast3G-shaped stress full detail readiness is 1.18–1.66 seconds, exceeding 1 second; representative 150 ms profile meets targets. Local document.wasDiscarded=false does not diagnose Earl's actual Chrome Memory Saver behavior. No live Owner session, cloud/provider call or staging-data change performed.
-- CI attempt 1 spent over five minutes downloading Ubuntu fonts before tests; cancelled and retried the browser job on a fresh runner (WHR-71). No test or gate weakened.
-- Dispatch flag exceeded: 16 feature dispatches (>8 high-tier flag), 17 with records review. Additional test production, mutation race fixes and isolated reruns remained within two formal feature review rounds (cap 3). Runtime model identity unavailable.
+- Original local Fast3G-shaped full details remain1.18–1.66 seconds; Earl has now accepted actual staging navigation. No new deployed timing measurement or device-discard diagnosis.
+- Prior feature exceeded its high-tier dispatch flag (16;17 with READY records), within two formal feature rounds. This closeout is docs only; its second independent review covers the concurrent specification-record merge resolution. Runtime model identity unavailable.
 
-dispatches=17 prs=2 rounds_max=2 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
