@@ -134,13 +134,14 @@ describe("durable account partition", () => {
         await entered.promise;
         expect(client.getState().access).toBe("active");
         release.resolve();
-        await expect.poll(() => client.getState().access).toBe("expired");
+        await expect.poll(() => client.getState().access).toBe("signed_out");
         await expect(client.beginCapture()).rejects.toMatchObject({
           code: "access_expired",
         });
         // A successful response for this same context never clears the denial.
         await client.refresh();
-        expect(client.getState().access).toBe("expired");
+        expect(client.getState().access).toBe("signed_out");
+        expect(client.getState().session).toBeNull();
         const retained = await db.outbox.get([
           saved.originatingAccountId,
           saved.operationId,
@@ -183,7 +184,7 @@ describe("durable account partition", () => {
     };
     await local.refresh();
     expect(revalidations).toBe(1);
-    expect(local.getState().access).toBe("expired");
+    expect(local.getState().access).toBe("signed_out");
     await expect(local.beginCapture()).rejects.toMatchObject({
       code: "access_expired",
     });
@@ -460,13 +461,16 @@ describe("durable account partition", () => {
       };
       await expect(client.lookup("A7K3M9X")).rejects.toMatchObject({ code });
       online = false;
-      expect((await client.checkAccess()).access).toBe("expired");
+      expect((await client.checkAccess()).access).toBe("signed_out");
+      expect(client.getState().session).toBeNull();
       await expect(client.saveCapture(draft, form)).rejects.toMatchObject({
         code: "access_expired",
       });
-      expect((await client.ownSale(saved.operationId))?.photoDigest).toBe(
-        form.photo.sha256,
-      );
+      expect(await client.ownSale(saved.operationId)).toBeUndefined();
+      expect(
+        (await db.outbox.get([saved.originatingAccountId, saved.operationId]))
+          ?.photoDigest,
+      ).toBe(form.photo.sha256);
     },
   );
   it.each([
@@ -631,9 +635,9 @@ describe("durable account partition", () => {
     await pending;
     expect((await client.checkAccess()).access).toBe("expired");
   });
-  it("an authoritative mismatch still locks the context that made the request", async () => {
+  it("an authoritative mismatch hides and locks the context that made the request", async () => {
     api.session = async () => sessionFixture(now);
-    expect((await client.refresh()).access).toBe("expired");
+    expect((await client.refresh()).access).toBe("signed_out");
   });
   it("wrong photo digest cannot be saved", async () => {
     const form = await input();

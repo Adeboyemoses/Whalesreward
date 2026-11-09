@@ -4,6 +4,11 @@ import {
   ClientError,
   normalizeCardCode,
   sessionSchema,
+  authSessionSchema,
+  isRestricted,
+  type RestrictedSession,
+  type FirstPasswordInput,
+  type ConfiguredAssignment,
   type Session,
   type Lookup,
   type OutboxRow,
@@ -51,6 +56,13 @@ export class AttendantClient {
   private channel: BroadcastChannel | null = null;
   private checking: Promise<ClientState> | null = null;
   private authEpoch = 0;
+  private restricted: {
+    session: RestrictedSession;
+    attempt: string;
+    started: ClockSample;
+    duration: number;
+  } | null = null;
+  private accessNotice: string | null = null;
   private salesListeners = new Set<() => void>();
   private foregroundCleanup: (() => void) | null = null;
   private synchronizer: SaleSynchronizer;
@@ -95,7 +107,8 @@ export class AttendantClient {
         }
         return state.session;
       },
-      lock: (session) => this.lockContext(session),
+      lock: (session, code) =>
+        this.lockContext(session, code !== "online_sign_in_required"),
       changed: () => this.salesChanged(),
     });
     if (
@@ -123,7 +136,10 @@ export class AttendantClient {
     };
   };
   private publish(state: ClientState) {
-    this.state = state;
+    this.state =
+      state.access === "signed_out" && this.accessNotice
+        ? { ...state, notice: this.accessNotice }
+        : state;
     for (const listener of this.listeners) listener();
   }
   subscribeSales = (listener: () => void) => {
@@ -180,25 +196,34 @@ export class AttendantClient {
     this.channel?.postMessage("changed");
   }
   private async installation(signInAttempt?: string): Promise<Installation> {
-    return this.db.transaction("rw", this.db.meta, async () => {
-      const found = await this.db.meta.get("installation");
-      if (found) {
-        if (signInAttempt === undefined) return found;
-        const claimed = { ...found, signInAttempt };
-        await this.db.meta.put(claimed);
-        return claimed;
-      }
-      const row: Installation = {
-        key: "installation",
-        deviceId: uuidv7(),
-        activeAccountId: null,
-        logoutPending: false,
-        logoutOperationId: null,
-        signInAttempt: signInAttempt ?? null,
-      };
-      await this.db.meta.add(row);
-      return row;
-    });
+    return this.db.transaction(
+      "rw",
+      this.db.meta,
+      this.db.windows,
+      async () => {
+        const found = await this.db.meta.get("installation");
+        if (found) {
+          if (signInAttempt === undefined) return found;
+          if (found.activeAccountId)
+            await this.db.windows.update(found.activeAccountId, {
+              locked: true,
+            });
+          const claimed = { ...found, activeAccountId: null, signInAttempt };
+          await this.db.meta.put(claimed);
+          return claimed;
+        }
+        const row: Installation = {
+          key: "installation",
+          deviceId: uuidv7(),
+          activeAccountId: null,
+          logoutPending: false,
+          logoutOperationId: null,
+          signInAttempt: signInAttempt ?? null,
+        };
+        await this.db.meta.add(row);
+        return row;
+      },
+    );
   }
   async initialize() {
     await this.installation();
@@ -214,12 +239,36 @@ export class AttendantClient {
     }
   }
   private async readAccess(): Promise<ClientState> {
+    const epoch = this.authEpoch;
     const result = await this.db.transaction(
       "rw",
       this.db.meta,
       this.db.windows,
       async () => {
         const meta = await this.db.meta.get("installation");
+        if (
+          this.restricted &&
+          meta?.signInAttempt === this.restricted.attempt &&
+          !meta.activeAccountId &&
+          !meta.logoutPending
+        ) {
+          const elapsed = requestDuration(
+            this.restricted.started,
+            this.clock(),
+          );
+          if (elapsed !== null && elapsed < this.restricted.duration)
+            return {
+              session: null,
+              access: "password_change_required" as const,
+              logoutPending: false,
+              restrictedSession: this.restricted.session,
+              restrictionId: this.restricted.attempt,
+            };
+          this.restricted = null;
+          this.accessNotice =
+            "Your password-change session ended. Sign in online again.";
+          await this.db.meta.update("installation", { signInAttempt: null });
+        } else if (this.restricted) this.restricted = null;
         if (!meta?.activeAccountId || meta.logoutPending)
           return {
             session: null,
@@ -243,8 +292,9 @@ export class AttendantClient {
         };
       },
     );
+    if (epoch !== this.authEpoch) return this.state;
     this.publish(result);
-    return result;
+    return this.state;
   }
   private advance(row: OfflineWindow, now: ClockSample): OfflineWindow {
     const next = advanceWindow(
@@ -289,6 +339,13 @@ export class AttendantClient {
     // Handover can invalidate this claim but this invocation never writes it again.
     const meta = await this.installation(attempt);
     if (epoch !== this.authEpoch) throw this.accountChanged();
+    this.restricted = null;
+    this.accessNotice = null;
+    this.publish({
+      session: null,
+      access: "signed_out",
+      logoutPending: meta.logoutPending,
+    });
     await this.revokePending();
     const current = await this.db.meta.get("installation");
     if (
@@ -299,12 +356,40 @@ export class AttendantClient {
       throw this.accountChanged();
     // Explicit sign-in is the only operation that creates or unlocks an offline window.
     const requestStarted = this.clock();
-    const session = sessionSchema.parse(
-      await this.api.signIn(
-        { username: username.trim(), password, deviceId: meta.deviceId },
-        attempt,
-      ),
-    );
+    let response;
+    try {
+      response = authSessionSchema.parse(
+        await this.api.signIn(
+          { username: username.trim(), password, deviceId: meta.deviceId },
+          attempt,
+        ),
+      );
+    } catch (error) {
+      if (
+        epoch === this.authEpoch &&
+        error instanceof ClientError &&
+        [
+          "assignment_unavailable",
+          "unauthenticated",
+          "permission_denied",
+        ].includes(error.code)
+      ) {
+        const previous = this.state.session;
+        if (previous) await this.lockContext(previous, true);
+        else if (this.restricted) await this.clearRestricted();
+        this.accessNotice =
+          error.code === "assignment_unavailable"
+            ? "Sign-in is unavailable. Ask a station manager for help."
+            : "Your session ended. Sign in online again.";
+        await this.checkAccess();
+      }
+      throw error;
+    }
+    if (isRestricted(response)) {
+      await this.adoptRestricted(response, epoch, current, requestStarted);
+      return this.checkAccess();
+    }
+    const session = response;
     const now = this.clock();
     const transit = requestDuration(requestStarted, now);
     const elapsed =
@@ -366,6 +451,15 @@ export class AttendantClient {
         await this.signOut();
       throw error;
     }
+    if (epoch !== this.authEpoch) throw this.accountChanged();
+    ++this.authEpoch;
+    this.restricted = null;
+    this.accessNotice = null;
+    this.publish({
+      session,
+      access: row.locked ? "expired" : "active",
+      logoutPending: false,
+    });
     this.baselines.set(session.account.id, {
       captureContextId: session.captureContextId,
       runtimeId: now.runtimeId,
@@ -376,6 +470,156 @@ export class AttendantClient {
     this.signal();
     return this.checkAccess();
   }
+  private async adoptRestricted(
+    session: RestrictedSession,
+    epoch: number,
+    expected: Installation,
+    started: ClockSample,
+  ) {
+    const attempt = expected.signInAttempt ?? uuidv7();
+    const elapsed = requestDuration(started, this.clock());
+    const duration =
+      Date.parse(session.sessionExpiresAt) -
+      Date.parse(session.serverTime) -
+      (elapsed ?? Infinity);
+    if (duration <= 0)
+      throw new ClientError(
+        "unauthenticated",
+        "Your password-change session ended. Sign in again.",
+      );
+    await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
+      const meta = await this.db.meta.get("installation");
+      if (
+        epoch !== this.authEpoch ||
+        !meta ||
+        meta.logoutPending ||
+        meta.activeAccountId !== expected.activeAccountId ||
+        meta.signInAttempt !== expected.signInAttempt
+      )
+        throw this.accountChanged();
+      if (meta.activeAccountId)
+        await this.db.windows.update(meta.activeAccountId, { locked: true });
+      await this.db.meta.update("installation", {
+        activeAccountId: null,
+        signInAttempt: attempt,
+      });
+    });
+    if (epoch !== this.authEpoch) throw this.accountChanged();
+    this.restricted = { session, attempt, started: this.clock(), duration };
+    ++this.authEpoch;
+    this.accessNotice = null;
+    this.publish({
+      session: null,
+      access: "password_change_required",
+      logoutPending: false,
+      restrictedSession: session,
+      restrictionId: attempt,
+    });
+    this.signal();
+  }
+  private async clearRestricted() {
+    const restricted = this.restricted;
+    if (!restricted) return false;
+    return this.db.transaction("rw", this.db.meta, async () => {
+      const meta = await this.db.meta.get("installation");
+      if (
+        this.restricted !== restricted ||
+        meta?.signInAttempt !== restricted.attempt ||
+        meta.activeAccountId
+      )
+        return false;
+      await this.db.meta.update("installation", { signInAttempt: null });
+      this.restricted = null;
+      ++this.authEpoch;
+      return true;
+    });
+  }
+  async completeFirstPassword(input: FirstPasswordInput): Promise<ClientState> {
+    this.requireOnline();
+    const before = await this.checkAccess();
+    const restricted = this.restricted;
+    if (before.access !== "password_change_required" || !restricted)
+      throw new ClientError(
+        "unauthenticated",
+        "Sign in online again to change your first password.",
+      );
+    const epoch = this.authEpoch;
+    const invalid = /[\u0000-\u001f\u007f]/;
+    if (
+      !input.currentPassword ||
+      input.currentPassword.length > 1024 ||
+      invalid.test(input.currentPassword) ||
+      input.newPassword.length < 12 ||
+      input.newPassword.length > 1024 ||
+      invalid.test(input.newPassword) ||
+      input.newPassword === input.currentPassword
+    )
+      throw new ClientError(
+        "password_policy",
+        "Use a different password with 12 to 1024 characters and no control characters.",
+      );
+    if (input.newPassword !== input.confirmPassword)
+      throw new ClientError("password_mismatch", "The passwords do not match.");
+    try {
+      await this.api.completeFirstPassword(input);
+    } catch (error) {
+      if (epoch !== this.authEpoch || this.restricted !== restricted)
+        throw this.accountChanged();
+      if (
+        error instanceof ClientError &&
+        [
+          "unauthenticated",
+          "permission_denied",
+          "assignment_unavailable",
+        ].includes(error.code)
+      ) {
+        await this.clearRestricted();
+        this.accessNotice =
+          "Your password-change session ended. Sign in online again.";
+        await this.checkAccess();
+      }
+      throw error;
+    }
+    if (epoch !== this.authEpoch || this.restricted !== restricted)
+      throw this.accountChanged();
+    const cleared = await this.clearRestricted();
+    if (!cleared || this.authEpoch !== epoch + 1 || this.restricted)
+      throw this.accountChanged();
+    this.accessNotice =
+      "Password changed. Sign in online again before recording sales.";
+    this.signal();
+    return this.checkAccess();
+  }
+  async configuredAssignment(): Promise<ConfiguredAssignment> {
+    const session = await this.active();
+    const epoch = this.authEpoch;
+    this.requireOnline();
+    let result: ConfiguredAssignment;
+    try {
+      result = await this.api.configuredAssignment();
+    } catch (error) {
+      if (
+        error instanceof ClientError &&
+        [
+          "unauthenticated",
+          "permission_denied",
+          "assignment_unavailable",
+        ].includes(error.code)
+      )
+        await this.lockContext(session, true);
+      throw error;
+    }
+    if (epoch !== this.authEpoch) throw this.accountChanged();
+    await this.db.transaction("r", this.db.meta, this.db.windows, async () =>
+      this.assertCurrentContext(session),
+    );
+    if (result.acknowledgedAssignmentId !== session.assignment.id)
+      throw new ClientError(
+        "invalid_response",
+        "The assignment response changed. Sign in online again.",
+      );
+    return result;
+  }
   private accountChanged() {
     return new ClientError(
       "account_changed",
@@ -385,6 +629,8 @@ export class AttendantClient {
   async signOut(): Promise<ClientState> {
     this.synchronizer.stop();
     ++this.authEpoch;
+    this.restricted = null;
+    this.accessNotice = null;
     const key = uuidv7();
     await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
       const meta = await this.db.meta.get("installation");
@@ -414,15 +660,35 @@ export class AttendantClient {
     return this.checkAccess();
   }
   async refresh(): Promise<ClientState> {
+    const epoch = this.authEpoch;
     const before = await this.checkAccess();
-    if (!before.session || !this.online()) return before;
-    const account = before.session.account.id;
-    const context = before.session.captureContextId;
+    if (!this.online() || before.logoutPending) return before;
+    const meta = await this.installation();
+    if (epoch !== this.authEpoch) return this.state;
+    const account = before.session?.account.id;
+    const context = before.session?.captureContextId;
     const requestStarted = this.clock();
     try {
-      const fresh = sessionSchema.parse(await this.api.session());
+      const response = authSessionSchema.parse(await this.api.session());
+      if (epoch !== this.authEpoch) return this.state;
+      if (isRestricted(response)) {
+        if (
+          this.restricted &&
+          this.restricted.session.account.id === response.account.id &&
+          this.restricted.session.sessionExpiresAt === response.sessionExpiresAt
+        )
+          return this.checkAccess();
+        await this.adoptRestricted(response, epoch, meta, requestStarted);
+        return this.checkAccess();
+      }
+      if (!before.session) {
+        // A cookie alone cannot create an offline anchor. Only explicit sign-in can.
+        if (this.restricted) await this.clearRestricted();
+        return this.checkAccess();
+      }
+      const fresh = sessionSchema.parse(response);
       if (fresh.account.id !== account || fresh.captureContextId !== context) {
-        await this.lockContext(before.session);
+        await this.lockContext(before.session, true);
         return this.checkAccess();
       }
       await this.db.transaction(
@@ -430,8 +696,9 @@ export class AttendantClient {
         this.db.meta,
         this.db.windows,
         async () => {
+          if (epoch !== this.authEpoch) return;
           const meta = await this.db.meta.get("installation");
-          const row = await this.db.windows.get(account);
+          const row = await this.db.windows.get(account!);
           if (
             meta?.activeAccountId !== account ||
             meta.logoutPending ||
@@ -475,12 +742,15 @@ export class AttendantClient {
           "permission_denied",
           "assignment_unavailable",
         ].includes(error.code)
-      )
-        await this.lockContext(before.session);
+      ) {
+        if (epoch !== this.authEpoch) return this.state;
+        if (before.session) await this.lockContext(before.session, true);
+        else if (this.restricted) await this.clearRestricted();
+      }
     }
     return this.checkAccess();
   }
-  private async lockContext(session: Session) {
+  private async lockContext(session: Session, clearVisible = false) {
     await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
       const meta = await this.db.meta.get("installation");
       const row = await this.db.windows.get(session.account.id);
@@ -488,8 +758,20 @@ export class AttendantClient {
       if (
         meta?.activeAccountId === session.account.id &&
         row?.captureContextId === session.captureContextId
-      )
+      ) {
         await this.db.windows.update(session.account.id, { locked: true });
+        if (clearVisible) {
+          await this.db.meta.update("installation", {
+            activeAccountId: null,
+            signInAttempt: null,
+          });
+          ++this.authEpoch;
+          this.restricted = null;
+          this.accessNotice =
+            "Your session ended. Sign in online again. Pending sales and photos stay on this phone.";
+          this.synchronizer.stop();
+        }
+      }
     });
     this.signal();
     await this.checkAccess();
@@ -544,7 +826,7 @@ export class AttendantClient {
           "assignment_unavailable",
         ].includes(error.code)
       )
-        await this.lockContext(session);
+        await this.lockContext(session, true);
       throw error;
     }
     if (found.cardCode !== code)

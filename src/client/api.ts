@@ -3,9 +3,12 @@ import { connection } from "./offline/connection";
 import {
   ClientError,
   lookupSchema,
-  sessionSchema,
+  authSessionSchema,
+  configuredAssignmentSchema,
   type Lookup,
-  type Session,
+  type AuthSession,
+  type FirstPasswordInput,
+  type ConfiguredAssignment,
   saleStatusSchema,
   uploadPermissionSchema,
   type OriginalSale,
@@ -36,9 +39,11 @@ export interface AttendantApi {
   signIn(
     input: { username: string; password: string; deviceId: string },
     key: string,
-  ): Promise<Session>;
+  ): Promise<AuthSession>;
   signOut(key: string): Promise<void>;
-  session(): Promise<Session>;
+  session(): Promise<AuthSession>;
+  completeFirstPassword(input: FirstPasswordInput): Promise<void>;
+  configuredAssignment(): Promise<ConfiguredAssignment>;
   lookup(
     input: { source: "code"; code: string } | { source: "qr"; qr: string },
   ): Promise<Lookup>;
@@ -114,10 +119,14 @@ export class HttpAttendantApi implements AttendantApi {
         invalid_credentials: "The username or password is not correct.",
         unauthenticated: "Sign in online again to continue.",
         assignment_unavailable:
-          "Your pump assignment is unavailable. Contact your manager.",
+          "Sign-in is unavailable. Ask a station manager for help.",
         customer_not_found:
           "No customer has this card. Check the printed code, or scan the QR.",
         card_unavailable: "This card is unavailable for a new sale.",
+        password_policy:
+          "Use a different password with 12 to 1024 characters and no control characters.",
+        password_change_required:
+          "Change your first password before signing in again.",
         rate_limited: "Too many attempts. Wait a moment and try again.",
       };
       throw new ClientError(
@@ -148,13 +157,27 @@ export class HttpAttendantApi implements AttendantApi {
     input: { username: string; password: string; deviceId: string },
     key: string,
   ) {
-    return this.request("/api/attendant/sign-in", sessionSchema, input, key);
+    return this.request(
+      "/api/attendant/sign-in",
+      authSessionSchema,
+      input,
+      key,
+    );
   }
   signOut(key: string) {
     return this.request<void>("/api/attendant/sign-out", null, {}, key);
   }
   session() {
-    return this.request("/api/attendant/session", sessionSchema);
+    return this.request("/api/attendant/session", authSessionSchema);
+  }
+  completeFirstPassword(input: FirstPasswordInput) {
+    return this.request<void>("/api/attendant/first-password", null, input);
+  }
+  configuredAssignment() {
+    return this.request(
+      "/api/attendant/configured-assignment",
+      configuredAssignmentSchema,
+    );
   }
   lookup(
     input: { source: "code"; code: string } | { source: "qr"; qr: string },
@@ -268,6 +291,8 @@ const ERROR_CODES = new Set([
   "invalid_credentials",
   "unauthenticated",
   "assignment_unavailable",
+  "password_policy",
+  "password_change_required",
   "customer_not_found",
   "card_unavailable",
   "rate_limited",

@@ -31,7 +31,7 @@ type Dependencies = {
   db: CaptureDatabase;
   now: () => number;
   authorize: (readOnly: boolean) => Promise<Session>;
-  lock: (session: Session) => Promise<void>;
+  lock: (session: Session, code?: string) => Promise<void>;
   changed: () => void;
 };
 /** Every state mutation is scoped to the account, context and still-owned lease. */
@@ -397,7 +397,7 @@ export class SaleSynchronizer {
             "online_sign_in_required",
           ].includes(failure.code))
       ) {
-        await this.d.lock(session);
+        await this.d.lock(session, failure.code);
         return;
       }
       if (
