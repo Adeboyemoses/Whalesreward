@@ -444,7 +444,7 @@ export function createCorrectionsService({
         });
         const durable = (
           await db.query<Correction>(
-            `INSERT INTO correction_request(id,purchase_id,originating_attendant_id,operation_id,payload_digest,frozen_request_digest,based_on_revision_id,expected_purchase_version,proposed_revision_id,first_received_at,cutoff_at_receipt,time_policy_version,timing,state,reason,submitted_by_user_id,verified_author_attendant_id,authorship,authority_session_id,reserved_purchase_version,receipt) VALUES($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,'pending_validation',$13,$14,$3,'authenticated_attendant',$15,$16,$17) RETURNING *`,
+            `INSERT INTO correction_request(id,purchase_id,originating_attendant_id,operation_id,payload_digest,frozen_request_digest,based_on_revision_id,expected_purchase_version,proposed_revision_id,first_received_at,cutoff_at_receipt,time_policy_version,timing,state,reason,submitted_by_user_id,verified_author_attendant_id,authorship,authority_session_id,reserved_purchase_version,receipt) VALUES($1,$2,$3,$4,$5,$5,$6,$7,$8,clock_timestamp(),$9,$10,$11,'pending_validation',$12,$13,$3,'authenticated_attendant',$14,$15,$16) RETURNING *`,
             [
               id,
               p.id,
@@ -454,9 +454,9 @@ export function createCorrectionsService({
               base.id,
               p.version,
               rid,
-              now,
+
               cutoff,
-              CORRECTION_TIME_POLICY,
+              p.correction_time_policy_version ?? CORRECTION_TIME_POLICY,
               receipt.timing,
               body.reason,
               auth.user_id,

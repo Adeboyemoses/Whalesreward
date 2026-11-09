@@ -1,12 +1,14 @@
 import { readFile } from "node:fs/promises";
 import pg from "pg";
+import { randomBytes } from "node:crypto";
+import { digest } from "../../src/server/modules/auth/crypto";
 import sharp from "sharp";
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { newId } from "../../src/server/lib/ids";
 import type { EvidenceStorage } from "../../src/server/adapters/storage";
 import { createSyncService } from "../../src/server/modules/sync/service";
 import { createCorrectionsService } from "../../src/server/modules/corrections/service";
-import { syncFixture } from "../helpers/sync-fixture";
+import { syncFixture, fixtureId, changePrice } from "../helpers/sync-fixture";
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
@@ -28,8 +30,9 @@ const storage: EvidenceStorage = {
 const sync = createSyncService({ pool, storage }),
   svc = createCorrectionsService({ pool, storage });
 let jpeg: Buffer;
-async function fixture() {
+async function fixture(held = false) {
   const f = await syncFixture(pool, jpeg);
+  if (held) await changePrice(pool, f);
   const s = await sync.submit(f.token, f.original);
   const u = await sync.uploadPermission(f.token, s.status.purchaseId, {
     operationId: newId(),
@@ -46,6 +49,34 @@ async function fixture() {
     expectedVersion: s.status.version,
     uploadId: u.uploadId,
   });
+  if (held) {
+    const r = (
+      await pool.query(
+        "SELECT id FROM purchase_revision WHERE purchase_id=$1",
+        [done.purchaseId],
+      )
+    ).rows[0];
+    const db = await pool.connect();
+    try {
+      await db.query("BEGIN");
+      await db.query(
+        "UPDATE purchase_revision SET state='accepted',version=version+1,decision_actor_id=$2,decision_reason='Trusted prior review fixture',decided_at=clock_timestamp() WHERE id=$1",
+        [r.id, f.userId],
+      );
+      await db.query(
+        "UPDATE purchase SET current_revision_id=$2,version=version+1 WHERE id=$1",
+        [done.purchaseId, r.id],
+      );
+      await db.query("COMMIT");
+    } catch (e) {
+      await db.query("ROLLBACK");
+      throw e;
+    } finally {
+      db.release();
+    }
+    done.currentRevisionId = r.id;
+    done.version++;
+  }
   return {
     ...f,
     purchaseId: done.purchaseId,
@@ -66,6 +97,96 @@ async function pending(id: string) {
 }
 async function drain() {
   for (let i = 0; i < 25 && (await svc.processNext()); i++);
+}
+async function adminToken() {
+  await pool.query(
+    "UPDATE auth_user SET must_change_password=false WHERE id=$1",
+    [fixtureId(2)],
+  );
+  const token = randomBytes(32).toString("hex");
+  await pool.query(
+    "INSERT INTO auth_session(id,user_id,secret_verifier,expires_at,auth_version,last_online_sign_in_at) VALUES($1,$2,$3,clock_timestamp()+interval '1 hour',1,clock_timestamp())",
+    [newId(), fixtureId(2), digest(token)],
+  );
+  return token;
+}
+async function late(f: Awaited<ReturnType<typeof fixture>>) {
+  const name = `test_primary_receipt_${newId().replaceAll("-", "")}`;
+  await pool.query(
+    `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.purchase_id::text=TG_ARGV[0] THEN NEW.first_received_at=NEW.cutoff_at_receipt; END IF; RETURN NEW; END $$`,
+  );
+  await pool.query(
+    `CREATE TRIGGER ${name} BEFORE INSERT ON correction_request FOR EACH ROW EXECUTE FUNCTION ${name}('${f.purchaseId}')`,
+  );
+  try {
+    const result = await svc.submit(f.token, f.purchaseId, f.body);
+    await drain();
+    return await svc.byOperation(
+      f.token,
+      f.purchaseId,
+      result.data.operationId,
+    );
+  } finally {
+    await pool.query(`DROP TRIGGER ${name} ON correction_request`);
+    await pool.query(`DROP FUNCTION ${name}()`);
+  }
+}
+async function guard(
+  purchaseId: string,
+  c: { version: number },
+  outcome: "approve" | "reject" = "approve",
+) {
+  const p = (
+    await pool.query(
+      "SELECT version,current_revision_id FROM purchase WHERE id=$1",
+      [purchaseId],
+    )
+  ).rows[0];
+  return {
+    operationId: newId(),
+    expectedVersion: p.version,
+    expectedRevisionId: p.current_revision_id,
+    expectedCorrectionVersion: c.version,
+    outcome,
+    reason: "Independent correction review",
+  };
+}
+async function interveningRevision(
+  f: Awaited<ReturnType<typeof fixture>>,
+  candidate = false,
+) {
+  const id = newId(),
+    db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    if (!candidate)
+      await db.query(
+        "UPDATE purchase_revision SET state='superseded',version=version+1 WHERE id=$1",
+        [f.body.basedOnRevisionId],
+      );
+    await db.query(
+      `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,based_on_revision_id,kind,state,reason,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id,decision_actor_id,decision_reason,decided_at) SELECT $1,purchase_id,(SELECT max(revision_number)+1 FROM purchase_revision WHERE purchase_id=$2),$3,$4,payload_digest,id,'admin_correction',$5,'Trusted intervening review fixture',clock_timestamp(),amount_kobo+100000,quantity+1,currency,unit,quantity_precision,basis,entered_amount_kobo+100000,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id,$4,'Trusted intervening review fixture',clock_timestamp() FROM purchase_revision WHERE id=$6`,
+      [
+        id,
+        f.purchaseId,
+        newId(),
+        fixtureId(2),
+        candidate ? "proposed" : "accepted",
+        f.body.basedOnRevisionId,
+      ],
+    );
+    await db.query(
+      `UPDATE purchase SET ${candidate ? "resolution_candidate_revision_id" : "current_revision_id"}=$2,version=version+1 WHERE id=$1`,
+      [f.purchaseId, id],
+    );
+    await db.query("COMMIT");
+    return id;
+  } catch (e) {
+    await db.query("ROLLBACK");
+    throw e;
+  } finally {
+    db.release();
+  }
 }
 describe("M3 durable own correction processing", () => {
   beforeAll(async () => {
@@ -221,5 +342,105 @@ describe("M3 durable own correction processing", () => {
       validation_error: "sale_cancelled",
       decided_by_user_id: null,
     });
+  });
+  it("late review approval and lost-response replay replace the contribution exactly once", async () => {
+    const f = await fixture(),
+      c = await late(f),
+      token = await adminToken();
+    expect(c.state).toBe("awaiting_review");
+    const body = await guard(f.purchaseId, c);
+    const decision = await svc.decide(token, f.purchaseId, c.id, body);
+    expect(decision.creditedAfter).toBe(true);
+    expect(decision.after.amountKobo).toBe("3000000");
+    expect(await svc.decide(token, f.purchaseId, c.id, body)).toEqual(decision);
+    await expect(
+      svc.decide(token, f.purchaseId, c.id, {
+        ...body,
+        reason: "Changed review reason",
+      }),
+    ).rejects.toMatchObject({ code: "operation_conflict" });
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS n FROM purchase_revision WHERE purchase_id=$1 AND state='accepted'",
+          [f.purchaseId],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+  });
+  it("rejects a stale-base proposal with current guards while preserving the intervening accepted revision", async () => {
+    const f = await fixture(),
+      c = await late(f),
+      token = await adminToken();
+    const newer = await interveningRevision(f);
+    await expect(
+      svc.decide(token, f.purchaseId, c.id, await guard(f.purchaseId, c)),
+    ).rejects.toMatchObject({ code: "base_revision_changed" });
+    const decision = await svc.decide(
+      token,
+      f.purchaseId,
+      c.id,
+      await guard(f.purchaseId, c, "reject"),
+    );
+    expect(decision.appliedRevisionId).toBe(newer);
+    expect(decision.before.amountKobo).toBe("2100000");
+    expect(decision.after).toEqual(decision.before);
+    expect((await pending(c.id)).state).toBe("rejected");
+  });
+  it("never overwrites a staged resolution candidate; stale proposal rejection leaves it intact", async () => {
+    const f = await fixture(),
+      c = await late(f),
+      token = await adminToken();
+    const candidate = await interveningRevision(f, true);
+    await expect(
+      svc.decide(token, f.purchaseId, c.id, await guard(f.purchaseId, c)),
+    ).rejects.toMatchObject({ code: "base_revision_changed" });
+    await svc.decide(
+      token,
+      f.purchaseId,
+      c.id,
+      await guard(f.purchaseId, c, "reject"),
+    );
+    expect(
+      (
+        await pool.query(
+          "SELECT current_revision_id,resolution_candidate_revision_id FROM purchase WHERE id=$1",
+          [f.purchaseId],
+        )
+      ).rows[0],
+    ).toEqual({
+      current_revision_id: f.body.basedOnRevisionId,
+      resolution_candidate_revision_id: candidate,
+    });
+  });
+  it("numeric approval preserves unrelated price hold and zero contribution with its historical validation", async () => {
+    const f = await fixture(true),
+      c = await late(f),
+      token = await adminToken();
+    const before = (
+      await pool.query(
+        "SELECT id FROM purchase_hold WHERE purchase_id=$1 AND state='open'",
+        [f.purchaseId],
+      )
+    ).rows;
+    const result = await svc.decide(
+      token,
+      f.purchaseId,
+      c.id,
+      await guard(f.purchaseId, c),
+    );
+    expect(result.creditedAfter).toBe(false);
+    expect(result.remainingHolds.map((h) => h.id)).toEqual(
+      before.map((h) => h.id),
+    );
+    expect(result.after.amountKobo).toBe("3000000");
+    expect(
+      (
+        await pool.query(
+          "SELECT reasons FROM sync_validation WHERE purchase_id=$1",
+          [f.purchaseId],
+        )
+      ).rows[0].reasons,
+    ).toContain("price_uncertain");
   });
 });
