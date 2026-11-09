@@ -13,7 +13,7 @@ process.env.DATABASE_URL = database;
 export default defineConfig({
   ...base,
   testDir: ".",
-  testMatch: "station.spec.ts",
+  testMatch: ["station.spec.ts", "overflow.spec.ts"],
   globalSetup: "../../station/setup.ts",
   workers: 1,
   retries: 0,

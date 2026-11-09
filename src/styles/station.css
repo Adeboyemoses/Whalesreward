@@ -24,7 +24,7 @@
 .wr-station-quiet {
   background: var(--surface-100);
 }
-.wr-station-reason {
+.wr-station textarea.wr-station-reason {
   height: auto;
   padding: var(--space-3);
   resize: vertical;
@@ -65,4 +65,19 @@
     display: grid;
     gap: var(--space-4);
   }
+}
+
+.wr-station .wr-station-assign {
+  align-self: flex-start;
+}
+
+/* Input adornments stay attached; only action rows wrap on narrow screens. */
+.wr-station .wr-field .wr-row {
+  flex-wrap: nowrap;
+}
+.wr-station .wr-prefix {
+  height: var(--control-h-desktop);
+}
+.wr-station .wr-field .wr-row:has(> .wr-prefix) {
+  gap: 0;
 }

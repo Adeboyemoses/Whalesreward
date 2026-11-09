@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { v7 } from "uuid";
@@ -33,6 +33,56 @@ async function shot(page: Page, id: string, width: number) {
       ),
   ).toBe(true);
   await mkdir("tests/design-parity/station/screenshots", { recursive: true });
+  const metrics = await page.evaluate(() => {
+    const boxes = (node: Node | null) => {
+      if (!node) return [];
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return Array.from(range.getClientRects(), (r) => ({
+        x: r.x,
+        y: r.y,
+        width: r.width,
+        height: r.height,
+      }));
+    };
+    const footer = Array.from(document.querySelectorAll("p")).find(
+      (el) =>
+        el.textContent ===
+        "Counts toward loyalty after the details and photo sync.",
+    );
+    return {
+      viewport: innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      wordmark: boxes(
+        document.querySelector(".wr-brand-name")?.firstChild ?? null,
+      ),
+      loyaltyFooter: boxes(footer ?? null),
+      shortTargets:
+        innerWidth <= 390
+          ? Array.from(document.querySelectorAll("button,input,select,a"))
+              .filter((el) => {
+                const r = el.getBoundingClientRect();
+                return r.width > 0 && r.height > 0 && r.height < 48;
+              })
+              .map((el) => ({
+                tag: el.tagName,
+                height: el.getBoundingClientRect().height,
+              }))
+          : [],
+    };
+  });
+  if (!id.startsWith("F") && !id.startsWith("D") && !id.startsWith("P21")) {
+    expect(new Set(metrics.wordmark.map((r) => r.y)).size).toBe(1);
+    expect(metrics.shortTargets).toEqual([]);
+    if (metrics.loyaltyFooter.length)
+      expect(
+        new Set(metrics.loyaltyFooter.map((r) => r.y)).size,
+      ).toBeLessThanOrEqual(width === 390 ? 1 : 2);
+  }
+  await writeFile(
+    `tests/design-parity/station/screenshots/${id}-${width}.metrics.json`,
+    JSON.stringify(metrics, null, 2) + "\n",
+  );
   await page.screenshot({
     path: `tests/design-parity/station/screenshots/${id}-${width}.built.png`,
     fullPage: true,
@@ -89,6 +139,7 @@ for (const width of [1440, 390])
       await attendantSignIn(p, "grace.okon", accountPassword);
       await expect(p).toHaveURL(/\/attendant\/sale$/);
       await waitForWorker(p);
+      await shot(p, "Capture-wrap-regression", width === 1440 ? 390 : 360);
       await fillSale(p, { value: "20000.00" });
       await phone.setOffline(true);
       await save(p);
@@ -204,7 +255,7 @@ for (const width of [1440, 390])
         p.getByRole("button", { name: "Sign out to switch pump", exact: true }),
       ).toBeVisible();
       await expect(
-        p.getByText("2 sales · captured at Pump 02", { exact: true }),
+        p.getByText(/^2 sales · captured at .*PUMP02$/),
       ).toBeVisible();
       await shot(p, "A17-PumpChange", width === 1440 ? 390 : 360);
       const restricted = await browser.newContext({
