@@ -1,3 +1,4 @@
+import { lookupReceiptSchema } from "./lookup-receipt";
 import { z } from "zod";
 import { authId } from "./auth";
 import { MAX_KOBO } from "../money";
@@ -52,6 +53,7 @@ export const originalSaleSchema = z
     assignmentId: authId,
     cardCode,
     appCapturedAt: instant,
+    lookupReceipt: z.unknown().optional(),
     priceVersionId: authId,
     rateKobo: kobo,
     currency: z.literal("NGN"),
@@ -93,10 +95,23 @@ export type OriginalSale = z.infer<typeof originalSaleSchema>;
 export type UploadRequest = z.infer<typeof uploadSchema>;
 export type FinalizeRequest = z.infer<typeof finalizeSchema>;
 export type LookupInput = z.infer<typeof lookupSchema>;
+export const legacyLookupResponseSchema = z.strictObject({
+  cardCode,
+  customer: z.strictObject({
+    id: authId,
+    name: z.string(),
+    category: z.string(),
+  }),
+  lookedUpAt: instant,
+});
+export const lookupReceiptResponseSchema = legacyLookupResponseSchema
+  .extend({ lookupReceipt: lookupReceiptSchema.nullable() })
+  .strict();
 export type Lookup = {
   cardCode: string;
   customer: { id: string; name: string; category: string };
   lookedUpAt: string;
+  lookupReceipt?: string | null;
 };
 export type Hold = { kind: "price" | "card" | "date"; reasonCode: string };
 export type SaleStatus = {

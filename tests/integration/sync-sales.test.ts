@@ -220,7 +220,7 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
           [final.purchaseId],
         )
       ).rows[0];
-      expect(row.policy_version).toBe(2);
+      expect(row.policy_version).toBe(3);
       expect(row.reasons).toEqual(
         change === "uniform"
           ? []

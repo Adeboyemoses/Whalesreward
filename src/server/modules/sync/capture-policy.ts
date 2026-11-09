@@ -1,5 +1,5 @@
-/** P-20 refines P-18; provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
-export const CAPTURE_POLICY_VERSION = 2;
+/** P-23 refines P-20/P-18; provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
+export const CAPTURE_POLICY_VERSION = 3;
 /** Exact integer epoch microseconds from PostgreSQL EXTRACT, never a JS Date. */
 export type TrustedMicros = string;
 const micros = (value: TrustedMicros): bigint => BigInt(value);
@@ -19,6 +19,12 @@ export type CampaignHistory = {
 };
 export type CapturePolicyInput = {
   signedInAt: TrustedMicros;
+  lowerBound?: TrustedMicros;
+  cardLink?: {
+    linkedAt: TrustedMicros;
+    endedAt: TrustedMicros | null;
+    customerMatches: boolean;
+  } | null;
   receivedAt: TrustedMicros;
   offlineExpiresAt: TrustedMicros;
   contextRevokedAt: TrustedMicros | null;
@@ -39,13 +45,22 @@ export function evaluateCapturePolicy(
   input: CapturePolicyInput,
 ): CapturePolicyResult {
   const reasons = new Set<string>();
-  const s = micros(input.signedInAt),
+  const originalS = micros(input.signedInAt);
+  const s = micros(input.lowerBound ?? input.signedInAt),
     r = micros(input.receivedAt),
     expiry = micros(input.offlineExpiresAt);
   // Receipt can follow reauthentication; capture remains bounded by its original context.
   const u = r < expiry ? r : expiry;
-  if (u < s)
+  if (s < originalS || u < s)
     return { reasons: ["capture_history_incomplete"], campaignEligible: false };
+  if (
+    input.cardLink !== undefined &&
+    (!input.cardLink ||
+      !input.cardLink.customerMatches ||
+      micros(input.cardLink.linkedAt) > s ||
+      (input.cardLink.endedAt !== null && micros(input.cardLink.endedAt) <= r))
+  )
+    reasons.add("card_policy_unresolved");
   if (
     micros(input.assignment.effectiveFrom) > s ||
     (input.assignment.effectiveUntil !== null &&

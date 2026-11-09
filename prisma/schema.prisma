@@ -460,6 +460,11 @@ model CustomerIdentityChange {
 }
 
 model Purchase {
+  lookup_receipt_input Json? @db.JsonB
+  lookup_receipt_status String @default("fallback")
+  lookup_receipt_claims Json? @db.JsonB
+  capture_lower_bound DateTime? @db.Timestamptz(6)
+  capture_policy_version String?
   id                                        String                   @id @db.Uuid
   created_at                                DateTime                 @default(now()) @db.Timestamptz(6)
   originating_attendant_id                  String                   @db.Uuid
@@ -862,6 +867,7 @@ model SyncFinalizeOperation {
   @@map("sync_finalize_operation")
 }
 model SyncValidation {
+  captureEvidence Json? @map("capture_evidence")
   purchaseId String @id @map("purchase_id") @db.Uuid
   policyVersion Int @map("policy_version")
   reasons Json

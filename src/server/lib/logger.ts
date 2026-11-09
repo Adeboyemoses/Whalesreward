@@ -2,7 +2,7 @@ import pino, { type DestinationStream } from "pino";
 
 const REDACTED = "[Redacted]";
 const sensitiveKey =
-  /^(?:phone(?:number|_normalized)?|password(?:hash|_hash)?|code|(?:.*[_-])?token|.*Token|signed[_-]?url|authorization|cookie|secret(?:hash|verifier|_hash|_verifier)?)$/i;
+  /^(?:lookupReceipt|lookup_receipt_input|lookup_receipt_claims|phone(?:number|_normalized)?|password(?:hash|_hash)?|code|(?:.*[_-])?token|.*Token|signed[_-]?url|authorization|cookie|secret(?:hash|verifier|_hash|_verifier)?)$/i;
 
 /** Redact nested records and arrays before serialization; never mutate domain objects. */
 function redact(value: unknown, seen = new WeakSet<object>()): unknown {

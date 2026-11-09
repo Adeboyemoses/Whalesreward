@@ -1,9 +1,15 @@
+import {
+  lookupReceiptConfig,
+  type LookupReceiptKeys,
+} from "../sync/lookup-receipt";
+import { issueLookupReceipt } from "../sync/lookup-evidence";
 import type pg from "pg";
 import {
   registrationSchema,
   phoneLookupSchema,
   customerSearchSchema,
   registrationReceiptSchema,
+  registrationReceiptWithLookupSchema,
   customerLookupSchema,
   customerSummarySchema,
   customerProfileSchema,
@@ -35,7 +41,11 @@ async function attendant(db: pg.PoolClient, token: string | undefined) {
   if (!r) throw new AuthError("assignment_unavailable", 422);
   if (!r.online) throw new AuthError("online_sign_in_required", 403);
   if (!r.fresh) throw new AuthError("online_sign_in_required", 403);
-  return { ...r, user_id: session.user_id };
+  return {
+    ...r,
+    user_id: session.user_id,
+    capture_context_id: session.capture_context_id,
+  };
 }
 export async function registerCustomer(
   pool: pg.Pool,
@@ -43,6 +53,10 @@ export async function registerCustomer(
   token: string | undefined,
   input: unknown,
   normalizer: PhoneNormalizer = phoneNormalizer(),
+  options: {
+    receiptCapable?: boolean;
+    lookupReceiptKeys?: () => LookupReceiptKeys;
+  } = {},
 ) {
   const parsed = registrationSchema.parse(input),
     phone = normalizer.normalize(parsed.phone),
@@ -140,7 +154,14 @@ export async function registerCustomer(
               occurredAt: r.created_at.toISOString(),
             },
           );
-          return registrationReceiptSchema.parse({
+          return registrationReceiptWithLookupSchema.parse({
+            lookupReceipt: await issueLookupReceipt(
+              db,
+              actor.capture_context_id,
+              actor.id,
+              card.id,
+              (options.lookupReceiptKeys ?? lookupReceiptConfig)(),
+            ),
             operationId: parsed.operationId,
             customer: {
               id,
@@ -163,7 +184,18 @@ export async function registerCustomer(
           });
         },
       );
-      return { data, replayed };
+      const { lookupReceipt = null, ...legacy } = data as typeof data & {
+        lookupReceipt?: string | null;
+      };
+      return {
+        data: options.receiptCapable
+          ? registrationReceiptWithLookupSchema.parse({
+              ...legacy,
+              lookupReceipt,
+            })
+          : registrationReceiptSchema.parse(legacy),
+        replayed,
+      };
     });
   } catch (e) {
     const error = e as { code?: string; constraint?: string };
