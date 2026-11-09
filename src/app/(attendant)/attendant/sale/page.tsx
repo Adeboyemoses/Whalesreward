@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ScanLine } from "lucide-react";
+import { ScanLine, UserRoundPlus } from "lucide-react";
 import {
   Button,
   TextField,
@@ -340,16 +340,22 @@ function Sale() {
               }
             />
             {notFound && (
-              <Notice tone="warning">
-                <b>Customer not found.</b> A card that is not yet linked must
-                first be registered.
-                <Button
-                  variant="secondary"
-                  onClick={() => go(router, "/attendant/register")}
-                >
-                  Register this customer
-                </Button>
-              </Notice>
+              <>
+                <Notice>
+                  A card that is not yet linked must first be registered. If the
+                  customer lost a card, an admin issues a replacement; the sale
+                  cannot be recorded against the old card.
+                </Notice>
+                <div className="wr-row">
+                  <Button
+                    variant="secondary"
+                    icon={<UserRoundPlus aria-hidden />}
+                    onClick={() => go(router, "/attendant/register")}
+                  >
+                    Register this customer
+                  </Button>
+                </div>
+              </>
             )}
             {lookupError && !notFound && (
               <Notice>
