@@ -810,219 +810,238 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
   }
 });
 
-test("I-16 malformed successful generation response retains the committed operation until same-key reconciliation", async ({
-  page,
-}) => {
-  const f = await stationFixture(page);
-  try {
-    const name = `Fictional truncated stock ${v7().slice(-8)}`;
-    const bodies: unknown[] = [];
-    const ids: string[] = [];
-    await page.route("**/api/admin/card-batches", async (route) => {
-      if (route.request().method() !== "POST") return route.continue();
-      bodies.push(route.request().postDataJSON());
-      const response = await route.fetch();
-      expect(response.status()).toBe(201);
-      ids.push((await response.json()).data.id);
-      if (bodies.length === 1)
-        await route.fulfill({
-          status: 201,
-          headers: {
-            "content-type": "application/json",
-            "cache-control": "no-store",
-          },
-          body: '{"data":',
-        });
-      else await route.fulfill({ response });
-    });
-    await page.goto("/admin/cards/generate");
-    await page.getByLabel("Batch name", { exact: true }).fill(name);
-    await page.getByLabel("Number of cards", { exact: true }).fill("2");
-    await page
-      .getByRole("button", { name: "Review batch", exact: true })
-      .click();
-    const malformed = page.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname === "/api/admin/card-batches" &&
-        r.request().method() === "POST",
-    );
-    await page
-      .getByRole("button", { name: "Generate cards", exact: true })
-      .click();
-    expect((await malformed).status()).toBe(201);
-    expect(
-      (
-        await f.db.query(
-          "SELECT count(*)::int n FROM card_batch WHERE name=$1",
-          [name],
-        )
-      ).rows[0].n,
-    ).toBe(1);
-    await expect(
-      page.getByRole("button", {
-        name: "Retry same confirmation",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Review a new batch", exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: "Generate another batch", exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("link", { name: "Keep editing", exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("link", { name: "Cancel", exact: true }),
-    ).toHaveCount(0);
-    await page
-      .getByRole("button", { name: "Retry same confirmation", exact: true })
-      .click();
-    await expect(
-      page.getByRole("link", { name: "View batch", exact: true }),
-    ).toBeVisible();
-    expect(bodies).toHaveLength(2);
-    expect(bodies[1]).toEqual(bodies[0]);
-    expect(ids[1]).toBe(ids[0]);
-    expect(
-      (
-        await f.db.query(
-          "SELECT count(*)::int n FROM card_batch WHERE name=$1",
-          [name],
-        )
-      ).rows[0].n,
-    ).toBe(1);
-    expect(
-      (
-        await f.db.query("SELECT count(*)::int n FROM card WHERE batch_id=$1", [
-          ids[0],
-        ])
-      ).rows[0].n,
-    ).toBe(2);
-    expect(
-      (
-        await f.db.query(
-          "SELECT count(*)::int n FROM audit_event WHERE target_id=$1 AND action='batch_generated'",
-          [ids[0]],
-        )
-      ).rows[0].n,
-    ).toBe(1);
-  } finally {
-    await page.unrouteAll({ behavior: "wait" });
-    await f.db.end();
-  }
-});
+const invalidSuccessResponses = [
+  { name: "truncated JSON", body: '{"data":' },
+  { name: "null envelope", body: "null" },
+] as const;
 
-test("I-20 malformed successful export response retains one snapshot and forbids a new key until reconciled", async ({
-  page,
-}) => {
-  await ensureLocalCardBucket();
-  const f = await stationFixture(page);
-  try {
-    const b = await api<{ id: string; version: number }>(
-      page.request,
-      "card-batches",
-      { operationId: v7(), name: "Fictional truncated export stock", count: 2 },
-      201,
-    );
-    const bodies: unknown[] = [];
-    const ids: string[] = [];
-    await page.route(
-      `**/api/admin/card-batches/${b.id}/exports`,
-      async (route) => {
+for (const invalidSuccess of invalidSuccessResponses)
+  test(`I-16 malformed successful generation response retains the committed operation until same-key reconciliation [${invalidSuccess.name}]`, async ({
+    page,
+  }) => {
+    const f = await stationFixture(page);
+    try {
+      const name = `Fictional malformed stock ${v7().slice(-8)}`;
+      const bodies: unknown[] = [];
+      const ids: string[] = [];
+      await page.route("**/api/admin/card-batches", async (route) => {
         if (route.request().method() !== "POST") return route.continue();
         bodies.push(route.request().postDataJSON());
         const response = await route.fetch();
-        expect(response.status()).toBe(202);
+        expect(response.status()).toBe(201);
         ids.push((await response.json()).data.id);
         if (bodies.length === 1)
           await route.fulfill({
-            status: 202,
+            status: 201,
             headers: {
               "content-type": "application/json",
               "cache-control": "no-store",
             },
-            body: '{"data":',
+            body: invalidSuccess.body,
           });
         else await route.fulfill({ response });
-      },
-    );
-    await page.goto(`/admin/cards/${b.id}`);
-    await page
-      .getByRole("button", { name: "Review export preparation", exact: true })
-      .click();
-    const malformed = page.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname ===
-          `/api/admin/card-batches/${b.id}/exports` &&
-        r.request().method() === "POST",
-    );
-    await page
-      .getByRole("button", { name: "Confirm export preparation", exact: true })
-      .click();
-    expect((await malformed).status()).toBe(202);
-    expect(
-      (
-        await f.db.query(
-          "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
-          [b.id],
-        )
-      ).rows[0].n,
-    ).toBe(1);
-    await expect(
-      page.getByRole("button", {
-        name: "Retry same confirmation",
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Cancel", exact: true }),
-    ).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: "Review a new export", exact: true }),
-    ).toHaveCount(0);
-    const snapshot = (
-      await f.db.query(
-        "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
-        [ids[0]],
-      )
-    ).rows;
-    expect(snapshot).toHaveLength(2);
-    await page
-      .getByRole("button", { name: "Retry same confirmation", exact: true })
-      .click();
-    await expect(
-      page.getByRole("button", { name: "Review a new export", exact: true }),
-    ).toBeEnabled();
-    expect(bodies).toHaveLength(2);
-    expect(bodies[1]).toEqual(bodies[0]);
-    expect(ids[1]).toBe(ids[0]);
-    expect(
-      (
-        await f.db.query(
-          "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
-          [b.id],
-        )
-      ).rows[0].n,
-    ).toBe(1);
-    expect(
-      (
+      });
+      await page.goto("/admin/cards/generate");
+      await page.getByLabel("Batch name", { exact: true }).fill(name);
+      await page.getByLabel("Number of cards", { exact: true }).fill("2");
+      await page
+        .getByRole("button", { name: "Review batch", exact: true })
+        .click();
+      const malformed = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === "/api/admin/card-batches" &&
+          r.request().method() === "POST",
+      );
+      await page
+        .getByRole("button", { name: "Generate cards", exact: true })
+        .click();
+      expect((await malformed).status()).toBe(201);
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM card_batch WHERE name=$1",
+            [name],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      await expect(
+        page.getByRole("button", {
+          name: "Retry same confirmation",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Review a new batch", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", {
+          name: "Generate another batch",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Keep editing", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Cancel", exact: true }),
+      ).toHaveCount(0);
+      await page
+        .getByRole("button", { name: "Retry same confirmation", exact: true })
+        .click();
+      await expect(
+        page.getByRole("link", { name: "View batch", exact: true }),
+      ).toBeVisible();
+      expect(bodies).toHaveLength(2);
+      expect(bodies[1]).toEqual(bodies[0]);
+      expect(ids[1]).toBe(ids[0]);
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM card_batch WHERE name=$1",
+            [name],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM card WHERE batch_id=$1",
+            [ids[0]],
+          )
+        ).rows[0].n,
+      ).toBe(2);
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM audit_event WHERE target_id=$1 AND action='batch_generated'",
+            [ids[0]],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+    } finally {
+      await page.unrouteAll({ behavior: "wait" });
+      await f.db.end();
+    }
+  });
+
+for (const invalidSuccess of invalidSuccessResponses)
+  test(`I-20 malformed successful export response retains one snapshot and forbids a new key until reconciled [${invalidSuccess.name}]`, async ({
+    page,
+  }) => {
+    await ensureLocalCardBucket();
+    const f = await stationFixture(page);
+    try {
+      const b = await api<{ id: string; version: number }>(
+        page.request,
+        "card-batches",
+        {
+          operationId: v7(),
+          name: "Fictional malformed export stock",
+          count: 2,
+        },
+        201,
+      );
+      const bodies: unknown[] = [];
+      const ids: string[] = [];
+      await page.route(
+        `**/api/admin/card-batches/${b.id}/exports`,
+        async (route) => {
+          if (route.request().method() !== "POST") return route.continue();
+          bodies.push(route.request().postDataJSON());
+          const response = await route.fetch();
+          expect(response.status()).toBe(202);
+          ids.push((await response.json()).data.id);
+          if (bodies.length === 1)
+            await route.fulfill({
+              status: 202,
+              headers: {
+                "content-type": "application/json",
+                "cache-control": "no-store",
+              },
+              body: invalidSuccess.body,
+            });
+          else await route.fulfill({ response });
+        },
+      );
+      await page.goto(`/admin/cards/${b.id}`);
+      await page
+        .getByRole("button", { name: "Review export preparation", exact: true })
+        .click();
+      const malformed = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname ===
+            `/api/admin/card-batches/${b.id}/exports` &&
+          r.request().method() === "POST",
+      );
+      await page
+        .getByRole("button", {
+          name: "Confirm export preparation",
+          exact: true,
+        })
+        .click();
+      expect((await malformed).status()).toBe(202);
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
+            [b.id],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      await expect(
+        page.getByRole("button", {
+          name: "Retry same confirmation",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Cancel", exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.getByRole("button", { name: "Review a new export", exact: true }),
+      ).toHaveCount(0);
+      const snapshot = (
         await f.db.query(
           "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
           [ids[0]],
         )
-      ).rows,
-    ).toEqual(snapshot);
-    expect(
-      (
-        await f.db.query("SELECT status,version FROM card_batch WHERE id=$1", [
-          b.id,
-        ])
-      ).rows,
-    ).toEqual([{ status: "generated", version: 1 }]);
-  } finally {
-    await page.unrouteAll({ behavior: "wait" });
-    await f.db.end();
-  }
-});
+      ).rows;
+      expect(snapshot).toHaveLength(2);
+      await page
+        .getByRole("button", { name: "Retry same confirmation", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Review a new export", exact: true }),
+      ).toBeEnabled();
+      expect(bodies).toHaveLength(2);
+      expect(bodies[1]).toEqual(bodies[0]);
+      expect(ids[1]).toBe(ids[0]);
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
+            [b.id],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      expect(
+        (
+          await f.db.query(
+            "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
+            [ids[0]],
+          )
+        ).rows,
+      ).toEqual(snapshot);
+      expect(
+        (
+          await f.db.query(
+            "SELECT status,version FROM card_batch WHERE id=$1",
+            [b.id],
+          )
+        ).rows,
+      ).toEqual([{ status: "generated", version: 1 }]);
+    } finally {
+      await page.unrouteAll({ behavior: "wait" });
+      await f.db.end();
+    }
+  });
