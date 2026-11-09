@@ -5,6 +5,7 @@ import {
   createAttendantSchema,
   assignAttendantSchema,
   activatePriceSchema,
+  endAssignmentSchema,
 } from "./station";
 describe("M2 station inputs", () => {
   it("normalizes names and usernames before receipt comparison", () => {
@@ -61,5 +62,27 @@ describe("M2 station inputs", () => {
         reason: "Move",
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("P-21 assignment end guard", () => {
+  it("requires nonnull exact assignment and aggregate guards and rejects client authority", () => {
+    const input = {
+      operationId: newId(),
+      expectedVersion: 1,
+      expectedAssignmentId: newId(),
+      reason: " Leaving station ",
+    };
+    expect(endAssignmentSchema.parse(input).reason).toBe("Leaving station");
+    for (const bad of [
+      { ...input, expectedVersion: null },
+      { ...input, expectedAssignmentId: null },
+      { ...input, expectedVersion: undefined },
+      { ...input, expectedAssignmentId: undefined },
+      { ...input, effectiveUntil: new Date().toISOString() },
+      { ...input, actorId: newId() },
+    ]) {
+      expect(endAssignmentSchema.safeParse(bad).success).toBe(false);
+    }
   });
 });
