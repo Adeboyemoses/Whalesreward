@@ -16,6 +16,6 @@ WO-app-5 (WHR-11) Station, prices and attendants: READY since 2026-11-09
 ## Risks
 - WHR-81 tracks inherited pump-prefix formatting and an earlier isolated creation timeout with unknown historical cause. Diagnostic 10 repetitions and final full matrix passed. Proven separate 429 collisions were isolated by per-fixture documentation IPs; Core-reviewed local-only test-header setting preserves quotas/auth/production policy. No retries, timeout or assertion relaxation.
 - Existing partial navigation inventory and contract-driven states without dedicated boards are disclosed in parity. Earl's staging/physical-phone acceptance is pending; no live Owner, cloud/provider or staging-data operation performed by agents.
-- High-tier dispatch flag exceeded: 11 feature dispatches, 12 including records review (>8), covering two builders, independent tests, pre-review fixes, fixture audit and Core harness review. One formal feature round within cap 3; runtime model identity unavailable.
+- High-tier dispatch flag exceeded: 11 feature dispatches, 13 including two records reviews (>8), covering two builders, independent tests, pre-review fixes, fixture audit and Core harness review. One formal feature round within cap 3; records reviewed again after concurrent Core #81 merged. Runtime model identity unavailable.
 
-dispatches=12 prs=2 rounds_max=1 escalations=0 model=unknown
+dispatches=13 prs=2 rounds_max=2 escalations=0 model=unknown
