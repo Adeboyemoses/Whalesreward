@@ -148,6 +148,60 @@ test("I-05 reassignment notice is persistent across attendant screens without ch
   }
 });
 
+test("I-05 an older configured-assignment reply cannot hide a known warning or label the current pump as new", async ({
+  page,
+}) => {
+  const f = await registrationFixture(page);
+  try {
+    const previous = await (
+      await page.request.get("/api/attendant/configured-assignment")
+    ).json();
+    expect(previous.data.reassignmentRequiresSignIn).toBe(false);
+    await api(page.request, `attendants/${f.attendant.id}/assignment`, {
+      operationId: v7(),
+      expectedVersion: f.attendant.version,
+      expectedAssignmentId: f.attendant.assignment!.id,
+      pumpId: seedId(16),
+      expectedPumpVersion: 1,
+      reason: "Fictional out-of-order assignment notice",
+    });
+    const refreshed = page.waitForResponse((response) =>
+      response.url().endsWith("/api/attendant/session"),
+    );
+    await page.evaluate(() =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
+    expect((await refreshed).status()).toBe(200);
+    await expect(
+      page.getByText("Your pump assignment has changed.", { exact: true }),
+    ).toBeVisible();
+    await page.route("**/api/attendant/configured-assignment", (route) =>
+      route.fulfill({ status: 200, json: previous }),
+    );
+    const older = page.waitForResponse((response) =>
+      response.url().endsWith("/api/attendant/configured-assignment"),
+    );
+    await page.getByRole("link", { name: "Account", exact: true }).click();
+    expect((await older).status()).toBe(200);
+    await expect(
+      page.getByRole("button", {
+        name: "Sign out to switch pump",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Your pump assignment has changed.", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/New pump assigned:/)).toHaveCount(0);
+    await expect(
+      page.locator("dt").filter({ hasText: /^New assignment$/ }),
+    ).toHaveCount(0);
+    await expect(page.getByText(/\(current session\)/)).toBeVisible();
+  } finally {
+    await f.db.end();
+  }
+});
+
 test("I-05 I-23 reassignment arriving during a save keeps the original sale and photo intact", async ({
   page,
 }) => {

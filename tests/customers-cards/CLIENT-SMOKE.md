@@ -23,3 +23,11 @@ Targeted Linux browser command used the temporary `/private/tmp/whr-client-smoke
 `DATABASE_URL=postgresql://whr:whr@127.0.0.1:5433/whr_app6_client_smoke pnpm exec playwright test --config /private/tmp/whr-client-smoke-browser.config.mts --reporter=line`
 
 No export check, server/shared contract, service worker, or STATUS/coverage/lane file was edited. A one-line escaped-bug gotcha was added to the existing frontend agent file through the normal patch tool without a permission denial or bypass.
+
+## Combined persistence and delayed Account reply
+
+Integrated offline engineer `86cdf53` locally as `c9a7066`; no offline source was edited by the frontend builder. The former Account-first/offline-navigation failure now passes with the real configured-assignment response and retained pre-change session envelope.
+
+A further test first reproduced **1/1 failure**: after a real assignment change and true session refresh, replaying the genuine pre-change configured-assignment envelope on Account hid Sign out to switch pump. The screen also risked describing its current pump as a new target. Account now keeps any known global/session/configured warning through boolean OR, and shows the configured target/new-assignment row only when that actual configured response reports a change. The raw API response remains unchanged.
+
+Final focused combined production-build/Linux 390 px suite: **5 passed (10.4 seconds), zero failures/skips/retries**, including the strengthened offline-navigation, delayed-configured-reply and blocked-save regressions. Same command/config/database as above. Final local typecheck, lint, production build and **458/458 unit tests across 52 files** passed. Port 3000 was released after the run. Independent fidelity and EM full final-head gates remain required.
