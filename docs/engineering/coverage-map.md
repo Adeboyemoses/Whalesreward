@@ -2,18 +2,18 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
-## WO-spec-3c numeric-only correction policy (WHR-84)
+## WO-spec-3c numeric-only correction policy ACCEPTED (WHR-84)
 
-P-22 configures the [M3 correction-evidence policy](contracts/m3.md#own-corrections-and-late-review--a11-s01s09-i-37i-39), resolving WHR-47 for numeric-only corrections in the recorded basis against the retained validated photo. Other fields/evidence remain outside this flow. The amendment merged in [PR #84](https://github.com/Adeboyemoses/Whalesreward/pull/84) with green CI and code/security/integrity PASS at f78f49d. This separate READY records PR takes effect on its reviewed green staging merge; verification and full verdicts are posted on WHR-84.
+P-22 configures the [M3 correction-evidence policy](contracts/m3.md#own-corrections-and-late-review--a11-s01s09-i-37i-39), resolving WHR-47 for numeric-only corrections in the recorded basis against the retained validated photo. Other fields/evidence remain outside this flow. The amendment merged in [PR #84](https://github.com/Adeboyemoses/Whalesreward/pull/84) with green CI and code/security/integrity PASS at f78f49d. READY records [#85](https://github.com/Adeboyemoses/Whalesreward/pull/85) merged at 6b81b8b with all five checks green. Earl accepted the specification on 9 November 2026 and instructed closure. This docs-only closeout makes closure effective on its reviewed green staging merge; then WHR-84 moves to Done. Verification and full verdicts are posted on WHR-84.
 
 WO-core-8 (WHR-14) implements it separately. EM typecheck/lint, 333 unit tests, production build, evidence/prose/local-link/whitespace checks PASS. No new runtime tests or screen parity are claimed.
 
 | Invariants / boards | Specification evidence | Status |
 |---|---|---|
-| I-22/I-28/I-29/I-31/I-32/I-37–I-39/I-41 | P-22 policy, same-sale validated evidence, exact captured-basis calculation; immutable originals, receipt/midnight, stale-base, P-19 and audit rules retained | spec only; implementation tests pending WO-core-8 |
+| I-22/I-28/I-29/I-31/I-32/I-37–I-39/I-41 | P-22 policy, same-sale validated evidence, exact captured-basis calculation; immutable originals, receipt/midnight, stale-base, P-19 and audit rules retained | spec accepted; implementation tests pending WO-core-8 |
 | A11; S01/S09 | Existing numeric entry and late-review inputs; no board or UI changes | reference only; no parity claim |
 
-Initial READY records CI failed before 42 customer/card tests ran: two fixture clock reads differed by 1 microsecond, violating the exact 24-hour constraint. WHR-86 tracks the separate Core fix. No runtime/test/constraint changed; this records update requires fresh green CI before merge.
+Initial READY records CI failed before 42 customer/card tests ran: two fixture clock reads differed by 1 microsecond, violating the exact 24-hour constraint. WHR-86 tracks the separate Core fix. No runtime/test/constraint changed; fresh final-head CI passed before #85 merged. This acceptance closeout adds no runtime coverage.
 
 Required downstream tests: numeric amount/quantity acceptance without an unset policy, mismatched basis/extra fields/foreign or invalid evidence denial, meter-evidence guard, exact midnight and lost-response replay, stale-base conflicts and independent recovered review. Existing invariant and board runtime statuses remain unchanged. Rook should mirror P-22 into the product docs; this session does not edit them.
 
