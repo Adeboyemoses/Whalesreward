@@ -629,3 +629,17 @@ Feature [#89](https://github.com/Adeboyemoses/Whalesreward/pull/89) merged at `8
 | I-52 | corrections-adversarial.test.ts: expired-lease restart/fence, fifth crash and storage-configuration loss terminalization without GET; correction-runtime.test.ts: bounded automatic loop/shutdown | Backend correction/read slice on-staging; no broader UI/recovery/hold/duplicate/finalization claim |
 
 P-22 is configured for numeric retained-photo corrections; no extra activation gate. Corrections stay separate from originals. P-19 tests use trusted persisted awaiting-review provenance, not recovery intake. Earl approved one additional round for `3a003d4` only by code/security; both PASS, prior integrity PASS retained. Evidence records the exact exception. All 40 feature files stayed unchanged through required integration of the reviewed staging base. WHR-87/89 remain separate found work; no assertion, timeout or retry-policy relaxation. WHR-14/80/12 remain In Review for batched verification.
+
+
+## WO-spec-3d / WHR-91 signed lookup capture bound READY — 9 Nov 2026
+
+[Spec #91](https://github.com/Adeboyemoses/Whalesreward/pull/91) merged into staging with five green CI checks. M1/M2, data model, invariants and P-23 are specification coverage only. Code/security/integrity PASS at 5abc12b; the legacy strict-client compatibility finding was fixed. EM typecheck/lint, 454 existing unit tests, build and evidence validator PASS. No new automated P-23 coverage or screen parity is claimed.
+
+| Invariants | Specification verification / future implementation | Status |
+|---|---|---|
+| I-03, I-05a, I-28, I-28a, I-45a, I-45b | M1 P-23 original S/R/U and verified L, binding/lifetime/fallback; independent security/integrity PASS | Spec on staging; core tests pending |
+| I-22, I-28b | M1/M2 immutable evidence/digest, registration replay and capability projection; code/integrity PASS | Spec on staging; core/app replay tests pending |
+| I-31, I-33, I-34, I-35 | All histories over [L,U], link at R, independent holds and existing reviewers unchanged; integrity PASS | Spec on staging; core tests pending |
+| I-50 | Minimal account-partitioned receipt cache, no registration PII/SW cache; security PASS | Spec on staging; app storage tests pending |
+
+Rook to draft Core: P-23 receipt issuance and settlement, then App: P-23 draft and outbox evidence. Required scenarios are in M1's follow-on list. WHR-38 remains closed, client Q-528 pending, and WO-core-9/WHR-16 retains independent hold/capture review. WHR-91 stays In Review at READY; neither acceptance nor implementation is inferred.
