@@ -1,0 +1,60 @@
+{
+  "viewport": 390,
+  "document": 390,
+  "boxes": [
+    {
+      "tag": "DIV",
+      "class": "wr-root wr-admin wr-admin-shell",
+      "left": 0,
+      "right": 390,
+      "width": 390,
+      "scroll": 390,
+      "client": 390
+    },
+    {
+      "tag": "MAIN",
+      "class": "wr-main",
+      "left": 0,
+      "right": 390,
+      "width": 390,
+      "scroll": 390,
+      "client": 390
+    },
+    {
+      "tag": "DIV",
+      "class": "wr-station",
+      "left": 16,
+      "right": 374,
+      "width": 358,
+      "scroll": 358,
+      "client": 358
+    },
+    {
+      "tag": "DIV",
+      "class": "wr-section",
+      "left": 16,
+      "right": 374,
+      "width": 358,
+      "scroll": 358,
+      "client": 358
+    },
+    {
+      "tag": "DIV",
+      "class": "wr-table-wrap",
+      "left": 16,
+      "right": 374,
+      "width": 358,
+      "scroll": 650,
+      "client": 356
+    },
+    {
+      "tag": "TABLE",
+      "class": "wr-table",
+      "left": 17,
+      "right": 667,
+      "width": 650,
+      "scroll": 650,
+      "client": 650
+    }
+  ]
+}

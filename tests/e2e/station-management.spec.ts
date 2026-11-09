@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { v7 } from "uuid";
 import {
   stationFixture,
@@ -12,7 +12,31 @@ import { installAssignmentEndFake } from "../station/assignment-end-fake";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
 
-test.afterEach(async ({ page }) => {
+const failedResponses = new WeakMap<
+  Page,
+  Array<{ path: string; status: number }>
+>();
+test.beforeEach(async ({ page }) => {
+  const responses: Array<{ path: string; status: number }> = [];
+  failedResponses.set(page, responses);
+  page.on("response", (response) => {
+    const path = new URL(response.url()).pathname;
+    if (path.startsWith("/api/admin/") && response.status() >= 400)
+      responses.push({ path, status: response.status() });
+  });
+});
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) {
+    // Only status codes and headings, never request headers/bodies or form values.
+    console.log(
+      "Station failure diagnostics",
+      JSON.stringify({
+        path: new URL(page.url()).pathname,
+        responses: failedResponses.get(page),
+        headings: await page.getByRole("heading").allTextContents(),
+      }),
+    );
+  }
   await page.unrouteAll({ behavior: "wait" });
 });
 
@@ -505,7 +529,7 @@ test("I-32 a stale reviewed price cannot silently create a second configuration"
   try {
     const before = (
       await f.db.query(
-        "SELECT version FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
+        "SELECT version,rate_kobo::text FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
         [product],
       )
     ).rows[0];
@@ -526,7 +550,7 @@ test("I-32 a stale reviewed price cannot silently create a second configuration"
       {
         operationId: v7(),
         expectedVersion: before.version,
-        rateKobo: "120002",
+        rateKobo: (BigInt(before.rate_kobo) + 1n).toString(),
         currency: "NGN",
         quantityPrecision: 2,
         reason: "Fictional intervening activation",
@@ -560,7 +584,10 @@ test("I-32 a stale reviewed price cannot silently create a second configuration"
           [product],
         )
       ).rows[0],
-    ).toEqual({ version: before.version + 1, rate_kobo: "120002" });
+    ).toEqual({
+      version: before.version + 1,
+      rate_kobo: (BigInt(before.rate_kobo) + 1n).toString(),
+    });
   } finally {
     await f.db.query("SELECT pg_advisory_unlock(80511)");
     await f.db.end();
