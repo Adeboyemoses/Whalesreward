@@ -81,6 +81,7 @@ export async function noPII(page: Page, values: string[]) {
       }
     return JSON.stringify(all);
   });
-  for (const value of values) expect(stored).not.toContain(value);
+  for (const value of [...values, "Amina Bello", "Tunde Adebayo"])
+    expect(stored).not.toContain(value);
   for (const value of values) expect(page.url()).not.toContain(value);
 }

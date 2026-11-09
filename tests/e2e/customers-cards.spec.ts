@@ -628,3 +628,109 @@ for (const refusal of ["permission_denied"] as const)
       await f.db.end();
     }
   });
+
+test("I-18 I-20 lost transition and export responses retry the frozen operation without duplicate changes", async ({
+  page,
+}) => {
+  await ensureLocalCardBucket();
+  const f = await stationFixture(page);
+  try {
+    const b = await api<{ id: string; version: number }>(
+      page.request,
+      "card-batches",
+      { operationId: v7(), name: "Fictional uncertain stock", count: 2 },
+      201,
+    );
+    const transitionBodies: unknown[] = [];
+    await page.route(
+      `**/api/admin/card-batches/${b.id}/mark-printed`,
+      async (route) => {
+        transitionBodies.push(route.request().postDataJSON());
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        if (transitionBodies.length === 1) await route.abort("failed");
+        else await route.fulfill({ response });
+      },
+    );
+    await page.goto(`/admin/cards/${b.id}/mark-printed`);
+    await page
+      .getByLabel("Reason / print reference", { exact: true })
+      .fill("Fictional received stock confirmation");
+    await page
+      .getByRole("button", { name: "Review status change", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm status change", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Retry same confirmation", exact: true })
+      .click();
+    await page
+      .getByRole("link", { name: "View current batch", exact: true })
+      .click();
+    expect(transitionBodies).toHaveLength(2);
+    expect(transitionBodies[1]).toEqual(transitionBodies[0]);
+    expect(
+      (
+        await f.db.query("SELECT status,version FROM card_batch WHERE id=$1", [
+          b.id,
+        ])
+      ).rows,
+    ).toEqual([{ status: "printed", version: 2 }]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM audit_event WHERE target_id=$1 AND action='batch_status_changed'",
+          [b.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    const exportBodies: unknown[] = [];
+    const exportIds: string[] = [];
+    await page.route(
+      `**/api/admin/card-batches/${b.id}/exports`,
+      async (route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        exportBodies.push(route.request().postDataJSON());
+        const response = await route.fetch();
+        expect(response.status()).toBe(202);
+        exportIds.push((await response.json()).data.id);
+        if (exportBodies.length === 1) await route.abort("failed");
+        else await route.fulfill({ response });
+      },
+    );
+    await page
+      .getByRole("button", { name: "Review export preparation", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm export preparation", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Retry same confirmation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Review a new export", exact: true }),
+    ).toBeVisible();
+    expect(exportBodies).toHaveLength(2);
+    expect(exportBodies[1]).toEqual(exportBodies[0]);
+    expect(exportIds[1]).toBe(exportIds[0]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
+          [b.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await f.db.query("SELECT status,version FROM card_batch WHERE id=$1", [
+          b.id,
+        ])
+      ).rows,
+    ).toEqual([{ status: "printed", version: 2 }]);
+  } finally {
+    await page.unrouteAll({ behavior: "wait" });
+    await f.db.end();
+  }
+});
