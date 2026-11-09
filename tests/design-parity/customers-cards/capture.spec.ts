@@ -187,6 +187,7 @@ for (const width of [1440, 390])
           amount: "800000",
           state: "photo_pending",
         });
+        await historicalSale(f.db, { amount: "1000000", state: "held" });
       }
       await page.setViewportSize({ width, height: 1000 });
       await page.goto("/admin/customers");

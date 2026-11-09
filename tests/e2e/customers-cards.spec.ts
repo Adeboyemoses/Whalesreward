@@ -501,6 +501,25 @@ test("I-42 I-44 exact large recorded totals exclude pending held and cancelled s
     const expected = `₦${(total / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.00`;
     await expect(page.getByText(expected, { exact: true })).toBeVisible();
     await expect(
+      page
+        .getByRole("row")
+        .filter({ hasText: "Photo pending" })
+        .getByText("Photo pending", { exact: true }),
+    ).toHaveClass(/\bwr-pending\b/);
+    await expect(
+      page
+        .getByRole("row")
+        .filter({ hasText: "Held" })
+        .getByText("Held", { exact: true }),
+    ).toHaveClass(/\bwr-held\b/);
+    await expect(
+      page
+        .getByRole("row")
+        .filter({ hasText: "Cancelled" })
+        .getByText("Cancelled", { exact: true }),
+    ).toHaveClass(/\bwr-failed\b/);
+
+    await expect(
       page.getByText(/990000000000000(?:\.0*)? litres/),
     ).toBeVisible();
     await expect(page.getByText(/1(?:\.0*)? kilograms/).first()).toBeVisible();
