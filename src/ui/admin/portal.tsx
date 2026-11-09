@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdminSession } from "./session";
+import { StationPortal, stationSections } from "./station";
 import type { AdminSession as Session } from "@/client/admin-session";
 import { adminTime, adminAction } from "@/client/admin-display";
 import {
@@ -38,13 +39,18 @@ import {
 const link = (href: string, label: string) => (
   <Link href={"/admin/" + href}>{label}</Link>
 );
-export function AdminPortal({ path }: { path: string[] }) {
+export function AdminPortal({ path: initialPath }: { path: string[] }) {
   const pathname = usePathname();
-  path = pathname
-    .replace(/^\/admin\/?/, "")
-    .split("/")
-    .filter(Boolean);
+  const path = pathname
+    ? pathname
+        .replace(/^\/admin\/?/, "")
+        .split("/")
+        .filter(Boolean)
+    : initialPath;
   const route = path.join("/");
+  const stationRoute = ["pumps", "prices", "attendants"].includes(
+    path[0] ?? "",
+  );
   const router = useRouter();
   const { session, checked, error, epoch, transitionTo } = useAdminSession();
   const management = ![
@@ -74,6 +80,17 @@ export function AdminPortal({ path }: { path: string[] }) {
       !session
     )
       router.replace("/admin/sign-in");
+    else if (
+      !route &&
+      session?.state === "ready" &&
+      !session.permissions?.includes("users") &&
+      !session.permissions?.includes("roles")
+    ) {
+      const target = stationSections.find((item) =>
+        session.permissions?.includes(item.grant),
+      );
+      if (target) router.replace(target.href);
+    }
   }, [
     session,
     management,
@@ -104,7 +121,12 @@ export function AdminPortal({ path }: { path: string[] }) {
         </div>
       );
     }
-    if (!route && !grants.includes("users") && !grants.includes("roles")) {
+    if (
+      !route &&
+      !grants.includes("users") &&
+      !grants.includes("roles") &&
+      !stationSections.some((item) => grants.includes(item.grant))
+    ) {
       return (
         <div className="wr-root wr-admin wr-admin-access-card">
           <h1 className="wr-page-title">
@@ -128,8 +150,24 @@ export function AdminPortal({ path }: { path: string[] }) {
     return (
       <AdminShell
         station={session.station?.name ?? ""}
-        active={path[0] === "roles" ? "Roles & permissions" : "Admin users"}
+        active={
+          stationRoute
+            ? (stationSections.find((item) => item.href === "/admin/" + path[0])
+                ?.label ?? "Station pumps")
+            : path[0] === "roles"
+              ? "Roles & permissions"
+              : "Admin users"
+        }
         items={[
+          ...stationSections
+            .filter((item) =>
+              item.grant === "pumps"
+                ? grants.some((grant) =>
+                    ["pumps", "attendants", "prices"].includes(grant),
+                  )
+                : grants.includes(item.grant),
+            )
+            .map(({ label, href }) => ({ label, href })),
           ...(grants.includes("users")
             ? [{ label: "Admin users", href: "/admin/users" }]
             : []),
@@ -144,28 +182,36 @@ export function AdminPortal({ path }: { path: string[] }) {
           </>
         }
       >
-        <div className="wr-pagehead">
-          <div>
-            <div className="wr-eyebrow">Access management</div>
-            <h1 className="wr-page-title">Admin users & roles</h1>
-            <p className="wr-secondary">
-              Named portal accounts and permissions
-            </p>
+        {!stationRoute && (
+          <div className="wr-pagehead">
+            <div>
+              <div className="wr-eyebrow">Access management</div>
+              <h1 className="wr-page-title">Admin users & roles</h1>
+              <p className="wr-secondary">
+                Named portal accounts and permissions
+              </p>
+            </div>
+            <span className="wr-secondary">
+              {session.account.name} · {session.role?.name}
+            </span>
           </div>
-          <span className="wr-secondary">
-            {session.account.name} · {session.role?.name}
-          </span>
-        </div>
+        )}
         {error && (
           <p role="alert" className="wr-notice">
             {error}
           </p>
         )}
-        <Management
-          key={route.replace(/\/verification-sent$/, "") + ":" + epoch}
-          path={path}
-          session={session}
-        />
+        {stationRoute ? (
+          <StationPortal key={epoch} path={path} session={session} />
+        ) : !route && !grants.includes("users") && !grants.includes("roles") ? (
+          <p role="status">Opening your portal section…</p>
+        ) : (
+          <Management
+            key={route.replace(/\/verification-sent$/, "") + ":" + epoch}
+            path={path}
+            session={session}
+          />
+        )}
       </AdminShell>
     );
   }
