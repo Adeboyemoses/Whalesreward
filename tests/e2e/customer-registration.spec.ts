@@ -193,7 +193,9 @@ test("I-19 a registration receipt cannot authorize a sale after its card is reti
       .click();
     expect((await lookup).status()).toBe(422);
     await expect(page).toHaveURL(/\/done$/);
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "This card is unavailable" }),
+    ).toBeVisible();
   } finally {
     await f.db.end();
   }

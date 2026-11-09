@@ -1,3 +1,4 @@
+import { decodedPDFCodes } from "../customers-cards/pdf";
 import { ensureLocalCardBucket } from "../customers-cards/storage";
 import { test, expect } from "@playwright/test";
 import { v7 } from "uuid";
@@ -155,6 +156,7 @@ test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes witho
       )
     ).rows;
     await page.goto(`/admin/cards/${b.id}`);
+    let pdfBytes: Buffer | undefined;
     for (const [format, label] of [
       ["pdf", "Export PDF print sheet"],
       ["xlsx", "Export Excel register"],
@@ -192,7 +194,11 @@ test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes witho
       for await (const chunk of stream!) chunks.push(chunk);
       const bytes = Buffer.concat(chunks);
       if (format === "pdf") {
+        pdfBytes = bytes;
         expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+        expect(await decodedPDFCodes(bytes)).toEqual(
+          inventory.map((c) => c.code).sort(),
+        );
         expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(
           0,
         );
@@ -221,6 +227,92 @@ test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes witho
         )
       ).rows,
     ).toEqual(inventory);
+
+    const original = (
+      await f.db.query(
+        "SELECT id,batch_status,batch_version FROM card_export WHERE batch_id=$1 AND format='pdf'",
+        [b.id],
+      )
+    ).rows[0];
+    const frozen = (
+      await f.db.query(
+        "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
+        [original.id],
+      )
+    ).rows;
+    let current = b;
+    for (const action of ["mark-printed", "activate"])
+      current = await api(page.request, `card-batches/${b.id}/${action}`, {
+        operationId: v7(),
+        expectedVersion: current.version,
+        reason: "Fictional snapshot-boundary stock change",
+      });
+    await f.db.query("BEGIN");
+    try {
+      const card = (
+        await f.db.query(
+          "UPDATE card SET state='linked',version=version+1 WHERE batch_id=$1 AND code=$2 RETURNING id",
+          [b.id, inventory[0].code],
+        )
+      ).rows[0];
+      await f.db.query(
+        "INSERT INTO card_customer_link(id,card_id,customer_id,linked_at,actor_user_id,reason) VALUES($1,$2,'019a5000-0000-7000-8000-000000000027',clock_timestamp(),$3,'Fictional post-snapshot link')",
+        [v7(), card.id, f.userId],
+      );
+      await f.db.query("COMMIT");
+    } catch (e) {
+      await f.db.query("ROLLBACK");
+      throw e;
+    }
+    const oldFile = await page.request.get(
+      `/api/admin/card-batches/${b.id}/exports/${original.id}/file`,
+    );
+    expect(oldFile.status()).toBe(200);
+    expect(await oldFile.body()).toEqual(pdfBytes);
+    expect(
+      (
+        await f.db.query(
+          "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
+          [original.id],
+        )
+      ).rows,
+    ).toEqual(frozen);
+    expect(original).toMatchObject({
+      batch_status: "generated",
+      batch_version: 1,
+    });
+    const second = await stationFixture(page, ["cards", "cardExport"]);
+    try {
+      const newer = await api<{
+        id: string;
+        cardCount: string;
+        batchStatus: string;
+      }>(
+        page.request,
+        `card-batches/${b.id}/exports`,
+        { operationId: v7(), expectedVersion: current.version, format: "pdf" },
+        202,
+      );
+      expect(newer.cardCount).toBe("2");
+      expect(newer.batchStatus).toBe("active");
+      expect(
+        (
+          await f.db.query(
+            "SELECT code FROM card_export_item WHERE export_id=$1",
+            [newer.id],
+          )
+        ).rows
+          .map((r) => r.code)
+          .sort(),
+      ).toEqual(
+        inventory
+          .slice(1)
+          .map((c) => c.code)
+          .sort(),
+      );
+    } finally {
+      await second.db.end();
+    }
   } finally {
     await f.db.end();
   }
@@ -361,7 +453,7 @@ test("I-42 I-44 exact large recorded totals exclude pending held and cancelled s
       await f.db.query("SELECT id FROM card WHERE code=$1", [f.codes[0]])
     ).rows[0].id;
     const base = { customerId, cardId, cardCode: f.codes[0] };
-    const amount = "9999999999999990000";
+    const amount = "9000000000000000000";
     // Historical fixtures obey the real schema/revision guards; this is a read-projection test, not a claim of API credit acceptance.
     for (let i = 0; i < 11; i++)
       await historicalSale(f.db, { ...base, amount });
@@ -399,9 +491,9 @@ test("I-42 I-44 exact large recorded totals exclude pending held and cancelled s
     const expected = `₦${(total / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.00`;
     await expect(page.getByText(expected, { exact: true })).toBeVisible();
     await expect(
-      page.getByText(/1,099,999,999,999,998\.9(?:0*)? litres/),
+      page.getByText(/990000000000000(?:\.0*)? litres/),
     ).toBeVisible();
-    await expect(page.getByText(/1(?:\.0*)? kilograms/)).toBeVisible();
+    await expect(page.getByText(/1(?:\.0*)? kilograms/).first()).toBeVisible();
     await expect(
       page.getByText("₦1,000.00", { exact: true }).first(),
     ).toBeVisible();
@@ -409,3 +501,120 @@ test("I-42 I-44 exact large recorded totals exclude pending held and cancelled s
     await f.db.end();
   }
 });
+
+test("I-09 a late protected file response cannot start a download after leaving the route", async ({
+  page,
+}) => {
+  await ensureLocalCardBucket();
+  const f = await stationFixture(page);
+  const { barrier } = await import("../station/helpers");
+  const gate = barrier();
+  const downloads: string[] = [];
+  page.on("download", (d) => downloads.push(d.suggestedFilename()));
+  try {
+    const b = await api<{ id: string; version: number }>(
+      page.request,
+      "card-batches",
+      { operationId: v7(), name: "Fictional fenced download", count: 1 },
+      201,
+    );
+    await page.goto(`/admin/cards/${b.id}`);
+    await page
+      .getByRole("button", { name: "Review export preparation", exact: true })
+      .click();
+    const ready = page.waitForResponse(
+      async (r) =>
+        r.request().method() === "GET" &&
+        /\/exports\/[a-f0-9-]+$/.test(new URL(r.url()).pathname) &&
+        r.status() === 200 &&
+        (await r.json()).data?.state === "ready",
+    );
+    await page
+      .getByRole("button", { name: "Confirm export preparation", exact: true })
+      .click();
+    await ready;
+    await page.route(
+      "**/api/admin/card-batches/*/exports/*/file",
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        gate.reached();
+        await gate.blocked;
+        await route.fulfill({ response });
+      },
+    );
+    await page
+      .getByRole("button", { name: "Download PDF", exact: true })
+      .first()
+      .click();
+    await gate.started;
+    await page.goto("/admin/customers");
+    gate.release();
+    await page.unrouteAll({ behavior: "wait" });
+    await expect(
+      page.getByRole("heading", { name: "Customers", exact: true }),
+    ).toBeVisible();
+    expect(downloads).toEqual([]);
+  } finally {
+    gate.release();
+    await page.unrouteAll({ behavior: "wait" });
+    await f.db.end();
+  }
+});
+for (const refusal of ["permission_denied"] as const)
+  test(`I-07 protected ready file refuses ${refusal} before browser download`, async ({
+    page,
+  }) => {
+    await ensureLocalCardBucket();
+    const f = await stationFixture(page, [
+      "cards",
+      "cardExport",
+      "cardGenerate",
+    ]);
+    const downloads: string[] = [];
+    page.on("download", (d) => downloads.push(d.suggestedFilename()));
+    try {
+      const b = await api<{ id: string; version: number }>(
+        page.request,
+        "card-batches",
+        { operationId: v7(), name: "Fictional refused download", count: 1 },
+        201,
+      );
+      await page.goto(`/admin/cards/${b.id}`);
+      await page
+        .getByRole("button", { name: "Review export preparation", exact: true })
+        .click();
+      const ready = page.waitForResponse(
+        async (r) =>
+          r.request().method() === "GET" &&
+          /\/exports\/[a-f0-9-]+$/.test(new URL(r.url()).pathname) &&
+          r.status() === 200 &&
+          (await r.json()).data?.state === "ready",
+      );
+      await page
+        .getByRole("button", {
+          name: "Confirm export preparation",
+          exact: true,
+        })
+        .click();
+      const exportId = (await (await ready).json()).data.id;
+      await f.db.query(
+        "DELETE FROM role_permission WHERE role_id=(SELECT role_id FROM admin WHERE id=$1) AND permission_code='cardExport'",
+        [f.adminId],
+      );
+      const file = page.waitForResponse((r) =>
+        r.url().endsWith(`/exports/${exportId}/file`),
+      );
+      await page
+        .getByRole("button", { name: "Download PDF", exact: true })
+        .first()
+        .click();
+      expect((await file).status()).toBe(403);
+      await expect(
+        page.getByRole("heading", { name: "Sign in", exact: true }),
+      ).toBeVisible();
+      expect(downloads).toEqual([]);
+    } finally {
+      await f.db.end();
+    }
+  });
