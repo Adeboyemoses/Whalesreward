@@ -22,7 +22,7 @@ p1: [WHR-92]
 tickets: []
 ---
 
-Draft only: WHR-92 remains BUILD. The s02 staging incident is unreproduced and blocks merge/READY; no server-side cause or export source fix is established. Original client checks remain unchanged. WHR-90 has not started.
+Resume 10 Nov: Earl identified Prepare/PDF on a Generated batch at 17:16 UTC. Rook's lead is non-JSON edge errors being mislabeled before HTTP status is checked. Reproduce a real committed export followed by a 502 HTML transport response, classify non-OK/non-JSON as unavailable with original-operation retry, retain successful-response validation, then run round 2 reviews and final gates. No live edge/deploy cause is asserted. WHR-90 starts only in a fresh session after READY.
 
 The initial plan was committed at 84405b8 before dispatch. File scope later included the required one-line escape-to-test gotcha; no new product scope. No STATUS, coverage or lane files changed.
 
