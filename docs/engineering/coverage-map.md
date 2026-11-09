@@ -13,6 +13,8 @@ WO-core-8 (WHR-14) implements it separately. EM typecheck/lint, 333 unit tests, 
 | I-22/I-28/I-29/I-31/I-32/I-37–I-39/I-41 | P-22 policy, same-sale validated evidence, exact captured-basis calculation; immutable originals, receipt/midnight, stale-base, P-19 and audit rules retained | spec only; implementation tests pending WO-core-8 |
 | A11; S01/S09 | Existing numeric entry and late-review inputs; no board or UI changes | reference only; no parity claim |
 
+Initial READY records CI failed before 42 customer/card tests ran: two fixture clock reads differed by 1 microsecond, violating the exact 24-hour constraint. WHR-86 tracks the separate Core fix. No runtime/test/constraint changed; this records update requires fresh green CI before merge.
+
 Required downstream tests: numeric amount/quantity acceptance without an unset policy, mismatched basis/extra fields/foreign or invalid evidence denial, meter-evidence guard, exact midnight and lost-response replay, stale-base conflicts and independent recovered review. Existing invariant and board runtime statuses remain unchanged. Rook should mirror P-22 into the product docs; this session does not edit them.
 
 ## WO-spec-2a offboarding specification ACCEPTED (WHR-79)

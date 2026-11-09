@@ -14,7 +14,8 @@ WO-spec-3c (WHR-84) numeric-only correction evidence policy: READY on reviewed g
 - 2026-11-09: “Small amendment to m3.md; take it to READY, then stop.” Approved WO-spec-3c names WHR-47 Option A and P-22.
 
 ## Risks
+- WHR-86 tracks inherited customer/card fixture setup using two volatile clock reads: initial records CI violated the exact 24-hour constraint by 1 microsecond. No runtime/test/constraint change; fresh green CI required before merge.
 - Other correction kinds, replacement evidence and direct admin editing remain outside scope. WHR-48–50 and Q-528 remain separate.
 - Full runtime model ID unavailable; the requested session model is not runtime evidence.
 
-dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
+dispatches=5 prs=2 rounds_max=2 escalations=0 model=unavailable
