@@ -164,13 +164,26 @@ export async function installAttendantFake(
         headers: { "cache-control": "no-store" },
       });
     }
-    if (!active) return failure(route, 401, "unauthenticated");
+    if (!active || revoked) return failure(route, 401, "unauthenticated");
     if (path === "/api/attendant/session") {
       if (revoked) return failure(route, 401, "unauthenticated");
       expect(method).toBe("GET");
       return success(route, {
         ...active,
         serverTime: new Date(now()).toISOString(),
+      });
+    }
+    if (path === "/api/attendant/configured-assignment") {
+      expect(method).toBe("GET");
+      return success(route, {
+        configured: {
+          ...active.assignment,
+          pump: { ...active.pump, name: active.pump.code },
+          product: active.product,
+          effectiveFrom: active.lastOnlineSignInAt,
+        },
+        acknowledgedAssignmentId: active.assignment.id,
+        reassignmentRequiresSignIn: active.reassignmentRequiresSignIn,
       });
     }
     if (path === "/api/attendant/cards/lookup") {

@@ -1,3 +1,4 @@
+import { captureStorage } from "../station/helpers";
 import { createServer, request as httpRequest } from "node:http";
 import { expect, test, type Page, type BrowserContext } from "@playwright/test";
 import { ids, installAttendantFake } from "../fixtures/attendant-http-fake";
@@ -97,10 +98,19 @@ test("I-03 I-09 valid local capture renders before slow revalidation and a delay
     await expect(form(page)).toBeVisible({ timeout: 2000 });
     held.release.resolve();
     await held.completed.promise;
-    await expect(expired(page)).toBeVisible({ timeout: 2000 });
+    await expect(
+      page.getByRole("heading", { name: "Sign in", exact: true }),
+    ).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
+    const locked = await captureStorage(page);
+    expect(locked.activeAccountId).toBeNull();
+    expect(locked.windows).toHaveLength(1);
+    expect(locked.windows[0]).toMatchObject({ locked: true });
     expect(fake.activeSession()).not.toBeNull();
     await page.reload();
-    await expect(expired(page)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Sign in", exact: true }),
+    ).toBeVisible();
   } finally {
     held.release.resolve();
   }
@@ -442,7 +452,14 @@ test("connection pill responds to network events and failed requests without tre
   denial.release.resolve();
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await denial.completed.promise;
-  await expect(expired(page)).toBeVisible({ timeout: 2000 });
+  await expect(
+    page.getByRole("heading", { name: "Sign in", exact: true }),
+  ).toBeVisible({ timeout: 2000 });
+  await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
+  const locked = await captureStorage(page);
+  expect(locked.activeAccountId).toBeNull();
+  expect(locked.windows).toHaveLength(1);
+  expect(locked.windows[0]).toMatchObject({ locked: true });
   await expect(page.getByText("Online", { exact: true }).first()).toBeVisible({
     timeout: 2000,
   });
