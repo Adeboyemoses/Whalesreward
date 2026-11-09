@@ -11,6 +11,7 @@ import { AUTH_POLICY } from "./config";
 import { digest, hmac, sessionSecret } from "./crypto";
 import { AuthError } from "./errors";
 import { sessionView, restrictedSessionView, type LiveSession } from "./repo";
+import { securityLock } from "../../lib/security-lock";
 import { requireSession } from "../../lib/authz";
 import { consumeLimits } from "./rate-limit";
 
@@ -67,6 +68,7 @@ export async function signIn(
     { key: `in:user:${normalized}:${ip}`, capacity: 5 },
   ]);
   return transaction(pool, async (db) => {
+    await securityLock(db);
     // All retries serialize even when the first request has not committed a receipt.
     await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
       `attendant-sign-in:${key}`,
@@ -86,6 +88,26 @@ export async function signIn(
     let selected: LiveSession | undefined;
     const auth = attendantAuth(db, config, async (userId) => {
       // This callback runs only after Better Auth has verified the current password.
+      // Credential verification precedes this check; no assignment details leak
+      // for unknown accounts or bad passwords. Both session scopes need it.
+      const assignment = await db.query(
+        `SELECT ag.id FROM attendant a JOIN assignment ag ON ag.attendant_id=a.id
+         JOIN pump p ON p.id=ag.pump_id AND p.enabled
+         WHERE a.user_id=$1 AND ag.effective_from<=clock_timestamp()
+         AND ag.effective_until IS NULL`,
+        [userId],
+      );
+      // A revoked receipt must keep failing authentication even when the account
+      // is subsequently unassigned; it can never mint replacement authority.
+      if (receipt) {
+        const valid = await db.query(
+          "SELECT 1 FROM auth_session s JOIN auth_user u ON u.id=s.user_id WHERE s.id=$1 AND s.revoked_at IS NULL AND s.auth_version=u.auth_version AND u.enabled AND s.expires_at>clock_timestamp()",
+          [receipt.session_id],
+        );
+        if (!valid.rowCount) throw new AuthError("unauthenticated", 401);
+      }
+      if (!assignment.rowCount)
+        throw new AuthError("assignment_unavailable", 422);
       if (receipt) {
         if (receipt.request_hmac !== requestHmac)
           throw new AuthError("operation_conflict", 409);

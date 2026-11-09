@@ -89,7 +89,7 @@ export async function attendantView(
 ) {
   const r = (
     await db.query(
-      `SELECT a.*,u.username,u.display_name,ag.id AS assignment_id,EXISTS(SELECT 1 FROM capture_context c WHERE c.attendant_id=a.id AND c.assignment_id=ag.id) AS acknowledged FROM attendant a JOIN auth_user u ON u.id=a.user_id LEFT JOIN assignment ag ON ag.attendant_id=a.id AND ag.effective_until IS NULL LEFT JOIN pump p ON p.id=ag.pump_id WHERE a.id=$1 AND (p.station_id=$2 OR ag.id IS NULL)`,
+      `SELECT a.*,u.username,u.display_name,ag.id AS assignment_id,EXISTS(SELECT 1 FROM capture_context c WHERE c.attendant_id=a.id AND c.assignment_id=ag.id) AS acknowledged FROM attendant a JOIN auth_user u ON u.id=a.user_id LEFT JOIN assignment ag ON ag.attendant_id=a.id AND ag.effective_until IS NULL LEFT JOIN pump p ON p.id=ag.pump_id WHERE a.id=$1 AND (p.station_id=$2 OR (ag.id IS NULL AND (EXISTS(SELECT 1 FROM assignment historical JOIN pump hp ON hp.id=historical.pump_id WHERE historical.attendant_id=a.id AND hp.station_id=$2) OR NOT EXISTS(SELECT 1 FROM assignment historical WHERE historical.attendant_id=a.id))))`,
       [id, station],
     )
   ).rows[0];
@@ -172,9 +172,10 @@ export async function audit(
   reason: string,
   before: unknown,
   after: unknown,
+  boundary?: { operationId: string; occurredAt: string },
 ) {
   await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6::jsonb,$7::jsonb,$8,clock_timestamp())`,
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,operation_id,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,coalesce($10::timestamptz,clock_timestamp()))`,
     [
       newId(),
       actor,
@@ -184,6 +185,8 @@ export async function audit(
       JSON.stringify(before),
       JSON.stringify(after),
       auditText(reason),
+      boundary?.operationId ?? null,
+      boundary?.occurredAt ?? null,
     ],
   );
 }

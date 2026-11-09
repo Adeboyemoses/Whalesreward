@@ -3,6 +3,7 @@ import { authId } from "../../../shared/contracts/auth";
 import {
   activatePriceSchema,
   assignAttendantSchema,
+  endAssignmentSchema,
   attendantSearchSchema,
   candidateSchema,
   createAttendantSchema,
@@ -35,6 +36,7 @@ const writeSchemas: Record<string, z.ZodType> = {
   "prices-activate": activatePriceSchema,
   "attendants-create": createAttendantSchema,
   "attendants-assignment": assignAttendantSchema,
+  "attendants-assignment-end": endAssignmentSchema,
 };
 async function body(request: Request) {
   if (

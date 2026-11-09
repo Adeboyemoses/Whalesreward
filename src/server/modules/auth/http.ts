@@ -76,7 +76,7 @@ const messages: Record<string, string> = {
   invalid_credentials: "The username or password is incorrect.",
   unauthenticated: "Sign in to continue.",
   assignment_unavailable:
-    "Your assignment is unavailable. Contact your administrator.",
+    "Sign-in is unavailable. Ask a station manager for help.",
   operation_conflict: "Start a new sign-in attempt.",
   sign_in_retry_expired: "Start a new sign-in attempt.",
   invalid_request: "Check your request and try again.",
