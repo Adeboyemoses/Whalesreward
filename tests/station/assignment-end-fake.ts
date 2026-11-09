@@ -1,6 +1,6 @@
 import { expect, type Page, type Route } from "@playwright/test";
 import { v7 } from "uuid";
-import type { Attendant } from "./helpers";
+import { seedId, type Attendant } from "./helpers";
 
 /** Test transport only, until WHR-80 merges. It proves client contract handling,
  * never the real endpoint's transaction, revocation or queue preservation. */
@@ -8,7 +8,11 @@ export async function installAssignmentEndFake(
   page: Page,
   initial: Attendant,
   actor: { id: string; code: string; name: string },
-  options: { loseFirstResponse?: boolean; conflictFirst?: boolean } = {},
+  options: {
+    loseFirstResponse?: boolean;
+    conflictFirst?: boolean;
+    holdResponse?: { reached(): void; blocked: Promise<void> };
+  } = {},
 ) {
   if (!initial.assignment) throw new Error("Fake needs a current assignment");
   const originalAssignment = structuredClone(initial.assignment);
@@ -121,6 +125,10 @@ export async function installAssignmentEndFake(
         input: JSON.stringify(body),
         receipt: result,
       });
+      if (options.holdResponse) {
+        options.holdResponse.reached();
+        await options.holdResponse.blocked;
+      }
       if (options.loseFirstResponse && effectCount === 1 && calls.length === 1)
         return route.abort("failed");
       return success(route, result);
@@ -145,6 +153,11 @@ export async function installAssignmentEndFake(
           ...originalAssignment,
           id: v7(),
           version: originalAssignment.version + 1,
+          pump: { id: seedId(16), code: "PUMP04", name: "Pump 04" },
+          product: { id: seedId(11), code: "kerosene", unit: "litre" },
+          effectiveFrom: new Date(
+            Math.max(Date.now(), Date.parse(endedAt ?? "1970-01-01") + 1),
+          ).toISOString(),
         },
         handover: "fresh_sign_in_required",
       };

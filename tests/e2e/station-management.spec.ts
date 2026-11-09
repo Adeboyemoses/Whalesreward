@@ -5,6 +5,7 @@ import {
   createAttendant,
   seedId,
   api,
+  barrier,
   type Attendant,
 } from "../station/helpers";
 import { installAssignmentEndFake } from "../station/assignment-end-fake";
@@ -59,10 +60,11 @@ test("I-04 station pump creation derives its product and cancellation creates no
 
 test("I-32 reviewed price activation uses exact kobo and preserves prior versions", async ({
   page,
-}, info) => {
+}) => {
   const f = await stationFixture(page);
-  const code = info.project.name === "attendant" ? "diesel" : "pms";
-  const product = code === "pms" ? seedId(9) : seedId(10);
+  const code = "kerosene";
+  const product = seedId(11);
+  await f.db.query("SELECT pg_advisory_lock(80511)");
   try {
     const previous = (
       await f.db.query(
@@ -142,6 +144,7 @@ test("I-32 reviewed price activation uses exact kobo and preserves prior version
       quantity_precision: previous.quantity_precision,
     });
   } finally {
+    await f.db.query("SELECT pg_advisory_unlock(80511)");
     await f.db.end();
   }
 });
@@ -390,6 +393,228 @@ test("I-07 every selectable pump remains available beyond the first server page"
     await expect(picker.locator(`option[value="${target}"]`)).toHaveCount(1);
     await picker.selectOption(target);
     await expect(picker).toHaveValue(target);
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-32 a stale reviewed price cannot silently create a second configuration", async ({
+  page,
+}) => {
+  const f = await stationFixture(page);
+  const code = "kerosene";
+  const product = seedId(11);
+  await f.db.query("SELECT pg_advisory_lock(80511)");
+  try {
+    const before = (
+      await f.db.query(
+        "SELECT version FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
+        [product],
+      )
+    ).rows[0];
+    await page.goto(`/admin/prices/${code}/edit`);
+    await page.getByLabel(/New price/).fill("1200.03");
+    await page
+      .getByLabel("Quantity decimal places", { exact: true })
+      .selectOption("3");
+    await page
+      .getByLabel("Reason for change", { exact: true })
+      .fill("Fictional stale review");
+    await page
+      .getByRole("button", { name: "Review price change", exact: true })
+      .click();
+    await api(
+      page.request,
+      `prices/${code}/activate`,
+      {
+        operationId: v7(),
+        expectedVersion: before.version,
+        rateKobo: "120002",
+        currency: "NGN",
+        quantityPrecision: 2,
+        reason: "Fictional intervening activation",
+      },
+      201,
+    );
+    let confirms = 0;
+    page.on("request", (r) => {
+      if (r.url().endsWith(`/prices/${code}/activate`) && r.method() === "POST")
+        confirms++;
+    });
+    const response = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/prices/${code}/activate`) &&
+        r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Confirm new price", exact: true })
+      .click();
+    expect((await response).status()).toBe(409);
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: /changed|version|review|reload/i }),
+    ).toBeVisible();
+    expect(confirms).toBe(1);
+    expect(
+      (
+        await f.db.query(
+          "SELECT version,rate_kobo::text FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
+          [product],
+        )
+      ).rows[0],
+    ).toEqual({ version: before.version + 1, rate_kobo: "120002" });
+  } finally {
+    await f.db.query("SELECT pg_advisory_unlock(80511)");
+    await f.db.end();
+  }
+});
+
+test("I-07 live permission removal before price confirmation prevents a write", async ({
+  page,
+}) => {
+  const f = await stationFixture(page, ["prices"]);
+  const code = "kerosene";
+  const product = seedId(11);
+  await f.db.query("SELECT pg_advisory_lock(80511)");
+  try {
+    const before = (
+      await f.db.query(
+        "SELECT count(*)::int AS n FROM product_price_version WHERE product_id=$1",
+        [product],
+      )
+    ).rows[0].n;
+    await page.goto(`/admin/prices/${code}/edit`);
+    await page.getByLabel(/New price/).fill("1200.04");
+    await page
+      .getByLabel("Reason for change", { exact: true })
+      .fill("Fictional authority revocation");
+    await page
+      .getByRole("button", { name: "Review price change", exact: true })
+      .click();
+    await f.db.query(
+      "DELETE FROM role_permission WHERE role_id=(SELECT role_id FROM admin WHERE id=$1) AND permission_code='prices'",
+      [f.adminId],
+    );
+    const response = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/prices/${code}/activate`) &&
+        r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Confirm new price", exact: true })
+      .click();
+    expect((await response).status()).toBe(403);
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: /permission|access|sign/i })
+        .first(),
+    ).toBeVisible();
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int AS n FROM product_price_version WHERE product_id=$1",
+          [product],
+        )
+      ).rows[0].n,
+    ).toBe(before);
+  } finally {
+    await f.db.query("SELECT pg_advisory_unlock(80511)");
+    await f.db.end();
+  }
+});
+
+test("I-09 P-21 client contract fake late confirmation cannot replace a newer section", async ({
+  page,
+}) => {
+  const f = await stationFixture(page);
+  const child = await createAttendant(page);
+  const held = barrier();
+  const fake = await installAssignmentEndFake(
+    page,
+    child.attendant,
+    { id: f.adminId, code: `TEST-${f.adminId}`, name: "Ada Williams" },
+    { holdResponse: held },
+  );
+  try {
+    await page.goto(`/admin/attendants/${child.attendant.id}/end`);
+    await page.getByLabel(/Reason/).fill("Fictional held offboarding");
+    await page
+      .getByRole("button", { name: "Review end assignment", exact: true })
+      .click();
+    const response = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/assignment/end") && r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Confirm end assignment", exact: true })
+      .click();
+    await held.started;
+    await page
+      .getByRole("link", { name: "Station pumps", exact: true })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/\/admin\/pumps$/);
+    held.release();
+    await (await response).finished();
+    await expect(
+      page.getByRole("heading", { name: "Station pumps", exact: true }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/pumps$/);
+    expect(fake.effectCount).toBe(1);
+  } finally {
+    held.release();
+    await f.db.end();
+  }
+});
+
+test("I-09 P-21 client contract fake replay shows the historical receipt separately from a newer assignment", async ({
+  page,
+}) => {
+  const f = await stationFixture(page);
+  const child = await createAttendant(page);
+  const fake = await installAssignmentEndFake(
+    page,
+    child.attendant,
+    { id: f.adminId, code: `TEST-${f.adminId}`, name: "Ada Williams" },
+    { loseFirstResponse: true },
+  );
+  try {
+    await page.goto(`/admin/attendants/${child.attendant.id}/end`);
+    await page.getByLabel(/Reason/).fill("Fictional historical ending receipt");
+    await page
+      .getByRole("button", { name: "Review end assignment", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm end assignment", exact: true })
+      .click();
+    await expect(
+      page.getByRole("alert").filter({ hasText: /uncertain|connection/i }),
+    ).toBeVisible();
+    fake.reassign();
+    const latest = fake.current;
+    const replay = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/assignment/end") && r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: /retry.*confirm|confirm end assignment/i })
+      .first()
+      .click();
+    const response = await replay;
+    expect(response.status()).toBe(200);
+    const receipt = (await response.json()).data;
+    expect(receipt.attendant.assignment).toBeNull();
+    expect(receipt.attendant.version).toBe(child.attendant.version + 1);
+    await expect(
+      page.getByText("Assignment ended", { exact: false }).first(),
+    ).toBeVisible();
+    await expect(page.getByText(/Pump 04/).first()).toBeVisible();
+    expect(fake.effectCount).toBe(1);
+    expect(fake.current.assignment?.id).toBe(latest.assignment?.id);
+    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls[1]).toEqual(fake.calls[0]);
   } finally {
     await f.db.end();
   }
