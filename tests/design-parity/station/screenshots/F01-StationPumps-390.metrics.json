@@ -1,0 +1,43 @@
+{
+  "viewport": 390,
+  "documentWidth": 390,
+  "wordmark": [
+    {
+      "x": 68,
+      "y": 19,
+      "width": 128.765625,
+      "height": 22
+    }
+  ],
+  "loyaltyFooter": [],
+  "shortTargets": [
+    {
+      "tag": "A",
+      "height": 20
+    },
+    {
+      "tag": "A",
+      "height": 38
+    },
+    {
+      "tag": "A",
+      "height": 38
+    },
+    {
+      "tag": "A",
+      "height": 38
+    },
+    {
+      "tag": "A",
+      "height": 38
+    },
+    {
+      "tag": "A",
+      "height": 38
+    },
+    {
+      "tag": "A",
+      "height": 38
+    }
+  ]
+}

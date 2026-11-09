@@ -70,6 +70,60 @@ export const sessionSchema = z
       Date.parse(s.serverTime) >= Date.parse(s.lastOnlineSignInAt) &&
       (s.product.code === "cooking_gas") === (s.product.unit === "kilogram"),
   );
+export const restrictedSessionSchema = z
+  .strictObject({
+    state: z.literal("password_change_required"),
+    account: z.strictObject({
+      id,
+      staffCode: label.max(64),
+      name: label,
+      username: label.max(64),
+    }),
+    sessionExpiresAt: instant,
+    serverTime: instant,
+  })
+  .refine((s) => Date.parse(s.sessionExpiresAt) > Date.parse(s.serverTime));
+export const authSessionSchema = z.union([
+  sessionSchema,
+  restrictedSessionSchema,
+]);
+export type RestrictedSession = z.infer<typeof restrictedSessionSchema>;
+export type AuthSession = z.infer<typeof authSessionSchema>;
+export const configuredAssignmentSchema = z
+  .strictObject({
+    configured: z.strictObject({
+      id,
+      version,
+      pump: z.strictObject({ id, code: label.max(64), name: label }),
+      product: z.strictObject({
+        id,
+        code: productSchema,
+        unit: z.enum(["litre", "kilogram"]),
+      }),
+      effectiveFrom: instant,
+    }),
+    acknowledgedAssignmentId: id,
+    reassignmentRequiresSignIn: z.boolean(),
+  })
+  .refine(
+    (s) =>
+      (s.configured.product.code === "cooking_gas") ===
+        (s.configured.product.unit === "kilogram") &&
+      s.reassignmentRequiresSignIn ===
+        (s.configured.id !== s.acknowledgedAssignmentId),
+  );
+export type ConfiguredAssignment = z.infer<typeof configuredAssignmentSchema>;
+export type FirstPasswordInput = {
+  operationId: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+export function isRestricted(
+  session: AuthSession,
+): session is RestrictedSession {
+  return "state" in session && session.state === "password_change_required";
+}
 export const CARD_CODE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}$/;
 export function normalizeCardCode(value: string): string {
   const code = value.trim().toUpperCase();
@@ -223,7 +277,10 @@ export type CaptureInput = {
 };
 export type ClientState = {
   session: Session | null;
-  access: "signed_out" | "active" | "expired";
+  access: "signed_out" | "active" | "expired" | "password_change_required";
+  restrictedSession?: RestrictedSession;
+  restrictionId?: string;
+  notice?: string;
   logoutPending: boolean;
 };
 export class ClientError extends Error {

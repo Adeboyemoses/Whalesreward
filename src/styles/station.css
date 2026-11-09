@@ -1,0 +1,83 @@
+/* Station screens use the vendored board classes; these rules only arrange dynamic states. */
+/* An explicit zero minimum keeps wide tables inside their own scroll container. */
+.wr-station {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: var(--space-6);
+}
+.wr-station > * {
+  min-width: 0;
+}
+.wr-station .wr-sheet {
+  min-width: 0;
+}
+.wr-station .wr-sheet > h2 {
+  margin-top: 0;
+  margin-bottom: var(--space-5);
+}
+.wr-station .wr-sheet form,
+.wr-station-form {
+  display: grid;
+  gap: var(--space-4);
+}
+.wr-station-quiet {
+  background: var(--surface-100);
+}
+.wr-station textarea.wr-station-reason {
+  height: auto;
+  padding: var(--space-3);
+  resize: vertical;
+}
+.wr-station .wr-toolbar {
+  align-items: end;
+}
+.wr-station .wr-toolbar .wr-field:first-child {
+  flex: 1;
+}
+.wr-station .wr-row {
+  flex-wrap: wrap;
+}
+.wr-station .wr-kv dd {
+  overflow-wrap: anywhere;
+}
+.wr-station .wr-kv dt {
+  flex-shrink: 0;
+}
+.wr-station .wr-list-row {
+  display: block;
+}
+.wr-station .wr-list-row p {
+  margin: var(--space-2) 0;
+}
+.wr-station .wr-station-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+.wr-station .wr-station-account {
+  text-transform: none;
+  letter-spacing: normal;
+}
+@media (max-width: 899px) {
+  .wr-station .wr-toolbar {
+    display: grid;
+    gap: var(--space-4);
+  }
+}
+
+.wr-station .wr-station-assign {
+  align-self: flex-start;
+}
+
+/* Input adornments stay attached; only action rows wrap on narrow screens. */
+.wr-station .wr-field .wr-row {
+  flex-wrap: nowrap;
+}
+.wr-station .wr-prefix {
+  height: var(--control-h-desktop);
+}
+.wr-station .wr-field .wr-row:has(> .wr-prefix) {
+  gap: 0;
+}
