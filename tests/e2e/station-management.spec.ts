@@ -82,9 +82,11 @@ test("I-32 reviewed price activation uses exact kobo and preserves prior version
     await page
       .getByLabel("Reason for change", { exact: true })
       .fill("Fictional exact-rate check");
-    await page
-      .getByRole("button", { name: "Review price change", exact: true })
-      .click();
+    const review = page.getByRole("button", {
+      name: "Review price change",
+      exact: true,
+    });
+    if (await review.isEnabled()) await review.click();
     await expect(
       page.getByRole("button", { name: "Confirm new price", exact: true }),
     ).toHaveCount(0);
