@@ -247,6 +247,16 @@ test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes witho
         expectedVersion: current.version,
         reason: "Fictional snapshot-boundary stock change",
       });
+    const linkedCustomer = v7();
+    await f.db.query(
+      "INSERT INTO customer(id,customer_code,name,phone_normalized,category,version) VALUES($1,$2,'Tunde Adebayo',$3,'commercial_bus_driver',1)",
+      [
+        linkedCustomer,
+        `TEST-${linkedCustomer}`,
+        "+234" +
+          (await import("../customers-cards/helpers")).phoneNumber().slice(1),
+      ],
+    );
     await f.db.query("BEGIN");
     try {
       const card = (
@@ -256,8 +266,8 @@ test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes witho
         )
       ).rows[0];
       await f.db.query(
-        "INSERT INTO card_customer_link(id,card_id,customer_id,linked_at,actor_user_id,reason) VALUES($1,$2,'019a5000-0000-7000-8000-000000000027',clock_timestamp(),$3,'Fictional post-snapshot link')",
-        [v7(), card.id, f.userId],
+        "INSERT INTO card_customer_link(id,card_id,customer_id,linked_at,actor_user_id,reason) VALUES($1,$2,$4,clock_timestamp(),$3,'Fictional post-snapshot link')",
+        [v7(), card.id, f.userId, linkedCustomer],
       );
       await f.db.query("COMMIT");
     } catch (e) {
