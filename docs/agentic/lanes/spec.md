@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3c (WHR-84) numeric-only correction evidence policy: READY on reviewed green staging merge, 2026-11-09
+WO-spec-3c (WHR-84) numeric-only correction evidence policy: ACCEPTED since 2026-11-09
 
 ## In flight
-- [Amendment PR #84](https://github.com/Adeboyemoses/Whalesreward/pull/84): M3 and P-22, citing Earl's WHR-47 Option A. Merged at ebe3416 with all five CI checks green. Code/security/integrity PASS round 1 at f78f49d; full verdicts posted on WHR-84.
-- EM typecheck/lint, 333 unit tests, production build, prose/link/whitespace and evidence checks PASS. This separate docs-only READY records PR takes effect on its reviewed green merge; then WHR-84 is In Review.
-- No application code, migration, runtime coverage or board parity claimed. Existing midnight, stale-base, evidence, P-19 and contribution safeguards remain.
+- Earl accepted the specification and instructed closure on 9 November 2026. [Amendment #84](https://github.com/Adeboyemoses/Whalesreward/pull/84), ebe3416, and [READY records #85](https://github.com/Adeboyemoses/Whalesreward/pull/85), 6b81b8b, merged with all five CI checks green.
+- Code/security/integrity PASS at f78f49d; final READY records code PASS at 32dc316. Full verdicts and EM verification are posted on WHR-84. Acceptance covers M3 and P-22 only, with no runtime correction coverage or screen-parity claim.
+- This docs-only closeout makes closure effective on its reviewed green staging merge; then WHR-84 moves to Done.
 
 ## Next
-- Stop at READY; wait for Earl. WO-core-8 (WHR-14) implements P-22 separately.
-- Rook should mirror P-22 in the product docs; no product-doc writes authorized here.
+- Stop after closure. No next work order starts. WO-core-8 (WHR-14) implements P-22 separately.
+- Rook should mirror P-22 in product docs; no product-doc writes here.
 
 ## Earl's gos
-- 2026-11-09: “Small amendment to m3.md; take it to READY, then stop.” Approved WO-spec-3c names WHR-47 Option A and P-22.
+- 2026-11-09: “[spec] Earl accepted WO-spec-3c (WHR-84); close it, then stop.”
 
 ## Risks
-- WHR-86 tracks inherited customer/card fixture setup using two volatile clock reads: initial records CI violated the exact 24-hour constraint by 1 microsecond. No runtime/test/constraint change; fresh green CI required before merge.
+- WHR-86 remains a separate Core fixture follow-up. Initial READY CI failed the exact 24-hour constraint by 1 microsecond; fresh final-head CI passed without runtime/test/constraint changes.
 - Other correction kinds, replacement evidence and direct admin editing remain outside scope. WHR-48–50 and Q-528 remain separate.
-- Full runtime model ID unavailable; the requested session model is not runtime evidence.
+- Metrics below cover this closeout only; delivery metrics remain in #84/#85. Full runtime model ID unavailable.
 
-dispatches=5 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
