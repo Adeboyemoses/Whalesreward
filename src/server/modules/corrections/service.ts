@@ -176,7 +176,7 @@ async function view(db: pg.PoolClient, c: Correction) {
 }
 // Recognize formatted international phone shapes and Nigerian national mobile numbers.
 // Do not classify arbitrary integer/decimal amounts or separate operational numbers as phones.
-const phoneSeparator = String.raw`[\s()\p{Pd}]*`;
+const phoneSeparator = String.raw`[\s().\p{Pd}]*`;
 const mobileDigits = String.raw`[789*•xX]${phoneSeparator}[01*•xX](?:${phoneSeparator}[0-9*•xX]){8}`;
 const internationalPrefix = String.raw`(?:\+${phoneSeparator}2${phoneSeparator}3${phoneSeparator}4|0${phoneSeparator}0${phoneSeparator}2${phoneSeparator}3${phoneSeparator}4|2${phoneSeparator}3${phoneSeparator}4)`;
 const formattedPhone = new RegExp(
@@ -193,7 +193,7 @@ function redactPhones(value: string) {
     .replace(internationalPhone, "[phone removed]")
     .replace(formattedPhone, (candidate) => {
       const normalized = candidate
-        .replace(/[\s()\p{Pd}]/gu, "")
+        .replace(/[\s().\p{Pd}]/gu, "")
         .replace(/^00234/, "+234")
         .replace(/^234/, "+234")
         .replace(/^\+2340/, "+234");

@@ -672,6 +672,8 @@ describe("M3 durable own correction processing", () => {
   );
   it.each([
     "+234 800 000 0099",
+    "+234.800.000.0099",
+    "+1.(000).000.0000",
     "+1 (000) 000-0000",
     "+44 (0000) 000-000",
     "2348000000099",
@@ -787,7 +789,7 @@ describe("M3 durable own correction processing", () => {
     },
   );
   it("HTTP accepts numeric operational reasons and redacts formatted phone actor and original seller snapshots", async () => {
-    const phone = "+234 (800) 000-0099",
+    const phone = "+234.800.000.0099",
       f = await fixture(false, `Grace ${phone}`);
     await pool.query("UPDATE auth_user SET display_name=$2 WHERE id=$1", [
       f.userId,
@@ -855,7 +857,7 @@ describe("M3 durable own correction processing", () => {
     expect(decision.status, await decision.clone().text()).toBe(200);
     expect((await decision.json()).data.reason).toBe(body.reason);
   });
-  it.each(["+234 800 000 0099", "+234 (800) 000-0099"])(
+  it.each(["+234 800 000 0099", "+234 (800) 000-0099", "+234.800.000.0099"])(
     "HTTP decision independently rejects formatted phone with unchanged proposal: %s",
     async (phone) => {
       const f = await fixture(),
