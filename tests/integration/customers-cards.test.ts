@@ -24,6 +24,8 @@ import {
   prepareCardExport,
   downloadCardExport,
 } from "../../src/server/modules/cards/exports";
+import { cardOptions } from "../../src/server/modules/cards/config";
+import { createMailLoop } from "../../src/server/modules/admin-access/mail-loop";
 import type { CardArtifactStorage } from "../../src/server/adapters/card-artifacts";
 vi.setConfig({ testTimeout: 30000 });
 const schema = `customers_cards_${randomBytes(6).toString("hex")}`;
@@ -877,6 +879,350 @@ describe("M2 atomic customers and card inventory", () => {
       processed: true,
       delivered: false,
     });
+  });
+  const printLayout = {
+    pageWidthMm: 210,
+    pageHeightMm: 297,
+    cardWidthMm: 85.6,
+    cardHeightMm: 54,
+    marginMm: 10,
+    gapMm: 2,
+  };
+  const blockedPdfCases = ["pending", "failed"].flatMap((state) =>
+    [0, 1, 2].flatMap((attempts) =>
+      ["missing", "malformed"].flatMap((configuration) =>
+        ["absent", "expired"].map((lease) => ({
+          state,
+          attempts,
+          configuration,
+          lease,
+        })),
+      ),
+    ),
+  );
+  it.each(blockedPdfCases)(
+    "I-52 PDF configuration loss terminalizes $state/$attempts with $configuration layout and $lease lease, one row per polling step",
+    async ({ state, attempts, configuration, lease }) => {
+      const b = await batch();
+      const create = async (format: "pdf" | "xlsx") =>
+        (
+          await cardsWrite(
+            pool,
+            adminConfig(),
+            adminToken,
+            "export",
+            { operationId: newId(), expectedVersion: 1, format },
+            b.id,
+            format === "pdf" ? { layout: printLayout } : undefined,
+          )
+        ).data as { id: string };
+      const first = await create("pdf"),
+        second = await create("pdf"),
+        ids = [first.id, second.id];
+      await pool.query(
+        "UPDATE card_export SET status=$2,failure_code=CASE WHEN $2='failed' THEN 'preparation_failed' ELSE NULL END,attempts=$3::int,fencing_version=$3::int,lease_nonce=CASE WHEN $4='expired' THEN 'fictional-expired-pdf' ELSE NULL END,lease_until=CASE WHEN $4='expired' THEN clock_timestamp()-interval '1 second' ELSE NULL END,next_attempt_at=clock_timestamp()+interval '1 hour' WHERE id=ANY($1::uuid[])",
+        [ids, state, attempts, lease],
+      );
+      const immutable = (
+        await pool.query(
+          "SELECT id,batch_id,created_by,operation_id,format,batch_version,batch_status,batch_code,batch_name,snapshot_at FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+          [ids],
+        )
+      ).rows;
+      const items = (
+        await pool.query(
+          "SELECT * FROM card_export_item WHERE export_id=ANY($1::uuid[]) ORDER BY export_id,ordinal",
+          [ids],
+        )
+      ).rows;
+      const inventory = (
+        await pool.query("SELECT * FROM card WHERE batch_id=$1 ORDER BY id", [
+          b.id,
+        ])
+      ).rows;
+      const history = await cardsRead(
+        pool,
+        adminConfig(),
+        adminToken,
+        "history",
+        {},
+        b.id,
+      );
+      vi.stubEnv(
+        "WHR_CARD_PRINT_LAYOUT",
+        configuration === "missing" ? undefined : "{malformed",
+      );
+      try {
+        const restarted = { ...cardOptions(), storage };
+        expect(restarted.layout).toBeUndefined();
+        await expect(create("xlsx")).rejects.toMatchObject({
+          code: "rate_limited",
+        });
+        expect(await prepareCardExport(pool, restarted)).toEqual({
+          processed: true,
+          delivered: false,
+        });
+        const firstStep = (
+          await pool.query(
+            "SELECT status,attempts FROM card_export WHERE id=ANY($1::uuid[])",
+            [ids],
+          )
+        ).rows;
+        expect(
+          firstStep.filter((r) => r.status === "failed" && r.attempts === 3),
+        ).toHaveLength(1);
+        expect(firstStep.filter((r) => r.attempts === attempts)).toHaveLength(
+          1,
+        );
+        const xlsx = await create("xlsx");
+        expect(await prepareCardExport(pool, restarted)).toEqual({
+          processed: true,
+          delivered: false,
+        });
+        const terminal = (
+          await pool.query(
+            "SELECT status,attempts,fencing_version,lease_nonce,lease_until,next_attempt_at,failure_code FROM card_export WHERE id=ANY($1::uuid[])",
+            [ids],
+          )
+        ).rows;
+        for (const row of terminal)
+          expect(row).toEqual({
+            status: "failed",
+            attempts: 3,
+            fencing_version: String(attempts + 1),
+            lease_nonce: null,
+            lease_until: null,
+            next_attempt_at: null,
+            failure_code: "preparation_failed",
+          });
+        expect(await prepareCardExport(pool, restarted, first.id)).toEqual({
+          processed: false,
+        });
+        expect(await prepareCardExport(pool, restarted, xlsx.id)).toEqual({
+          processed: true,
+          delivered: true,
+        });
+        expect(
+          (
+            await pool.query(
+              "SELECT id,batch_id,created_by,operation_id,format,batch_version,batch_status,batch_code,batch_name,snapshot_at FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+              [ids],
+            )
+          ).rows,
+        ).toEqual(immutable);
+        expect(
+          (
+            await pool.query(
+              "SELECT * FROM card_export_item WHERE export_id=ANY($1::uuid[]) ORDER BY export_id,ordinal",
+              [ids],
+            )
+          ).rows,
+        ).toEqual(items);
+        expect(
+          (
+            await pool.query(
+              "SELECT * FROM card WHERE batch_id=$1 ORDER BY id",
+              [b.id],
+            )
+          ).rows,
+        ).toEqual(inventory);
+        expect(
+          await cardsRead(pool, adminConfig(), adminToken, "history", {}, b.id),
+        ).toEqual(history);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+  it("I-52 missing layout preserves live pending and retry PDF leases and their quota until expiry", async () => {
+    const b = await batch();
+    const create = async (format: "pdf" | "xlsx") =>
+      (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format },
+          b.id,
+          format === "pdf" ? { layout: printLayout } : undefined,
+        )
+      ).data as { id: string };
+    const first = await create("pdf"),
+      second = await create("pdf"),
+      ids = [first.id, second.id];
+    await pool.query(
+      "UPDATE card_export SET attempts=1,fencing_version=1,lease_nonce='fictional-live-pdf',lease_until=clock_timestamp()+interval '1 hour' WHERE id=ANY($1::uuid[])",
+      [ids],
+    );
+    await pool.query(
+      "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=2,fencing_version=2 WHERE id=$1",
+      [second.id],
+    );
+    const before = (
+      await pool.query(
+        "SELECT * FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+        [ids],
+      )
+    ).rows;
+    expect(await prepareCardExport(pool, options, first.id)).toEqual({
+      processed: false,
+    });
+    expect(await prepareCardExport(pool, options, second.id)).toEqual({
+      processed: false,
+    });
+    await expect(create("xlsx")).rejects.toMatchObject({
+      code: "rate_limited",
+    });
+    expect(
+      (
+        await pool.query(
+          "SELECT * FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+          [ids],
+        )
+      ).rows,
+    ).toEqual(before);
+    await pool.query(
+      "UPDATE card_export SET lease_until=clock_timestamp()-interval '1 second' WHERE id=ANY($1::uuid[])",
+      [ids],
+    );
+    expect(await prepareCardExport(pool, options, first.id)).toEqual({
+      processed: true,
+      delivered: false,
+    });
+    expect(await prepareCardExport(pool, options, second.id)).toEqual({
+      processed: true,
+      delivered: false,
+    });
+    const xlsx = await create("xlsx");
+    expect(await prepareCardExport(pool, options, xlsx.id)).toEqual({
+      processed: true,
+      delivered: true,
+    });
+  });
+  it("I-52 configuration-loss recovery preserves a live PDF renderer then fences its late bytes after lease expiry", async () => {
+    const b = await batch(),
+      e = (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "pdf" },
+          b.id,
+          { layout: printLayout },
+        )
+      ).data as { id: string };
+    const write = vi.fn(storage.write);
+    let liveResult: Awaited<ReturnType<typeof prepareCardExport>> | undefined,
+      recovery: Awaited<ReturnType<typeof prepareCardExport>> | undefined;
+    expect(
+      await prepareCardExport(
+        pool,
+        {
+          storage: { ...storage, write },
+          layout: printLayout,
+          render: async () => {
+            liveResult = await prepareCardExport(pool, options, e.id);
+            await pool.query(
+              "UPDATE card_export SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",
+              [e.id],
+            );
+            recovery = await prepareCardExport(pool, options, e.id);
+            return {
+              bytes: new Uint8Array([1, 2, 3]),
+              contentType: "application/pdf",
+              extension: "pdf",
+            };
+          },
+        },
+        e.id,
+      ),
+    ).toEqual({ processed: true, delivered: false });
+    expect(liveResult).toEqual({ processed: false });
+    expect(recovery).toEqual({ processed: true, delivered: false });
+    expect(write).not.toHaveBeenCalled();
+    expect(
+      (
+        await pool.query(
+          "SELECT status,attempts,fencing_version,object_key,sha256,prepared_at,lease_nonce,lease_until FROM card_export WHERE id=$1",
+          [e.id],
+        )
+      ).rows[0],
+    ).toEqual({
+      status: "failed",
+      attempts: 3,
+      fencing_version: "2",
+      object_key: null,
+      sha256: null,
+      prepared_at: null,
+      lease_nonce: null,
+      lease_until: null,
+    });
+    expect(
+      await prepareCardExport(pool, { ...options, layout: printLayout }, e.id),
+    ).toEqual({ processed: false });
+  });
+  it("I-52 automatic polling terminalizes configuration-blocked PDFs without any GET and resumes independent XLSX", async () => {
+    const b = await batch();
+    const create = async (format: "pdf" | "xlsx") =>
+      (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format },
+          b.id,
+          format === "pdf" ? { layout: printLayout } : undefined,
+        )
+      ).data as { id: string };
+    const first = await create("pdf"),
+      second = await create("pdf");
+    const tick = async () => {
+      let observed!: (
+        result: Awaited<ReturnType<typeof prepareCardExport>>,
+      ) => void;
+      const completed = new Promise<
+        Awaited<ReturnType<typeof prepareCardExport>>
+      >((resolve) => {
+        observed = resolve;
+      });
+      const loop = createMailLoop({
+        processNext: async () => {
+          const result = await prepareCardExport(pool, options);
+          observed(result);
+          return result;
+        },
+        close: async () => {},
+        batchSize: 1,
+        report: () => {},
+      });
+      try {
+        return await completed;
+      } finally {
+        await loop.stop();
+      }
+    };
+    expect(await tick()).toEqual({ processed: true, delivered: false });
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS n FROM card_export WHERE id=ANY($1::uuid[]) AND status='pending'",
+          [[first.id, second.id]],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(await tick()).toEqual({ processed: true, delivered: false });
+    const xlsx = await create("xlsx");
+    expect(await tick()).toEqual({ processed: true, delivered: true });
+    expect(
+      (
+        await pool.query("SELECT status FROM card_export WHERE id=$1", [
+          xlsx.id,
+        ])
+      ).rows[0].status,
+    ).toBe("ready");
   });
   it("HTTP validates bodies, origin, cookie surface, oversized input and fixed category", async () => {
     const b = await active(),

@@ -31,23 +31,25 @@ export async function prepareCardExport(
 ): Promise<{ processed: boolean; delivered?: boolean }> {
   const claim = await transaction(pool, async (db) => {
     await securityLock(db);
-    // A final attempt can die before acknowledging its lease. Recover one row per
-    // polling step, including PDFs whose layout is no longer configured. Expiry
-    // is checked again in the claim update; a live final renderer keeps its lease.
-    const exhausted = (
+    // Recover one unusable claim per polling step: exhausted attempts or PDFs
+    // blocked by configuration loss. Closing the retry budget makes failure
+    // terminal; a new export is required after configuration is restored. Live
+    // leases remain owned by their renderer, regardless of local configuration.
+    const unavailable = (
       await db.query(
-        "SELECT id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND(status='pending' OR(status='failed' AND lease_nonce IS NOT NULL)) AND attempts>=$2 AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
-        [exportId ?? null, CARD_POLICY.maxAttempts],
+        "SELECT id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND status IN('pending','failed') AND((attempts>=$2 AND(status='pending' OR lease_nonce IS NOT NULL)) OR(format='pdf' AND NOT $3::boolean AND attempts<$2)) AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
+        [exportId ?? null, CARD_POLICY.maxAttempts, !!options.layout],
       )
     ).rows[0];
-    if (exhausted) {
+    if (unavailable) {
       const recovered = await db.query(
-        "UPDATE card_export SET status='failed',failure_code='preparation_failed',lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL,fencing_version=fencing_version+1 WHERE id=$1 AND(status='pending' OR(status='failed' AND lease_nonce IS NOT NULL)) AND attempts>=$2 AND fencing_version=$3 AND lease_nonce IS NOT DISTINCT FROM $4 AND(lease_until IS NULL OR lease_until<=clock_timestamp())",
+        "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=greatest(attempts,$2),lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL,fencing_version=fencing_version+1 WHERE id=$1 AND status IN('pending','failed') AND((attempts>=$2 AND(status='pending' OR lease_nonce IS NOT NULL)) OR(format='pdf' AND NOT $5::boolean AND attempts<$2)) AND fencing_version=$3 AND lease_nonce IS NOT DISTINCT FROM $4 AND(lease_until IS NULL OR lease_until<=clock_timestamp())",
         [
-          exhausted.id,
+          unavailable.id,
           CARD_POLICY.maxAttempts,
-          exhausted.fencing_version,
-          exhausted.lease_nonce,
+          unavailable.fencing_version,
+          unavailable.lease_nonce,
+          !!options.layout,
         ],
       );
       return recovered.rowCount === 1 ? { denied: true } : null;
