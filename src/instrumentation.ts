@@ -12,6 +12,9 @@ export async function register() {
       const { startAutomaticCardExports } =
         await import("./server/modules/cards/runtime");
       startAutomaticCardExports();
+      const { startAutomaticCorrections } =
+        await import("./server/modules/corrections/runtime");
+      startAutomaticCorrections();
     } catch (error) {
       // Next catches instrumentation exceptions and keeps listening: terminate explicitly.
       logger.error(
