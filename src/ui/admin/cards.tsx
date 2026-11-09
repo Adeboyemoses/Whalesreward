@@ -402,43 +402,6 @@ function GenerateBatch({ confirm }: { confirm: boolean }) {
                 until the batch is Printed, then Active. Codes are reserved on
                 the server; generation can be retried safely.
               </Notice>
-              {attempt.state === "applied" && attempt.receipt ? (
-                <Link
-                  className="wr-btn wr-btn-primary"
-                  href={`/admin/cards/${attempt.receipt.id}`}
-                >
-                  View batch
-                </Link>
-              ) : (
-                <Button
-                  disabled={attempt.state === "rejected"}
-                  loading={state.busy}
-                  onClick={() => void state.submit()}
-                >
-                  {attempt.state === "uncertain"
-                    ? "Retry same confirmation"
-                    : "Generate cards"}
-                </Button>
-              )}
-              {!locked && (
-                <Link
-                  className="wr-btn wr-btn-secondary"
-                  href="/admin/cards/generate"
-                >
-                  Keep editing
-                </Link>
-              )}
-              {attempt.state === "rejected" && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    state.setAttempt(null);
-                    router.push("/admin/cards/generate");
-                  }}
-                >
-                  Review a new batch
-                </Button>
-              )}
             </>
           ) : confirm ? (
             <Notice>
@@ -447,6 +410,7 @@ function GenerateBatch({ confirm }: { confirm: boolean }) {
             </Notice>
           ) : (
             <form
+              id="wr-generate-batch-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 review();
@@ -470,30 +434,77 @@ function GenerateBatch({ confirm }: { confirm: boolean }) {
                 onChange={(e) => setDraft({ ...draft, count: e.target.value })}
               />
               <p className="wr-help">Enter 1–1000 cards per batch.</p>
-              <Button type="submit">Review batch</Button>
             </form>
           )}
-          {!locked && (
-            <Link
-              className="wr-btn wr-btn-secondary"
-              href="/admin/cards"
-              onClick={() => state.setAttempt(null)}
-            >
-              Cancel
-            </Link>
-          )}
-          {attempt?.state === "applied" && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                state.setAttempt(null);
-                setDraft({ name: "", count: "" });
-                router.push("/admin/cards/generate");
-              }}
-            >
-              Generate another batch
-            </Button>
-          )}
+          <div className="wr-cc-actions">
+            {(confirm || locked) && attempt && (
+              <>
+                {attempt.state === "applied" && attempt.receipt ? (
+                  <Link
+                    className="wr-btn wr-btn-primary"
+                    href={`/admin/cards/${attempt.receipt.id}`}
+                  >
+                    View batch
+                  </Link>
+                ) : (
+                  <Button
+                    disabled={attempt.state === "rejected"}
+                    loading={state.busy}
+                    onClick={() => void state.submit()}
+                  >
+                    {attempt.state === "uncertain"
+                      ? "Retry same confirmation"
+                      : "Generate cards"}
+                  </Button>
+                )}
+                {!locked && (
+                  <Link
+                    className="wr-btn wr-btn-secondary"
+                    href="/admin/cards/generate"
+                  >
+                    Keep editing
+                  </Link>
+                )}
+                {attempt.state === "rejected" && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      state.setAttempt(null);
+                      router.push("/admin/cards/generate");
+                    }}
+                  >
+                    Review a new batch
+                  </Button>
+                )}
+              </>
+            )}
+            {!confirm && !locked && (
+              <Button type="submit" form="wr-generate-batch-form">
+                Review batch
+              </Button>
+            )}
+            {!locked && (
+              <Link
+                className="wr-btn wr-btn-secondary"
+                href="/admin/cards"
+                onClick={() => state.setAttempt(null)}
+              >
+                Cancel
+              </Link>
+            )}
+            {attempt?.state === "applied" && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  state.setAttempt(null);
+                  setDraft({ name: "", count: "" });
+                  router.push("/admin/cards/generate");
+                }}
+              >
+                Generate another batch
+              </Button>
+            )}
+          </div>
         </Sheet>
         <Identification />
       </div>
@@ -640,6 +651,7 @@ function BatchTransition({
           )}
           {!state.attempt ? (
             <form
+              id="wr-batch-transition-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 review();
@@ -658,9 +670,6 @@ function BatchTransition({
                 Cancel leaves the status unchanged. There is no
                 Generated-to-Active shortcut and no reverse transition.
               </Notice>
-              <Button type="submit" disabled={b.status !== from}>
-                Review status change
-              </Button>
             </form>
           ) : (
             <>
@@ -674,36 +683,6 @@ function BatchTransition({
                   },
                 ]}
               />
-              {state.attempt.state !== "applied" && (
-                <Button
-                  disabled={stale || state.attempt.state === "rejected"}
-                  loading={state.busy}
-                  onClick={() => void state.submit()}
-                >
-                  {state.attempt.state === "uncertain"
-                    ? "Retry same confirmation"
-                    : "Confirm status change"}
-                </Button>
-              )}
-              {state.attempt.state === "review" && !state.busy && (
-                <Button
-                  variant="secondary"
-                  onClick={() => state.setAttempt(null)}
-                >
-                  Keep editing
-                </Button>
-              )}
-              {(state.attempt.state === "rejected" || stale) && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    state.setAttempt(null);
-                    reload();
-                  }}
-                >
-                  Reload and review current record
-                </Button>
-              )}
               {state.attempt.receipt && (
                 <KeyValueList
                   items={[
@@ -720,17 +699,62 @@ function BatchTransition({
               )}
             </>
           )}
-          <Link
-            className="wr-btn wr-btn-secondary"
-            href={`/admin/cards/${b.id}`}
-            onClick={() => {
-              if (state.attempt?.state !== "uncertain") state.setAttempt(null);
-            }}
-          >
-            {state.attempt?.state === "applied"
-              ? "View current batch"
-              : "Cancel"}
-          </Link>
+          <div className="wr-cc-actions">
+            {!state.attempt ? (
+              <Button
+                type="submit"
+                form="wr-batch-transition-form"
+                disabled={b.status !== from}
+              >
+                Review status change
+              </Button>
+            ) : (
+              <>
+                {state.attempt.state !== "applied" && (
+                  <Button
+                    disabled={stale || state.attempt.state === "rejected"}
+                    loading={state.busy}
+                    onClick={() => void state.submit()}
+                  >
+                    {state.attempt.state === "uncertain"
+                      ? "Retry same confirmation"
+                      : "Confirm status change"}
+                  </Button>
+                )}
+                {state.attempt.state === "review" && !state.busy && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => state.setAttempt(null)}
+                  >
+                    Keep editing
+                  </Button>
+                )}
+                {(state.attempt.state === "rejected" || stale) && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      state.setAttempt(null);
+                      reload();
+                    }}
+                  >
+                    Reload and review current record
+                  </Button>
+                )}
+              </>
+            )}
+            <Link
+              className="wr-btn wr-btn-secondary"
+              href={`/admin/cards/${b.id}`}
+              onClick={() => {
+                if (state.attempt?.state !== "uncertain")
+                  state.setAttempt(null);
+              }}
+            >
+              {state.attempt?.state === "applied"
+                ? "View current batch"
+                : "Cancel"}
+            </Link>
+          </div>
         </Sheet>
         <Sheet title="Batch">
           <KeyValueList
