@@ -185,12 +185,16 @@ test("A17 persistent cross-screen warning and original queue fixture at390", asy
       }),
     ).toBeVisible();
     await capture(page, "A17-PumpChange");
-    for (const [route, label, id] of [
-      ["/attendant/sale", "Sale", "A17-SaleWarning"],
-      ["/attendant/register", "Register", "A17-RegisterWarning"],
-      ["/attendant/uploads", "Uploads", "A17-UploadsWarning"],
+    for (const [route, id] of [
+      ["/attendant/sale", "A17-SaleWarning"],
+      ["/attendant/register", "A17-RegisterWarning"],
+      ["/attendant/uploads", "A17-UploadsWarning"],
     ] as const) {
-      await page.getByRole("link", { name: label, exact: true }).click();
+      // The Uploads link's accessible name includes the pending-count badge.
+      await page
+        .getByRole("navigation", { name: "Main" })
+        .locator(`a[href="${route}"]`)
+        .click();
       await expect(page).toHaveURL(new RegExp(`${route}$`));
       await expect(warning(page)).toHaveCount(1);
       await capture(page, id);

@@ -1,0 +1,20 @@
+{
+  "viewport": 390,
+  "documentWidth": 390,
+  "rootWidth": 390,
+  "bodyFont": "\"IBM Plex Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+  "focus": {
+    "tag": "BODY",
+    "width": "3px",
+    "style": "none",
+    "color": "rgb(0, 0, 0)"
+  },
+  "notices": [
+    {
+      "text": "New pump assigned: Pump 04 · Kerosene. Sign out and sign in online with your own account before using the new pump. Pending sales keep their original details.",
+      "background": "rgb(253, 240, 204)",
+      "width": 358
+    }
+  ],
+  "shortTargets": []
+}
