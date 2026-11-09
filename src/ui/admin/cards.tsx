@@ -373,7 +373,16 @@ function GenerateBatch({ confirm }: { confirm: boolean }) {
         back={{ href: "/admin/cards", label: "Back to batches" }}
       />
       <div className="wr-cc-two">
-        <Sheet title={confirm ? "Confirm new batch" : "Generate a batch"}>
+        <Sheet
+          title={confirm ? "Confirm new batch" : "Generate a batch"}
+          badge={
+            confirm && attempt && attempt.state !== "applied" ? (
+              <StatusPill small tone="pending">
+                Will start as Generated
+              </StatusPill>
+            ) : undefined
+          }
+        >
           {error && (
             <Notice tone="danger" role="alert">
               {error}
@@ -628,6 +637,18 @@ function BatchTransition({
       />
       <div className="wr-cc-two">
         <Sheet title="Change batch status">
+          <div className="wr-row" role="group" aria-label="Batch lifecycle">
+            <BatchPill status="generated" />
+            <span aria-hidden="true">→</span>
+            <BatchPill status="printed" />
+            <span aria-hidden="true">→</span>
+            <StatusPill
+              small
+              tone={b.status === "active" ? "synced" : "neutral"}
+            >
+              Active
+            </StatusPill>
+          </div>
           <p>
             This change:{" "}
             <b>
