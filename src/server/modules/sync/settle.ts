@@ -55,7 +55,11 @@ export async function settle(
   ).rows;
   // Card and link are locked before evaluating their authoritative historical intervals.
   const card = (
-    await db.query<{ state: string; replaced_by_card_id: string | null }>(
+    await db.query<{
+      state: string;
+      replaced_by_card_id: string | null;
+      retired_at_receipt: boolean;
+    }>(
       "SELECT c.state,c.replaced_by_card_id,c.retired_at<=(SELECT server_received_at FROM purchase WHERE id=$2) AS retired_at_receipt FROM card c WHERE c.id=$1 FOR SHARE",
       [p.card_id, p.id],
     )
