@@ -5,8 +5,10 @@ import {
   freezeCustomerChange,
   customerFile,
   pageQuery,
+  customerChangeIsUncertain,
 } from "./customer-admin-api";
-import { AdminError } from "./admin-api";
+import { AdminError, adminRequest } from "./admin-api";
+import { batchSchema, cardExportSchema } from "../shared/contracts/customers-cards";
 afterEach(() => vi.unstubAllGlobals());
 describe("customer/card protected transport", () => {
   it("rejects malformed and extra response fields", async () => {
@@ -178,4 +180,105 @@ it("keeps the exact reviewed transition and export version on retries", async ()
     expect(request.mock.calls[0]).toEqual(request.mock.calls[1]);
     expect(change.body.expectedVersion).toBe(2);
   }
+});
+
+describe("actual adminRequest malformed success retry classification", () => {
+  const id = "00000000-0000-7000-8000-000000000001";
+  const batch = {
+    id,
+    batchCode: "BATCH001",
+    name: "Fictional print stock",
+    version: 1,
+    status: "generated",
+    createdAt: "2026-11-09T10:00:00Z",
+    createdBy: { id, code: "ADMIN001", name: "Ada Williams" },
+    total: "4",
+    unassigned: "4",
+    linked: "0",
+    retired: "0",
+    availableToAssign: "0",
+  };
+  const artifact = {
+    id: "00000000-0000-7000-8000-000000000002",
+    batchId: id,
+    format: "pdf",
+    state: "pending",
+    preparedAt: null,
+    snapshotAt: "2026-11-09T10:00:00Z",
+    batchStatus: "generated",
+    batchVersion: 1,
+    cardCount: "4",
+    expiresAt: null,
+    failure: null,
+  };
+  for (const [status, path, body, schema, receipt] of [
+    [201, "card-batches", { name: batch.name, count: 4 }, batchSchema, batch],
+    [
+      200,
+      `card-batches/${id}/mark-printed`,
+      { expectedVersion: 1, reason: "Fictional print job" },
+      batchSchema,
+      { ...batch, status: "printed", version: 2 },
+    ],
+    [
+      202,
+      `card-batches/${id}/exports`,
+      { expectedVersion: 1, format: "pdf" },
+      cardExportSchema,
+      artifact,
+    ],
+  ] as const) {
+    for (const malformed of [
+      '{"data":',
+      "<html>upstream response interrupted</html>",
+    ]) {
+      it(`retains the frozen operation after malformed ${status} (${malformed.startsWith("<") ? "non-JSON" : "truncated JSON"})`, async () => {
+        const fetch = vi
+          .fn()
+          .mockResolvedValueOnce(new Response(malformed, { status }))
+          .mockResolvedValueOnce(
+            new Response(JSON.stringify({ data: receipt }), { status }),
+          );
+        vi.stubGlobal("fetch", fetch);
+        const api = new CustomerAdminApi(adminRequest),
+          change = freezeCustomerChange(path, body);
+        const error = await api
+          .commit(change, schema as z.ZodType<object>)
+          .catch((e) => e);
+        expect(error).toMatchObject({ code: "invalid_response", status });
+        expect(customerChangeIsUncertain(error)).toBe(true);
+        await expect(
+          api.commit(change, schema as z.ZodType<object>),
+        ).resolves.toEqual(receipt);
+        expect(fetch.mock.calls[0]).toEqual(fetch.mock.calls[1]);
+        expect(JSON.parse(fetch.mock.calls[0]?.[1].body)).toEqual(change.body);
+        expect(Object.isFrozen(change.body)).toBe(true);
+      });
+    }
+  }
+  it.each([
+    [409, "version_conflict"],
+    [409, "operation_conflict"],
+    [409, "invalid_transition"],
+    [503, "print_layout_unconfigured"],
+    [403, "permission_denied"],
+    [401, "session_required"],
+  ] as const)(
+    "keeps a valid definitive %i %s distinct",
+    async (status, code) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(JSON.stringify({ error: { code } }), { status }),
+          ),
+      );
+      const error = await adminRequest("card-batches", {
+        operationId: id,
+      }).catch((e) => e);
+      expect(error).toMatchObject({ code, status });
+      expect(customerChangeIsUncertain(error)).toBe(false);
+    },
+  );
 });

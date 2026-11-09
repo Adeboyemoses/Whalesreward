@@ -19,6 +19,7 @@ import { titleCase } from "@/client/customer-admin-types";
 import {
   freezeCustomerChange,
   customerMessage,
+  customerChangeIsUncertain,
   customerFile,
   type CustomerChange,
 } from "@/client/customer-admin-api";
@@ -274,11 +275,7 @@ function useCardChange<T>(key: string, schema: z.ZodType<T>) {
       }
     } catch (error) {
       if (current()) {
-        const unknown =
-          error instanceof AdminError &&
-          (error.status === 0 ||
-            (error.status >= 500 &&
-              error.code !== "print_layout_unconfigured"));
+        const unknown = customerChangeIsUncertain(error);
         setAttempt({
           ...attempt,
           state: unknown ? "uncertain" : "rejected",

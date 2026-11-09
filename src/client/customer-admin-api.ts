@@ -14,6 +14,12 @@ export function freezeCustomerChange<T extends object>(
     }),
   });
 }
+/** A malformed success can follow a commit; retain the frozen operation for replay. */
+export const customerChangeIsUncertain = (error: unknown): boolean =>
+  error instanceof AdminError &&
+  (error.code === "invalid_response" ||
+    error.status === 0 ||
+    (error.status >= 500 && error.code !== "print_layout_unconfigured"));
 export const pageOf = <T>(schema: z.ZodType<T>) =>
   z.strictObject({
     items: z.array(schema).max(100),
