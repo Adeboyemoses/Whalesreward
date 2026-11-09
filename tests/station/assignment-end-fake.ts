@@ -18,6 +18,7 @@ export async function installAssignmentEndFake(
   let effectCount = 0;
   let endedAt: string | null = null;
   let allow = true;
+  let projected = false;
   const success = (route: Route, data: unknown) =>
     route.fulfill({
       status: 200,
@@ -39,7 +40,8 @@ export async function installAssignmentEndFake(
       },
     });
   await page.route(`**/api/admin/attendants/${initial.id}`, async (route) => {
-    if (route.request().method() !== "GET" || !endedAt) return route.continue();
+    if (route.request().method() !== "GET" || !projected)
+      return route.continue();
     return success(route, current);
   });
   await page.route(
@@ -83,6 +85,7 @@ export async function installAssignmentEndFake(
       }
       if (options.conflictFirst && calls.length === 1) {
         current = { ...current, version: current.version + 1 };
+        projected = true;
         return failure(route, "version_conflict", 409);
       }
       if (
@@ -95,6 +98,7 @@ export async function installAssignmentEndFake(
         Math.max(Date.now(), Date.parse(originalAssignment.effectiveFrom) + 1),
       ).toISOString();
       effectCount++;
+      projected = true;
       current = {
         ...current,
         version: current.version + 1,

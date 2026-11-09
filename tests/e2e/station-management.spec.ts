@@ -292,3 +292,103 @@ for (const loseResponse of [false, true])
       await f.db.end();
     }
   });
+
+test("I-07 prices-only pump configuration never reads attendant identities", async ({
+  page,
+}) => {
+  const f = await stationFixture(page, ["prices"]);
+  const forbidden: string[] = [];
+  page.on("request", (r) => {
+    if (
+      /\/api\/admin\/(?:attendants|assignment-candidates)|\/pumps\/[^/]+\/(?:attendants|assignments)/.test(
+        r.url(),
+      )
+    )
+      forbidden.push(new URL(r.url()).pathname);
+  });
+  try {
+    await page.goto("/admin/pumps");
+    await expect(
+      page.getByRole("heading", { name: "Station pumps", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Add pump", exact: true }),
+    ).toHaveCount(0);
+    expect(forbidden).toEqual([]);
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-07 pumps-only assignment uses narrow candidates without broad account reads", async ({
+  page,
+}) => {
+  const owner = await stationFixture(page);
+  const child = await createAttendant(page);
+  await owner.db.end();
+  await page.context().clearCookies();
+  const f = await stationFixture(page, ["pumps"]);
+  const forbidden: string[] = [];
+  page.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (
+      path === "/api/admin/attendants/search" ||
+      /^\/api\/admin\/attendants\/[^/]+$/.test(path)
+    )
+      forbidden.push(path);
+  });
+  try {
+    await page.goto(`/admin/pumps/${seedId(16)}/assign`);
+    await page
+      .getByLabel("Attendant account", { exact: true })
+      .selectOption(child.attendant.id);
+    await page
+      .getByLabel("Reason for assignment", { exact: true })
+      .fill("Fictional pumps-only reassignment");
+    await page
+      .getByRole("button", { name: "Review assignment", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm assignment", exact: true })
+      .click();
+    await expect(
+      page.getByText("Fresh online sign-in required", { exact: false }).first(),
+    ).toBeVisible();
+    expect(forbidden).toEqual([]);
+    const rows = (
+      await f.db.query(
+        "SELECT pump_id FROM assignment WHERE attendant_id=$1 AND effective_until IS NULL",
+        [child.attendant.id],
+      )
+    ).rows;
+    expect(rows).toEqual([{ pump_id: seedId(16) }]);
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-07 every selectable pump remains available beyond the first server page", async ({
+  page,
+}) => {
+  const f = await stationFixture(page);
+  const target = v7();
+  try {
+    const fixtures = Array.from({ length: 106 }, (_, index) => ({
+      id: index === 0 ? target : v7(),
+      name: `Fictional picker pump ${index} ${target}`,
+      code: `PICK-${index}-${target}`,
+    }));
+    await f.db.query(
+      "INSERT INTO pump(id,station_id,code,name,product_id,enabled,version,created_at) SELECT x.id::uuid,$1::uuid,x.code,x.name,$2::uuid,true,1,CASE WHEN x.id=$3 THEN '2020-01-01'::timestamptz ELSE clock_timestamp() END FROM jsonb_to_recordset($4::jsonb) AS x(id text,name text,code text)",
+      [seedId(8), seedId(9), target, JSON.stringify(fixtures)],
+    );
+    await page.goto("/admin/attendants/new");
+    const picker = page.getByLabel("Assign pump", { exact: true });
+    await expect(picker.locator(`option[value="${target}"]`)).toHaveCount(1);
+    await picker.selectOption(target);
+    await expect(picker).toHaveValue(target);
+  } finally {
+    await f.db.end();
+  }
+});
