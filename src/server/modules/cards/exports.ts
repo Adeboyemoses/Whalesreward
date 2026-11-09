@@ -31,6 +31,27 @@ export async function prepareCardExport(
 ): Promise<{ processed: boolean; delivered?: boolean }> {
   const claim = await transaction(pool, async (db) => {
     await securityLock(db);
+    // A final attempt can die before acknowledging its lease. Recover one row per
+    // polling step, including PDFs whose layout is no longer configured. Expiry
+    // is checked again in the claim update; a live final renderer keeps its lease.
+    const exhausted = (
+      await db.query(
+        "SELECT id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND(status='pending' OR(status='failed' AND lease_nonce IS NOT NULL)) AND attempts>=$2 AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
+        [exportId ?? null, CARD_POLICY.maxAttempts],
+      )
+    ).rows[0];
+    if (exhausted) {
+      const recovered = await db.query(
+        "UPDATE card_export SET status='failed',failure_code='preparation_failed',lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL,fencing_version=fencing_version+1 WHERE id=$1 AND(status='pending' OR(status='failed' AND lease_nonce IS NOT NULL)) AND attempts>=$2 AND fencing_version=$3 AND lease_nonce IS NOT DISTINCT FROM $4 AND(lease_until IS NULL OR lease_until<=clock_timestamp())",
+        [
+          exhausted.id,
+          CARD_POLICY.maxAttempts,
+          exhausted.fencing_version,
+          exhausted.lease_nonce,
+        ],
+      );
+      return recovered.rowCount === 1 ? { denied: true } : null;
+    }
     const r = (
       await db.query(
         `SELECT e.* FROM card_export e WHERE($1::uuid IS NULL OR e.id=$1) AND e.status IN('pending','failed') AND e.attempts<$2 AND(e.next_attempt_at IS NULL OR e.next_attempt_at<=clock_timestamp()) AND(e.lease_until IS NULL OR e.lease_until<=clock_timestamp()) AND(e.format='xlsx' OR $3::boolean) ORDER BY e.created_at,e.id LIMIT 1 FOR UPDATE SKIP LOCKED`,

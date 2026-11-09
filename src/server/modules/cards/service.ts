@@ -200,7 +200,7 @@ export async function cardsWrite(
           }
           const active = (
             await db.query(
-              "SELECT count(*)::int AS n FROM card_export WHERE created_by=$1 AND(status='pending' OR(status='failed' AND attempts<$2))",
+              "SELECT count(*)::int AS n FROM card_export WHERE created_by=$1 AND status IN('pending','failed') AND(attempts<$2 OR lease_until>clock_timestamp())",
               [actor.admin_id, CARD_POLICY.maxAttempts],
             )
           ).rows[0].n;

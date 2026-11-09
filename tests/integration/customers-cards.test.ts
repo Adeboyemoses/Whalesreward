@@ -658,6 +658,226 @@ describe("M2 atomic customers and card inventory", () => {
       pool.query("UPDATE card_export SET status='pending' WHERE id=$1", [e.id]),
     ).rejects.toMatchObject({ code: "23514" });
   });
+  it("I-52 automatically terminalizes two crashed final claims and releases their preparation quota without changing snapshots or inventory", async () => {
+    const b = await batch();
+    const create = async () =>
+      (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+          b.id,
+        )
+      ).data as { id: string };
+    const first = await create(),
+      second = await create(),
+      ids = [first.id, second.id];
+    const inventory = (
+      await pool.query("SELECT * FROM card WHERE batch_id=$1 ORDER BY id", [
+        b.id,
+      ])
+    ).rows;
+    const snapshots = (
+      await pool.query(
+        "SELECT * FROM card_export_item WHERE export_id=ANY($1::uuid[]) ORDER BY export_id,ordinal",
+        [ids],
+      )
+    ).rows;
+    const history = await cardsRead(
+      pool,
+      adminConfig(),
+      adminToken,
+      "history",
+      {},
+      b.id,
+    );
+    await pool.query(
+      "UPDATE card_export SET attempts=3,fencing_version=3,lease_nonce='fictional-crashed-final-claim',lease_until=clock_timestamp()-interval '1 second' WHERE id=ANY($1::uuid[])",
+      [ids],
+    );
+    // Capacity must recover even before the next automatic polling tick.
+    const replacement = await create();
+    expect(await prepareCardExport(pool, options)).toEqual({
+      processed: true,
+      delivered: false,
+    });
+    expect(await prepareCardExport(pool, options)).toEqual({
+      processed: true,
+      delivered: false,
+    });
+    const terminal = (
+      await pool.query(
+        "SELECT id,status,attempts,fencing_version,lease_nonce,lease_until,failure_code,next_attempt_at FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+        [ids],
+      )
+    ).rows;
+    expect(terminal).toHaveLength(2);
+    for (const row of terminal)
+      expect(row).toMatchObject({
+        status: "failed",
+        attempts: 3,
+        fencing_version: "4",
+        lease_nonce: null,
+        lease_until: null,
+        failure_code: "preparation_failed",
+        next_attempt_at: null,
+      });
+    expect(await prepareCardExport(pool, options, first.id)).toEqual({
+      processed: false,
+    });
+    expect(
+      (
+        await pool.query("SELECT * FROM card WHERE batch_id=$1 ORDER BY id", [
+          b.id,
+        ])
+      ).rows,
+    ).toEqual(inventory);
+    expect(
+      (
+        await pool.query(
+          "SELECT * FROM card_export_item WHERE export_id=ANY($1::uuid[]) ORDER BY export_id,ordinal",
+          [ids],
+        )
+      ).rows,
+    ).toEqual(snapshots);
+    expect(
+      await cardsRead(pool, adminConfig(), adminToken, "history", {}, b.id),
+    ).toEqual(history);
+    expect(await prepareCardExport(pool, options, replacement.id)).toEqual({
+      processed: true,
+      delivered: true,
+    });
+  });
+  it("I-52 recovers a final renderer that finishes after expiry and fences its bytes permanently", async () => {
+    const b = await batch(),
+      e = (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+          b.id,
+        )
+      ).data as { id: string };
+    await pool.query(
+      "UPDATE card_export SET attempts=2,fencing_version=2 WHERE id=$1",
+      [e.id],
+    );
+    const write = vi.fn(storage.write);
+    const staleStorage = { ...storage, write };
+    let recovery: Awaited<ReturnType<typeof prepareCardExport>> | undefined;
+    expect(
+      await prepareCardExport(
+        pool,
+        {
+          storage: staleStorage,
+          render: async () => {
+            await pool.query(
+              "UPDATE card_export SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",
+              [e.id],
+            );
+            // Another automatic polling step recovers the row while this expired
+            // renderer is still running; its eventual bytes must stay fenced.
+            recovery = await prepareCardExport(pool, options, e.id);
+            return {
+              bytes: new Uint8Array([1, 2, 3]),
+              contentType:
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              extension: "xlsx",
+            };
+          },
+        },
+        e.id,
+      ),
+    ).toEqual({ processed: true, delivered: false });
+    expect(write).not.toHaveBeenCalled();
+    expect(recovery).toEqual({ processed: true, delivered: false });
+    expect(await prepareCardExport(pool, options, e.id)).toEqual({
+      processed: false,
+    });
+    const row = (
+      await pool.query(
+        "SELECT status,attempts,object_key,sha256,byte_size,lease_nonce,lease_until,fencing_version FROM card_export WHERE id=$1",
+        [e.id],
+      )
+    ).rows[0];
+    expect(row).toEqual({
+      status: "failed",
+      attempts: 3,
+      object_key: null,
+      sha256: null,
+      byte_size: null,
+      lease_nonce: null,
+      lease_until: null,
+      fencing_version: "4",
+    });
+    await expect(
+      downloadCardExport(pool, adminToken, b.id, e.id, storage),
+    ).rejects.toMatchObject({ code: "export_failed" });
+  });
+  it("I-52 preserves unexpired final claims and their active quota until their leases end", async () => {
+    const b = await batch();
+    const create = async () =>
+      (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+          b.id,
+        )
+      ).data as { id: string };
+    const first = await create(),
+      second = await create(),
+      ids = [first.id, second.id];
+    await pool.query(
+      "UPDATE card_export SET attempts=3,fencing_version=3,lease_nonce='fictional-live-final-claim',lease_until=clock_timestamp()+interval '1 hour' WHERE id=ANY($1::uuid[])",
+      [ids],
+    );
+    // A retried final attempt retains failed state while rendering; it is
+    // still an active preparation until its lease expires.
+    await pool.query(
+      "UPDATE card_export SET status='failed',failure_code='preparation_failed' WHERE id=$1",
+      [second.id],
+    );
+    const before = (
+      await pool.query(
+        "SELECT * FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+        [ids],
+      )
+    ).rows;
+    expect(await prepareCardExport(pool, options, first.id)).toEqual({
+      processed: false,
+    });
+    expect(await prepareCardExport(pool, options, second.id)).toEqual({
+      processed: false,
+    });
+    await expect(create()).rejects.toMatchObject({ code: "rate_limited" });
+    expect(
+      (
+        await pool.query(
+          "SELECT * FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
+          [ids],
+        )
+      ).rows,
+    ).toEqual(before);
+    await pool.query(
+      "UPDATE card_export SET lease_until=clock_timestamp()-interval '1 second' WHERE id=ANY($1::uuid[])",
+      [ids],
+    );
+    expect(await prepareCardExport(pool, options, first.id)).toEqual({
+      processed: true,
+      delivered: false,
+    });
+    expect(await prepareCardExport(pool, options, second.id)).toEqual({
+      processed: true,
+      delivered: false,
+    });
+  });
   it("HTTP validates bodies, origin, cookie surface, oversized input and fixed category", async () => {
     const b = await active(),
       code = (await codes(b.id)).items[0]!.code,
