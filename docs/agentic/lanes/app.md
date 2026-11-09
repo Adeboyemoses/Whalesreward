@@ -14,6 +14,6 @@ WO-app-4a (WHR-75) Admin navigation: ACCEPTED by Earl on 2026-11-09
 
 ## Risks
 - Original local Fast3G-shaped full details remain1.18–1.66 seconds; Earl has now accepted actual staging navigation. No new deployed timing measurement or device-discard diagnosis.
-- Prior feature exceeded its high-tier dispatch flag (16;17 with READY records), within two formal feature rounds. This closeout is docs only. Runtime model identity unavailable.
+- Prior feature exceeded its high-tier dispatch flag (16;17 with READY records), within two formal feature rounds. This closeout is docs only; its second independent review covers the concurrent specification-record merge resolution. Runtime model identity unavailable.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unknown
+dispatches=2 prs=1 rounds_max=2 escalations=0 model=unknown
