@@ -575,18 +575,25 @@ describe("M2 atomic customers and card inventory", () => {
     ).toBe(0);
     vi.stubEnv("WHR_CARD_PRINT_LAYOUT", JSON.stringify(invalid));
     try {
+      const exportResult = await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        { ...input, operationId: newId(), format: "xlsx" },
+        b.id,
+      );
+      expect(exportResult.data).toMatchObject({
+        state: "pending",
+        format: "xlsx",
+      });
       expect(
-        (
-          await cardsWrite(
-            pool,
-            adminConfig(),
-            adminToken,
-            "export",
-            { ...input, operationId: newId(), format: "xlsx" },
-            b.id,
-          )
-        ).data,
-      ).toMatchObject({ state: "pending", format: "xlsx" });
+        await prepareCardExport(
+          pool,
+          options,
+          (exportResult.data as { id: string }).id,
+        ),
+      ).toEqual({ processed: true, delivered: true });
     } finally {
       vi.unstubAllEnvs();
     }
@@ -614,6 +621,41 @@ describe("M2 atomic customers and card inventory", () => {
         "INSERT INTO card_export_item(export_id,card_id,ordinal,code,qr_payload,card_state,assignment_eligible) VALUES($1,$2,1001,$3,$3,'unassigned',false)",
         [e.id, card.id, card.code],
       ),
+    ).rejects.toMatchObject({ code: "23514" });
+    expect(await prepareCardExport(pool, options, e.id)).toEqual({
+      processed: true,
+      delivered: true,
+    });
+  });
+  it("ready artifacts require all checksum metadata and cannot be overwritten after publication", async () => {
+    const b = await batch(),
+      e = (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+          b.id,
+        )
+      ).data as { id: string };
+    await expect(
+      pool.query(
+        "UPDATE card_export SET status='ready',prepared_at=clock_timestamp() WHERE id=$1",
+        [e.id],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+    expect(await prepareCardExport(pool, options, e.id)).toEqual({
+      processed: true,
+      delivered: true,
+    });
+    await expect(
+      pool.query("UPDATE card_export SET sha256=repeat('a',64) WHERE id=$1", [
+        e.id,
+      ]),
+    ).rejects.toMatchObject({ code: "23514" });
+    await expect(
+      pool.query("UPDATE card_export SET status='pending' WHERE id=$1", [e.id]),
     ).rejects.toMatchObject({ code: "23514" });
   });
   it("HTTP validates bodies, origin, cookie surface, oversized input and fixed category", async () => {

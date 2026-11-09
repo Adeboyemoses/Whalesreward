@@ -157,3 +157,40 @@ export const cardExportSchema = z.strictObject({
   expiresAt: instant.nullable(),
   failure: z.literal("preparation_failed").nullable(),
 });
+
+export const customerSaleSchema = z.strictObject({
+  id: authId,
+  saleCode: z.string(),
+  appCapturedAt: instant,
+  serverReceivedAt: instant,
+  product: z.enum(["pms", "diesel", "kerosene", "cooking_gas"]),
+  unit: z.enum(["litre", "kilogram"]),
+  amountKobo: count,
+  currency: z.literal("NGN"),
+  quantity: z.string().regex(/^\d+(\.\d{1,6})?$/),
+  seller: z.strictObject({
+    id: authId,
+    name: z.string(),
+    username: z.string(),
+  }),
+  pump: z.strictObject({ id: authId, code: z.string() }),
+  state: z.enum([
+    "received",
+    "photo_pending",
+    "finalizing",
+    "credited",
+    "held",
+    "cancelled",
+  ]),
+  holds: z
+    .array(
+      z.strictObject({
+        kind: z.enum(["price", "card", "date"]),
+        reasonCode: z.string(),
+      }),
+    )
+    .max(3),
+  duplicateFlag: z.boolean(),
+  correctionPending: z.boolean(),
+  credited: z.boolean(),
+});

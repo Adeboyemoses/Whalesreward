@@ -7,6 +7,7 @@ import {
   customerLookupSchema,
   customerSummarySchema,
   customerProfileSchema,
+  customerSaleSchema,
 } from "../../../shared/contracts/customers-cards";
 import { pageSchema } from "../../../shared/contracts/admin";
 import {
@@ -33,7 +34,7 @@ async function attendant(db: pg.PoolClient, token: string | undefined) {
   ).rows[0];
   if (!r) throw new AuthError("assignment_unavailable", 422);
   if (!r.online) throw new AuthError("online_sign_in_required", 403);
-  if (!r.fresh) throw new AuthError("fresh_sign_in_required", 403);
+  if (!r.fresh) throw new AuthError("online_sign_in_required", 403);
   return { ...r, user_id: session.user_id };
 }
 export async function registerCustomer(
@@ -326,9 +327,8 @@ export async function customerRead(
         )
       ).rows;
       return {
-        items: rows
-          .slice(0, limit)
-          .map((r) => ({
+        items: rows.slice(0, limit).map((r) =>
+          customerSaleSchema.parse({
             id: r.id,
             saleCode: r.sale_code,
             appCapturedAt: r.app_captured_at.toISOString(),
@@ -349,7 +349,8 @@ export async function customerRead(
             duplicateFlag: r.duplicate_flag,
             correctionPending: r.correction_pending,
             credited: r.credited === true,
-          })),
+          }),
+        ),
         nextCursor:
           rows.length > limit
             ? nextCursor(config.secret, scope, rows[limit - 1].id)
