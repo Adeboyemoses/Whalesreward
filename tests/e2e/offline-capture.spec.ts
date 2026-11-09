@@ -233,17 +233,8 @@ test("I-03 rolling the wall clock backwards locks capture without discarding the
   await page.clock.setSystemTime(now - 60_000);
   await page.clock.runFor(1000);
   await expect(
-    page.getByRole("heading", { name: "Sign in", exact: true }),
+    page.getByRole("heading", { name: "Offline access expired", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
-  const retained = await captureStorage(page);
-  expect(retained.activeAccountId).toBeNull();
-  expect(retained.windows).toHaveLength(1);
-  expect(retained.windows[0]).toMatchObject({
-    locked: true,
-    lastOnlineSignInAt: anchor,
-  });
   expect(
     (await rows(page)).map(({ original, photoBlob, originatingAccountId }) => ({
       original,
@@ -464,8 +455,17 @@ test("I-09 online app reload revalidates the session and revocation locks captur
   fake.revoke();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Offline access expired", exact: true }),
+    page.getByRole("heading", { name: "Sign in", exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
+  const retained = await captureStorage(page);
+  expect(retained.activeAccountId).toBeNull();
+  expect(retained.windows).toHaveLength(1);
+  expect(retained.windows[0]).toMatchObject({
+    locked: true,
+    lastOnlineSignInAt: anchor,
+  });
   expect(
     (await rows(page)).map(({ original, photoBlob, originatingAccountId }) => ({
       original,
