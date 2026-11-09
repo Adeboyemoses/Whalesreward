@@ -4,7 +4,18 @@ import {
   fillRegistration,
   noPII,
 } from "../customers-cards/helpers";
-test.use({ trace: "off", video: "off", screenshot: "off" });
+test.use({
+  trace: "off",
+  video: "off",
+  screenshot: "off",
+  permissions: ["camera"],
+  launchOptions: {
+    args: [
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream",
+    ],
+  },
+});
 test("I-02 I-14 online registration links once and requires fresh card lookup before sale", async ({
   page,
 }) => {
