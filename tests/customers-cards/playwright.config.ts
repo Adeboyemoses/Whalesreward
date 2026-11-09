@@ -10,6 +10,7 @@ const database =
   process.env.DATABASE_URL ??
   "postgresql://whr:whr@127.0.0.1:5433/whr_app6_customers";
 process.env.DATABASE_URL = database;
+process.env.WHR_CUSTOMERS_TEST_BUCKET = "whr-app6-tests";
 export default defineConfig({
   ...base,
   testDir: "../e2e",
@@ -46,7 +47,7 @@ export default defineConfig({
       }),
       STORAGE_ENDPOINT: "http://127.0.0.1:9000",
       STORAGE_REGION: "us-east-1",
-      STORAGE_BUCKET: "whr-local",
+      STORAGE_BUCKET: "whr-app6-tests",
       STORAGE_ACCESS_KEY_ID: "whr-local",
       STORAGE_SECRET_ACCESS_KEY: "local-development-only",
     },

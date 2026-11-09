@@ -1,3 +1,4 @@
+import { ensureLocalCardBucket } from "../customers-cards/storage";
 import { test, expect } from "@playwright/test";
 import { v7 } from "uuid";
 import { PDFDocument } from "pdf-lib";
@@ -24,7 +25,9 @@ test("I-18 card generation starts with an explicit review", async ({
   const f = await stationFixture(page);
   try {
     await page.goto("/admin/cards/generate");
-    await expect(page.getByRole("heading", { name: /Generate/ })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Generate card batch", exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Review batch", exact: true }),
     ).toBeVisible();
@@ -73,6 +76,7 @@ test("I-18 cancel leaves stock unchanged and explicit reviews move Generated to 
     await page
       .getByRole("button", { name: "Generate cards", exact: true })
       .click();
+    await page.getByRole("link", { name: "View batch", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/cards\/[a-f0-9-]+$/);
     const id = new URL(page.url()).pathname.split("/").at(-1)!;
     const codes = (
@@ -103,6 +107,9 @@ test("I-18 cancel leaves stock unchanged and explicit reviews move Generated to 
       await page
         .getByRole("button", { name: "Confirm status change", exact: true })
         .click();
+      await page
+        .getByRole("link", { name: "View current batch", exact: true })
+        .click();
       await expect(page).toHaveURL(new RegExp(`/admin/cards/${id}$`));
       expect(
         (await f.db.query("SELECT status FROM card_batch WHERE id=$1", [id]))
@@ -132,6 +139,7 @@ test("I-18 cancel leaves stock unchanged and explicit reviews move Generated to 
 test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes without lifecycle side effects", async ({
   page,
 }) => {
+  await ensureLocalCardBucket();
   const f = await stationFixture(page);
   try {
     const b = await api<{ id: string; version: number }>(
@@ -155,12 +163,20 @@ test("I-20 prepared PDF and XLSX downloads contain reserved snapshot codes witho
       await page
         .getByRole("button", { name: "Review export preparation", exact: true })
         .click();
+      const ready = page.waitForResponse(
+        async (r) =>
+          r.request().method() === "GET" &&
+          /\/exports\/[a-f0-9-]+$/.test(new URL(r.url()).pathname) &&
+          r.status() === 200 &&
+          (await r.json()).data?.state === "ready",
+      );
       await page
         .getByRole("button", {
           name: "Confirm export preparation",
           exact: true,
         })
         .click();
+      await ready;
       const downloadButton = page
         .getByRole("button", {
           name: format === "pdf" ? "Download PDF" : "Download XLSX",
@@ -274,7 +290,7 @@ test("I-15 customer cursor stays bound to the submitted filter and back preserve
           id,
           `TEST-${id}`,
           `Fictional cursor ${i}`,
-          `+23480${BigInt("0x" + id.replaceAll("-", "").slice(-9)) % 1000000000n}`,
+          `+23480${(BigInt("0x" + id.replaceAll("-", "").slice(-9)) % 100000000n).toString().padStart(8, "0")}`,
         ],
       );
     }
@@ -300,7 +316,9 @@ test("I-15 customer cursor stays bound to the submitted filter and back preserve
     expect(next.query).toBe("Fictional cursor");
     expect(next.category).toBe("keg_buyer");
     await page
-      .getByRole("link", { name: /Fictional cursor/ })
+      .getByRole("row")
+      .filter({ hasText: "Fictional cursor" })
+      .getByRole("link", { name: "View", exact: true })
       .first()
       .click();
     await expect(page).toHaveURL(/\/admin\/customers\/[a-f0-9-]+$/);
@@ -314,6 +332,79 @@ test("I-15 customer cursor stays bound to the submitted filter and back preserve
     await expect(
       page.getByLabel("Customer category", { exact: true }),
     ).toHaveValue("keg_buyer");
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-42 I-44 exact large recorded totals exclude pending held and cancelled sales and keep litres apart from kilograms", async ({
+  page,
+}) => {
+  const { registrationFixture, phoneNumber } =
+    await import("../customers-cards/helpers");
+  const { historicalSale } = await import("../customers-cards/historical");
+  const f = await registrationFixture(page);
+  try {
+    const response = await page.request.post("/api/attendant/customers", {
+      headers: { Origin: "http://127.0.0.1:3000" },
+      data: {
+        operationId: v7(),
+        name: "Tunde Adebayo",
+        phone: phoneNumber(),
+        category: "keg_buyer",
+        card: { source: "code", code: f.codes[0] },
+      },
+    });
+    expect(response.status()).toBe(201);
+    const customerId = (await response.json()).data.customer.id;
+    const cardId = (
+      await f.db.query("SELECT id FROM card WHERE code=$1", [f.codes[0]])
+    ).rows[0].id;
+    const base = { customerId, cardId, cardCode: f.codes[0] };
+    const amount = "9999999999999990000";
+    // Historical fixtures obey the real schema/revision guards; this is a read-projection test, not a claim of API credit acceptance.
+    for (let i = 0; i < 11; i++)
+      await historicalSale(f.db, { ...base, amount });
+    await historicalSale(f.db, {
+      ...base,
+      amount: "150000",
+      product: "cooking_gas",
+    });
+    await historicalSale(f.db, {
+      ...base,
+      amount: "100000",
+      state: "photo_pending",
+    });
+    await historicalSale(f.db, { ...base, amount: "900000", state: "held" });
+    await historicalSale(f.db, {
+      ...base,
+      amount: "800000",
+      state: "cancelled",
+    });
+    const total = BigInt(amount) * 11n + 150000n;
+    const profile = await api<{
+      recordedSpendKobo: string;
+      completedPurchaseCount: string;
+      pending: { amountKobo: string; count: string };
+      quantities: { unit: string; quantity: string }[];
+    }>(page.request, `customers/${customerId}`);
+    expect(profile.recordedSpendKobo).toBe(total.toString());
+    expect(profile.completedPurchaseCount).toBe("12");
+    expect(profile.pending).toEqual({ amountKobo: "100000", count: "1" });
+    expect(profile.quantities.map((q) => q.unit).sort()).toEqual([
+      "kilogram",
+      "litre",
+    ]);
+    await page.goto(`/admin/customers/${customerId}`);
+    const expected = `₦${(total / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.00`;
+    await expect(page.getByText(expected, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText(/1,099,999,999,999,998\.9(?:0*)? litres/),
+    ).toBeVisible();
+    await expect(page.getByText(/1(?:\.0*)? kilograms/)).toBeVisible();
+    await expect(
+      page.getByText("₦1,000.00", { exact: true }).first(),
+    ).toBeVisible();
   } finally {
     await f.db.end();
   }

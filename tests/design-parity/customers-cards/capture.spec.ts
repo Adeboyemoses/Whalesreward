@@ -1,3 +1,4 @@
+import { ensureLocalCardBucket } from "../../customers-cards/storage";
 import { test, expect, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import {
@@ -98,18 +99,22 @@ for (const width of [390, 360])
         .getByRole("button", { name: "Register and link card", exact: true })
         .click();
       await expect(
-        page.getByText("This phone number already has an account.", {
-          exact: true,
-        }),
+        page
+          .getByText("This phone number already has an account.", {
+            exact: true,
+          })
+          .first(),
       ).toBeVisible();
       await page
         .getByRole("button", { name: "Find existing customer", exact: true })
         .click();
       await expect(
-        page.getByRole("button", {
-          name: "Open Amina Bello and record a sale",
-          exact: true,
-        }),
+        page
+          .getByRole("button", {
+            name: "Open Amina Bello and record a sale",
+            exact: true,
+          })
+          .first(),
       ).toBeVisible();
       await shot(page, "A25-RegisterDuplicatePhone", width);
       await page.goto("/attendant/sale");
@@ -126,6 +131,7 @@ for (const width of [390, 360])
 for (const width of [1440, 390])
   test(`C01 B05 S08 and seven card boards at ${width}`, async ({ page }) => {
     test.setTimeout(120000);
+    await ensureLocalCardBucket();
     const f = await registrationFixture(page);
     try {
       await page.setViewportSize({ width, height: 1000 });
@@ -171,6 +177,7 @@ for (const width of [1440, 390])
       await page
         .getByRole("button", { name: "Generate cards", exact: true })
         .click();
+      await page.getByRole("link", { name: "View batch", exact: true }).click();
       await expect(page).toHaveURL(/\/admin\/cards\/[a-f0-9-]+$/);
       const id = new URL(page.url()).pathname.split("/").at(-1)!;
       await shot(page, "K02-CardBatch", width);
@@ -185,6 +192,9 @@ for (const width of [1440, 390])
       await page
         .getByRole("button", { name: "Confirm status change", exact: true })
         .click();
+      await page
+        .getByRole("link", { name: "View current batch", exact: true })
+        .click();
       await expect(page).toHaveURL(new RegExp(`/admin/cards/${id}$`));
       await page.goto(`/admin/cards/${id}/activate`);
       await page
@@ -196,6 +206,9 @@ for (const width of [1440, 390])
       await page
         .getByRole("button", { name: "Confirm status change", exact: true })
         .click();
+      await page
+        .getByRole("link", { name: "View current batch", exact: true })
+        .click();
       await expect(page).toHaveURL(new RegExp(`/admin/cards/${id}$`));
       await shot(page, "K06-CardBatchActive", width);
       await page
@@ -204,12 +217,20 @@ for (const width of [1440, 390])
       await page
         .getByRole("button", { name: "Review export preparation", exact: true })
         .click();
+      const ready = page.waitForResponse(
+        async (r) =>
+          r.request().method() === "GET" &&
+          /\/exports\/[a-f0-9-]+$/.test(new URL(r.url()).pathname) &&
+          r.status() === 200 &&
+          (await r.json()).data?.state === "ready",
+      );
       await page
         .getByRole("button", {
           name: "Confirm export preparation",
           exact: true,
         })
         .click();
+      await ready;
       await expect(
         page.getByRole("button", { name: "Download PDF", exact: true }).first(),
       ).toBeVisible();

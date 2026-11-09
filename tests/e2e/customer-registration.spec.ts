@@ -70,9 +70,11 @@ test("I-15 normalized duplicate phone uses a separate exact lookup and does not 
       .getByRole("button", { name: "Register and link card", exact: true })
       .click();
     await expect(
-      page.getByText("This phone number already has an account.", {
-        exact: true,
-      }),
+      page
+        .getByText("This phone number already has an account.", {
+          exact: true,
+        })
+        .first(),
     ).toBeVisible();
     const lookup = page.waitForResponse((r) =>
       r.url().endsWith("/api/attendant/customers/lookup"),
@@ -82,10 +84,12 @@ test("I-15 normalized duplicate phone uses a separate exact lookup and does not 
       .click();
     expect((await lookup).status()).toBe(200);
     await expect(
-      page.getByRole("button", {
-        name: "Open Amina Bello and record a sale",
-        exact: true,
-      }),
+      page
+        .getByRole("button", {
+          name: "Open Amina Bello and record a sale",
+          exact: true,
+        })
+        .first(),
     ).toBeVisible();
     expect(
       (await f.db.query("SELECT state FROM card WHERE code=$1", [f.codes[1]!]))
@@ -162,6 +166,166 @@ test("I-02 registration requires connectivity and does not renew the capture win
     expect(after).toEqual(before);
   } finally {
     await context.setOffline(false);
+    await f.db.end();
+  }
+});
+
+test("I-19 a registration receipt cannot authorize a sale after its card is retired", async ({
+  page,
+}) => {
+  const f = await registrationFixture(page);
+  try {
+    await page.goto("/attendant/register");
+    await fillRegistration(page, f.codes[0]!);
+    await page
+      .getByRole("button", { name: "Register and link card", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/done$/);
+    await f.db.query(
+      "UPDATE card SET state='retired',retired_at=clock_timestamp(),retirement_reason='Fictional lost card',version=version+1 WHERE code=$1",
+      [f.codes[0]],
+    );
+    const lookup = page.waitForResponse((r) =>
+      r.url().endsWith("/api/attendant/cards/lookup"),
+    );
+    await page
+      .getByRole("button", { name: "Record a sale for Amina", exact: true })
+      .click();
+    expect((await lookup).status()).toBe(422);
+    await expect(page).toHaveURL(/\/done$/);
+    await expect(page.getByRole("alert")).toBeVisible();
+  } finally {
+    await f.db.end();
+  }
+});
+test("I-09 disabling an attendant clears registration PII and cannot create a customer", async ({
+  page,
+}) => {
+  const f = await registrationFixture(page);
+  try {
+    await page.goto("/attendant/register");
+    const phone = await fillRegistration(page, f.codes[0]!);
+    await f.db.query(
+      "UPDATE auth_user SET enabled=false,auth_version=auth_version+1,updated_at=clock_timestamp() WHERE id=$1",
+      [f.attendant.accountId],
+    );
+    await page
+      .getByRole("button", { name: "Register and link card", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Register and link card", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
+    await noPII(page, [phone, "+234" + phone.slice(1)]);
+    expect(
+      (await f.db.query("SELECT state FROM card WHERE code=$1", [f.codes[0]]))
+        .rows[0].state,
+    ).toBe("unassigned");
+  } finally {
+    await f.db.end();
+  }
+});
+test("I-06 a late committed registration response cannot restore a receipt on another route", async ({
+  page,
+}) => {
+  const f = await registrationFixture(page);
+  const { barrier } = await import("../station/helpers");
+  const gate = barrier();
+  try {
+    await page.goto("/attendant/register");
+    const phone = await fillRegistration(page, f.codes[0]!);
+    await page.route("**/api/attendant/customers", async (route) => {
+      const response = await route.fetch();
+      expect(response.status()).toBe(201);
+      gate.reached();
+      await gate.blocked;
+      await route.fulfill({ response });
+    });
+    await page
+      .getByRole("button", { name: "Register and link card", exact: true })
+      .click();
+    await gate.started;
+    await page.goto("/attendant/account");
+    gate.release();
+    await page.unrouteAll({ behavior: "wait" });
+    await page.goto("/attendant/register");
+    await expect(page.getByLabel("Customer name", { exact: true })).toHaveValue(
+      "",
+    );
+    await expect(page.getByLabel("Phone number", { exact: true })).toHaveValue(
+      "",
+    );
+    await expect(page.getByText("Card linked", { exact: true })).toHaveCount(0);
+    await noPII(page, [phone, "+234" + phone.slice(1)]);
+  } finally {
+    gate.release();
+    await page.unrouteAll({ behavior: "wait" });
+    await f.db.end();
+  }
+});
+
+test("I-17 scanner adapter and typed codes use the same reserved card parser against the real API", async ({
+  page,
+}) => {
+  const f = await registrationFixture(page);
+  try {
+    // Only the physical QR detector result is substituted; camera and registration HTTP are real local fixtures.
+    await page.addInitScript((code) => {
+      Object.defineProperty(window, "BarcodeDetector", {
+        configurable: true,
+        value: class {
+          async detect() {
+            return [{ rawValue: code }];
+          }
+        },
+      });
+    }, f.codes[0]!);
+    await page.goto("/attendant/register");
+    await fillRegistration(page, f.codes[0]!);
+    await page
+      .getByRole("button", { name: "Scan QR card", exact: true })
+      .or(page.getByRole("button", { name: "Scan", exact: true }))
+      .click();
+    await page
+      .getByRole("button", { name: "Read QR card", exact: true })
+      .click();
+    await expect(page.getByLabel("Card number", { exact: true })).toHaveValue(
+      f.codes[0]!,
+    );
+    const sent = page.waitForRequest(
+      (r) => new URL(r.url()).pathname === "/api/attendant/customers",
+    );
+    await page
+      .getByRole("button", { name: "Register and link card", exact: true })
+      .click();
+    expect((await sent).postDataJSON().card).toEqual({
+      source: "qr",
+      qr: f.codes[0],
+    });
+    await expect(page).toHaveURL(/\/done$/);
+    await page
+      .getByRole("button", { name: "Register another customer", exact: true })
+      .click();
+    const phone = await fillRegistration(
+      page,
+      ` ${f.codes[0]!.toLowerCase()} `,
+    );
+    const refusal = page.waitForResponse(
+      (r) => new URL(r.url()).pathname === "/api/attendant/customers",
+    );
+    await page
+      .getByRole("button", { name: "Register and link card", exact: true })
+      .click();
+    expect((await refusal).status()).toBe(409);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM customer WHERE phone_normalized=$1",
+          ["+234" + phone.slice(1)],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  } finally {
     await f.db.end();
   }
 });
