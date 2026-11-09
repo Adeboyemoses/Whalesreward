@@ -15,6 +15,8 @@ API producer command:
 DATABASE_URL=postgresql://whr:whr@127.0.0.1:5433/whr_app6_s02_repro pnpm exec playwright test --config tests/customers-cards/s02.config.ts
 ```
 
+The producer was then expanded to ten fictional reserved cards per batch, with a required multi-page PDF. **6 passed, 0 failed, 0 skipped, zero retries (32.2 seconds)** across the same format/lifecycle matrix. This start-only rerun used the already verified production artifact. The temporary `.mts` config imported `tests/customers-cards/s02.config.ts`, set absolute `testDir` and `globalSetup` to the original directories, and overrode only `webServer.command` to `pnpm start --hostname 0.0.0.0` and `webServer.cwd` to the worktree root; all environment, schema, transport, quota and assertion settings were inherited unchanged.
+
 Browser tests use `tests/customers-cards/playwright.config.ts` with the desktop project and grep `I-20 prepared PDF and XLSX downloads`, then `lost transition|malformed successful export`. Native macOS Chromium was blocked before execution by sandbox MachPortRendezvous permission denial. A local Linux Playwright browser server in image `whr-upload-browser:lean` was connected by `use.connectOptions`; a loopback TCP proxy forwarded browser requests to the host production server. The app used the successfully built host artifact and `pnpm start`, avoiding a different application build. Temporary harness failures (missing login idempotency header and a TypeScript Buffer/BodyInit mismatch) were corrected before export assertions; they are not product failures.
 
 ## Boundary trace and conclusion

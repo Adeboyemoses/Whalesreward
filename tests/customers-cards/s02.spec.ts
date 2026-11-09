@@ -75,7 +75,7 @@ for (const [format, initialState] of (["pdf", "xlsx"] as const).flatMap(
       let batch = await client.commit(
         freezeCustomerChange("card-batches", {
           name: "Fictional s02 export stock",
-          count: 2,
+          count: 10,
         }),
         batchSchema,
       );
@@ -174,7 +174,7 @@ for (const [format, initialState] of (["pdf", "xlsx"] as const).flatMap(
           "customerFile PDF signature",
         ).toBe("%PDF-");
         expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(
-          0,
+          1,
         );
       } else {
         expect(
