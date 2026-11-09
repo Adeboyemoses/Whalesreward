@@ -18,4 +18,10 @@ invariants: [I-14, I-15, I-16, I-17, I-18, I-19, I-20, I-48, I-50, I-52]
 p1: []
 tickets: []
 ---
-Implementation and independent review pending. No READY claim.
+The original pre-builder plan block remains unchanged. Necessary support paths
+also reviewed within the approved M2 scope are src/server/adapters/** (phone and
+private artifact adapters), src/instrumentation.ts (automatic preparation), and
+docs/engineering/{contracts,data-model} plus docs/qa (compatibility and evidence).
+Round one: security PASS; code/integrity found P1 exhausted-lease recovery.
+The follow-up remains within the same approved export lifecycle and I-52 scope.
+Implementation review and the fix check are pending. No READY claim.
