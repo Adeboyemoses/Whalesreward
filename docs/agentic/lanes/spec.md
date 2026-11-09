@@ -1,20 +1,20 @@
 # lane:spec
-WO-spec-2a (WHR-79) attendant offboarding by assignment end: ACCEPTED since 2026-11-09
+WO-spec-3c (WHR-84) numeric-only correction evidence policy: READY on reviewed green staging merge, 2026-11-09
 
 ## In flight
-- Earl accepted the specification on 9 November 2026 and instructed closure. [Specification #71](https://github.com/Adeboyemoses/Whalesreward/pull/71), 8368f48, and [READY records #72](https://github.com/Adeboyemoses/Whalesreward/pull/72), e8e231f, are merged with all five checks green.
-- Existing code/security/integrity PASS round 2 at d392a716 and verification remain in `.review/spec__wo-2a-offboarding.md` and WHR-79. Acceptance covers P-21 and the M1/M2/M3/model specification, with no implementation or screen-parity claim.
-- This documentation closeout is linked from WHR-79. Its reviewed green staging merge makes the closure effective; then WHR-79 moves to Done.
+- [Amendment PR #84](https://github.com/Adeboyemoses/Whalesreward/pull/84): M3 and P-22, citing Earl's WHR-47 Option A. Merged at ebe3416 with all five CI checks green. Code/security/integrity PASS round 1 at f78f49d; full verdicts posted on WHR-84.
+- EM typecheck/lint, 333 unit tests, production build, prose/link/whitespace and evidence checks PASS. This separate docs-only READY records PR takes effect on its reviewed green merge; then WHR-84 is In Review.
+- No application code, migration, runtime coverage or board parity claimed. Existing midnight, stale-base, evidence, P-19 and contribution safeguards remain.
 
 ## Next
-- Stop after closure. No next work order is started. Backend WHR-80 and WO-app-5 (WHR-11) remain separate implementation work.
-- Product-doc mirroring remains with Rook, pending Earl's go under Q-527; attendant disable stays a possible later client addition.
+- Stop at READY; wait for Earl. WO-core-8 (WHR-14) implements P-22 separately.
+- Rook should mirror P-22 in the product docs; no product-doc writes authorized here.
 
 ## Earl's gos
-- 2026-11-09: “spec] Earl accepted WO-spec-2a (WHR-79); close it, then stop.”
+- 2026-11-09: “Small amendment to m3.md; take it to READY, then stop.” Approved WO-spec-3c names WHR-47 Option A and P-22.
 
 ## Risks
-- Q-528 client confirmation remains pending. Acceptance does not authorize product-doc edits, implementation, provider or cloud actions.
-- Metrics below cover this documentation closeout only. Full runtime model ID unavailable; delivery metrics remain in #71/#72.
+- Other correction kinds, replacement evidence and direct admin editing remain outside scope. WHR-48–50 and Q-528 remain separate.
+- Full runtime model ID unavailable; the requested session model is not runtime evidence.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
