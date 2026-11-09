@@ -1,5 +1,37 @@
 import { createHash } from "node:crypto";
-/** Versioned, recursively key-sorted JSON. Schemas normalize codes, instants and decimals first. */
+/** Recursively key-sorted JSON, using an explicit stack for bounded-size deeply nested evidence. */
+export function canonicalJson(value: unknown): string {
+  type Task = { value: unknown } | { text: string };
+  const pending: Task[] = [{ value }],
+    output: string[] = [];
+  while (pending.length) {
+    const task = pending.pop()!;
+    if ("text" in task) {
+      output.push(task.text);
+      continue;
+    }
+    const v = task.value;
+    if (Array.isArray(v)) {
+      output.push("[");
+      pending.push({ text: "]" });
+      for (let i = v.length - 1; i >= 0; i--) {
+        pending.push({ value: v[i] });
+        if (i > 0) pending.push({ text: "," });
+      }
+    } else if (v !== null && typeof v === "object") {
+      output.push("{");
+      pending.push({ text: "}" });
+      const entries = Object.entries(v).sort(([a], [b]) => a.localeCompare(b));
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const [k, x] = entries[i]!;
+        pending.push({ value: x }, { text: ":" }, { text: JSON.stringify(k) });
+        if (i > 0) pending.push({ text: "," });
+      }
+    } else output.push(JSON.stringify(v));
+  }
+  return output.join("");
+}
+/** Keep absent/null receipts in the legacy namespace; every other JSON value is immutable evidence. */
 export function payloadDigest(value: unknown): string {
   let namespace = "sync-v1";
   if (
@@ -12,16 +44,7 @@ export function payloadDigest(value: unknown): string {
     if (lookupReceipt == null) value = legacy;
     else namespace = "sync-v2-lookup";
   }
-  function stable(v: unknown): string {
-    if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
-    if (v !== null && typeof v === "object")
-      return `{${Object.entries(v)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, x]) => `${JSON.stringify(k)}:${stable(x)}`)
-        .join(",")}}`;
-    return JSON.stringify(v);
-  }
   return createHash("sha256")
-    .update(`${namespace}\0${stable(value)}`)
+    .update(`${namespace}\0${canonicalJson(value)}`)
     .digest("hex");
 }

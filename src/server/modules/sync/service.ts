@@ -24,7 +24,7 @@ import { newId } from "../../lib/ids";
 import type { EvidenceStorage } from "../../adapters/storage";
 import { StorageSizeError } from "../../adapters/storage";
 import { SyncError } from "./errors";
-import { payloadDigest } from "./canonical";
+import { canonicalJson, payloadDigest } from "./canonical";
 import {
   transaction,
   authority,
@@ -263,7 +263,7 @@ export function createSyncService({
             sale.photo.sha256,
             sale.photo.bytes,
             evidence.receivedAt,
-            JSON.stringify(sale.lookupReceipt ?? null),
+            canonicalJson(sale.lookupReceipt ?? null),
             evidence.status,
             evidence.claims ? JSON.stringify(evidence.claims) : null,
             evidence.lowerBound,
