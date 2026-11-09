@@ -219,39 +219,54 @@ test("I-32 reviewed price activation uses exact kobo and preserves prior version
 test("I-01 attendant creation never defaults or redisplays its temporary password", async ({
   page,
 }) => {
-  const f = await stationFixture(page);
+  const f = await test.step("Provision isolated admin and sign in", () =>
+    stationFixture(page));
   const username = `favour.${v7().slice(-12)}`;
   const password = "Fictional-creation-2026";
   try {
-    await page.goto("/admin/attendants/new");
-    await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
-    await page.getByLabel("Full name", { exact: true }).fill("Favour James");
-    await page.getByLabel("Username", { exact: true }).fill(username);
-    await page.getByLabel("Password", { exact: true }).fill(password);
-    await page
-      .getByLabel("Assign pump", { exact: true })
-      .selectOption(seedId(14));
-    await page
-      .getByRole("button", { name: "Create account", exact: true })
-      .click();
-    await expect(page).toHaveURL(/\/admin\/attendants\/[0-9a-f-]+$/);
-    await expect(page.getByText(password, { exact: true })).toHaveCount(0);
-    const user = (
-      await f.db.query(
-        "SELECT a.id,u.must_change_password FROM attendant a JOIN auth_user u ON u.id=a.user_id WHERE u.username_normalized=$1",
-        [username],
-      )
-    ).rows[0];
-    expect(user.must_change_password).toBe(true);
-    const stored = await page.evaluate(() =>
-      JSON.stringify([localStorage, sessionStorage]),
-    );
-    expect(stored).not.toContain(password);
-    await expect(
-      page.getByRole("button", { name: /Reset password|Disable account/i }),
-    ).toHaveCount(0);
+    await test.step("Open empty credential form and enter fictional account", async () => {
+      await page.goto("/admin/attendants/new");
+      await expect(page.getByLabel("Password", { exact: true })).toHaveValue(
+        "",
+      );
+      await page.getByLabel("Full name", { exact: true }).fill("Favour James");
+      await page.getByLabel("Username", { exact: true }).fill(username);
+      await page.getByLabel("Password", { exact: true }).fill(password);
+      await page
+        .getByLabel("Assign pump", { exact: true })
+        .selectOption(seedId(14));
+    });
+    await test.step("Submit once and await committed create response", async () => {
+      const response = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === "/api/admin/attendants" &&
+          r.request().method() === "POST",
+      );
+      await page
+        .getByRole("button", { name: "Create account", exact: true })
+        .click();
+      expect((await response).status()).toBe(201);
+      await expect(page).toHaveURL(/\/admin\/attendants\/[0-9a-f-]+$/);
+    });
+    await test.step("Check restricted account and absence of retained credential", async () => {
+      await expect(page.getByText(password, { exact: true })).toHaveCount(0);
+      const user = (
+        await f.db.query(
+          "SELECT a.id,u.must_change_password FROM attendant a JOIN auth_user u ON u.id=a.user_id WHERE u.username_normalized=$1",
+          [username],
+        )
+      ).rows[0];
+      expect(user.must_change_password).toBe(true);
+      const stored = await page.evaluate(() =>
+        JSON.stringify([localStorage, sessionStorage]),
+      );
+      expect(stored).not.toContain(password);
+      await expect(
+        page.getByRole("button", { name: /Reset password|Disable account/i }),
+      ).toHaveCount(0);
+    });
   } finally {
-    await f.db.end();
+    await test.step("Close fixture database connection", () => f.db.end());
   }
 });
 
