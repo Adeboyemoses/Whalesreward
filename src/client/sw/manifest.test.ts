@@ -21,6 +21,7 @@ describe("attendant precache build inputs", () => {
     for (const route of [
       "sign-in",
       "sale",
+      "register",
       "account",
       "account/hand-over",
       "access-expired",
@@ -88,6 +89,7 @@ describe("attendant precache build inputs", () => {
     ).toEqual([
       { url: "/attendant/sign-in", revision: "fixture-build" },
       { url: "/attendant/sale", revision: "fixture-build" },
+      { url: "/attendant/register", revision: "fixture-build" },
       { url: "/attendant/account", revision: "fixture-build" },
       { url: "/attendant/account/hand-over", revision: "fixture-build" },
       { url: "/attendant/access-expired", revision: "fixture-build" },
