@@ -1,7 +1,13 @@
 /* Station screens use the vendored board classes; these rules only arrange dynamic states. */
+/* An explicit zero minimum keeps wide tables inside their own scroll container. */
 .wr-station {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: var(--space-6);
+}
+.wr-station > * {
+  min-width: 0;
 }
 .wr-station .wr-sheet {
   min-width: 0;
