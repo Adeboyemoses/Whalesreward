@@ -140,6 +140,15 @@ export async function settle(
       policy.campaignEligible && !held,
     ],
   );
+  for (const code of reasons.filter(
+    (r) =>
+      r === "capture_authorization_unresolved" ||
+      r === "capture_time_unresolved",
+  ))
+    await db.query(
+      "INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES($1,$2,$3,$4,clock_timestamp(),1)",
+      [newId(), p.id, code, `p20-${CAPTURE_POLICY_VERSION}`],
+    );
   await db.query(
     `UPDATE purchase SET status=$2,current_revision_id=$3,version=version+1 WHERE id=$1 AND status='finalizing'`,
     [p.id, held ? "held" : "credited", held ? null : revisionId],
