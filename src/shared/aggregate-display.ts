@@ -1,7 +1,7 @@
 import type { QuantityUnit } from "./quantity";
 /** Read-only aggregate display; does not expand purchase/input money bounds. */
 export function formatAggregateNaira(value: string): string {
-  if (!/^(0|[1-9][0-9]{0,29})$/.test(value))
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]{0,29})$/.test(value))
     throw new TypeError("Expected nonnegative aggregate kobo");
   const kobo = BigInt(value),
     whole = (kobo / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -13,6 +13,7 @@ export function formatAggregateQuantity(
   unit: QuantityUnit,
 ): string {
   if (
+    typeof value !== "string" ||
     !/^\d{1,24}(?:\.\d{1,6})?$/.test(value) ||
     (unit !== "litre" && unit !== "kilogram")
   )
