@@ -38,3 +38,7 @@ A populated-history comparison also exposed the pending-upload pill incorrectly 
 Fix-level desktop drift found during independent comparison was routed to builders: stretched K01/K04/K05 actions, inverted C01 toolbar widths and centered K02/K06 status panel. The A24 notice tone/copy/action placement was likewise routed to the phone builder. Final recapture verifies their explicit commits; the checker changed no production code.
 
 No staging Owner, cloud/provider operation, staging-data mutation, customer recovery workflow or physical-print acceptance occurred.
+
+## Formal round 1 error-path follow-up
+
+Normal rendered UI and the retained PNG/PDF/geometry artifacts are unchanged by builder fix `583e1dc`. The new error path is verified separately: real committed201 generation and202 export responses were truncated after `route.fetch`; **2 failed /0 passed** before the fix, then the malformed-success and existing lost-transport cases passed **12/12 (13.6 seconds)** across both browser projects with two repetitions, two workers and zero retries. Retry retains the original operation/body/result and one batch/audit/export snapshot; fresh-key controls remain unavailable until reconciliation. See `tests/customers-cards/BASELINE.md` and tests `I-16 malformed successful generation response retains the committed operation until same-key reconciliation` and `I-20 malformed successful export response retains one snapshot and forbids a new key until reconciled`. No new normal-screen or native PDF visual acceptance is implied.

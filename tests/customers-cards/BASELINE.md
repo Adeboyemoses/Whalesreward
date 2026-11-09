@@ -43,3 +43,14 @@ The preliminary fresh-read correction passed **10/10 (27.2 seconds)**. The final
 Typecheck and scoped ESLint passed. Full-default/policy gates must still be rerun by the EM; no green full-head result is claimed here.
 
 The other frozen-run failure is the unchanged station assignment contract fake's `route.fulfill: Route is already handled!` at `tests/station/assignment-end-fake.ts:63`, matching the existing WHR-83 report with unknown root cause. Its source was not changed or reclassified as fixed.
+
+## Formal round 1: committed success with an unreadable response
+
+Code and integrity reviewers independently identified the genuine acceptance P1: a malformed successful HTTP response produced `invalid_response` with status201/202, but the mutation hook treated it as rejected and offered a fresh-key review after the server had committed.
+
+Independent browser regressions `44c9932` use the real local server and database: fetch the actual201 generation or202 export response, record its server ID, confirm one committed database record, then deliver the same successful status with truncated JSON (`{"data":`). These are protocol-failure probes after real acceptance, not mocked business success. Before fix integration, the desktop run ended **2 failed, 0 passed**, zero retries, because Retry same confirmation was absent. Error contexts confirmed Keep editing/Review a new batch/Cancel and Review a new export were exposed instead.
+
+After explicit builder fix `583e1dc` (checker integration `179d6eb`), the two malformed-success cases and the existing lost-transition/export case passed **12/12 (13.6 seconds)**: desktop and attendant, two repetitions each, two workers, zero failures/skips/retries. Command:
+`pnpm exec playwright test --config tests/customers-cards/playwright.config.ts --grep 'malformed successful|lost transition' --repeat-each=2 --workers=2 --retries=0 --reporter=line`.
+
+The assertions prove no fresh-key controls until reconciliation, original body/operation ID and server result ID on retry, exactly one generated batch/audit and one immutable export snapshot, and unchanged batch lifecycle. Existing abort tests, authority/domain-conflict behavior, quotas and standard timeouts remain unchanged. Typecheck and scoped ESLint passed. No production code was written by the checker. Full final-head gates and formal round2 remain the EM's responsibility; no new full-suite success is claimed here.
