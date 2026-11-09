@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { lockAssignmentHistory } from "../../lib/assignment-history-lock";
 import { lockPriceHistory } from "../../lib/price-history-lock";
 import { hashPassword } from "better-auth/crypto";
 import { newId } from "../../lib/ids";
@@ -269,6 +270,13 @@ export async function stationWrite(
           { ...parsed, targetId },
           async () => {
             // Security lock is first; lock identity, aggregate and interval in order.
+            const identity = (
+              await db.query("SELECT user_id FROM attendant WHERE id=$1", [
+                targetId,
+              ])
+            ).rows[0];
+            if (!identity) throw new AuthError("not_found", 404);
+            await lockAssignmentHistory(db, identity.user_id, "write");
             const user = (
               await db.query(
                 "SELECT u.id,u.auth_version,u.enabled FROM auth_user u JOIN attendant a ON a.user_id=u.id WHERE a.id=$1 FOR UPDATE OF u",
@@ -380,6 +388,13 @@ export async function stationWrite(
           action,
           { ...parsed, targetId },
           async () => {
+            const identity = (
+              await db.query("SELECT user_id FROM attendant WHERE id=$1", [
+                targetId,
+              ])
+            ).rows[0];
+            if (!identity) throw new AuthError("not_found", 404);
+            await lockAssignmentHistory(db, identity.user_id, "write");
             const a = (
               await db.query(
                 "SELECT a.*,u.enabled FROM attendant a JOIN auth_user u ON u.id=a.user_id WHERE a.id=$1 FOR UPDATE OF a",

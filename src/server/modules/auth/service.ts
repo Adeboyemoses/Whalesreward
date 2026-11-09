@@ -11,7 +11,7 @@ import { AUTH_POLICY } from "./config";
 import { digest, hmac, sessionSecret } from "./crypto";
 import { AuthError } from "./errors";
 import { sessionView, restrictedSessionView, type LiveSession } from "./repo";
-import { securityLock } from "../admin-access/repo";
+import { securityLock } from "../../lib/security-lock";
 import { requireSession } from "../../lib/authz";
 import { consumeLimits } from "./rate-limit";
 

@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { securityLock } from "../admin-access/repo";
+import { lockAssignmentHistory } from "../../lib/assignment-history-lock";
 import { AuthError } from "./errors";
 import {
   attendantSessionSchema,
@@ -23,7 +23,14 @@ export async function liveSession(
 ): Promise<LiveSession> {
   // Take the boundary lock in a separate statement before opening the authority
   // snapshot. Offboarding and sign-in use this same transaction lifetime lock.
-  await securityLock(db);
+  const identity = (
+    await db.query<{ user_id: string }>(
+      "SELECT user_id FROM auth_session WHERE secret_verifier=$1",
+      [verifier],
+    )
+  ).rows[0];
+  if (!identity) throw new AuthError("unauthenticated", 401);
+  await lockAssignmentHistory(db, identity.user_id, "read");
   const result = await db.query<LiveSession>(
     `SELECT s.id,s.user_id,s.expires_at,s.created_at,s.capture_context_id,s.access_scope,u.must_change_password
  FROM auth_session s JOIN auth_user u ON u.id=s.user_id
