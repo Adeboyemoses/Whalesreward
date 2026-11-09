@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
 import { stationFixture } from "../../station/helpers";
 
 test("F01 mobile table scrolling stays inside the document viewport", async ({
@@ -30,6 +31,11 @@ test("F01 mobile table scrolling stays inside the document viewport", async ({
         };
       }),
     }));
+    await mkdir("tests/design-parity/station/screenshots", { recursive: true });
+    await writeFile(
+      "tests/design-parity/station/screenshots/F01-overflow-390.metrics.json",
+      JSON.stringify(geometry, null, 2) + "\n",
+    );
     // Nonsecret geometry and a fixture-only list screenshot make a failure actionable.
     if (geometry.document > geometry.viewport)
       await page.screenshot({
