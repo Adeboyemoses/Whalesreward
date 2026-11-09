@@ -3,6 +3,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdminSession } from "./session";
 import { StationPortal, stationSections } from "./station";
+import { CustomerPortal } from "./customers";
+import { CardsPortal } from "./cards";
+const customerSections = [
+  { grant: "customers", label: "Customers", href: "/admin/customers" },
+  { grant: "cards", label: "Loyalty cards", href: "/admin/cards" },
+] as const;
+const portalSections = [...stationSections, ...customerSections];
 import type { AdminSession as Session } from "@/client/admin-session";
 import { adminTime, adminAction } from "@/client/admin-display";
 import {
@@ -48,6 +55,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
         .filter(Boolean)
     : initialPath;
   const route = path.join("/");
+  const customerRoute = ["customers", "cards", "sales"].includes(path[0] ?? "");
   const stationRoute = ["pumps", "prices", "attendants"].includes(
     path[0] ?? "",
   );
@@ -86,7 +94,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
       !session.permissions?.includes("users") &&
       !session.permissions?.includes("roles")
     ) {
-      const target = stationSections.find((item) =>
+      const target = portalSections.find((item) =>
         session.permissions?.includes(item.grant),
       );
       if (target) router.replace(target.href);
@@ -125,7 +133,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
       !route &&
       !grants.includes("users") &&
       !grants.includes("roles") &&
-      !stationSections.some((item) => grants.includes(item.grant))
+      !portalSections.some((item) => grants.includes(item.grant))
     ) {
       return (
         <div className="wr-root wr-admin wr-admin-access-card">
@@ -151,15 +159,20 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
       <AdminShell
         station={session.station?.name ?? ""}
         active={
-          stationRoute
-            ? (stationSections.find((item) => item.href === "/admin/" + path[0])
-                ?.label ?? "Station pumps")
-            : path[0] === "roles"
-              ? "Roles & permissions"
-              : "Admin users"
+          customerRoute
+            ? path[0] === "cards"
+              ? "Loyalty cards"
+              : "Customers"
+            : stationRoute
+              ? (stationSections.find(
+                  (item) => item.href === "/admin/" + path[0],
+                )?.label ?? "Station pumps")
+              : path[0] === "roles"
+                ? "Roles & permissions"
+                : "Admin users"
         }
         items={[
-          ...stationSections
+          ...portalSections
             .filter((item) =>
               item.grant === "pumps"
                 ? grants.some((grant) =>
@@ -182,7 +195,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           </>
         }
       >
-        {!stationRoute && (
+        {!stationRoute && !customerRoute && (
           <div className="wr-pagehead">
             <div>
               <div className="wr-eyebrow">Access management</div>
@@ -201,7 +214,13 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
             {error}
           </p>
         )}
-        {stationRoute ? (
+        {customerRoute ? (
+          path[0] === "cards" ? (
+            <CardsPortal key={epoch} path={path} session={session} />
+          ) : (
+            <CustomerPortal key={epoch} path={path} session={session} />
+          )
+        ) : stationRoute ? (
           <StationPortal key={epoch} path={path} session={session} />
         ) : !route && !grants.includes("users") && !grants.includes("roles") ? (
           <p role="status">Opening your portal section…</p>

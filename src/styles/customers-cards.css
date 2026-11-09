@@ -1,0 +1,98 @@
+.wr-customers-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.wr-customers-cards .wr-cc-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+.wr-customers-cards .wr-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.wr-customers-cards .wr-sheet h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wr-customers-cards form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.wr-customers-cards .wr-toolbar {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 12px;
+}
+.wr-customers-cards .wr-toolbar > .wr-field:first-child {
+  flex: 1;
+}
+.wr-customers-cards .wr-cc-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.wr-customers-cards .wr-cc-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+}
+.wr-customers-cards .wr-cc-exports {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.wr-customers-cards .wr-kv-row {
+  overflow-wrap: anywhere;
+}
+.wr-customers-cards .wr-kpi-value {
+  overflow-wrap: anywhere;
+}
+.wr-customers-cards .wr-cc-pdf {
+  width: 100%;
+  height: 75vh;
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-md);
+}
+@media (max-width: 900px) {
+  .wr-customers-cards .wr-cc-two,
+  .wr-customers-cards .wr-cc-kpis {
+    grid-template-columns: 1fr;
+  }
+  .wr-customers-cards .wr-toolbar,
+  .wr-customers-cards .wr-cc-status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .wr-customers-cards .wr-table {
+    min-width: 720px;
+  }
+  .wr-customers-cards .wr-kv-row {
+    gap: 12px;
+  }
+  .wr-customers-cards .wr-kpi-value {
+    font-size: 28px;
+  }
+}
+
+.wr-customers-cards > * {
+  min-width: 0;
+}
+.wr-customers-cards .wr-row {
+  flex-wrap: wrap;
+}
+.wr-customers-cards textarea.wr-station-reason {
+  height: auto;
+  resize: vertical;
+}
