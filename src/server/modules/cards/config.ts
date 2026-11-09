@@ -1,4 +1,4 @@
-import type { CardPrintLayout } from "./renderer";
+import { validateCardPrintLayout, type CardPrintLayout } from "./renderer";
 import { AuthError } from "../auth/errors";
 export const CARD_POLICY = Object.freeze({
   maxBatchSize: 1000,
@@ -40,9 +40,10 @@ export function cardOptions(): CardOptions {
         )
       )
         throw new Error();
+      validateCardPrintLayout(value);
       layout = value;
     } catch {
-      throw new AuthError("print_layout_unconfigured", 503);
+      layout = undefined;
     }
   }
   const lifetime = process.env.WHR_CARD_EXPORT_LIFETIME_SECONDS;

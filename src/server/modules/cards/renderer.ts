@@ -42,7 +42,7 @@ const mm = (value: number) => (value * 72) / 25.4;
 const FOOTER_MM = 8;
 const exactCardCode = new RegExp(`^[${CARD_ALPHABET}]{7}$`);
 
-function validateLayout(layout: CardPrintLayout) {
+export function validateCardPrintLayout(layout: CardPrintLayout) {
   const {
     pageWidthMm: pw,
     pageHeightMm: ph,
@@ -167,7 +167,7 @@ export async function renderCardExport(
     };
   }
   if (!layout) throw new Error("print_layout_unconfigured");
-  const { columns, rows } = validateLayout(layout);
+  const { columns, rows } = validateCardPrintLayout(layout);
   const printableItems = items.filter((item) => item.state === "unassigned");
   if (!printableItems.length) throw new Error("no_printable_cards");
   const doc = await PDFDocument.create();

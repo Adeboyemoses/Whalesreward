@@ -16,6 +16,7 @@ import { newId } from "../../lib/ids";
 import {
   requireAdminSession,
   requireSession,
+  requirePermission,
   securityLock,
 } from "../../lib/authz";
 import { transaction } from "../admin-access/repo";
@@ -113,9 +114,16 @@ export async function handleCardsCustomers(
       token = isAttendant ? attendantCookie(request) : adminCookie(request);
     const actor = await transaction(pool, async (db) => {
       await securityLock(db);
-      return isAttendant
-        ? requireSession(db, digest(token ?? ""))
-        : requireAdminSession(db, token);
+      if (isAttendant) return requireSession(db, digest(token ?? ""));
+      const current = await requireAdminSession(db, token);
+      requirePermission(current, area === "cards" ? "cards" : "customers");
+      if (action === "purchases") requirePermission(current, "sales");
+      if (action === "create") requirePermission(current, "cardGenerate");
+      if (action === "mark-printed") requirePermission(current, "cardPrint");
+      if (action === "activate") requirePermission(current, "cardActivate");
+      if (["export", "exports", "export-detail", "file"].includes(action))
+        requirePermission(current, "cardExport");
+      return current;
     });
     const exportRate = ["export", "file"].includes(action),
       generate = action === "create",
@@ -185,6 +193,7 @@ export async function handleCardsCustomers(
       headers.set("Content-Length", String(file.bytes.byteLength));
       return new Response(Buffer.from(file.bytes), { headers });
     } else if (write) {
+      if (action === "export") createCardArtifactStorage();
       const result = await cardsWrite(
         pool,
         config,

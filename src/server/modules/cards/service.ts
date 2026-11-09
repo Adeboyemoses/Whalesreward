@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { randomInt } from "node:crypto";
+import { validateCardPrintLayout } from "./renderer";
 import { CARD_ALPHABET, cardCode } from "../../../shared/contracts/sync";
 import { pageSchema } from "../../../shared/contracts/admin";
 import {
@@ -188,8 +189,15 @@ export async function cardsWrite(
           throw new AuthError("version_conflict", 409);
         if (action === "export") {
           const body = createExportSchema.parse(parsed);
-          if (body.format === "pdf" && !options.layout)
-            throw new AuthError("print_layout_unconfigured", 503);
+          if (body.format === "pdf") {
+            if (!options.layout)
+              throw new AuthError("print_layout_unconfigured", 503);
+            try {
+              validateCardPrintLayout(options.layout);
+            } catch {
+              throw new AuthError("print_layout_unconfigured", 503);
+            }
+          }
           const active = (
             await db.query(
               "SELECT count(*)::int AS n FROM card_export WHERE created_by=$1 AND(status='pending' OR(status='failed' AND attempts<$2))",
