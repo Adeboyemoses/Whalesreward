@@ -390,6 +390,166 @@ describe("M3 sales reads and private evidence", () => {
       ),
     ).rejects.toMatchObject({ code: "evidence_unavailable" });
   });
+  it("bounds each detail collection and resumes its scoped history cursor without leaking private reasons", async () => {
+    const saleResult = await sale();
+    const base = (
+      await pool.query("SELECT current_revision_id FROM purchase WHERE id=$1", [
+        saleResult.purchaseId,
+      ])
+    ).rows[0].current_revision_id;
+    for (let n = 0; n < 29; n++)
+      await pool.query(
+        `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,based_on_revision_id,kind,state,reason,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id) SELECT $1,purchase_id,$2,$3,actor_user_id,'fictional',$4,'attendant_correction','proposed','Private revision narrative',clock_timestamp(),amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,evidence_asset_id FROM purchase_revision WHERE id=$4`,
+        [newId(), n + 2, newId(), base],
+      );
+    const detail = await readSales(
+      pool,
+      config,
+      attendant.token,
+      "attendant",
+      "detail",
+      {},
+      saleResult.purchaseId,
+    );
+    const parsed = (
+      await import("../../src/shared/contracts/sales")
+    ).attendantSaleDetailSchema.parse(detail);
+    expect(parsed.revisions).toHaveLength(25);
+    expect(parsed.historyCursors.revisions).toBeTruthy();
+    expect(JSON.stringify(parsed)).not.toContain("Private revision narrative");
+    const next = await readSales(
+      pool,
+      config,
+      attendant.token,
+      "attendant",
+      "history",
+      { kind: "revisions", cursor: parsed.historyCursors.revisions },
+      saleResult.purchaseId,
+    );
+    expect(next).toMatchObject({ items: expect.any(Array), nextCursor: null });
+    expect((next as { items: unknown[] }).items).toHaveLength(5);
+    await expect(
+      readSales(
+        pool,
+        config,
+        attendant.token,
+        "attendant",
+        "history",
+        { kind: "corrections", cursor: parsed.historyCursors.revisions },
+        saleResult.purchaseId,
+      ),
+    ).rejects.toMatchObject({ code: "invalid_request" });
+  });
+  it("loads authority after a blocked security boundary and denies a permission revoked before release", async () => {
+    const writer = await pool.connect();
+    await writer.query("BEGIN");
+    await writer.query(
+      "SELECT id FROM security_state WHERE id=true FOR UPDATE",
+    );
+    await writer.query(
+      "DELETE FROM role_permission WHERE role_id=$1 AND permission_code=$2",
+      [id(1), "sales"],
+    );
+    let finished = false;
+    const pending = adminSearch().finally(() => {
+      finished = true;
+    });
+    // Observe a real database lock wait, not an assumed timing race.
+    for (let n = 0; n < 100; n++) {
+      const waiting = (
+        await pool.query(
+          "SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT id FROM security_state%'",
+        )
+      ).rowCount;
+      if (waiting) break;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(finished).toBe(false);
+    await writer.query("COMMIT");
+    writer.release();
+    await expect(pending).rejects.toMatchObject({ code: "permission_denied" });
+    await pool.query(
+      "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'sales')",
+      [id(1)],
+    );
+  });
+  it("serializes slow photo I/O with permission revocation and denies the next issuance", async () => {
+    const s = await sale();
+    const photo = (
+      await pool.query("SELECT id FROM photo_asset WHERE purchase_id=$1", [
+        s.purchaseId,
+      ])
+    ).rows[0].id;
+    let releaseRead!: () => void, enteredRead!: () => void;
+    const entered = new Promise<void>((r) => {
+      enteredRead = r;
+    });
+    const slow = new Promise<void>((r) => {
+      releaseRead = r;
+    });
+    const issued = readSalePhoto(
+      pool,
+      adminToken,
+      "admin",
+      s.purchaseId,
+      { assetId: photo },
+      () => ({
+        ...reader,
+        available: async (key, bytes) => {
+          enteredRead();
+          await slow;
+          return reader.available(key, bytes);
+        },
+      }),
+    );
+    await entered;
+    const writer = await pool.connect();
+    let committed = false;
+    const revoke = (async () => {
+      await writer.query("BEGIN");
+      await writer.query(
+        "SELECT id FROM security_state WHERE id=true FOR UPDATE",
+      );
+      await writer.query(
+        "DELETE FROM role_permission WHERE role_id=$1 AND permission_code='sales'",
+        [id(1)],
+      );
+      await writer.query("COMMIT");
+      committed = true;
+      writer.release();
+    })();
+    for (let n = 0; n < 100; n++) {
+      const waiting = (
+        await pool.query(
+          "SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT id FROM security_state%'",
+        )
+      ).rowCount;
+      if (waiting) break;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(committed).toBe(false);
+    releaseRead();
+    await expect(issued).resolves.toMatchObject({ assetId: photo });
+    await revoke;
+    const unavailable = vi.fn(() => {
+      throw new Error("No configuration");
+    });
+    await expect(
+      readSalePhoto(
+        pool,
+        adminToken,
+        "admin",
+        s.purchaseId,
+        { assetId: photo },
+        unavailable,
+      ),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    expect(unavailable).not.toHaveBeenCalled();
+    await pool.query(
+      "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'sales')",
+      [id(1)],
+    );
+  });
   it("photo/search HTTP is private, no-store and rejects GET search or unknown query fields", async () => {
     const request = new Request(`${config.origin}/api/admin/sales/search`, {
       method: "POST",
