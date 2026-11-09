@@ -541,9 +541,12 @@ export function AssignmentEditor({
   const mutation = useMutation<AssignmentReceipt | AssignmentEndReceipt>(
     end ? assignmentEndReceiptSchema : assignmentReceiptSchema,
     (value) => {
-      const path = canProfile
-        ? `/admin/attendants/${value.attendant.id}`
-        : `/admin/pumps/${"ended" in value ? value.ended.pumpId : value.attendant.assignment?.pump.id}`;
+      const path =
+        pumpId || contextPumpId
+          ? `/admin/pumps/${pumpId ?? contextPumpId}`
+          : canProfile
+            ? `/admin/attendants/${value.attendant.id}`
+            : `/admin/pumps/${"ended" in value ? value.ended.pumpId : value.attendant.assignment?.pump.id}`;
       receipt.save(
         path,
         "ended" in value
