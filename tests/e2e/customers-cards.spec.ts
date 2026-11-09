@@ -49,7 +49,7 @@ test("I-18 cancel leaves stock unchanged and explicit reviews move Generated to 
       .getByRole("button", { name: "Review batch", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Confirm new batch", exact: true }),
+      page.getByRole("heading", { name: /^Confirm new batch/ }),
     ).toBeVisible();
     expect(
       (

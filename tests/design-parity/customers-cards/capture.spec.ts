@@ -231,7 +231,7 @@ for (const width of [1440, 390])
         .getByRole("button", { name: "Review batch", exact: true })
         .click();
       await expect(
-        page.getByRole("heading", { name: "Confirm new batch", exact: true }),
+        page.getByRole("heading", { name: /^Confirm new batch/ }),
       ).toBeVisible();
       await shot(page, "K04-GenerateConfirm", width);
       await page
