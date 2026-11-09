@@ -770,4 +770,82 @@ describe("independent P-21 offboarding adversarial checks", () => {
       await pool.query(`DROP FUNCTION ${name}()`);
     }
   });
+  it.each([
+    { scope: "ready", restricted: false },
+    { scope: "first-password", restricted: true },
+  ])(
+    "I-09 P-21 revoked sign-in replay cannot restore a $scope session or anchor",
+    async ({ restricted }) => {
+      const f = await target(restricted);
+      const originalKey = newId();
+      const body = { username: f.username, password, deviceId: newId() };
+      const signIn = async (key: string, input = body) => {
+        const attempt = request("attendant/sign-in", { body: input });
+        attempt.headers.set("idempotency-key", key);
+        return result(await handleAuth(attempt, "sign-in"));
+      };
+      const original = await signIn(originalKey);
+      expect(original.response.status, JSON.stringify(original.body)).toBe(200);
+      expect(original.cookie).toBeTruthy();
+      if (restricted)
+        expect(original.body.data.state).toBe("password_change_required");
+      else expect(original.body.data.captureContextId).toBeTruthy();
+      const ended = await end(f, endInput(f));
+      expect(ended.response.status, JSON.stringify(ended.body)).toBe(200);
+      const afterEnd = await snapshot(f.id);
+      const receipts = async () =>
+        (
+          await pool.query(
+            `SELECT to_jsonb(r) receipt FROM attendant_sign_in_request r
+      JOIN auth_session s ON s.id=r.session_id WHERE s.user_id=$1 ORDER BY r.request_key`,
+            [f.userId],
+          )
+        ).rows;
+      const originalReceipts = await receipts();
+      expect(originalReceipts).toHaveLength(1);
+      for (const [key, input, status, code, message] of [
+        [originalKey, body, 401, "unauthenticated", "Sign in to continue."],
+        [
+          newId(),
+          body,
+          422,
+          "assignment_unavailable",
+          "Sign-in is unavailable. Ask a station manager for help.",
+        ],
+        [
+          originalKey,
+          { ...body, password: "Fictional incorrect password" },
+          401,
+          "invalid_credentials",
+          "The username or password is incorrect.",
+        ],
+        [
+          newId(),
+          { ...body, password: "Fictional incorrect password" },
+          401,
+          "invalid_credentials",
+          "The username or password is incorrect.",
+        ],
+      ] as const) {
+        const denied = await signIn(key, input);
+        expect(denied.response.status, JSON.stringify(denied.body)).toBe(
+          status,
+        );
+        expect(denied.body.error).toEqual({ code, message, retryable: false });
+        expect(denied.response.headers.get("set-cookie")).toBeNull();
+        expect(denied.response.headers.get("cache-control")).toBe("no-store");
+        expect(denied.body.data).toBeUndefined();
+        expect(await snapshot(f.id)).toEqual(afterEnd);
+        expect(await receipts()).toEqual(originalReceipts);
+      }
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int n FROM auth_session WHERE user_id=$1 AND revoked_at IS NULL",
+            [f.userId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    },
+  );
 });
