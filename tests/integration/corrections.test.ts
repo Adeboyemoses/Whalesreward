@@ -3,7 +3,14 @@ import pg from "pg";
 import { randomBytes } from "node:crypto";
 import { digest } from "../../src/server/modules/auth/crypto";
 import sharp from "sharp";
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
+import {
+  handleCorrections,
+  correctionStorage,
+} from "../../src/server/modules/corrections/http";
+import { COOKIE as ATTENDANT_COOKIE } from "../../src/server/modules/auth/http";
+import { COOKIE as ADMIN_COOKIE } from "../../src/server/modules/admin-access/http";
+import { database } from "../../src/server/lib/db";
 import { newId } from "../../src/server/lib/ids";
 import type { EvidenceStorage } from "../../src/server/adapters/storage";
 import { createSyncService } from "../../src/server/modules/sync/service";
@@ -30,8 +37,16 @@ const storage: EvidenceStorage = {
 const sync = createSyncService({ pool, storage }),
   svc = createCorrectionsService({ pool, storage });
 let jpeg: Buffer;
-async function fixture(held = false) {
+async function fixture(held = false, sellerName?: string) {
   const f = await syncFixture(pool, jpeg);
+  if (sellerName) {
+    const id = newId();
+    await pool.query(
+      `INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest) SELECT $1,attendant_id,assignment_id,signed_in_at,offline_expires_at,$3,seller_username,device_binding_digest FROM capture_context WHERE id=$2`,
+      [id, f.original.captureContextId, sellerName],
+    );
+    f.original.captureContextId = id;
+  }
   if (held) await changePrice(pool, f);
   const s = await sync.submit(f.token, f.original);
   const u = await sync.uploadPermission(f.token, s.status.purchaseId, {
@@ -213,6 +228,12 @@ async function interveningRevision(
 }
 describe("M3 durable own correction processing", () => {
   beforeAll(async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", randomBytes(32).toString("hex"));
+    vi.stubEnv("BETTER_AUTH_URL", "https://corrections.example.test");
+    vi.stubEnv("WHR_ENV", "test");
+    // Disable only automatic scheduling; HTTP session, Origin, schema and service checks remain real.
+    vi.stubEnv("NEXT_PHASE", "phase-production-build");
+    vi.spyOn(correctionStorage, "read").mockImplementation(storage.read);
     await pool.query(
       await readFile(
         new URL("../../prisma/fixtures.sql", import.meta.url),
@@ -225,7 +246,11 @@ describe("M3 durable own correction processing", () => {
       .jpeg()
       .toBuffer();
   });
-  afterAll(() => pool.end());
+  afterAll(async () => {
+    await Promise.all([pool.end(), database().end()]);
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
   it("reserves receipt and base, then replaces one accepted contribution without rewriting original", async () => {
     const f = await fixture();
     const result = await svc.submit(f.token, f.purchaseId, f.body);
@@ -643,6 +668,253 @@ describe("M3 durable own correction processing", () => {
         ).rows[0].n,
       ).toBe(0);
       expect((await pending(c.id)).state).toBe("awaiting_review");
+    },
+  );
+  it.each([
+    "+234 800 000 0099",
+    "+1 (000) 000-0000",
+    "+44 (0000) 000-000",
+    "2348000000099",
+    "+234 (800) 000-0099",
+    "(+234)-800-000-0099",
+    "+ 2 3 4 (8 0 0) 0 0 0-0 0 9 9",
+    "+234 (0) 800 000 0099",
+    "(080) 000-00099",
+    "0 (8 0 0) 000 0099",
+    "+234 (80*) ***-0099",
+    "(080) ****-0099",
+  ])(
+    "HTTP rejects formatted phone in submit and decision without domain writes: %s",
+    async (phone) => {
+      const f = await fixture();
+      const reason = `Call ${phone}`;
+      const post = (
+        action: "submit" | "decide",
+        body: unknown,
+        token: string,
+        id?: string,
+      ) =>
+        handleCorrections(
+          new Request(
+            `https://corrections.example.test/api/${action === "submit" ? "attendant" : "admin"}/sales/${f.purchaseId}/corrections${id ? `/${id}/decision` : ""}`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                Origin: "https://corrections.example.test",
+                cookie: `${action === "submit" ? ATTENDANT_COOKIE : ADMIN_COOKIE}=${token}`,
+              },
+              body: JSON.stringify(body),
+            },
+          ),
+          action,
+          f.purchaseId,
+          id,
+        );
+      const before = (
+        await pool.query(
+          "SELECT version,current_revision_id FROM purchase WHERE id=$1",
+          [f.purchaseId],
+        )
+      ).rows[0];
+      const response = await post("submit", { ...f.body, reason }, f.token);
+      const text = await response.text();
+      expect(response.status, text).toBe(400);
+      expect(JSON.parse(text).error).toEqual({
+        code: "invalid_request",
+        message: "This request could not be completed.",
+        retryable: false,
+      });
+      expect(text).not.toContain(phone);
+      expect(
+        (
+          await pool.query(
+            "SELECT version,current_revision_id FROM purchase WHERE id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0],
+      ).toEqual(before);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM correction_request WHERE purchase_id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM audit_event WHERE target_id=$1 AND action LIKE 'correction_%'",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      const c = await late(f),
+        proposal = await pending(c.id),
+        guardBefore = await guard(f.purchaseId, c);
+      const rejected = await post(
+        "decide",
+        { ...guardBefore, reason },
+        await adminToken(),
+        c.id,
+      );
+      const error = await rejected.text();
+      expect(rejected.status, error).toBe(400);
+      expect(JSON.parse(error).error.code).toBe("invalid_request");
+      expect(error).not.toContain(phone);
+      expect(await pending(c.id)).toEqual(proposal);
+      expect(await guard(f.purchaseId, c)).toMatchObject({
+        expectedVersion: guardBefore.expectedVersion,
+        expectedRevisionId: guardBefore.expectedRevisionId,
+      });
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM sale_decision WHERE purchase_id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM audit_event WHERE target_id=$1 AND action IN ('correction_approved','correction_rejected')",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    },
+  );
+  it("HTTP accepts numeric operational reasons and redacts formatted phone actor and original seller snapshots", async () => {
+    const phone = "+234 (800) 000-0099",
+      f = await fixture(false, `Grace ${phone}`);
+    await pool.query("UPDATE auth_user SET display_name=$2 WHERE id=$1", [
+      f.userId,
+      `Grace ${phone}`,
+    ]);
+    const input = {
+      ...f.body,
+      reason:
+        "Correct 2 + 3 litres at pump 3; amount 3000000 kobo, quantity 30.00",
+    };
+    const response = await handleCorrections(
+      new Request(
+        `https://corrections.example.test/api/attendant/sales/${f.purchaseId}/corrections`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            Origin: "https://corrections.example.test",
+            cookie: `${ATTENDANT_COOKIE}=${f.token}`,
+          },
+          body: JSON.stringify(input),
+        },
+      ),
+      "submit",
+      f.purchaseId,
+    );
+    expect(response.status, await response.clone().text()).toBe(201);
+    const received = await response.json();
+    expect(received.data.reason).toBe(input.reason);
+    await drain();
+    const events = (
+      await pool.query(
+        "SELECT actor_snapshot,originating_seller_snapshot FROM audit_event WHERE target_id=$1 AND action LIKE 'correction_%' ORDER BY occurred_at",
+        [f.purchaseId],
+      )
+    ).rows;
+    expect(events[0].actor_snapshot.nameAtEvent).toBe("Grace [phone removed]");
+    expect(events[0].originating_seller_snapshot.name).toBe(
+      "Grace [phone removed]",
+    );
+    expect(JSON.stringify(events)).not.toContain(phone);
+    const g = await fixture(),
+      c = await late(g),
+      body = {
+        ...(await guard(g.purchaseId, c)),
+        reason: "Confirmed 30 litres from 3000000 kobo at pump 3",
+      };
+    const decision = await handleCorrections(
+      new Request(
+        `https://corrections.example.test/api/admin/sales/${g.purchaseId}/corrections/${c.id}/decision`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            Origin: "https://corrections.example.test",
+            cookie: `${ADMIN_COOKIE}=${await adminToken()}`,
+          },
+          body: JSON.stringify(body),
+        },
+      ),
+      "decide",
+      g.purchaseId,
+      c.id,
+    );
+    expect(decision.status, await decision.clone().text()).toBe(200);
+    expect((await decision.json()).data.reason).toBe(body.reason);
+  });
+  it.each(["+234 800 000 0099", "+234 (800) 000-0099"])(
+    "HTTP decision independently rejects formatted phone with unchanged proposal: %s",
+    async (phone) => {
+      const f = await fixture(),
+        c = await late(f),
+        before = await pending(c.id),
+        body = { ...(await guard(f.purchaseId, c)), reason: `Call ${phone}` };
+      const response = await handleCorrections(
+        new Request(
+          `https://corrections.example.test/api/admin/sales/${f.purchaseId}/corrections/${c.id}/decision`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              Origin: "https://corrections.example.test",
+              cookie: `${ADMIN_COOKIE}=${await adminToken()}`,
+            },
+            body: JSON.stringify(body),
+          },
+        ),
+        "decide",
+        f.purchaseId,
+        c.id,
+      );
+      const text = await response.text();
+      expect(response.status, text).toBe(400);
+      expect(JSON.parse(text).error).toEqual({
+        code: "invalid_request",
+        message: "This request could not be completed.",
+        retryable: false,
+      });
+      expect(text).not.toContain(phone);
+      expect(await pending(c.id)).toEqual(before);
+      expect(
+        (
+          await pool.query(
+            "SELECT version,current_revision_id FROM purchase WHERE id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0],
+      ).toEqual({
+        version: body.expectedVersion,
+        current_revision_id: body.expectedRevisionId,
+      });
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM sale_decision WHERE purchase_id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM audit_event WHERE target_id=$1 AND action IN ('correction_approved','correction_rejected')",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
     },
   );
 });

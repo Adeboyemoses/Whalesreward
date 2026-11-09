@@ -174,8 +174,36 @@ async function view(db: pg.PoolClient, c: Correction) {
     policyBlocks: c.policy_blocks,
   });
 }
+// Recognize formatted international phone shapes and Nigerian national mobile numbers.
+// Do not classify arbitrary integer/decimal amounts or separate operational numbers as phones.
+const phoneSeparator = String.raw`[\s()\p{Pd}]*`;
+const mobileDigits = String.raw`[789*•xX]${phoneSeparator}[01*•xX](?:${phoneSeparator}[0-9*•xX]){8}`;
+const internationalPrefix = String.raw`(?:\+${phoneSeparator}2${phoneSeparator}3${phoneSeparator}4|0${phoneSeparator}0${phoneSeparator}2${phoneSeparator}3${phoneSeparator}4|2${phoneSeparator}3${phoneSeparator}4)`;
+const formattedPhone = new RegExp(
+  String.raw`(?<![0-9*•])(?:${internationalPrefix}${phoneSeparator}(?:0${phoneSeparator})?${mobileDigits}|0${phoneSeparator}${mobileDigits})(?![0-9*•xX])`,
+  "gu",
+);
+// An explicit '+' identifies an international number without imposing a country numbering policy.
+const internationalPhone = new RegExp(
+  String.raw`\+${phoneSeparator}[1-9](?:${phoneSeparator}[0-9*•xX]){6,14}(?![0-9*•xX])`,
+  "gu",
+);
+function redactPhones(value: string) {
+  return value
+    .replace(internationalPhone, "[phone removed]")
+    .replace(formattedPhone, (candidate) => {
+      const normalized = candidate
+        .replace(/[\s()\p{Pd}]/gu, "")
+        .replace(/^00234/, "+234")
+        .replace(/^234/, "+234")
+        .replace(/^\+2340/, "+234");
+      return /^(?:\+234|0)[789*•xX][01*•xX][0-9*•xX]{8}$/u.test(normalized)
+        ? "[phone removed]"
+        : candidate;
+    });
+}
 function privateAuditText(value: string) {
-  return auditText(value)
+  return auditText(redactPhones(value))
     .replace(
       /\b(?:otp|password|token|secret)\s*(?:[:=]\s*|\s+)\S+/gi,
       "[secret removed]",
@@ -183,8 +211,7 @@ function privateAuditText(value: string) {
     .replace(
       /\b(?:verification code|one[- ]time code|code)\s*(?::|=|is)?\s*\d{4,8}\b/gi,
       "[secret removed]",
-    )
-    .replace(/(?:\+234|0)[789][01][\d*•xX ()-]{7,}/g, "[phone removed]");
+    );
 }
 function safeReason(reason: string) {
   if (
