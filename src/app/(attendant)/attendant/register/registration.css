@@ -1,0 +1,43 @@
+.wr-registration .wr-screen {
+  gap: var(--space-4);
+}
+.wr-registration .wr-section + .wr-section {
+  padding-top: 0;
+  border-top: 0;
+}
+.wr-registration .wr-actionbar > .wr-btn {
+  width: 100%;
+}
+.wr-registration .wr-label {
+  flex-wrap: wrap;
+}
+.wr-registration .wr-category-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+.wr-registration .wr-category-panel .wr-btn {
+  justify-content: flex-start;
+}
+.wr-registration .wr-category-trigger {
+  width: 100%;
+  justify-content: space-between;
+  font-weight: 400;
+  color: var(--ink-900);
+  border-radius: var(--radius-md);
+}
+.wr-registration .wr-result {
+  padding-top: var(--space-2);
+}
+.wr-registration .wr-loyalty-card .wr-brand-name {
+  font-size: 15px;
+}
+.wr-registration .wr-loyalty-foot {
+  flex-wrap: wrap;
+}
+.wr-registration .wr-kv-row dd {
+  overflow-wrap: anywhere;
+}
+.wr-registration .wr-historical {
+  color: var(--on-inverse-muted);
+  font-size: 13px;
+}

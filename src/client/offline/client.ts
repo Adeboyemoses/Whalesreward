@@ -750,6 +750,21 @@ export class AttendantClient {
     }
     return this.checkAccess();
   }
+  // Online modules report a denial against the context which issued the request.
+  // The existing lock fences stale responses and retains every original/blob.
+  async observeAuthorityError(error: unknown, session: Session): Promise<void> {
+    if (
+      error instanceof ClientError &&
+      [
+        "unauthenticated",
+        "permission_denied",
+        "assignment_unavailable",
+        "online_sign_in_required",
+        "password_change_required",
+      ].includes(error.code)
+    )
+      await this.lockContext(session, true);
+  }
   private async lockContext(session: Session, clearVisible = false) {
     await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
       const meta = await this.db.meta.get("installation");

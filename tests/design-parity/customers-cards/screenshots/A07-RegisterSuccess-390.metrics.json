@@ -1,0 +1,73 @@
+{
+  "viewport": 390,
+  "document": 390,
+  "loyaltyCards": [
+    {
+      "identity": [
+        {
+          "x": 36,
+          "y": 508,
+          "width": 59,
+          "height": 17
+        },
+        {
+          "x": 95,
+          "y": 508,
+          "width": 7,
+          "height": 17
+        },
+        {
+          "x": 102,
+          "y": 508,
+          "width": 3,
+          "height": 17
+        },
+        {
+          "x": 105,
+          "y": 508,
+          "width": 59.640625,
+          "height": 17
+        },
+        {
+          "x": 105,
+          "y": 508,
+          "width": 59.640625,
+          "height": 17
+        }
+      ],
+      "station": [
+        {
+          "x": 36,
+          "y": 536,
+          "width": 96,
+          "height": 17
+        },
+        {
+          "x": 132,
+          "y": 536,
+          "width": 61,
+          "height": 17
+        }
+      ],
+      "monoFont": "\"IBM Plex Mono\", ui-monospace, \"SF Mono\", Menlo, monospace",
+      "wordmark": [
+        {
+          "x": 72,
+          "y": 366,
+          "width": 118.90625,
+          "height": 21
+        }
+      ]
+    }
+  ],
+  "wordmark": [
+    {
+      "x": 52,
+      "y": 16.5,
+      "width": 118.90625,
+      "height": 21
+    }
+  ],
+  "loyaltyFooter": [],
+  "shortTargets": []
+}

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ScanLine } from "lucide-react";
+import { ScanLine, UserRoundPlus } from "lucide-react";
 import {
   Button,
   TextField,
@@ -9,6 +9,8 @@ import {
   Notice,
   PhotoCapture,
 } from "@/ui";
+import { HttpRegistrationApi } from "@/client/registration-api";
+import { ClientError } from "@/client/types";
 import { parseNaira, parseKobo, formatNaira } from "@/shared/money";
 import {
   amountToQuantity,
@@ -30,6 +32,7 @@ import {
   message,
   categoryName,
   formatTime,
+  useSaleHandoff,
 } from "../_components/runtime";
 import { Camera } from "../_components/camera";
 import { Receipt } from "../_components/receipt";
@@ -37,10 +40,12 @@ import { formatAmountInput } from "../_components/amount-input";
 function Sale() {
   const { client, state, online } = useAttendant();
   const router = useRouter();
+  const handoff = useSaleHandoff();
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [card, setCard] = useState("");
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const [resolvedCode, setResolvedCode] = useState("");
+  const [notFound, setNotFound] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [basis, setBasis] = useState<"amount" | "quantity">("amount");
@@ -67,6 +72,35 @@ function Sale() {
         (next) => {
           if (live) {
             setDraft(next);
+            const pending = handoff.take(next.session);
+            if (pending) {
+              const generation = ++request.current;
+              setCard(pending.cardCode);
+              setFinding(true);
+              void new HttpRegistrationApi()
+                .currentCard(pending.cardCode, pending.customerId)
+                .then(
+                  (found) => {
+                    if (
+                      live &&
+                      generation === request.current &&
+                      client.getState().access === "active" &&
+                      client.getState().session?.captureContextId === contextId
+                    ) {
+                      setLookup(found);
+                      setResolvedCode(found.cardCode);
+                    }
+                  },
+                  async (error) => {
+                    await client.observeAuthorityError(error, next.session);
+                    if (live && generation === request.current)
+                      setLookupError(message(error));
+                  },
+                )
+                .finally(() => {
+                  if (live && generation === request.current) setFinding(false);
+                });
+            }
             setMedium(
               next.session.product.code === "cooking_gas" ? "cylinder" : "",
             );
@@ -84,7 +118,7 @@ function Sale() {
       live = false;
       mounted.current = false;
     };
-  }, [client, accountId, contextId]);
+  }, [client, accountId, contextId, handoff]);
   useEffect(() => {
     return () => {
       if (photoUrl) URL.revokeObjectURL(photoUrl);
@@ -130,6 +164,7 @@ function Sale() {
     setLookup(null);
     setResolvedCode("");
     setLookupError(null);
+    setNotFound(false);
     try {
       const found = await client.lookup(code, source);
       if (
@@ -143,13 +178,18 @@ function Sale() {
       setResolvedCode(normalized);
       setLookup(found);
     } catch (e) {
-      if (mounted.current && generation === request.current)
+      if (mounted.current && generation === request.current) {
         setLookupError(message(e));
+        setNotFound(
+          e instanceof ClientError && e.code === "customer_not_found",
+        );
+      }
     } finally {
       if (mounted.current && generation === request.current) setFinding(false);
     }
   }
   function changeCard() {
+    setNotFound(false);
     request.current++;
     setFinding(false);
     setLookup(null);
@@ -299,7 +339,25 @@ function Sale() {
                 </Button>
               }
             />
-            {lookupError && (
+            {notFound && (
+              <>
+                <Notice>
+                  A card that is not yet linked must first be registered. If the
+                  customer lost a card, an admin issues a replacement; the sale
+                  cannot be recorded against the old card.
+                </Notice>
+                <div className="wr-row">
+                  <Button
+                    variant="secondary"
+                    icon={<UserRoundPlus aria-hidden />}
+                    onClick={() => go(router, "/attendant/register")}
+                  >
+                    Register this customer
+                  </Button>
+                </div>
+              </>
+            )}
+            {lookupError && !notFound && (
               <Notice>
                 A card that is not yet linked must first be registered. If the
                 customer lost a card, ask a station admin for help. A connection
