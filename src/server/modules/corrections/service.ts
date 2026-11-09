@@ -586,7 +586,9 @@ export function createCorrectionsService({
         ).rows[0];
         try {
           if (!session) throw new Error();
-          await ownAuthority(db, session.secret_verifier);
+          if (claimed.authorship === "unverified_recovery")
+            failure = "recovery_validation_unavailable";
+          else await ownAuthority(db, session.secret_verifier);
         } catch {
           authorityLost = true;
         }
@@ -697,8 +699,9 @@ export function createCorrectionsService({
           )
             throw new AuthError("version_conflict", 409);
           if (
-            p.current_revision_id !== c.based_on_revision_id ||
-            p.resolution_candidate_revision_id
+            body.outcome === "approve" &&
+            (p.current_revision_id !== c.based_on_revision_id ||
+              p.resolution_candidate_revision_id)
           )
             throw new AuthError("base_revision_changed", 409);
           const r = await revision(db, p.id, c.proposed_revision_id);
@@ -743,8 +746,9 @@ export function createCorrectionsService({
         )
           throw new AuthError("version_conflict", 409);
         if (
-          p.current_revision_id !== c.based_on_revision_id ||
-          p.resolution_candidate_revision_id
+          body.outcome === "approve" &&
+          (p.current_revision_id !== c.based_on_revision_id ||
+            p.resolution_candidate_revision_id)
         )
           throw new AuthError("base_revision_changed", 409);
         await evidence(db, p, prep.r!.evidence_asset_id!);
