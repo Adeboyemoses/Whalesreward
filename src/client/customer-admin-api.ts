@@ -14,9 +14,9 @@ export function freezeCustomerChange<T extends object>(
     }),
   });
 }
-/** A malformed success can follow a commit; retain the frozen operation for replay. */
+/** After dispatch, unexpected errors cannot prove rejection; retain frozen replay. */
 export const customerChangeIsUncertain = (error: unknown): boolean =>
-  error instanceof AdminError &&
+  !(error instanceof AdminError) ||
   (error.code === "invalid_response" ||
     error.status === 0 ||
     (error.status >= 500 && error.code !== "print_layout_unconfigured"));

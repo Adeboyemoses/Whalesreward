@@ -8,6 +8,7 @@ import {
   customerChangeIsUncertain,
 } from "./customer-admin-api";
 import { AdminError, adminRequest } from "./admin-api";
+import { AdminSessionStore, type AdminSession } from "./admin-session";
 import { batchSchema, cardExportSchema } from "../shared/contracts/customers-cards";
 afterEach(() => vi.unstubAllGlobals());
 describe("customer/card protected transport", () => {
@@ -231,8 +232,19 @@ describe("actual adminRequest malformed success retry classification", () => {
     for (const malformed of [
       '{"data":',
       "<html>upstream response interrupted</html>",
+      "null",
+      "true",
+      "false",
+      "0",
+      '"unexpected"',
+      "[]",
+      "{}",
+      '{"data":null}',
+      '{"data":[]}',
+      '{"data":{"unexpected":true}}',
+      '{"error":{"code":"version_conflict"}}',
     ]) {
-      it(`retains the frozen operation after malformed ${status} (${malformed.startsWith("<") ? "non-JSON" : "truncated JSON"})`, async () => {
+      it(`retains the frozen operation after invalid ${status} body ${malformed}`, async () => {
         const fetch = vi
           .fn()
           .mockResolvedValueOnce(new Response(malformed, { status }))
@@ -245,7 +257,8 @@ describe("actual adminRequest malformed success retry classification", () => {
         const error = await api
           .commit(change, schema as z.ZodType<object>)
           .catch((e) => e);
-        expect(error).toMatchObject({ code: "invalid_response", status });
+        if (malformed === "null") expect(error).toBeInstanceOf(TypeError);
+        else expect(error).toMatchObject({ code: "invalid_response" });
         expect(customerChangeIsUncertain(error)).toBe(true);
         await expect(
           api.commit(change, schema as z.ZodType<object>),
@@ -281,4 +294,117 @@ describe("actual adminRequest malformed success retry classification", () => {
       expect(customerChangeIsUncertain(error)).toBe(false);
     },
   );
+});
+
+describe("unexpected card transport outcomes and live authority", () => {
+  it.each([
+    new TypeError("Unexpected transport failure"),
+    new Error("Unexpected decoder failure"),
+    "opaque failure",
+    null,
+    undefined,
+  ])(
+    "retains the frozen operation after an unexpected rejection %s",
+    async (unexpected) => {
+      const request = vi
+        .fn()
+        .mockRejectedValueOnce(unexpected)
+        .mockResolvedValueOnce({ ok: true });
+      const api = new CustomerAdminApi(request),
+        change = freezeCustomerChange("card-batches", {
+          name: "Fictional print stock",
+          count: 4,
+        });
+      let rejection: unknown;
+      try {
+        await api.commit(change, z.strictObject({ ok: z.boolean() }));
+      } catch (error) {
+        rejection = error;
+      }
+      expect(customerChangeIsUncertain(rejection)).toBe(true);
+      await expect(
+        api.commit(change, z.strictObject({ ok: z.boolean() })),
+      ).resolves.toEqual({ ok: true });
+      expect(request.mock.calls[0]).toEqual(request.mock.calls[1]);
+    },
+  );
+  it("retains a failed actual fetch request for same-body retry", async () => {
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("Fetch rejected unexpectedly"))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { ok: true } }), { status: 201 }),
+      );
+    vi.stubGlobal("fetch", fetch);
+    const api = new CustomerAdminApi(adminRequest),
+      change = freezeCustomerChange("card-batches", {
+        name: "Fictional print stock",
+        count: 4,
+      });
+    const error = await api
+      .commit(change, z.strictObject({ ok: z.boolean() }))
+      .catch((e) => e);
+    expect(error).toMatchObject({ code: "network", status: 0 });
+    expect(customerChangeIsUncertain(error)).toBe(true);
+    await api.commit(change, z.strictObject({ ok: z.boolean() }));
+    expect(fetch.mock.calls[0]).toEqual(fetch.mock.calls[1]);
+  });
+  const session = (id: string): AdminSession => ({
+    state: "ready",
+    account: { id, name: "Ada Williams", username: "ada.williams" },
+    permissions: ["cards", "cardGenerate"],
+  });
+  it("fences a late null response after account authority changes", async () => {
+    let finish!: (value: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockReturnValue(
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+      ),
+    );
+    const store = new AdminSessionStore();
+    store.adopt(session("A"));
+    const api = new CustomerAdminApi(store.request),
+      change = freezeCustomerChange("card-batches", {
+        name: "Fictional print stock",
+        count: 4,
+      });
+    const pending = api.commit(change, z.strictObject({ ok: z.boolean() }));
+    store.adopt(session("B"));
+    finish(new Response("null", { status: 201 }));
+    await expect(pending).rejects.toMatchObject({ code: "obsolete" });
+    expect(store.getSnapshot().session?.account.id).toBe("B");
+    expect(store.lists.size).toBe(0);
+  });
+  it.each([
+    [401, "session_required"],
+    [403, "permission_denied"],
+  ] as const)("preserves live %i authority clearing", async (status, code) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: { code } }), { status }),
+        ),
+    );
+    const store = new AdminSessionStore();
+    store.adopt(session("A"));
+    store.lists.set("customers:change:generate", { private: true });
+    const epoch = store.getSnapshot().epoch;
+    const api = new CustomerAdminApi(store.request),
+      change = freezeCustomerChange("card-batches", {
+        name: "Fictional print stock",
+        count: 4,
+      });
+    const error = await api
+      .commit(change, z.strictObject({ ok: z.boolean() }))
+      .catch((e) => e);
+    expect(customerChangeIsUncertain(error)).toBe(false);
+    expect(store.getSnapshot().session).toBeNull();
+    expect(store.getSnapshot().epoch).toBeGreaterThan(epoch);
+    expect(store.lists.size).toBe(0);
+  });
 });
