@@ -38,6 +38,7 @@ export async function collectPrecacheManifest(root) {
   const shellRoutes = [
     "/attendant/sign-in",
     "/attendant/sale",
+    "/attendant/register",
     "/attendant/account",
     "/attendant/account/hand-over",
     "/attendant/access-expired",

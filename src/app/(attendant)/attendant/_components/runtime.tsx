@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -33,12 +34,39 @@ const RuntimeContext = createContext<Runtime>({
   online: true,
   error: null,
 });
+type SaleHandoff = {
+  accountId: string;
+  contextId: string;
+  cardCode: string;
+  customerId: string;
+};
+const SaleHandoffContext = createContext<{
+  offer: (value: SaleHandoff) => void;
+  take: (session: Session) => SaleHandoff | null;
+}>({ offer: () => {}, take: () => null });
+export function useSaleHandoff() {
+  return useContext(SaleHandoffContext);
+}
 export function message(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "Something went wrong. Please try again.";
 }
 export function AttendantProvider({ children }: { children: ReactNode }) {
+  const saleHandoff = useRef<SaleHandoff | null>(null);
+  const [handoff] = useState(() => ({
+    offer: (value: SaleHandoff) => {
+      saleHandoff.current = value;
+    },
+    take: (session: Session) => {
+      const value = saleHandoff.current;
+      saleHandoff.current = null;
+      return value?.accountId === session.account.id &&
+        value.contextId === session.captureContextId
+        ? value
+        : null;
+    },
+  }));
   const [runtime, setRuntime] = useState<Runtime>({
     client: null,
     state: null,
@@ -51,6 +79,13 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
     let initialized = false;
     let probing = false;
     const update = () => {
+      const state = client.getState();
+      if (
+        state.access !== "active" ||
+        saleHandoff.current?.accountId !== state.session?.account.id ||
+        saleHandoff.current?.contextId !== state.session?.captureContextId
+      )
+        saleHandoff.current = null;
       if (active)
         setRuntime((previous) => ({
           client: initialized ? client : previous.client,
@@ -127,7 +162,9 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
   }, []);
   return (
     <RuntimeContext.Provider value={runtime}>
-      {children}
+      <SaleHandoffContext.Provider value={handoff}>
+        {children}
+      </SaleHandoffContext.Provider>
     </RuntimeContext.Provider>
   );
 }
@@ -245,6 +282,7 @@ export function Frame({
         <BottomNav
           items={[
             { label: "Sale", href: "/attendant/sale" },
+            { label: "Register", href: "/attendant/register" },
             { label: "Uploads", href: "/attendant/uploads" },
             { label: "Account", href: "/attendant/account" },
           ]}
@@ -276,6 +314,7 @@ export function AccessGate({
   if (
     !state?.session ||
     state.access === "signed_out" ||
+    state.access === "password_change_required" ||
     (state.access === "expired" && !allowExpired)
   )
     return (

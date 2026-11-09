@@ -12,8 +12,7 @@ registerRoute(
   ({ request, url }) =>
     request.mode === "navigate" &&
     url.origin === self.location.origin &&
-    url.pathname.startsWith("/attendant/") &&
-    !url.pathname.startsWith("/attendant/register"),
+    url.pathname.startsWith("/attendant/"),
   async ({ request, url }) => {
     const controller = new AbortController();
     let timer;
@@ -36,7 +35,11 @@ registerRoute(
     } catch {
       const exact = await matchPrecache(url.pathname);
       if (exact) return exact;
-      const shell = await matchPrecache("/attendant/sale");
+      const shell = await matchPrecache(
+        url.pathname.startsWith("/attendant/register/")
+          ? "/attendant/register"
+          : "/attendant/sale",
+      );
       return shell ?? Response.error();
     } finally {
       clearTimeout(timer);

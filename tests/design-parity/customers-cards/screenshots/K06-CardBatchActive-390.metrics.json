@@ -1,0 +1,26 @@
+{
+  "viewport": 390,
+  "document": 390,
+  "loyaltyCards": [],
+  "wordmark": [
+    {
+      "x": 68,
+      "y": 19,
+      "width": 128.765625,
+      "height": 22
+    }
+  ],
+  "loyaltyFooter": [],
+  "shortTargets": [
+    {
+      "tag": "A",
+      "label": "Sign out",
+      "height": 20
+    },
+    {
+      "tag": "A",
+      "label": "Amina Bello · CUST007",
+      "height": 18
+    }
+  ]
+}

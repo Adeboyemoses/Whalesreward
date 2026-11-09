@@ -85,3 +85,35 @@ describe("generic attendant navigation deadline", () => {
     expect(mocks.precache).not.toHaveBeenCalled();
   });
 });
+
+it("serves only the generic registration shell offline and never intercepts phone lookup APIs", async () => {
+  vi.stubGlobal("self", {
+    __WB_MANIFEST: [],
+    location: { origin: "https://fixture.example" },
+  });
+  vi.stubGlobal("fetch", async () => {
+    throw new Error("offline");
+  });
+  const register = new Response("generic register shell");
+  mocks.precache.mockImplementation(async (path: string) =>
+    path === "/attendant/register" ? register : undefined,
+  );
+  await import("./worker.js");
+  const [match, handle] = mocks.route.mock.calls[0]!;
+  const url = new URL("https://fixture.example/attendant/register");
+  expect(match({ request: { mode: "navigate" }, url })).toBe(true);
+  expect(
+    match({
+      request: { mode: "cors" },
+      url: new URL("https://fixture.example/api/attendant/customers/lookup"),
+    }),
+  ).toBe(false);
+  const result = await handle({
+    request: new Request(url),
+    url: new URL(url + "/customer/done"),
+  });
+  expect(result).toBe(register);
+  expect(mocks.precache).not.toHaveBeenCalledWith(
+    "/api/attendant/customers/lookup",
+  );
+});

@@ -212,3 +212,55 @@ it("WHR-77 a sign-out from another tab fences a held restricted response", async
   expect((await client.checkAccess()).access).toBe("signed_out");
   expect(await db.windows.count()).toBe(0);
 });
+it("registration authority denial hides identity but preserves original queues and the sign-in anchor", async () => {
+  await client.signIn("grace.okon", "fictional");
+  const session = client.getState().session!;
+  const anchor = await db.windows.get(session.account.id);
+  const blob = new Blob(["fictional meter evidence"], { type: "image/jpeg" });
+  const digest = Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()),
+    ),
+    (b) => b.toString(16).padStart(2, "0"),
+  ).join("");
+  const original = await client.saveCapture(await client.beginCapture(), {
+    cardCode: "C9P4T7M",
+    customerCache: await client.lookup("C9P4T7M"),
+    medium: "vehicle",
+    basis: "amount",
+    value: "20000",
+    photo: { blob, bytes: blob.size, mediaType: "image/jpeg", sha256: digest },
+  });
+  await client.observeAuthorityError(
+    new ClientError("unauthenticated", "Ended", 401),
+    session,
+  );
+  expect(client.getState().access).toBe("signed_out");
+  expect((await db.windows.get(session.account.id))?.lastOnlineSignInAt).toBe(
+    anchor?.lastOnlineSignInAt,
+  );
+  expect((await db.windows.get(session.account.id))?.locked).toBe(true);
+  expect(await client.ownSales()).toEqual([]);
+  const retained = await db.outbox.get([
+    session.account.id,
+    original.operationId,
+  ]);
+  expect(retained?.original).toEqual(original.original);
+  expect(retained?.photoDigest).toBe(digest);
+  expect(retained?.photoBlob.size).toBe(blob.size);
+  expect(retained?.state).toBe("saved");
+});
+it("a registration denial for an older session cannot lock the newly signed-in account", async () => {
+  await client.signIn("grace.okon", "fictional");
+  const old = client.getState().session!;
+  await client.signOut();
+  api.current = sessionFixture(now, v7());
+  await client.signIn("favour.test", "fictional");
+  const fresh = client.getState().session!;
+  await client.observeAuthorityError(
+    new ClientError("permission_denied", "Ended", 403),
+    old,
+  );
+  expect(client.getState().access).toBe("active");
+  expect(client.getState().session).toEqual(fresh);
+});

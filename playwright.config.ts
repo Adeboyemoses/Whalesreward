@@ -18,6 +18,15 @@ export default defineConfig({
     env: {
       WHR_ENV: "local",
       WHR_TRUSTED_IP_HEADER: "x-test-ip",
+      // Explicit fictional local policies/storage; never configure a deployed app.
+      WHR_PHONE_POLICY: "ng-mobile-v1",
+      WHR_CARD_PRINT_LAYOUT:
+        '{"pageWidthMm":210,"pageHeightMm":297,"cardWidthMm":85.6,"cardHeightMm":54,"marginMm":10,"gapMm":2}',
+      STORAGE_ENDPOINT: "http://127.0.0.1:9000",
+      STORAGE_REGION: "us-east-1",
+      STORAGE_BUCKET: "whr-e2e-cards",
+      STORAGE_ACCESS_KEY_ID: "whr-local",
+      STORAGE_SECRET_ACCESS_KEY: "local-development-only",
       EMAIL_PROVIDER: "noop",
       BETTER_AUTH_URL: "http://127.0.0.1:3000",
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
