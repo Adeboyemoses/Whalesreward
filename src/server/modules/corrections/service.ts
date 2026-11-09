@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type pg from "pg";
 import {
   correctionSubmissionSchema,
@@ -173,9 +174,21 @@ async function view(db: pg.PoolClient, c: Correction) {
     policyBlocks: c.policy_blocks,
   });
 }
+function privateAuditText(value: string) {
+  return auditText(value)
+    .replace(
+      /\b(?:otp|password|token|secret)\s*(?:[:=]\s*|\s+)\S+/gi,
+      "[secret removed]",
+    )
+    .replace(
+      /\b(?:verification code|one[- ]time code|code)\s*(?::|=|is)?\s*\d{4,8}\b/gi,
+      "[secret removed]",
+    )
+    .replace(/(?:\+234|0)[789][01][\d*•xX ()-]{7,}/g, "[phone removed]");
+}
 function safeReason(reason: string) {
   if (
-    auditText(reason) !== reason ||
+    privateAuditText(reason) !== reason ||
     /\b(?:otp|code|password|token|secret)\s*[:=]/i.test(reason)
   )
     throw new AuthError("invalid_request", 400);
@@ -233,7 +246,12 @@ async function apply(
   await evidence(db, p, r.evidence_asset_id!);
   const gate = (
     await db.query<{ blocked: boolean }>(
-      `SELECT EXISTS(SELECT 1 FROM purchase_hold WHERE purchase_id=$1 AND state='open') OR EXISTS(SELECT 1 FROM purchase_validation_block WHERE purchase_id=$1 AND resolved_at IS NULL) OR NOT EXISTS(SELECT 1 FROM sync_validation WHERE purchase_id=$1 AND reasons='[]'::jsonb) AS blocked`,
+      `SELECT EXISTS(SELECT 1 FROM purchase_hold WHERE purchase_id=$1 AND state='open') OR EXISTS(SELECT 1 FROM purchase_validation_block WHERE purchase_id=$1 AND resolved_at IS NULL) OR NOT EXISTS(SELECT 1 FROM sync_validation WHERE purchase_id=$1) OR EXISTS(
+ SELECT 1 FROM sync_validation v CROSS JOIN LATERAL jsonb_array_elements_text(v.reasons) AS reason(code)
+ WHERE v.purchase_id=$1 AND NOT (
+ (reason.code IN ('price_uncertain','replaced_card') AND EXISTS(SELECT 1 FROM purchase_hold h WHERE h.purchase_id=$1 AND h.state='resolved' AND h.kind=CASE WHEN reason.code='price_uncertain' THEN 'price' ELSE 'card' END AND h.reason_code=reason.code))
+ OR (reason.code IN ('capture_authorization_unresolved','capture_time_unresolved') AND EXISTS(SELECT 1 FROM purchase_validation_block b WHERE b.purchase_id=$1 AND b.code=reason.code AND b.resolved_at IS NOT NULL AND b.resolution_reference IS NOT NULL))
+ )) AS blocked`,
       [p.id],
     )
   ).rows[0]!;
@@ -254,28 +272,146 @@ async function apply(
   );
   await markCampaigns(db, p.id);
 }
+const auditHumanSchema = z.strictObject({
+  kind: z.enum(["admin", "attendant"]),
+  userId: z.uuid(),
+  code: z.string().max(120),
+  nameAtEvent: z.string().max(120),
+  usernameAtEvent: z.string().max(120),
+  roleAtEvent: z.string().max(120).nullable(),
+});
+const auditSellerSchema = z.strictObject({
+  attendantId: z.uuid(),
+  accountId: z.uuid(),
+  staffCode: z.string().max(120),
+  name: z.string().max(120),
+  username: z.string().max(120),
+});
+const auditValuesSchema = z.strictObject({
+  amountKobo: z.string().regex(/^[1-9][0-9]*$/),
+  quantity: z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/),
+  currency: z.literal("NGN"),
+  unit: z.enum(["litre", "kilogram"]),
+  basis: z.enum(["amount", "quantity"]),
+  medium: z.enum(["vehicle", "keg", "three_wheeler", "bike", "cylinder"]),
+  rateKobo: z.string().regex(/^[1-9][0-9]*$/),
+  priceVersionId: z.uuid(),
+  revisionId: z.uuid().nullable(),
+  credited: z.boolean(),
+  correctionState: z
+    .enum(["pending_validation", "awaiting_review", "accepted", "rejected"])
+    .nullable(),
+});
+function snapshotText(value: string) {
+  return privateAuditText(value).slice(0, 120);
+}
+/** Material effective fields only. A received proposal does not yet change credited values. */
+async function auditEffective(
+  db: pg.PoolClient,
+  p: Purchase,
+  state: Correction["state"] | null,
+) {
+  const r = await revision(db, p.id, p.current_revision_id!);
+  const values = revisionValues(r);
+  return auditValuesSchema.parse({
+    amountKobo: values.amountKobo,
+    quantity: values.quantity,
+    currency: values.currency,
+    unit: values.unit,
+    basis: values.basis,
+    medium: values.medium,
+    rateKobo: values.rateKobo,
+    priceVersionId: values.priceVersionId,
+    revisionId: p.current_revision_id,
+    credited: p.status === "credited",
+    correctionState: state,
+  });
+}
 async function correctionAudit(
   db: pg.PoolClient,
   p: Purchase,
   c: Correction,
   actor: string | null,
-  action: string,
+  action:
+    | "correction_received"
+    | "correction_applied"
+    | "correction_approved"
+    | "correction_rejected",
+  operationId: string,
+  reason: string,
+  beforeState: Correction["state"] | null,
 ) {
+  safeReason(reason);
+  const current = await purchase(db, p.id);
+  const before = await auditEffective(db, p, beforeState),
+    after = await auditEffective(db, current, c.state);
+  let actorSnapshot:
+    | z.infer<typeof auditHumanSchema>
+    | { kind: "system"; service: "validation"; nameAtEvent: string };
+  if (actor) {
+    const user = (
+      await db.query<{
+        kind: "admin" | "attendant";
+        user_id: string;
+        code: string;
+        display_name: string;
+        username: string;
+        role_name: string | null;
+      }>(
+        `SELECT u.kind,u.id AS user_id,coalesce(a.admin_code,t.staff_code) AS code,u.display_name,u.username,r.name AS role_name FROM auth_user u LEFT JOIN admin a ON a.user_id=u.id LEFT JOIN role r ON r.id=a.role_id LEFT JOIN attendant t ON t.user_id=u.id WHERE u.id=$1`,
+        [actor],
+      )
+    ).rows[0];
+    if (!user) throw new AuthError("temporarily_unavailable", 503);
+    actorSnapshot = auditHumanSchema.parse({
+      kind: user.kind,
+      userId: user.user_id,
+      code: snapshotText(user.code),
+      nameAtEvent: snapshotText(user.display_name),
+      usernameAtEvent: snapshotText(user.username),
+      roleAtEvent:
+        user.role_name === null ? null : snapshotText(user.role_name),
+    });
+  } else
+    actorSnapshot = {
+      kind: "system",
+      service: "validation",
+      nameAtEvent: "Correction validation",
+    };
+  const seller = (
+    await db.query<{
+      attendant_id: string;
+      account_id: string;
+      staff_code: string;
+      seller_name: string;
+      seller_username: string;
+    }>(
+      `SELECT a.id AS attendant_id,a.user_id AS account_id,a.staff_code,p.seller_name,p.seller_username FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id WHERE p.id=$1`,
+      [p.id],
+    )
+  ).rows[0]!;
+  const sellerSnapshot = auditSellerSchema.parse({
+    attendantId: seller.attendant_id,
+    accountId: seller.account_id,
+    staffCode: snapshotText(seller.staff_code),
+    name: snapshotText(seller.seller_name),
+    username: snapshotText(seller.seller_username),
+  });
   const id = newId();
   await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at) VALUES($1,$2,$3,$4,'purchase',$5,$6,'{}',$7,$8,clock_timestamp())`,
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at,actor_snapshot,originating_seller_snapshot) VALUES($1,$2,$3,$4,'purchase',$5,$6,$7,$8,$9,clock_timestamp(),$10,$11)`,
     [
       id,
       actor,
       actor ? "user" : "system",
       action,
       p.id,
-      c.operation_id,
-      JSON.stringify({
-        correctionState: c.state,
-        revisionId: c.proposed_revision_id,
-      }),
-      action,
+      operationId,
+      JSON.stringify(before),
+      JSON.stringify(after),
+      reason,
+      JSON.stringify(actorSnapshot),
+      JSON.stringify(sellerSnapshot),
     ],
   );
   return id;
@@ -509,6 +645,9 @@ export function createCorrectionsService({
           await correction(db, p.id, id),
           auth.user_id,
           "correction_received",
+          body.operationId,
+          body.reason,
+          null,
         );
         return {
           data: attendantCorrectionSchema.parse(durable.receipt),
@@ -639,13 +778,19 @@ export function createCorrectionsService({
           `UPDATE correction_request SET state=$2,version=version+1,lease_token=NULL,lease_until=NULL,validation_error=$3,decided_at=CASE WHEN $2 IN ('accepted','rejected') THEN clock_timestamp() ELSE NULL END,decision_reason=$3 WHERE id=$1 AND state='pending_validation' AND lease_token=$4`,
           [c.id, state, failure, c.lease_token],
         );
-        await correctionAudit(
-          db,
-          p,
-          { ...c, state },
-          null,
-          state === "accepted" ? "correction_applied" : "correction_validated",
-        );
+        if (state === "accepted" || state === "rejected")
+          await correctionAudit(
+            db,
+            p,
+            { ...c, state },
+            null,
+            state === "accepted" ? "correction_applied" : "correction_rejected",
+            c.operation_id,
+            state === "rejected"
+              ? `Correction validation rejected: ${failure}`
+              : c.reason,
+            c.state,
+          );
         return true;
       });
     },
@@ -794,6 +939,9 @@ export function createCorrectionsService({
           { ...c, state: approved ? "accepted" : "rejected" },
           a.user_id,
           approved ? "correction_approved" : "correction_rejected",
+          body.operationId,
+          body.reason,
+          c.state,
         );
         const current = await purchase(db, p.id);
         const holds = (

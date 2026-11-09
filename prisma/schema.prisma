@@ -794,6 +794,8 @@ model AuditEvent {
   target_type       String
   target_id         String    @db.Uuid
   operation_id      String?   @db.Uuid
+  actor_snapshot              Json?     @db.JsonB
+  originating_seller_snapshot Json?     @db.JsonB
   before            Json      @db.JsonB
   after             Json      @db.JsonB
   reason            String

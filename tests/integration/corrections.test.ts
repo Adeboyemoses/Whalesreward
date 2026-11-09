@@ -110,6 +110,29 @@ async function adminToken() {
   );
   return token;
 }
+async function resolvedPriceFixture() {
+  const f = await fixture(true);
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    await db.query(
+      "UPDATE purchase_hold SET state='resolved',resolved_by=$2,resolution_operation_id=$3,resolution_reason='Trusted captured-price confirmation',resolved_at=clock_timestamp(),resolution_revision_id=$4,version=version+1 WHERE purchase_id=$1 AND kind='price' AND state='open'",
+      [f.purchaseId, fixtureId(5), newId(), f.body.basedOnRevisionId],
+    );
+    await db.query(
+      "UPDATE purchase SET status='credited',version=version+1 WHERE id=$1",
+      [f.purchaseId],
+    );
+    await db.query("COMMIT");
+    f.body.expectedVersion++;
+    return f;
+  } catch (e) {
+    await db.query("ROLLBACK");
+    throw e;
+  } finally {
+    db.release();
+  }
+}
 async function late(f: Awaited<ReturnType<typeof fixture>>) {
   const name = `test_primary_receipt_${newId().replaceAll("-", "")}`;
   await pool.query(
@@ -386,6 +409,16 @@ describe("M3 durable own correction processing", () => {
     expect(decision.before.amountKobo).toBe("2100000");
     expect(decision.after).toEqual(decision.before);
     expect((await pending(c.id)).state).toBe("rejected");
+    const audit = (
+      await pool.query(
+        "SELECT operation_id,reason,before,after FROM audit_event WHERE id=$1",
+        [decision.auditEventId],
+      )
+    ).rows[0];
+    expect(audit.operation_id).toBe(decision.operationId);
+    expect(audit.reason).toBe(decision.reason);
+    expect(audit.before.amountKobo).toBe("2100000");
+    expect(audit.after.amountKobo).toBe("2100000");
   });
   it("never overwrites a staged resolution candidate; stale proposal rejection leaves it intact", async () => {
     const f = await fixture(),
@@ -443,4 +476,173 @@ describe("M3 durable own correction processing", () => {
       ).rows[0].reasons,
     ).toContain("price_uncertain");
   });
+  it.each(["automatic", "late"] as const)(
+    "a %s correction preserves a legitimately resolved price hold and its original history",
+    async (kind) => {
+      const f = await resolvedPriceFixture();
+      let id: string;
+      if (kind === "automatic") {
+        const received = await svc.submit(f.token, f.purchaseId, f.body);
+        id = received.data.id;
+        await drain();
+        expect((await pending(id)).state).toBe("accepted");
+      } else {
+        const c = await late(f);
+        id = c.id;
+        const result = await svc.decide(
+          await adminToken(),
+          f.purchaseId,
+          c.id,
+          await guard(f.purchaseId, c),
+        );
+        expect(result.creditedAfter).toBe(true);
+      }
+      const row = (
+        await pool.query(
+          "SELECT p.status,r.amount_kobo::text,s.reasons,(SELECT count(*)::int FROM purchase_revision WHERE purchase_id=p.id AND state='accepted') AS accepted FROM purchase p JOIN purchase_revision r ON r.id=p.current_revision_id JOIN sync_validation s ON s.purchase_id=p.id WHERE p.id=$1",
+          [f.purchaseId],
+        )
+      ).rows[0];
+      expect(row).toEqual({
+        status: "credited",
+        amount_kobo: "3000000",
+        reasons: ["price_uncertain"],
+        accepted: 1,
+      });
+      expect((await pending(id)).state).toBe("accepted");
+    },
+  );
+  it("correction audit records exact effective changes, actual operations and immutable executor/seller snapshots without private payloads", async () => {
+    const f = await fixture();
+    await pool.query(
+      "UPDATE auth_user SET display_name='Grace +2348000000099 token=fictional-private-value' WHERE id=$1",
+      [f.userId],
+    );
+    const received = await svc.submit(f.token, f.purchaseId, f.body);
+    const intake = (
+      await pool.query(
+        "SELECT a.*,to_jsonb(a)->'actor_snapshot' AS actor_snapshot,to_jsonb(a)->'originating_seller_snapshot' AS originating_seller_snapshot FROM audit_event a WHERE target_id=$1 AND action='correction_received'",
+        [f.purchaseId],
+      )
+    ).rows[0];
+    expect(intake.reason).toBe(f.body.reason);
+    expect(intake.before.amountKobo).toBe("2000000");
+    expect(intake.after.amountKobo).toBe("2000000");
+    expect(intake.actor_snapshot).toMatchObject({
+      kind: "attendant",
+      userId: f.userId,
+    });
+    expect(intake.originating_seller_snapshot).toMatchObject({
+      attendantId: f.attendantId,
+      accountId: f.userId,
+    });
+    await drain();
+    const applied = (
+      await pool.query(
+        "SELECT a.*,to_jsonb(a)->'actor_snapshot' AS actor_snapshot,to_jsonb(a)->'originating_seller_snapshot' AS originating_seller_snapshot FROM audit_event a WHERE target_id=$1 AND action='correction_applied'",
+        [f.purchaseId],
+      )
+    ).rows[0];
+    expect(applied.reason).toBe(f.body.reason);
+    expect(applied.operation_id).toBe(f.body.operationId);
+    expect(applied.before.amountKobo).toBe("2000000");
+    expect(applied.after.amountKobo).toBe("3000000");
+    expect(applied.before.quantity).toBe("20");
+    expect(applied.after.quantity).toBe("30");
+    expect(applied.actor_user_id).toBeNull();
+    expect(applied.actor_snapshot).toEqual({
+      kind: "system",
+      service: "validation",
+      nameAtEvent: "Correction validation",
+    });
+    expect(applied.originating_seller_snapshot).toMatchObject({
+      attendantId: f.attendantId,
+      accountId: f.userId,
+    });
+    expect(JSON.stringify([intake, applied])).not.toMatch(
+      /2348000000099|fictional-private-value|final\/|staging\/|https?:/,
+    );
+    expect((await pending(received.data.id)).state).toBe("accepted");
+    const g = await fixture(),
+      c = await late(g),
+      body = await guard(g.purchaseId, c),
+      decision = await svc.decide(await adminToken(), g.purchaseId, c.id, body);
+    const event = (
+      await pool.query(
+        "SELECT a.*,to_jsonb(a)->'actor_snapshot' AS actor_snapshot,to_jsonb(a)->'originating_seller_snapshot' AS originating_seller_snapshot FROM audit_event a WHERE id=$1",
+        [decision.auditEventId],
+      )
+    ).rows[0];
+    expect(event.operation_id).toBe(body.operationId);
+    expect(event.reason).toBe(body.reason);
+    expect(event.before.amountKobo).toBe("2000000");
+    expect(event.after.amountKobo).toBe("3000000");
+    expect(event.actor_user_id).toBe(fixtureId(2));
+    expect(event.actor_snapshot).toMatchObject({
+      kind: "admin",
+      userId: fixtureId(2),
+      code: "ADMIN001",
+      roleAtEvent: "Owner",
+    });
+    expect(event.originating_seller_snapshot).toMatchObject({
+      accountId: g.userId,
+    });
+  });
+  it.each([
+    "Call +2348000000099",
+    "token=fictional-private-value",
+    "OTP: 123456",
+    "OTP 123456",
+    "token fictional-private-value",
+    "Call 080****0099",
+    "Receipt https://private.example.test/object",
+  ])(
+    "rejects private correction reason before audit persistence: %s",
+    async (reason) => {
+      const f = await fixture();
+      await expect(
+        svc.submit(f.token, f.purchaseId, { ...f.body, reason }),
+      ).rejects.toMatchObject({ code: "invalid_request", status: 400 });
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM audit_event WHERE target_id=$1 AND action='correction_received'",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM correction_request WHERE purchase_id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      const c = await late(f);
+      await expect(
+        svc.decide(await adminToken(), f.purchaseId, c.id, {
+          ...(await guard(f.purchaseId, c)),
+          reason,
+        }),
+      ).rejects.toMatchObject({ code: "invalid_request", status: 400 });
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM audit_event WHERE target_id=$1 AND action IN ('correction_approved','correction_rejected')",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS n FROM sale_decision WHERE purchase_id=$1",
+            [f.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      expect((await pending(c.id)).state).toBe("awaiting_review");
+    },
+  );
 });
