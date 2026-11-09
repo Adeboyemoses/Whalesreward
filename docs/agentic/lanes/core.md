@@ -1,22 +1,21 @@
 # lane:core
-WO-core-6 (WHR-10) pumps, prices and attendants: ACCEPTED since 2026-11-06
+WO-core-6a (WHR-80) P-21 attendant offboarding: READY since 2026-11-09
 
 ## In flight
-- Earl explicitly accepted WO-core-6 within m2.md scope and instructed closure. WHR-10 moves to Done after this reviewed, green documentation closeout merges.
-- Feature [#68](https://github.com/Adeboyemoses/Whalesreward/pull/68), c6390ec, and READY records [#69](https://github.com/Adeboyemoses/Whalesreward/pull/69), 95e7ccb, are merged. Code/security/integrity PASS round 2 at 3995e55; evidence validates. Existing named output: docs/qa/verification-2026-11-06-station.md.
-- Acceptance covers the M2 backend and its 27 station regressions, including P-20 inside/outside interval and paused-COMMIT price visibility. Prior EM evidence: typecheck/lint/build, unit248, PostgreSQL178, time3 per timezone, Linux browser104/four existing skips/zero retries, signed-upload1 PASS. This closeout adds no implementation or new product verification.
+- Feature [#77](https://github.com/Adeboyemoses/Whalesreward/pull/77) merged into staging at 72a737b with all five required checks green. Guarded assignment ending revokes full/restricted sessions and contexts atomically, retaining history, queued originals and P-20 bounds.
+- Code/security/integrity PASS round 2 at8739cbb; high-tier evidence validates. EM typecheck/lint/build, unit260, PostgreSQL201/named23, time3 per timezone, exact-source Linux browser130/four existing staging-only skips/zero retries and signed-upload1 PASS. Named output: docs/qa/verification-2026-11-09-offboarding.md.
+- Actual audit/rollback, OR permissions, exact guards, revocation races, historical replay after reassignment, old-key401/fresh-unassigned422, and termination one microsecond before/at/after original U verified. Two legacy fixture setups gained current assignment/fresh authority; all original policy assertions retained.
 
 ## Next
-- WO-core-7 (WHR-12), customers, registration and card batches, is the next intended work order only after Earl approves it. It is Backlog without an approval line. No worktree, plan, implementation or issue changes for it; stop after this closure.
+- Post WHR-80 READY with named output; keep it In Review pending Earl's verification. Then immediately start approved WO-core-7 (WHR-12), customers, registration and card batches, in this session as Earl expressly requested. Stop after WHR-12 READY; no acceptance inferred for either.
 
 ## Earl's gos
-- 2026-11-06: “Earl accepted WO-core-6 (WHR-10) within m2.md scope (decision on WHR-76); close it.”
-- 2026-11-06: “Next work order: WO-core-7 (WHR-12), customers, registration and card batches, once Earl approves it. Stop until then.”
+- 2026-11-09: “Do WHR-80 first: implement P-21 offboarding per m2.md, take it to READY with named test output, post READY. Then continue straight into WHR-12 (customers, registration and card batches) and take it to READY. Stop after WHR-12's READY.”
 
 ## Risks
-- WHR-76 is resolved as Option A: P-16/m2.md govern; broader edit/status wording was a drafting error. No pump deactivation or attendant disable/reset endpoint is accepted or added.
-- WHR-77 first-password UI and WO-app-5 screen smoke remain separate app work; acceptance is for the backend. WHR-79 offboarding specification/core follow-up is outside this closeout; no assignment-ending rule implemented here.
-- WHR-67 known handover navigation retry and WHR-78 fixture-extension collision remain separate. Feature CI had one WHR-67 flaky retry; records CI and EM runs passed104 without retries. No policy, assertion or gate relaxed.
-- No cloud/provider, manual staging-data, main promotion or UI-parity claim. P-20 client Q-528 remains pending. Prior feature #68 dispatch flag9>8 remains historical; this closeout uses one reviewer. Runtime model ID unavailable.
+- P-21 adds assignment ending, no attendant disable/reset or pump deactivation. No migration/dependency or cloud/provider/manual staging-data operation; no main promotion or UI parity.
+- Full M3 recovery-grant/capture-review APIs remain future work; no new authority is fabricated. Actual later same-account reassignment/upload is verified. New registration checks belong to WHR-12 and must use the same live authority protocol.
+- Offline phones retain their partition and originals until observing revocation; no remote-erasure claim. Earlier revocation time and original S/R/U remain intact; client Q-528 pending.
+- Feature #77 dispatch flag9>8 reflects explicit replay coverage and scoped re-review; two rounds within cap3. One separate records reviewer makes10 total. Runtime model ID unavailable.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=10 prs=2 rounds_max=2 escalations=0 model=unavailable
