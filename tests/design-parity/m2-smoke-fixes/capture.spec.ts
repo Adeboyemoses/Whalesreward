@@ -189,7 +189,7 @@ test("A17 persistent cross-screen warning and original queue fixture at390", asy
       ["/attendant/sale", "Sale", "A17-SaleWarning"],
       ["/attendant/register", "Register", "A17-RegisterWarning"],
       ["/attendant/uploads", "Uploads", "A17-UploadsWarning"],
-    ]) {
+    ] as const) {
       await page.getByRole("link", { name: label, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`${route}$`));
       await expect(warning(page)).toHaveCount(1);

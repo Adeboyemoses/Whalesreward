@@ -1,5 +1,11 @@
 import { defineConfig } from "@playwright/test";
 import base from "../../customers-cards/playwright.config";
+const server = base.webServer as {
+  command: string;
+  url: string;
+  timeout: number;
+  env: Record<string, string>;
+};
 
 export default defineConfig({
   ...base,
@@ -13,7 +19,7 @@ export default defineConfig({
       : {}),
   },
   webServer: {
-    ...base.webServer,
+    ...server,
     ...(process.env.WHR_USE_BUILT_APP === "1"
       ? { command: "pnpm start --hostname 0.0.0.0" }
       : {}),
