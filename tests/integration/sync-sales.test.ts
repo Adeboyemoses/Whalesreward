@@ -179,11 +179,27 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
       const fresh = await newSession(pool, f);
       f.token = fresh.token;
       if (change === "price") await changePrice(pool, f);
-      if (change === "assignment")
+      if (change === "assignment") {
         await pool.query(
           "UPDATE assignment SET effective_until=$2 WHERE id=$1",
           [f.assignmentId, "2026-11-03T05:59:59.999999Z"],
         );
+        // P-21 requires a current assignment and fresh same-account upload
+        // authority; the queued original retains its historical context/bounds.
+        const replacement = newId();
+        await pool.query(
+          "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,changed_by,reason) VALUES($1,$2,$3,2,clock_timestamp(),$4,'Fictional later reassignment')",
+          [
+            replacement,
+            f.attendantId,
+            f.pumpId,
+            "019a5000-0000-7000-8000-000000000005",
+          ],
+        );
+        f.token = (
+          await newSession(pool, { ...f, assignmentId: replacement })
+        ).token;
+      }
       const p = await exactReceipt(
         f.stationId,
         "2026-11-03T08:05:00.000000Z",
@@ -586,6 +602,21 @@ describe("M1 real PostgreSQL and MinIO sync", () => {
       f.assignmentId,
       new Date(f.start.getTime() + 2000),
     ]);
+    // P-21 permits this historical upload through a later current assignment
+    // and fresh authority, without replacing the original capture context.
+    const replacement = newId();
+    await pool.query(
+      "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,changed_by,reason) VALUES($1,$2,$3,2,clock_timestamp(),$4,'Fictional later reassignment')",
+      [
+        replacement,
+        f.attendantId,
+        f.pumpId,
+        "019a5000-0000-7000-8000-000000000005",
+      ],
+    );
+    f.token = (
+      await newSession(pool, { ...f, assignmentId: replacement })
+    ).token;
     const p = await prepared(f);
     const held = await service.finalize(
       f.token,
