@@ -144,6 +144,15 @@ export async function readSales(
   purchaseId?: string,
 ) {
   const own = audience === "attendant";
+  if (
+    action === "search" &&
+    typeof input === "object" &&
+    input !== null &&
+    "day" in input &&
+    input.day !== undefined &&
+    !wire.saleDateSchema.safeParse(input.day).success
+  )
+    throw new AuthError("date_invalid", 422);
   if (purchaseId) authId.parse(purchaseId);
   const parsed =
     action === "detail"
@@ -246,7 +255,9 @@ export async function readSales(
       const unavailable =
         result.status === "cancelled" ||
         !result.current_revision_id ||
-        result.calculation_mode === "meter_evidence";
+        result.calculation_mode === "meter_evidence" ||
+        !wire.evidenceSchema.safeParse(result.evidence).success ||
+        wire.evidenceSchema.parse(result.evidence).state !== "validated";
       const past =
         !!cutoff &&
         (result.now as Date).getTime() >= new Date(cutoff).getTime();
@@ -261,7 +272,7 @@ export async function readSales(
         },
         correctionWindow: {
           cutoff,
-          automaticEligible: !unavailable && !!cutoff && !!cutoff && !past,
+          automaticEligible: !unavailable && !!cutoff && !past,
           reason: unavailable
             ? "sale_unavailable"
             : !cutoff

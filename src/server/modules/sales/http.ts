@@ -141,7 +141,16 @@ export async function handleSalesRead(
       e instanceof AuthError
         ? e
         : e instanceof z.ZodError
-          ? new AuthError("invalid_request", 400)
+          ? new AuthError(
+              action === "search" &&
+                e.issues.some((issue) => issue.path[0] === "day")
+                ? "date_invalid"
+                : "invalid_request",
+              action === "search" &&
+                e.issues.some((issue) => issue.path[0] === "day")
+                ? 422
+                : 400,
+            )
           : new AuthError("temporarily_unavailable", 503);
     if (error.retryAfter) headers.set("Retry-After", String(error.retryAfter));
     return Response.json(

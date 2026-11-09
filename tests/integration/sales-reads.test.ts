@@ -57,7 +57,7 @@ const reader: SaleEvidenceReader = {
   },
 };
 let service: ReturnType<typeof createSyncService>;
-async function sale(amount = "2000000") {
+async function sale(amount = "2000000", finalize = true) {
   const input: OriginalSale = {
     operationId: newId(),
     captureContextId: attendant.contextId,
@@ -74,7 +74,7 @@ async function sale(amount = "2000000") {
       basis: "amount",
       enteredAmountKobo: amount,
       amountKobo: amount,
-      quantity: (BigInt(amount) / 1000n).toString().replace(/(..)$/, ".$1"),
+      quantity: "1",
     },
     photo: {
       sha256: sha256(jpeg),
@@ -86,6 +86,7 @@ async function sale(amount = "2000000") {
   const { amountToQuantity } = await import("../../src/shared/quantity");
   input.entry.quantity = amountToQuantity(BigInt(amount), 100000n, 2);
   const submitted = await service.submit(attendant.token, input);
+  if (!finalize) return submitted.status;
   const uploaded = await service.uploadPermission(
     attendant.token,
     submitted.status.purchaseId,
@@ -549,6 +550,75 @@ describe("M3 sales reads and private evidence", () => {
       "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'sales')",
       [id(1)],
     );
+  });
+  it("rejects impossible Lagos day browsing filters with date_invalid", async () => {
+    await expect(adminSearch({ day: "2026-02-30" })).rejects.toMatchObject({
+      code: "date_invalid",
+      status: 422,
+    });
+    const request = new Request(`${config.origin}/api/admin/sales/search`, {
+      method: "POST",
+      headers: {
+        origin: config.origin,
+        "content-type": "application/json",
+        cookie: `${COOKIE}=${adminToken}`,
+      },
+      body: JSON.stringify({ day: "2026-02-30" }),
+    });
+    const response = await handleSalesRead(request, "admin", "search");
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      error: { code: "date_invalid" },
+    });
+  });
+  it("reports missing and pending evidence instead of approving the correction window", async () => {
+    const s = await sale("2000000", false);
+    const factory = vi.fn(() => reader);
+    await expect(
+      readSalePhoto(
+        pool,
+        attendant.token,
+        "attendant",
+        s.purchaseId,
+        {},
+        factory,
+      ),
+    ).rejects.toMatchObject({ code: "evidence_unavailable", status: 404 });
+    expect(factory).not.toHaveBeenCalled();
+    await service.uploadPermission(attendant.token, s.purchaseId, {
+      operationId: newId(),
+      sha256: sha256(jpeg),
+      bytes: jpeg.length,
+      mediaType: "image/jpeg",
+    });
+    await expect(
+      readSalePhoto(
+        pool,
+        attendant.token,
+        "attendant",
+        s.purchaseId,
+        {},
+        factory,
+      ),
+    ).rejects.toMatchObject({ code: "evidence_pending", status: 409 });
+    expect(factory).not.toHaveBeenCalled();
+    expect(
+      await readSales(
+        pool,
+        config,
+        attendant.token,
+        "attendant",
+        "detail",
+        {},
+        s.purchaseId,
+      ),
+    ).toMatchObject({
+      evidence: { state: "pending" },
+      correctionWindow: {
+        automaticEligible: false,
+        reason: "sale_unavailable",
+      },
+    });
   });
   it("photo/search HTTP is private, no-store and rejects GET search or unknown query fields", async () => {
     const request = new Request(`${config.origin}/api/admin/sales/search`, {
