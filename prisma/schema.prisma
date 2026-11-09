@@ -461,6 +461,7 @@ model CustomerIdentityChange {
 
 model Purchase {
   lookup_receipt_input Json? @db.JsonB
+  lookup_receipt_input_json String? @db.Text
   lookup_receipt_status String @default("fallback")
   lookup_receipt_claims Json? @db.JsonB
   capture_lower_bound DateTime? @db.Timestamptz(6)

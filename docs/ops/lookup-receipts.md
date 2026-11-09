@@ -12,3 +12,5 @@ Rotate by adding a fresh key to the allowlist while keeping previous verificatio
 Clients opt into response evidence with exactly `X-WR-Lookup-Receipt: 1`. Enable the app capability only after this core release. Legacy responses omit the field; legacy submissions retain their original digest namespace. Registration freezes evidence regardless of capability and projects the same original result on replay.
 
 Existing ordinary lookup and registration authorization is unchanged. An expired session/context still receives its existing authorization error; if receipt eligibility disappears after authorization, the receipt helper returns null. This feature does not change midnight or correction-cutoff policy.
+
+Protected immutable canonical JSON text preserves all submitted evidence, including NUL and unpaired-surrogate escapes that PostgreSQL JSONB cannot represent. The optional JSONB projection is null for those values; verification still falls back, and the exact original value remains in the digest. Both storage representations are excluded from logs and general audit.

@@ -48,3 +48,19 @@ export function payloadDigest(value: unknown): string {
     .update(`${namespace}\0${canonicalJson(value)}`)
     .digest("hex");
 }
+
+/** PostgreSQL JSONB cannot represent NUL or unpaired UTF-16 surrogates, including keys. */
+export function jsonbRepresentable(value: unknown): boolean {
+  const pending: unknown[] = [value];
+  const unsupported =
+    /\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  while (pending.length) {
+    const item = pending.pop();
+    if (typeof item === "string" && unsupported.test(item)) return false;
+    if (Array.isArray(item)) pending.push(...item);
+    else if (item !== null && typeof item === "object") {
+      for (const [key, child] of Object.entries(item)) pending.push(key, child);
+    }
+  }
+  return true;
+}

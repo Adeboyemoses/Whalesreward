@@ -64,6 +64,7 @@ it("redacts P-23 receipt bytes and evidence at any nesting depth", () => {
       lookupReceipt: "receipt-canary",
       nested: {
         lookup_receipt_input: { a: "receipt-canary" },
+        lookup_receipt_input_json: "receipt-canary",
         lookup_receipt_claims: "receipt-canary",
       },
     },

@@ -24,7 +24,7 @@ import { newId } from "../../lib/ids";
 import type { EvidenceStorage } from "../../adapters/storage";
 import { StorageSizeError } from "../../adapters/storage";
 import { SyncError } from "./errors";
-import { canonicalJson, payloadDigest } from "./canonical";
+import { canonicalJson, jsonbRepresentable, payloadDigest } from "./canonical";
 import {
   transaction,
   authority,
@@ -233,8 +233,8 @@ export function createSyncService({
           lookupReceiptKeys(),
         );
         await db.query(
-          `INSERT INTO purchase(id,originating_attendant_id,operation_id,payload_digest,sale_code,capture_context_id,assignment_id,station_id,pump_id,product_id,seller_name,seller_username,card_code,app_captured_at,server_received_at,price_version_id,basis,entered_amount_kobo,entered_quantity,amount_kobo,quantity,rate_kobo,currency,unit,quantity_precision,medium,expected_photo_digest,expected_photo_bytes,status,version,lookup_receipt_input,lookup_receipt_status,lookup_receipt_claims,capture_lower_bound,capture_policy_version)
-     VALUES($1,$2,$3,$4,'S'||nextval('sync_sale_code_seq'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$27::timestamptz,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'received',1,$28::jsonb,$29,$30::jsonb,$31::timestamptz,'p23-3')`,
+          `INSERT INTO purchase(id,originating_attendant_id,operation_id,payload_digest,sale_code,capture_context_id,assignment_id,station_id,pump_id,product_id,seller_name,seller_username,card_code,app_captured_at,server_received_at,price_version_id,basis,entered_amount_kobo,entered_quantity,amount_kobo,quantity,rate_kobo,currency,unit,quantity_precision,medium,expected_photo_digest,expected_photo_bytes,status,version,lookup_receipt_input,lookup_receipt_status,lookup_receipt_claims,capture_lower_bound,capture_policy_version,lookup_receipt_input_json)
+     VALUES($1,$2,$3,$4,'S'||nextval('sync_sale_code_seq'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$27::timestamptz,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'received',1,$28::jsonb,$29,$30::jsonb,$31::timestamptz,'p23-3',$32)`,
           [
             id,
             auth.attendantId,
@@ -263,10 +263,13 @@ export function createSyncService({
             sale.photo.sha256,
             sale.photo.bytes,
             evidence.receivedAt,
-            canonicalJson(sale.lookupReceipt ?? null),
+            jsonbRepresentable(sale.lookupReceipt)
+              ? canonicalJson(sale.lookupReceipt ?? null)
+              : null,
             evidence.status,
             evidence.claims ? JSON.stringify(evidence.claims) : null,
             evidence.lowerBound,
+            canonicalJson(sale.lookupReceipt ?? null),
           ],
         );
         return { id, created: true };
