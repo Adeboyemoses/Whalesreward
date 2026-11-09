@@ -1,16 +1,75 @@
 import { createHash } from "node:crypto";
-/** Versioned, recursively key-sorted JSON. Schemas normalize codes, instants and decimals first. */
+/** Recursively key-sorted JSON, using an explicit stack for bounded-size deeply nested evidence. */
+function sortedJson(
+  value: unknown,
+  compareKeys: (a: string, b: string) => number,
+): string {
+  type Task = { value: unknown } | { text: string };
+  const pending: Task[] = [{ value }],
+    output: string[] = [];
+  while (pending.length) {
+    const task = pending.pop()!;
+    if ("text" in task) {
+      output.push(task.text);
+      continue;
+    }
+    const v = task.value;
+    if (Array.isArray(v)) {
+      output.push("[");
+      pending.push({ text: "]" });
+      for (let i = v.length - 1; i >= 0; i--) {
+        pending.push({ value: v[i] });
+        if (i > 0) pending.push({ text: "," });
+      }
+    } else if (v !== null && typeof v === "object") {
+      output.push("{");
+      pending.push({ text: "}" });
+      const entries = Object.entries(v).sort(([a], [b]) => compareKeys(a, b));
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const [k, x] = entries[i]!;
+        pending.push({ value: x }, { text: ":" }, { text: JSON.stringify(k) });
+        if (i > 0) pending.push({ text: "," });
+      }
+    } else output.push(JSON.stringify(v));
+  }
+  return output.join("");
+}
+/** New receipt evidence uses a locale-independent total ordering of distinct UTF-16 keys. */
+export function canonicalJson(value: unknown): string {
+  return sortedJson(value, (a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+/** Keep absent/null receipts in the legacy namespace; every other JSON value is immutable evidence. */
 export function payloadDigest(value: unknown): string {
-  function stable(v: unknown): string {
-    if (Array.isArray(v)) return `[${v.map(stable).join(",")}]`;
-    if (v !== null && typeof v === "object")
-      return `{${Object.entries(v)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, x]) => `${JSON.stringify(k)}:${stable(x)}`)
-        .join(",")}}`;
-    return JSON.stringify(v);
+  let namespace = "sync-v1";
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "lookupReceipt" in value
+  ) {
+    const { lookupReceipt, ...legacy } = value as Record<string, unknown>;
+    if (lookupReceipt == null) value = legacy;
+    else namespace = "sync-v2-lookup";
   }
   return createHash("sha256")
-    .update(`sync-v1\0${stable(value)}`)
+    .update(
+      `${namespace}\0${namespace === "sync-v1" ? sortedJson(value, (a, b) => a.localeCompare(b)) : canonicalJson(value)}`,
+    )
     .digest("hex");
+}
+
+/** PostgreSQL JSONB cannot represent NUL or unpaired UTF-16 surrogates, including keys. */
+export function jsonbRepresentable(value: unknown): boolean {
+  const pending: unknown[] = [value];
+  const unsupported =
+    /\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  while (pending.length) {
+    const item = pending.pop();
+    if (typeof item === "string" && unsupported.test(item)) return false;
+    if (Array.isArray(item)) pending.push(...item);
+    else if (item !== null && typeof item === "object") {
+      for (const [key, child] of Object.entries(item)) pending.push(key, child);
+    }
+  }
+  return true;
 }

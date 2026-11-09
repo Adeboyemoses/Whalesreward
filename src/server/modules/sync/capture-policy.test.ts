@@ -316,3 +316,103 @@ describe("P-20 capped capture interval", () => {
     });
   });
 });
+
+describe("P-23 shared lower bound", () => {
+  it("uses L for price, assignment, campaign and card while retaining original receipt", () => {
+    const f = fixture();
+    f.lowerBound = at(2);
+    f.receivedAt = at(3);
+    f.prices = [
+      { effectiveFrom: at(0), rateKobo: "90000", currency: "NGN" },
+      { effectiveFrom: at(2), rateKobo: "100000", currency: "NGN" },
+    ];
+    f.assignment.effectiveFrom = at(2);
+    f.cardLink = { linkedAt: at(2), endedAt: null, customerMatches: true };
+    f.settings = [
+      {
+        effectiveFrom: at(2),
+        campaignId: "campaign",
+        purchaseStart: at(2),
+        purchaseCutoff: at(4),
+        uploadDeadline: at(5),
+      },
+    ];
+    expect(evaluateCapturePolicy(f)).toEqual({
+      reasons: [],
+      campaignEligible: true,
+    });
+    f.lowerBound = at(1);
+    expect(evaluateCapturePolicy(f).reasons).toEqual(
+      expect.arrayContaining([
+        "card_policy_unresolved",
+        "capture_authorization_unresolved",
+        "price_uncertain",
+        "capture_history_incomplete",
+      ]),
+    );
+  });
+  it("includes both exact bounds and rejects invalid lower bounds", () => {
+    const f = fixture();
+    f.lowerBound = f.receivedAt;
+    f.cardLink = {
+      linkedAt: f.lowerBound,
+      endedAt: null,
+      customerMatches: true,
+    };
+    expect(evaluateCapturePolicy(f).reasons).toEqual([]);
+    f.cardLink.endedAt = f.receivedAt;
+    expect(evaluateCapturePolicy(f).reasons).toContain(
+      "card_policy_unresolved",
+    );
+    f.lowerBound = (BigInt(f.receivedAt) + 1n).toString();
+    expect(evaluateCapturePolicy(f).reasons).toEqual([
+      "capture_history_incomplete",
+    ]);
+    f.lowerBound = (BigInt(f.signedInAt) - 1n).toString();
+    expect(evaluateCapturePolicy(f).reasons).toEqual([
+      "capture_history_incomplete",
+    ]);
+  });
+  it("checks card ending after capped U through first R and preserves independent failures", () => {
+    const f = fixture();
+    f.lowerBound = at(2);
+    f.offlineExpiresAt = at(3);
+    f.receivedAt = at(4);
+    f.cardLink = { linkedAt: at(2), endedAt: at(4), customerMatches: true };
+    f.contextRevokedAt = at(3);
+    f.prices.push({
+      effectiveFrom: at(3),
+      rateKobo: "110000",
+      currency: "NGN",
+    });
+    expect(evaluateCapturePolicy(f).reasons).toEqual(
+      expect.arrayContaining([
+        "card_policy_unresolved",
+        "capture_authorization_unresolved",
+        "price_uncertain",
+      ]),
+    );
+  });
+});
+
+it("P-23 classifies replacement-ended linkage once while preserving independent history uncertainty", () => {
+  const f = fixture();
+  f.cardLink = {
+    linkedAt: at(0),
+    endedAt: at(2),
+    customerMatches: true,
+    endedByReplacement: true,
+  };
+  expect(evaluateCapturePolicy(f).reasons).toEqual(["replaced_card"]);
+  f.cardLink.customerMatches = false;
+  expect(evaluateCapturePolicy(f).reasons).toEqual(
+    expect.arrayContaining(["replaced_card", "card_policy_unresolved"]),
+  );
+  f.cardLink.customerMatches = true;
+  f.cardLink.linkedAt = at(2);
+  expect(evaluateCapturePolicy(f).reasons).toEqual(
+    expect.arrayContaining(["replaced_card", "card_policy_unresolved"]),
+  );
+  f.cardLink = null;
+  expect(evaluateCapturePolicy(f).reasons).toContain("card_policy_unresolved");
+});

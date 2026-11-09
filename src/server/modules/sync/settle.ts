@@ -22,6 +22,7 @@ export async function settle(
   const ctx = (
     await db.query<{
       signed_in_at: string;
+      lower_bound: string;
       received_at: string;
       offline_expires_at: string;
       revoked_at: string | null;
@@ -29,6 +30,7 @@ export async function settle(
       effective_until: string | null;
     }>(
       `SELECT (EXTRACT(EPOCH FROM c.signed_in_at)*1000000)::bigint::text AS signed_in_at,
+ (EXTRACT(EPOCH FROM coalesce(p.capture_lower_bound,c.signed_in_at))*1000000)::bigint::text AS lower_bound,
  (EXTRACT(EPOCH FROM p.server_received_at)*1000000)::bigint::text AS received_at,
  (EXTRACT(EPOCH FROM c.offline_expires_at)*1000000)::bigint::text AS offline_expires_at,
  (EXTRACT(EPOCH FROM c.revoked_at)*1000000)::bigint::text AS revoked_at,
@@ -51,8 +53,35 @@ export async function settle(
       [p.station_id, p.id],
     )
   ).rows;
+  // Card and link are locked before evaluating their authoritative historical intervals.
+  const card = (
+    await db.query<{
+      state: string;
+      replaced_by_card_id: string | null;
+      retired_at_receipt: boolean;
+    }>(
+      "SELECT c.state,c.replaced_by_card_id,c.retired_at<=(SELECT server_received_at FROM purchase WHERE id=$2) AS retired_at_receipt FROM card c WHERE c.id=$1 FOR SHARE",
+      [p.card_id, p.id],
+    )
+  ).rows[0];
+  const links = (
+    await db.query<{
+      id: string;
+      customer_id: string;
+      linked_at: string;
+      ended_at: string | null;
+    }>(
+      `SELECT l.id,l.customer_id,(EXTRACT(EPOCH FROM l.linked_at)*1000000)::bigint::text AS linked_at,(EXTRACT(EPOCH FROM l.ended_at)*1000000)::bigint::text AS ended_at
+    FROM card_customer_link l JOIN purchase p ON p.id=$2 WHERE l.card_id=$1 AND l.linked_at<=p.server_received_at ORDER BY l.linked_at FOR SHARE OF l`,
+      [p.card_id, p.id],
+    )
+  ).rows;
+  const link = p.lookup_receipt_claims
+    ? links.find((l) => l.id === p.lookup_receipt_claims!.cardCustomerLinkId)
+    : links.findLast((l) => l.customer_id === p.customer_id);
   const policy = evaluateCapturePolicy({
     signedInAt: ctx.signed_in_at,
+    lowerBound: ctx.lower_bound,
     receivedAt: ctx.received_at,
     offlineExpiresAt: ctx.offline_expires_at,
     contextRevokedAt: ctx.revoked_at,
@@ -60,50 +89,32 @@ export async function settle(
       effectiveFrom: ctx.effective_from,
       effectiveUntil: ctx.effective_until,
     },
+    cardLink: link
+      ? {
+          linkedAt: link.linked_at,
+          endedAt: link.ended_at,
+          endedByReplacement:
+            card?.state === "retired" &&
+            card.retired_at_receipt &&
+            card.replaced_by_card_id !== null,
+          customerMatches:
+            link.customer_id === p.customer_id &&
+            (!p.lookup_receipt_claims ||
+              (p.lookup_receipt_claims.cardId === p.card_id &&
+                p.lookup_receipt_claims.customerId === p.customer_id)),
+        }
+      : null,
     rateKobo: p.rate_kobo,
     currency: p.currency,
     prices,
     settings,
   });
-  // Card state is checked again at acceptance, not trusted from the earlier lookup.
-  const card = (
-    await db.query<{ state: string; replaced_by_card_id: string | null }>(
-      "SELECT state,replaced_by_card_id FROM card WHERE id=$1 FOR SHARE",
-      [p.card_id],
-    )
-  ).rows[0];
-  if (card?.state === "retired")
+  if (card?.state === "retired" && card.retired_at_receipt)
     policy.reasons.push(
       card.replaced_by_card_id ? "replaced_card" : "card_policy_unresolved",
     );
   if (!card || !p.customer_id)
     policy.reasons.push("capture_history_incomplete");
-  const historical = (
-    await db.query<{
-      customer_id: string;
-      linked_before_signin: boolean;
-      ends_after_receipt: boolean;
-    }>(
-      `SELECT l.customer_id,l.linked_at<=c.signed_in_at AS linked_before_signin,
-       (l.ended_at IS NULL OR l.ended_at>p.server_received_at) AS ends_after_receipt
-       FROM card_customer_link l JOIN purchase p ON p.id=$2
-       JOIN capture_context c ON c.id=p.capture_context_id
-       WHERE l.card_id=$1 AND l.linked_at<=p.server_received_at ORDER BY l.linked_at FOR SHARE OF l`,
-      [p.card_id, p.id],
-    )
-  ).rows;
-  if (
-    historical.some((l) => l.customer_id !== p.customer_id) ||
-    !historical.some(
-      (l) =>
-        l.customer_id === p.customer_id &&
-        l.linked_before_signin &&
-        l.ends_after_receipt,
-    )
-  ) {
-    if (!policy.reasons.includes("replaced_card"))
-      policy.reasons.push("card_policy_unresolved");
-  }
   const reasons = [...new Set(policy.reasons)];
   const held = reasons.length > 0;
   const revisionId = newId();
@@ -132,12 +143,25 @@ export async function settle(
       [newId(), p.id, hold.kind, revisionId, hold.reason],
     );
   await db.query(
-    "INSERT INTO sync_validation(purchase_id,policy_version,reasons,campaign_eligible) VALUES($1,$2,$3,$4)",
+    "INSERT INTO sync_validation(purchase_id,policy_version,reasons,campaign_eligible,capture_evidence) VALUES($1,$2,$3,$4,$5)",
     [
       p.id,
       CAPTURE_POLICY_VERSION,
       JSON.stringify(reasons),
       policy.campaignEligible && !held,
+      JSON.stringify({
+        signedInAt: ctx.signed_in_at,
+        receivedAt: ctx.received_at,
+        offlineExpiresAt: ctx.offline_expires_at,
+        lowerBound: ctx.lower_bound,
+        upperBound:
+          BigInt(ctx.received_at) < BigInt(ctx.offline_expires_at)
+            ? ctx.received_at
+            : ctx.offline_expires_at,
+        policyVersion: p.capture_policy_version ?? "p20-2",
+        cardCustomerLinkId: link?.id ?? null,
+        verifiedLookup: p.lookup_receipt_claims !== null,
+      }),
     ],
   );
   for (const code of reasons.filter(
@@ -147,7 +171,7 @@ export async function settle(
   ))
     await db.query(
       "INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES($1,$2,$3,$4,clock_timestamp(),1)",
-      [newId(), p.id, code, `p20-${CAPTURE_POLICY_VERSION}`],
+      [newId(), p.id, code, p.capture_policy_version ?? `p20-2`],
     );
   await db.query(
     `UPDATE purchase SET status=$2,current_revision_id=$3,version=version+1 WHERE id=$1 AND status='finalizing'`,

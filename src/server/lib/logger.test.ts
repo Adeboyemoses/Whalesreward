@@ -52,3 +52,23 @@ it("redacts child logger bindings and error context", () => {
     );
   expect(lines.join("")).not.toContain("secret-");
 });
+it("redacts P-23 receipt bytes and evidence at any nesting depth", () => {
+  const lines: string[] = [];
+  const logger = createLogger({
+    write: (line: string) => {
+      lines.push(line);
+    },
+  });
+  logger.info(
+    {
+      lookupReceipt: "receipt-canary",
+      nested: {
+        lookup_receipt_input: { a: "receipt-canary" },
+        lookup_receipt_input_json: "receipt-canary",
+        lookup_receipt_claims: "receipt-canary",
+      },
+    },
+    "purchase.received",
+  );
+  expect(lines.join("")).not.toContain("receipt-canary");
+});

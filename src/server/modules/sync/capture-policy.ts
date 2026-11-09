@@ -1,5 +1,5 @@
-/** P-20 refines P-18; provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
-export const CAPTURE_POLICY_VERSION = 2;
+/** P-23 refines P-20/P-18; provisional pending Q-528. No app/UUID/EXIF time enters this policy. */
+export const CAPTURE_POLICY_VERSION = 3;
 /** Exact integer epoch microseconds from PostgreSQL EXTRACT, never a JS Date. */
 export type TrustedMicros = string;
 const micros = (value: TrustedMicros): bigint => BigInt(value);
@@ -19,6 +19,13 @@ export type CampaignHistory = {
 };
 export type CapturePolicyInput = {
   signedInAt: TrustedMicros;
+  lowerBound?: TrustedMicros;
+  cardLink?: {
+    linkedAt: TrustedMicros;
+    endedAt: TrustedMicros | null;
+    customerMatches: boolean;
+    endedByReplacement?: boolean;
+  } | null;
   receivedAt: TrustedMicros;
   offlineExpiresAt: TrustedMicros;
   contextRevokedAt: TrustedMicros | null;
@@ -39,13 +46,25 @@ export function evaluateCapturePolicy(
   input: CapturePolicyInput,
 ): CapturePolicyResult {
   const reasons = new Set<string>();
-  const s = micros(input.signedInAt),
+  const originalS = micros(input.signedInAt);
+  const s = micros(input.lowerBound ?? input.signedInAt),
     r = micros(input.receivedAt),
     expiry = micros(input.offlineExpiresAt);
   // Receipt can follow reauthentication; capture remains bounded by its original context.
   const u = r < expiry ? r : expiry;
-  if (u < s)
+  if (s < originalS || u < s)
     return { reasons: ["capture_history_incomplete"], campaignEligible: false };
+  if (input.cardLink !== undefined) {
+    const link = input.cardLink;
+    // A replacement has its own resolvable hold; do not add an unresolvable
+    // generic reason for that same ending. Independent bad history still blocks.
+    if (!link || !link.customerMatches || micros(link.linkedAt) > s)
+      reasons.add("card_policy_unresolved");
+    if (link && link.endedAt !== null && micros(link.endedAt) <= r)
+      reasons.add(
+        link.endedByReplacement ? "replaced_card" : "card_policy_unresolved",
+      );
+  }
   if (
     micros(input.assignment.effectiveFrom) > s ||
     (input.assignment.effectiveUntil !== null &&

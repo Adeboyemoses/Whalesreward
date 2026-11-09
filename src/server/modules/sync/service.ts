@@ -1,3 +1,5 @@
+import { lookupReceiptConfig, type LookupReceiptKeys } from "./lookup-receipt";
+import { issueLookupReceipt, freezeLookupEvidence } from "./lookup-evidence";
 import type pg from "pg";
 import {
   originalSaleSchema,
@@ -22,7 +24,7 @@ import { newId } from "../../lib/ids";
 import type { EvidenceStorage } from "../../adapters/storage";
 import { StorageSizeError } from "../../adapters/storage";
 import { SyncError } from "./errors";
-import { payloadDigest } from "./canonical";
+import { canonicalJson, jsonbRepresentable, payloadDigest } from "./canonical";
 import {
   transaction,
   authority,
@@ -82,9 +84,11 @@ type Context = {
 export function createSyncService({
   pool,
   storage,
+  lookupReceiptKeys = lookupReceiptConfig,
 }: {
   pool: pg.Pool;
   storage: EvidenceStorage;
+  lookupReceiptKeys?: () => LookupReceiptKeys;
 }) {
   async function resolve(token: string | undefined, id: string) {
     return transaction(pool, async (db) => {
@@ -128,14 +132,15 @@ export function createSyncService({
     async lookup(
       token: string | undefined,
       input: LookupInput,
+      receiptCapable = false,
     ): Promise<Lookup> {
       const body = parsed(lookupSchema, input);
       const code = body.source === "code" ? body.code : body.qr;
       return transaction(pool, async (db) => {
-        await authority(db, token);
+        const auth = await authority(db, token);
         const card = (
           await db.query<{ id: string; state: string; status: string }>(
-            `SELECT c.id,c.state,b.status FROM card c JOIN card_batch b ON b.id=c.batch_id WHERE c.code=$1`,
+            `SELECT c.id,c.state,b.status FROM card c JOIN card_batch b ON b.id=c.batch_id WHERE c.code=$1 FOR SHARE OF c,b`,
             [code],
           )
         ).rows[0];
@@ -155,6 +160,17 @@ export function createSyncService({
           cardCode: code,
           customer,
           lookedUpAt: new Date().toISOString(),
+          ...(receiptCapable
+            ? {
+                lookupReceipt: await issueLookupReceipt(
+                  db,
+                  auth.captureContextId,
+                  auth.attendantId,
+                  card!.id,
+                  lookupReceiptKeys(),
+                ),
+              }
+            : {}),
         };
       });
     },
@@ -207,9 +223,18 @@ export function createSyncService({
         ).rowCount;
         if (!price) throw new SyncError("calculation_invalid", 422);
         const id = newId();
+        const evidence = await freezeLookupEvidence(
+          db,
+          sale.lookupReceipt,
+          sale.captureContextId,
+          auth.attendantId,
+          ctx.station_id,
+          sale.cardCode,
+          lookupReceiptKeys(),
+        );
         await db.query(
-          `INSERT INTO purchase(id,originating_attendant_id,operation_id,payload_digest,sale_code,capture_context_id,assignment_id,station_id,pump_id,product_id,seller_name,seller_username,card_code,app_captured_at,server_received_at,price_version_id,basis,entered_amount_kobo,entered_quantity,amount_kobo,quantity,rate_kobo,currency,unit,quantity_precision,medium,expected_photo_digest,expected_photo_bytes,status,version)
-     VALUES($1,$2,$3,$4,'S'||nextval('sync_sale_code_seq'),$5,$6,$7,$8,$9,$10,$11,$12,$13,clock_timestamp(),$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'received',1)`,
+          `INSERT INTO purchase(id,originating_attendant_id,operation_id,payload_digest,sale_code,capture_context_id,assignment_id,station_id,pump_id,product_id,seller_name,seller_username,card_code,app_captured_at,server_received_at,price_version_id,basis,entered_amount_kobo,entered_quantity,amount_kobo,quantity,rate_kobo,currency,unit,quantity_precision,medium,expected_photo_digest,expected_photo_bytes,status,version,lookup_receipt_input,lookup_receipt_status,lookup_receipt_claims,capture_lower_bound,capture_policy_version,lookup_receipt_input_json)
+     VALUES($1,$2,$3,$4,'S'||nextval('sync_sale_code_seq'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$27::timestamptz,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'received',1,$28::jsonb,$29,$30::jsonb,$31::timestamptz,'p23-3',$32)`,
           [
             id,
             auth.attendantId,
@@ -237,6 +262,14 @@ export function createSyncService({
             sale.medium,
             sale.photo.sha256,
             sale.photo.bytes,
+            evidence.receivedAt,
+            jsonbRepresentable(sale.lookupReceipt)
+              ? canonicalJson(sale.lookupReceipt ?? null)
+              : null,
+            evidence.status,
+            evidence.claims ? JSON.stringify(evidence.claims) : null,
+            evidence.lowerBound,
+            canonicalJson(sale.lookupReceipt ?? null),
           ],
         );
         return { id, created: true };

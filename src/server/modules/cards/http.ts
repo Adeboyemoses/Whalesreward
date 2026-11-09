@@ -170,7 +170,16 @@ export async function handleCardsCustomers(
       status = 200;
     if (area === "customers") {
       if (action === "register") {
-        const result = await registerCustomer(pool, config, token, input);
+        const result = await registerCustomer(
+          pool,
+          config,
+          token,
+          input,
+          undefined,
+          {
+            receiptCapable: request.headers.get("X-WR-Lookup-Receipt") === "1",
+          },
+        );
         data = result.data;
         status = result.replayed ? 200 : 201;
       } else if (action === "lookup")

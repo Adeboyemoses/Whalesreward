@@ -1,3 +1,4 @@
+import { lookupReceiptSchema } from "./lookup-receipt";
 import { z } from "zod";
 import { authId } from "./auth";
 import { pageSchema } from "./admin";
@@ -71,6 +72,9 @@ export const registrationReceiptSchema = z.strictObject({
   registeredAtStation: station,
   registeredBy: actor,
 });
+export const registrationReceiptWithLookupSchema = registrationReceiptSchema
+  .extend({ lookupReceipt: lookupReceiptSchema.nullable() })
+  .strict();
 export const customerLookupSchema = z.strictObject({
   customer: z.strictObject({
     id: authId,

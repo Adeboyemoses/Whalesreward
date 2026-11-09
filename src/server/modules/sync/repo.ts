@@ -36,7 +36,11 @@ export async function authority(
   ).rows[0];
   if (!r) throw new AuthError("unauthenticated", 401);
   if (write && r.expired) throw new SyncError("online_sign_in_required", 403);
-  return { attendantId: r.id, userId: session.user_id };
+  return {
+    attendantId: r.id,
+    userId: session.user_id,
+    captureContextId: session.capture_context_id,
+  };
 }
 export type Purchase = {
   id: string;
@@ -60,6 +64,10 @@ export type Purchase = {
   expected_photo_digest: string;
   expected_photo_bytes: string;
   cancellation_reason: string | null;
+  lookup_receipt_claims:
+    | import("../../../shared/contracts/lookup-receipt").LookupReceiptClaims
+    | null;
+  capture_policy_version: string | null;
 };
 export async function ownedPurchase(
   db: pg.PoolClient,

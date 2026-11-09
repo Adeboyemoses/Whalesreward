@@ -105,7 +105,11 @@ export async function handleSync(
       if (action === "lookup") {
         const body = lookupSchema.safeParse(input);
         if (!body.success) throw new SyncError("invalid_request", 400);
-        data = await service.lookup(credential, body.data);
+        data = await service.lookup(
+          credential,
+          body.data,
+          request.headers.get("X-WR-Lookup-Receipt") === "1",
+        );
       } else if (action === "submit") {
         const body = originalSaleSchema.safeParse(input);
         if (!body.success) throw new SyncError("invalid_request", 400);
