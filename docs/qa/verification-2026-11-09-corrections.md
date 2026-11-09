@@ -2,10 +2,10 @@
 
 WO-core-8 / WHR-14. Backend verification against M3, including merged
 WO-spec-3c / P-22. The EM executed the commands and named tests below on frozen source
-`3a003d4` (including the prepared dotted-phone fix and merged spec READY
-records). Three review rounds are complete; the prepared fix awaits Earl's
-explicit exception for one additional round. This is not a READY claim. Correction screens follow in
-WO-app-7. WHR-80 and WHR-12 remain In Review for Earl's batched smoke tests.
+`3a003d4`. Feature [#89](https://github.com/Adeboyemoses/Whalesreward/pull/89)
+merged into staging at `83be123` with all five required checks green. READY
+takes effect after these separately reviewed records merge. Correction screens
+follow in WO-app-7. WHR-80 and WHR-12 remain In Review for Earl's batched smoke tests.
 
 ## Acceptance matrix
 
@@ -225,8 +225,44 @@ A prepared two-line detector correction includes dotted punctuation in matching
 and normalization. Four HTTP/snapshot assertions failed before that correction;
 all now pass, alongside the full 330-test PostgreSQL suite. Submission, decision
 and snapshot regressions cover dotted Nigerian and international forms. The
-review cap is three; this fix remains unreviewed pending Earl's explicit approval
-for one additional round. No PR or READY state is claimed before that review.
+ordinary review cap is three. Earl explicitly approved one additional round
+for commit `3a003d4` only, by code-reviewer and security-reviewer against
+`6059568`; any other feature change would void it. Both scoped reviewers passed
+at `433a603`, each verifying 18 focused HTTP tests. The prior integrity PASS at
+`6059568` remains applicable to unchanged integrity code. The exact approval,
+scope and exception are committed in `.review/core__wo-8-corrections.md`.
+
+## Final combined staging verification
+
+GitHub required an up-to-date branch. Independently reviewed app/spec staging
+commits were integrated at `0dfdc59`; SHA-256 comparisons confirmed that all 40
+files in this feature's patch were byte-identical to `660eae3`. No additional
+feature change followed the approved fix. Evidence validation passed. Feature
+#89 merged at `83be123` with all five checks green.
+
+EM combined-base output:
+
+```text
+pnpm typecheck                         exit 0
+pnpm lint                              exit 0
+pnpm test                              52 files, 454 passed
+pnpm build                             exit 0; Workbox34 generic assets
+pnpm test:integration                  21 files, 330 passed (9.79s)
+pnpm test:time                         5 passed in UTC; 5 passed in America/New_York
+pnpm test:e2e --workers=2 (Linux)       214 passed, 4 existing staging-only skips (3.4m)
+signed-upload browser                  1 passed (477ms), sequential dedicated output
+named core integration + unit          70 +41 passed; 111 names above
+```
+
+Feature CI run42632134096 also passed454 unit tests,330 PostgreSQL tests,
+5 time tests in each timezone,214 browser tests with four existing skips, and
+one signed-upload browser test. No flaky result was reported. The additional
+unit/browser cases belong to the independently reviewed customer/card UI base.
+The first local combined run could not reach MinIO on container-loopback9000;
+all12 failures were ECONNREFUSED in the newer card-export fixtures. A local-only
+TCP forward to the existing development MinIO resolved that setup failure;
+the full fresh-database run then passed with no source, assertion, timeout or
+retry-policy change. No cloud or deployed storage configuration changed.
 
 ## Limits
 
