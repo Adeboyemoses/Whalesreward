@@ -28,4 +28,4 @@ All three independent reviewers returned PASS in round 1 with no findings and al
 
 EM verification: typecheck, lint, 333 unit tests and production build PASS. New/changed prose paragraphs and list items are <=120 words; local Markdown file targets and the new M3 section anchor resolve; diff whitespace PASS. No code, schema or user flow changed; integration/e2e run through ordinary CI, with no new runtime coverage claimed. Rook should mirror P-22 in product docs.
 
-READY takes effect only on reviewed green staging merge; the EM posts merged PR and verbatim verdicts on WHR-84 and stops. No application code or product-doc write.
+The shared-records validator requires a separate docs-only READY PR after this amendment merges. STATUS.md, the spec lane file and coverage-map.md were therefore removed from this PR; the reviewed M3 and P-22 texts are unchanged. The EM posts merged PRs and verbatim verdicts on WHR-84, then stops at READY. No application code or product-doc write.
