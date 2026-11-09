@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { v7 } from "uuid";
 import {
   stationFixture,
@@ -12,7 +12,31 @@ import { installAssignmentEndFake } from "../station/assignment-end-fake";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
 
-test.afterEach(async ({ page }) => {
+const failedResponses = new WeakMap<
+  Page,
+  Array<{ path: string; status: number }>
+>();
+test.beforeEach(async ({ page }) => {
+  const responses: Array<{ path: string; status: number }> = [];
+  failedResponses.set(page, responses);
+  page.on("response", (response) => {
+    const path = new URL(response.url()).pathname;
+    if (path.startsWith("/api/admin/") && response.status() >= 400)
+      responses.push({ path, status: response.status() });
+  });
+});
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) {
+    // Only status codes and headings, never request headers/bodies or form values.
+    console.log(
+      "Station failure diagnostics",
+      JSON.stringify({
+        path: new URL(page.url()).pathname,
+        responses: failedResponses.get(page),
+        headings: await page.getByRole("heading").allTextContents(),
+      }),
+    );
+  }
   await page.unrouteAll({ behavior: "wait" });
 });
 
