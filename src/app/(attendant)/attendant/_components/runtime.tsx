@@ -20,6 +20,7 @@ import { registerAttendantWorker } from "@/client/sw/register";
 import { connection, probeConnection } from "@/client/offline/connection";
 import { AppHeader, BottomNav, Notice, Button } from "@/ui";
 import type { NavLabel } from "@/ui/navigation";
+import type { ConfiguredAssignment } from "@/client/types";
 
 type Client = ReturnType<typeof getAttendantClient>;
 type Runtime = {
@@ -27,12 +28,14 @@ type Runtime = {
   state: ClientState | null;
   online: boolean;
   error: string | null;
+  reassignmentRequiresSignIn: boolean;
 };
 const RuntimeContext = createContext<Runtime>({
   client: null,
   state: null,
   online: true,
   error: null,
+  reassignmentRequiresSignIn: false,
 });
 type SaleHandoff = {
   accountId: string;
@@ -40,10 +43,22 @@ type SaleHandoff = {
   cardCode: string;
   customerId: string;
 };
+type RegistrationHandoff = Omit<SaleHandoff, "customerId"> & {
+  source: "code" | "qr";
+};
 const SaleHandoffContext = createContext<{
   offer: (value: SaleHandoff) => void;
   take: (session: Session) => SaleHandoff | null;
-}>({ offer: () => {}, take: () => null });
+  offerRegistration: (value: RegistrationHandoff) => void;
+  registrationCandidate: (session: Session) => RegistrationHandoff | null;
+  clearRegistration: () => void;
+}>({
+  offer: () => {},
+  take: () => null,
+  offerRegistration: () => {},
+  registrationCandidate: () => null,
+  clearRegistration: () => {},
+});
 export function useSaleHandoff() {
   return useContext(SaleHandoffContext);
 }
@@ -54,6 +69,7 @@ export function message(error: unknown): string {
 }
 export function AttendantProvider({ children }: { children: ReactNode }) {
   const saleHandoff = useRef<SaleHandoff | null>(null);
+  const registrationHandoff = useRef<RegistrationHandoff | null>(null);
   const [handoff] = useState(() => ({
     offer: (value: SaleHandoff) => {
       saleHandoff.current = value;
@@ -66,32 +82,67 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
         ? value
         : null;
     },
+    offerRegistration: (value: RegistrationHandoff) => {
+      registrationHandoff.current = value;
+    },
+    registrationCandidate: (session: Session) => {
+      const value = registrationHandoff.current;
+      return value?.accountId === session.account.id &&
+        value.contextId === session.captureContextId
+        ? value
+        : null;
+    },
+    clearRegistration: () => {
+      registrationHandoff.current = null;
+    },
   }));
   const [runtime, setRuntime] = useState<Runtime>({
     client: null,
     state: null,
     online: true,
     error: null,
+    reassignmentRequiresSignIn: false,
   });
   useEffect(() => {
     const client = getAttendantClient();
     let active = true;
     let initialized = false;
     let probing = false;
+    let refreshingAssignment = false;
+    let reassignmentContext: string | null = null;
+    const assignmentChanged = (state: ClientState) => {
+      const context = state.session
+        ? `${state.session.account.id}:${state.session.captureContextId}`
+        : null;
+      if (!context || (reassignmentContext && reassignmentContext !== context))
+        reassignmentContext = null;
+      if (state.session?.reassignmentRequiresSignIn)
+        reassignmentContext = context;
+      return !!context && reassignmentContext === context;
+    };
     const update = () => {
       const state = client.getState();
+      const changed = assignmentChanged(state);
       if (
         state.access !== "active" ||
         saleHandoff.current?.accountId !== state.session?.account.id ||
         saleHandoff.current?.contextId !== state.session?.captureContextId
       )
         saleHandoff.current = null;
+      if (
+        state.access !== "active" ||
+        registrationHandoff.current?.accountId !== state.session?.account.id ||
+        registrationHandoff.current?.contextId !==
+          state.session?.captureContextId
+      )
+        registrationHandoff.current = null;
       if (active)
         setRuntime((previous) => ({
           client: initialized ? client : previous.client,
           state: initialized ? client.getState() : previous.state,
           online: connection.isOnline(),
           error: null,
+          reassignmentRequiresSignIn: changed,
         }));
     };
     const fail = (error: unknown) => {
@@ -102,6 +153,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
           state: client.getState(),
           online: connection.isOnline(),
           error: message(error),
+          reassignmentRequiresSignIn: assignmentChanged(client.getState()),
         });
     };
     const unsubscribe = client.subscribe(update);
@@ -146,6 +198,24 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
           });
       }
     }, 1000);
+    // Reuse the authority refresh while the phone stays on Sale. It keeps the
+    // original capture context/anchor and never navigates or interrupts a save.
+    const assignmentTimer = window.setInterval(() => {
+      if (
+        document.visibilityState === "visible" &&
+        connection.isOnline() &&
+        client.getState().access === "active" &&
+        !refreshingAssignment
+      ) {
+        refreshingAssignment = true;
+        void client
+          .refresh()
+          .then(update, fail)
+          .finally(() => {
+            refreshingAssignment = false;
+          });
+      }
+    }, 30000);
     window.addEventListener("online", network);
     window.addEventListener("offline", network);
     document.addEventListener("visibilitychange", resume);
@@ -155,6 +225,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
       unsubscribeConnection();
       stopSync();
       clearInterval(timer);
+      clearInterval(assignmentTimer);
       window.removeEventListener("online", network);
       window.removeEventListener("offline", network);
       document.removeEventListener("visibilitychange", resume);
@@ -255,6 +326,8 @@ export function Frame({
   active = "Sale",
   noNav = false,
   signIn = false,
+  assignmentChanged = false,
+  configuredAssignment,
 }: {
   title: string;
   context?: ReactNode;
@@ -263,8 +336,10 @@ export function Frame({
   active?: NavLabel;
   noNav?: boolean;
   signIn?: boolean;
+  assignmentChanged?: boolean;
+  configuredAssignment?: ConfiguredAssignment["configured"];
 }) {
-  const { online } = useAttendant();
+  const { online, state, reassignmentRequiresSignIn } = useAttendant();
   const pending = useOwnCount();
   return (
     <div
@@ -276,7 +351,22 @@ export function Frame({
         connection={online ? "online" : "offline"}
         secondary={!signIn && title !== "New sale"}
       />
-      <main className="wr-screen">{children}</main>
+      <main className="wr-screen">
+        {!signIn &&
+          state?.session &&
+          (reassignmentRequiresSignIn || assignmentChanged) && (
+            <Notice tone="warning">
+              <b>
+                {configuredAssignment
+                  ? `New pump assigned: ${configuredAssignment.pump.name} · ${productName[configuredAssignment.product.code]}.`
+                  : "Your pump assignment has changed."}
+              </b>{" "}
+              Sign out and sign in online with your own account before using the
+              new pump. Pending sales keep their original details.
+            </Notice>
+          )}
+        {children}
+      </main>
       {action && <div className="wr-actionbar">{action}</div>}
       {!noNav && (
         <BottomNav

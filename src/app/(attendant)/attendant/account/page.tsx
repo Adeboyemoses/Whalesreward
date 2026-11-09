@@ -67,6 +67,8 @@ function Account() {
       title="Your account"
       context="This account is assigned to one pump."
       active="Account"
+      assignmentChanged={changed}
+      configuredAssignment={configured?.configured}
       action={
         changed ? (
           <>
@@ -81,17 +83,6 @@ function Account() {
         ) : undefined
       }
     >
-      {changed && (
-        <Notice tone="warning">
-          <b>
-            {configured
-              ? `New pump assigned: ${configured.configured.pump.name} · ${productName[configured.configured.product.code]}.`
-              : "Your pump assignment has changed."}
-          </b>{" "}
-          Sign out and sign in online with your own account before using the new
-          pump. Pending sales keep their original details.
-        </Notice>
-      )}
       <div className="wr-card wr-quiet wr-person">
         <span className="wr-avatar wr-person-icon">
           <UserRound aria-hidden />
