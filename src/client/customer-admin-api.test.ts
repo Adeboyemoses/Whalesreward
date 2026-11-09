@@ -257,8 +257,7 @@ describe("actual adminRequest malformed success retry classification", () => {
         const error = await api
           .commit(change, schema as z.ZodType<object>)
           .catch((e) => e);
-        if (malformed === "null") expect(error).toBeInstanceOf(TypeError);
-        else expect(error).toMatchObject({ code: "invalid_response" });
+        expect(error).toMatchObject({ code: "invalid_response" });
         expect(customerChangeIsUncertain(error)).toBe(true);
         await expect(
           api.commit(change, schema as z.ZodType<object>),

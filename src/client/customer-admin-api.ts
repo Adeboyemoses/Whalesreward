@@ -17,9 +17,10 @@ export function freezeCustomerChange<T extends object>(
 /** After dispatch, unexpected errors cannot prove rejection; retain frozen replay. */
 export const customerChangeIsUncertain = (error: unknown): boolean =>
   !(error instanceof AdminError) ||
-  (error.code === "invalid_response" ||
-    error.status === 0 ||
-    (error.status >= 500 && error.code !== "print_layout_unconfigured"));
+  error.code === "invalid_response" ||
+  error.code === "unavailable" ||
+  error.status === 0 ||
+  (error.status >= 500 && error.code !== "print_layout_unconfigured");
 export const pageOf = <T>(schema: z.ZodType<T>) =>
   z.strictObject({
     items: z.array(schema).max(100),

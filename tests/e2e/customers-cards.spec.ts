@@ -924,6 +924,173 @@ for (const invalidSuccess of invalidSuccessResponses)
     }
   });
 
+test("I-20 committed PDF preparation followed by 502 HTML stays unavailable and retries the same snapshot", async ({
+  page,
+}) => {
+  await ensureLocalCardBucket();
+  const f = await stationFixture(page);
+  try {
+    const b = await api<{ id: string; version: number }>(
+      page.request,
+      "card-batches",
+      {
+        operationId: v7(),
+        name: "Fictional unavailable export stock",
+        count: 10,
+      },
+      201,
+    );
+    const inventory = (
+      await f.db.query(
+        "SELECT id,code,qr_payload,state FROM card WHERE batch_id=$1 ORDER BY code",
+        [b.id],
+      )
+    ).rows;
+    const bodies: unknown[] = [];
+    const ids: string[] = [];
+    await page.route(
+      `**/api/admin/card-batches/${b.id}/exports`,
+      async (route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        bodies.push(route.request().postDataJSON());
+        const response = await route.fetch();
+        expect(response.status()).toBe(202);
+        ids.push((await response.json()).data.id);
+        // Establish actual durable acceptance before substituting transport.
+        expect(
+          (
+            await f.db.query(
+              "SELECT id,batch_version,batch_status,format FROM card_export WHERE batch_id=$1",
+              [b.id],
+            )
+          ).rows,
+        ).toEqual([
+          {
+            id: ids[0],
+            batch_version: 1,
+            batch_status: "generated",
+            format: "pdf",
+          },
+        ]);
+        if (bodies.length === 1)
+          await route.fulfill({
+            status: 502,
+            headers: {
+              "content-type": "text/html",
+              "cache-control": "no-store",
+            },
+            body: "<!doctype html><title>Bad gateway</title><p>Fictional local gateway unavailable</p>",
+          });
+        else await route.fulfill({ response });
+      },
+    );
+    await page.goto(`/admin/cards/${b.id}`);
+    await page
+      .getByRole("button", { name: "Export PDF print sheet", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Review export preparation", exact: true })
+      .click();
+    const failedTransport = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname ===
+          `/api/admin/card-batches/${b.id}/exports` &&
+        r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Confirm export preparation", exact: true })
+      .click();
+    expect((await failedTransport).status()).toBe(502);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({
+      expectedVersion: 1,
+      format: "pdf",
+      operationId: expect.any(String),
+    });
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
+          [b.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    const snapshot = (
+      await f.db.query(
+        "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
+        [ids[0]],
+      )
+    ).rows;
+    expect(snapshot).toHaveLength(10);
+    await expect(
+      page.getByText(/The result could not be verified/),
+    ).toHaveCount(0);
+    const unavailable = page
+      .getByRole("alert")
+      .filter({ hasText: /unavailable/i });
+    await expect(unavailable).toBeVisible();
+    await expect(unavailable).toContainText("do not assume it failed");
+    await expect(
+      page.getByText(/The result is uncertain\. Retry the same confirmation/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: "Retry same confirmation",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Cancel", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Review a new export", exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Retry same confirmation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Review a new export", exact: true }),
+    ).toBeEnabled();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(ids[1]).toBe(ids[0]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
+          [b.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await f.db.query(
+          "SELECT card_id,code,qr_payload,card_state FROM card_export_item WHERE export_id=$1 ORDER BY ordinal",
+          [ids[0]],
+        )
+      ).rows,
+    ).toEqual(snapshot);
+    expect(
+      (
+        await f.db.query("SELECT status,version FROM card_batch WHERE id=$1", [
+          b.id,
+        ])
+      ).rows,
+    ).toEqual([{ status: "generated", version: 1 }]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT id,code,qr_payload,state FROM card WHERE batch_id=$1 ORDER BY code",
+          [b.id],
+        )
+      ).rows,
+    ).toEqual(inventory);
+  } finally {
+    await page.unrouteAll({ behavior: "wait" });
+    await f.db.end();
+  }
+});
+
 for (const invalidSuccess of invalidSuccessResponses)
   test(`I-20 malformed successful export response retains one snapshot and forbids a new key until reconciled [${invalidSuccess.name}]`, async ({
     page,
