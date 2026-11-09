@@ -9,6 +9,9 @@ export async function register() {
       const { startAutomaticAdminMail } =
         await import("./server/modules/admin-access/mail-runtime");
       startAutomaticAdminMail();
+      const { startAutomaticCardExports } =
+        await import("./server/modules/cards/runtime");
+      startAutomaticCardExports();
     } catch (error) {
       // Next catches instrumentation exceptions and keeps listening: terminate explicitly.
       logger.error(
