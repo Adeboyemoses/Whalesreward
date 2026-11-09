@@ -54,6 +54,31 @@ test("I-04 station pump creation derives its product and cancellation creates no
       )
     ).rows;
     expect(result).toEqual([{ name, product_id: seedId(9) }]);
+    await page.goto("/admin/pumps/new");
+    await page
+      .getByLabel("Pump name", { exact: true })
+      .fill(name.toUpperCase());
+    await page.getByLabel("Product", { exact: true }).selectOption("pms");
+    const duplicate = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/admin/pumps" &&
+        r.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Add pump", exact: true }).click();
+    expect((await duplicate).status()).toBe(409);
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: /already|unique|name.*use|name.*another/i }),
+    ).toBeVisible();
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int AS n FROM pump WHERE lower(name)=lower($1)",
+          [name],
+        )
+      ).rows[0].n,
+    ).toBe(1);
     await expect(
       page.getByRole("button", { name: /deactivate|remove pump|disable/i }),
     ).toHaveCount(0);
@@ -146,6 +171,44 @@ test("I-32 reviewed price activation uses exact kobo and preserves prior version
     ).toEqual({
       rate_kobo: previous.rate_kobo,
       quantity_precision: previous.quantity_precision,
+    });
+    await page.goto(`/admin/prices/${code}/edit`);
+    await expect(rate).toHaveValue("90071992547409.91");
+    await page
+      .getByLabel("Reason for change", { exact: true })
+      .fill("Fictional precision-only review");
+    const unchanged = page.getByRole("button", {
+      name: "Review price change",
+      exact: true,
+    });
+    if (await unchanged.isEnabled()) await unchanged.click();
+    await expect(
+      page.getByRole("button", { name: "Confirm new price", exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByLabel("Quantity decimal places", { exact: true })
+      .selectOption("4");
+    await page
+      .getByRole("button", { name: "Review price change", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Confirm new price", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Confirm new price", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/prices$/);
+    expect(
+      (
+        await f.db.query(
+          "SELECT rate_kobo::text,quantity_precision,version FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
+          [product],
+        )
+      ).rows[0],
+    ).toEqual({
+      rate_kobo: "9007199254740991",
+      quantity_precision: 4,
+      version: previous.version + 2,
     });
   } finally {
     await f.db.query("SELECT pg_advisory_unlock(80511)");

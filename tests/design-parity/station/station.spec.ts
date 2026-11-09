@@ -15,6 +15,11 @@ import { fillSale, save, waitForWorker } from "../../fixtures/offline-browser";
 async function shot(page: Page, id: string, width: number) {
   await page.setViewportSize({ width, height: 1000 });
   await page.evaluate(() => document.fonts.ready);
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: /^(?:Loading|Refreshing|Opening|Checking)/ }),
+  ).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -64,7 +69,7 @@ for (const width of [1440, 390])
         [seedId(3)],
       );
       await f.db.query(
-        "INSERT INTO auth_credential(id,user_id,provider,provider_account_id,password_hash,updated_at) VALUES($1,$2,'credential',$2::text,$3,now()) ON CONFLICT(provider,provider_account_id) DO UPDATE SET password_hash=excluded.password_hash,updated_at=now()",
+        "INSERT INTO auth_credential(id,user_id,provider,provider_account_id,password_hash,updated_at) VALUES($1,$2::uuid,'credential',$2::text,$3,now()) ON CONFLICT(provider,provider_account_id) DO UPDATE SET password_hash=excluded.password_hash,updated_at=now()",
         [v7(), seedId(3), await hashPassword(accountPassword)],
       );
       await p.route("**/api/sync/**", (route) =>
@@ -197,6 +202,9 @@ for (const width of [1440, 390])
       await p.goto("/attendant/account");
       await expect(
         p.getByRole("button", { name: "Sign out to switch pump", exact: true }),
+      ).toBeVisible();
+      await expect(
+        p.getByText("2 sales · captured at Pump 02", { exact: true }),
       ).toBeVisible();
       await shot(p, "A17-PumpChange", width === 1440 ? 390 : 360);
       const restricted = await browser.newContext({
