@@ -1,21 +1,22 @@
 # lane:spec
-WO-spec-3c (WHR-84) numeric-only correction evidence policy: ACCEPTED since 2026-11-09
+WO-spec-3d (WHR-91) signed lookup capture bound: READY since 2026-11-09
 
 ## In flight
-- Earl accepted the specification and instructed closure on 9 November 2026. [Amendment #84](https://github.com/Adeboyemoses/Whalesreward/pull/84), ebe3416, and [READY records #85](https://github.com/Adeboyemoses/Whalesreward/pull/85), 6b81b8b, merged with all five CI checks green.
-- Code/security/integrity PASS at f78f49d; final READY records code PASS at 32dc316. Full verdicts and EM verification are posted on WHR-84. Acceptance covers M3 and P-22 only, with no runtime correction coverage or screen-parity claim.
-- This docs-only closeout makes closure effective on its reviewed green staging merge; then WHR-84 moves to Done.
+- [Spec PR #91](https://github.com/Adeboyemoses/Whalesreward/pull/91) merged into staging with five green CI checks. P-23 amends M1/M2, data model, invariants and the decisions index; no runtime implementation claimed.
+- Code/security/integrity PASS at 5abc12b, round 2. Code P1 legacy-client compatibility fixed through explicit response capability negotiation. EM typecheck/lint, 454 unit tests, build and evidence validator PASS.
+- This separate reviewed records PR completes READY. WHR-91 stays In Review; acceptance is not inferred.
 
 ## Next
-- Stop after closure. No next work order starts. WO-core-8 (WHR-14) implements P-22 separately.
-- Rook should mirror P-22 in product docs; no product-doc writes here.
+- Rook to draft Core: P-23 receipt issuance and settlement (signing, binding, registration replay, fallback, lower-bound policy and tests).
+- Rook to draft App: P-23 draft and outbox evidence (minimal cache, immutable draft/save, submission, migration and retry tests), after core support.
+- Rook should mirror P-23 in product docs. Stop here; neither follow-on starts.
 
 ## Earl's gos
-- 2026-11-09: “[spec] Earl accepted WO-spec-3c (WHR-84); close it, then stop.”
+- 2026-11-09: “Work order WHR-91 (WO-spec-3d) is approved and in Todo.” “Spec only, no code.” “Stop when it's merged into staging, and report READY with the follow-on core and app work orders you listed.”
 
 ## Risks
-- WHR-86 remains a separate Core fixture follow-up. Initial READY CI failed the exact 24-hour constraint by 1 microsecond; fresh final-head CI passed without runtime/test/constraint changes.
-- Other correction kinds, replacement evidence and direct admin editing remain outside scope. WHR-48–50 and Q-528 remain separate.
-- Metrics below cover this closeout only; delivery metrics remain in #84/#85. Full runtime model ID unavailable.
+- Runtime still uses the prior policy until the separate implementation work orders ship.
+- WHR-38 remains closed; client Q-528 confirmation remains pending. WHR-16 retains independent holds/capture review with unchanged permissions.
+- Runtime full model ID unavailable. Metrics include the records review.
 
-dispatches=1 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=7 prs=2 rounds_max=2 escalations=0 model=unavailable
