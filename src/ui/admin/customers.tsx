@@ -389,7 +389,11 @@ function PurchaseHistory({ id, scoped }: { id: string; scoped: boolean }) {
                       ? "synced"
                       : s.state === "cancelled"
                         ? "failed"
-                        : "held"
+                        : ["received", "photo_pending", "finalizing"].includes(
+                              s.state,
+                            )
+                          ? "pending"
+                          : "held"
                   }
                 >
                   {s.credited ? "Completed" : titleCase(s.state)}
