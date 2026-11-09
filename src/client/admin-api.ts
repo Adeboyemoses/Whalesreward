@@ -1,6 +1,8 @@
 import { v7 } from "uuid";
 export const adminOperationId = () => v7();
 const messages: Record<string, string> = {
+  unavailable:
+    "The service is unavailable. Retry the same request; do not assume it failed.",
   last_owner: "At least one active Owner must remain.",
   delegation_denied:
     "You cannot grant or change access beyond your own authority.",
@@ -61,8 +63,14 @@ export async function adminRequest<T>(
   try {
     data = await r.json();
   } catch {
-    throw new AdminError("invalid_response", r.status);
+    throw new AdminError(r.ok ? "invalid_response" : "unavailable", r.status);
   }
-  if (!r.ok) throw new AdminError(data.error?.code ?? "unavailable", r.status);
+  if (!r.ok)
+    throw new AdminError(
+      typeof data?.error?.code === "string" ? data.error.code : "unavailable",
+      r.status,
+    );
+  if (!data || typeof data !== "object" || !("data" in data))
+    throw new AdminError("invalid_response", r.status);
   return data.data as T;
 }

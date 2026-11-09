@@ -20,6 +20,7 @@ You build `src/app/(attendant)/**`, `src/app/(admin)/**`, `src/ui/**`, `src/styl
 - **Accessibility:** 48 px targets on the phone (`control-h`; 44 px is the absolute floor), visible 2 px focus ring, labels on every input, `aria-current` on nav, `aria-pressed` on segments, status never by colour alone, 4.5:1 contrast. Attendant body text 16 px minimum.
 - **Phone first.** Attendant screens work from 360 px wide, one column, sticky primary action. Admin works at 1440 px and collapses under 900 px.
 - **M2 smoke escapes:** invalid card formats never imply registration is needed; check A17 on Sale and across offline navigation, including a save already in progress.
+- **Admin transport escape:** unreadable non-OK responses are unavailable and retain same-operation replay; malformed successful responses still fail validation and never authorize a fresh key.
 - Fonts are self-hosted from `src/styles/design-system/fonts/` (the PWA must render offline). Load the latin-ext subset so ₦ renders.
 
 ## Implementation brief (before dispatch, for any board-covered work)
