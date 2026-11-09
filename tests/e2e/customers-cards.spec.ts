@@ -653,6 +653,8 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
 }) => {
   await ensureLocalCardBucket();
   const f = await stationFixture(page);
+  const { barrier } = await import("../station/helpers");
+  const currentRead = barrier();
   try {
     const b = await api<{ id: string; version: number }>(
       page.request,
@@ -684,9 +686,50 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
     await page
       .getByRole("button", { name: "Retry same confirmation", exact: true })
       .click();
-    await page
-      .getByRole("link", { name: "View current batch", exact: true })
-      .click();
+    // Force the route's current read to stay pending after the real server
+    // returns Printed/version 2. Do not begin another review from cached data.
+    await page.route(`**/api/admin/card-batches/${b.id}`, async (route) => {
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      expect((await response.json()).data).toMatchObject({
+        id: b.id,
+        status: "printed",
+        version: 2,
+      });
+      currentRead.reached();
+      await currentRead.blocked;
+      await route.fulfill({ response });
+    });
+    await test.step("Reread Printed version 2 before reviewing an export", async () => {
+      const freshBatch = page.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          new URL(response.url()).pathname ===
+            `/api/admin/card-batches/${b.id}` &&
+          response.status() === 200,
+      );
+      await page
+        .getByRole("link", { name: "View current batch", exact: true })
+        .click();
+      await currentRead.started;
+      expect(
+        (
+          await f.db.query(
+            "SELECT count(*)::int n FROM card_export WHERE batch_id=$1",
+            [b.id],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      currentRead.release();
+      expect((await (await freshBatch).json()).data).toMatchObject({
+        id: b.id,
+        status: "printed",
+        version: 2,
+      });
+      await expect(
+        page.getByRole("heading", { name: /^Printed\b/ }),
+      ).toBeVisible();
+    });
     expect(transitionBodies).toHaveLength(2);
     expect(transitionBodies[1]).toEqual(transitionBodies[0]);
     expect(
@@ -721,6 +764,14 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
     await page
       .getByRole("button", { name: "Review export preparation", exact: true })
       .click();
+    await expect(
+      page
+        .locator(".wr-kv-row")
+        .filter({
+          has: page.getByText("Reviewed batch version", { exact: true }),
+        })
+        .getByRole("definition"),
+    ).toHaveText("2");
     await page
       .getByRole("button", { name: "Confirm export preparation", exact: true })
       .click();
@@ -731,6 +782,10 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
       page.getByRole("button", { name: "Review a new export", exact: true }),
     ).toBeVisible();
     expect(exportBodies).toHaveLength(2);
+    expect(exportBodies[0]).toMatchObject({
+      expectedVersion: 2,
+      format: "pdf",
+    });
     expect(exportBodies[1]).toEqual(exportBodies[0]);
     expect(exportIds[1]).toBe(exportIds[0]);
     expect(
@@ -749,6 +804,7 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
       ).rows,
     ).toEqual([{ status: "printed", version: 2 }]);
   } finally {
+    currentRead.release();
     await page.unrouteAll({ behavior: "wait" });
     await f.db.end();
   }
