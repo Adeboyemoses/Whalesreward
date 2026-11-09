@@ -1,0 +1,21 @@
+{
+  "viewport": 360,
+  "documentWidth": 360,
+  "wordmark": [
+    {
+      "x": 52,
+      "y": 17,
+      "width": 118.90625,
+      "height": 21
+    }
+  ],
+  "loyaltyFooter": [
+    {
+      "x": 21,
+      "y": 892,
+      "width": 318,
+      "height": 17
+    }
+  ],
+  "shortTargets": []
+}
