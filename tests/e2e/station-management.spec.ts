@@ -584,7 +584,10 @@ test("I-32 a stale reviewed price cannot silently create a second configuration"
           [product],
         )
       ).rows[0],
-    ).toEqual({ version: before.version + 1, rate_kobo: "120002" });
+    ).toEqual({
+      version: before.version + 1,
+      rate_kobo: (BigInt(before.rate_kobo) + 1n).toString(),
+    });
   } finally {
     await f.db.query("SELECT pg_advisory_unlock(80511)");
     await f.db.end();
