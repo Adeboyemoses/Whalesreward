@@ -28,6 +28,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 | P-19 | Recovered unverified corrections require ordinary late review by sales AND corrections admin distinct from executor and grant authorizer; only that decision clears proposal block, never automatic treatment. Refines P-11 | Earl, 4 Nov 2026; WHR-46 and WHR-52 |
 | P-21 | Offboarding ends the attendant's pump assignment: no active assignment refuses sign-in/capture; ending it revokes all sessions, preserving history and queues under P-20. Extends P-10; retains P-16's excluded disable/reset controls and no pump deactivation. Guarded endpoint and recovery rules are in [M2](../contracts/m2.md#assignment-ending-offboarding--p-21-wo-spec-2a-whr-79); attendant disable is a possible later client addition, not approved scope | Earl, 6 Nov 2026; [WHR-76 decision](https://linear.app/phaneum/issue/WHR-76), [WHR-79](https://linear.app/phaneum/issue/WHR-79) |
 
+| P-22 | Attendant corrections change only the entered amount or quantity in the sale's recorded basis against its retained validated meter photo. Card, customer, medium, product, pump, rate and photo are not attendant-correctable; other mistakes use existing authorized admin review/cancel paths. Configures the M3 correction-evidence policy for numeric-only corrections; other correction kinds remain out of scope. Refines P-05; preserves P-19 independent recovered review | Earl, 9 Nov 2026; [WHR-47 Option A](https://linear.app/phaneum/issue/WHR-47), [WHR-84](https://linear.app/phaneum/issue/WHR-84). Rook to mirror in product docs |
+
 ## Technical (this repo)
 
 | ID | Decision | Since |
