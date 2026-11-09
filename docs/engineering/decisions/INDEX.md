@@ -50,6 +50,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | T-16 | Run bounded admin-mail polling inside the existing web process with explicit provider opt-in, durable message leases and graceful shutdown; no extra paid component | EM choice delegated by Earl, 2026-11-06; WHR-68 |
 
+| T-18 | Render immutable card snapshots locally with pdf-lib 1.17.1, ExcelJS 4.4.0 and node-qrcode 1.5.4 (MIT); keep physical layout and phone policy behind D08 configuration | EM choice under approved WHR-12, 2026-11-09 |
+
 ## Open product decisions that touch code
 
 D02 (meter settings, halfway rounding; capped capture build default P-20 (refines P-18) awaits Q-528 client confirmation), D05 (other retirement cases), D06 (role matrix, token expiries, providers, loss-of-email process), D07 (photo originals, backups, restore objectives), D08 (field validation), D09 (campaign dates, grace, retention values). See `product-docs/06 Delivery and Handoffs/Design Handoff Readiness.md`. Build them behind configuration or adapters; never invent the client's policy.
