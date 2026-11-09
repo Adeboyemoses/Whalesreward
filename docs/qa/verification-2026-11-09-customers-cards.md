@@ -2,6 +2,8 @@
 
 WO-core-7 / WHR-12. Backend acceptance against `docs/engineering/contracts/m2.md`. EM verification on frozen implementation and tests `09e39ec` (including both review-driven recovery fixes); approval/review and the READY records follow separately.
 
+Final combined staging verification is recorded below: 333 unit tests, 260 PostgreSQL tests, 168 browser passes plus four existing skips and signed-upload1. The named 59+58 output remains the reviewed customer/card source verification; the later base merge adds independently reviewed app tests.
+
 ## Acceptance matrix
 
 | Contract | Required evidence |
@@ -169,3 +171,21 @@ The permission-first file guard was independently reproduced as a failing 403-ve
 ## Limits
 
 Phone numbering and physical printing remain D08 configuration/approval boundaries. No UI parity, phone change, card replacement, manager intake, physical print confirmation, cloud configuration or staging-data operation is claimed. T-18 records the local MIT-licensed runtime libraries; WHR-82 tracks the moderate advisory in ExcelJS's unused transitive UUID functions.
+
+## Final combined staging verification
+
+The EM merged separately reviewed app station UI #80 (9768962) into the reviewed customer/card branch, producing bb1e86ecf938ad9997de76526a6e5d181099421a. No customer/card production or test file changed after the final reviewed head3161c08; only evidence and unrelated base files differ. The evidence validator passed with the current staging base. A git archive of the exact final head was installed in the isolated Linux browser container.
+
+```text
+pnpm typecheck                                  exit 0
+pnpm lint                                       exit 0, no warnings
+pnpm test                                       43 files, 333 passed (1.51s)
+pnpm build                                      exit 0; Workbox 32 generic assets
+pnpm test:integration                           18 files, 260 passed (9.60s)
+pnpm test:time                                  3 passed in UTC; 3 passed in America/New_York
+pnpm test:e2e (Linux Chromium)                   168 passed, 4 existing staging-only skips (1.8m)
+Playwright signed-upload browser test            1 passed (409ms)
+pnpm audit --prod                               moderate1, high0, critical0 (WHR-82)
+```
+
+Local browser retries were zero. Feature CI run42545843483 instead reported166 passed,2 flaky and4 skipped; both cases passed retry, and storage1 passed. The station uncertain-replay failure was duplicate route fulfilment at assignment-end-fake.ts:63 (WHR-83); handover hit the already tracked interrupted sign-in navigation at offline-browser.ts:5 (WHR-67). No incorrect account access was observed and root cause for the route fixture remains unconfirmed. No assertion or configured retry count changed. The changed browser/unit counts come from the independently reviewed station UI base; no new customer/card UI parity or device acceptance is claimed. Feature #81 merged with all five required CI checks green. This records-only update adds no runtime implementation or relaxed assertion.
