@@ -2,7 +2,7 @@
 
 WO-core-8 / WHR-14. Backend verification against M3, including merged
 WO-spec-3c / P-22. The EM executed the commands and named tests below on frozen source
-`c0940c9`; independent reviews follow separately. Correction screens follow in
+`ec9eced`; independent round-two reviews follow separately. Correction screens follow in
 WO-app-7. WHR-80 and WHR-12 remain In Review for Earl's batched smoke tests.
 
 ## Acceptance matrix
@@ -22,7 +22,7 @@ WO-app-7. WHR-80 and WHR-12 remain In Review for Earl's batched smoke tests.
 
 ## EM verification output
 
-A fresh dedicated PostgreSQL database applied all 12 migrations. These are EM
+A fresh dedicated PostgreSQL database applied all 13 migrations. These are EM
 results on the combined implementation and independently authored tests:
 
 ```text
@@ -30,12 +30,12 @@ pnpm typecheck                   exit 0
 pnpm lint                        exit 0, no warnings
 pnpm test                        49 files, 374 passed
 pnpm build                       exit 0; Workbox 31 generic assets
-pnpm test:integration             21 files, 302 passed (30.48s)
+pnpm test:integration             21 files, 312 passed (9.28s)
 pnpm test:time                    5 passed in UTC; 5 passed in America/New_York
-named correction/read integration 3 files, 42 passed (2.82s)
-named correction/read units       6 files, 41 passed (261ms)
-pnpm test:e2e (Linux Chromium)    168 passed, 4 existing staging-only skips (2.3m)
-signed-upload browser            1 passed (904ms)
+named correction/read integration 3 files, 52 passed (6.44s)
+named correction/read units       6 files, 41 passed (662ms)
+pnpm test:e2e --workers=2 (Linux) 168 passed, 4 existing staging-only skips (3.8m)
+signed-upload browser            1 passed; sequential run, dedicated output directory
 ```
 
 No backend test was skipped. The primary and independent suites use real
@@ -47,65 +47,70 @@ sync, evidence, customer/card and station assertions remain intact.
 ### Named output
 
 ```text
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > reserves receipt and base, then replaces one accepted contribution without rewriting original 159ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > same operation changed material content conflicts before stale version; another pending edit cannot replace it 110ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects unsupported basis changes, replacement evidence and fake recovery provenance 87ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > unavailable retained bytes preserve receipt and original then terminalize after bounded failures 200ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rechecks live authority after slow evidence read and does not revive a revoked session 104ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > expired exhausted claim is rejected without inventing a reviewer, and cancellation closes pending causally 119ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > reads own accepted sale and denies foreign IDs, wrong kind and restricted sessions 90ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > uses current accepted exact amounts for filtered whole-result totals and duplicates remain included 102ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-37 durable receipt 2026-11-09T22:59:59.999Z decides the exact Lagos midnight boundary 140ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-37 durable receipt 2026-11-09T23:00:00.000Z decides the exact Lagos midnight boundary 95ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > late review approval and lost-response replay replace the contribution exactly once 103ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > history and detail share strict privacy projection and exact numeric values 51ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > an expired capture window does not deny reads or renew it 11ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > serves only own validated bytes and binds signed access to the selected asset 84ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects a stale-base proposal with current guards while preserving the intervening accepted revision 109ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-22/I-39 two devices racing one purchase reserve one proposal and preserve the original 102ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-22 same correction operation with changed content conflicts before stale version checks 90ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > bounds each detail collection and resumes its scoped history cursor without leaking private reasons 83ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > loads authority after a blocked security boundary and denies a permission revoked before release 15ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > serializes slow photo I/O with permission revocation and denies the next issuance 68ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29 correction above 2^53 keeps exact kobo and captured rate while original remains immutable 82ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > never overwrites a staged resolution candidate; stale proposal rejection leaves it intact 94ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > rejects impossible Lagos day browsing filters with date_invalid 36ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > reports missing and pending evidence instead of approving the correction window 44ms
-✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > photo/search HTTP is private, no-store and rejects GET search or unknown query fields 30ms
-✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > numeric approval preserves unrelated price hold and zero contribution with its historical validation 141ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29 quantity correction retains precision 2 and rounds money once 136ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29 quantity correction retains precision 3 and rounds money once 77ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-37/I-38 a long offline original with a cross-day capture interval cannot reopen automatic correction 66ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-39 stale purchase and foreign base guards cannot create correction history 85ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-09 revocation during slow evidence validation fences the worker and terminates its proposal 78ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-52 an expired worker lease can restart without allowing the stale worker to replace credit 79ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-52 a fifth-attempt crash with an expired lease reaches a durable terminal result 67ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-52 lost storage configuration settles bounded durable work without a status GET 114ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-46 a later accepted correction marks reconciliation and leaves the finalized snapshot byte-identical 63ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > P-19 approve requires both grants and an independent reviewer without rewriting authorship 91ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > P-19 reject requires both grants and an independent reviewer without rewriting authorship 80ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-09/P-19 a reviewer losing a grant during photo I/O cannot approve or consume the proposal 54ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-39 two independent reviewers racing approve and reject commit one decision 77ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-39 cancellation while evidence is in flight closes the proposal and prevents worker credit 65ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29/I-41 accepted original money, captured rate and photo binding are immutable 45ms
-✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-25 accepted evidence cannot be rebound to another purchase 89ms
-✓ |unit| src/server/modules/corrections/cutoff.time.test.ts > correction authoritative time > proves a day only from original bounded interval, never upload or phone time 2ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > reserves receipt and base, then replaces one accepted contribution without rewriting original 508ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > same operation changed material content conflicts before stale version; another pending edit cannot replace it 276ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects unsupported basis changes, replacement evidence and fake recovery provenance 181ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > reads own accepted sale and denies foreign IDs, wrong kind and restricted sessions 161ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > unavailable retained bytes preserve receipt and original then terminalize after bounded failures 374ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-37 durable receipt 2026-11-09T22:59:59.999Z decides the exact Lagos midnight boundary 371ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > uses current accepted exact amounts for filtered whole-result totals and duplicates remain included 358ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rechecks live authority after slow evidence read and does not revive a revoked session 281ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > history and detail share strict privacy projection and exact numeric values 137ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-37 durable receipt 2026-11-09T23:00:00.000Z decides the exact Lagos midnight boundary 326ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > expired exhausted claim is rejected without inventing a reviewer, and cancellation closes pending causally 322ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > an expired capture window does not deny reads or renew it 22ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > serves only own validated bytes and binds signed access to the selected asset 189ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-22/I-39 two devices racing one purchase reserve one proposal and preserve the original 240ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > bounds each detail collection and resumes its scoped history cursor without leaking private reasons 314ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > late review approval and lost-response replay replace the contribution exactly once 432ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-22 same correction operation with changed content conflicts before stale version checks 355ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > loads authority after a blocked security boundary and denies a permission revoked before release 45ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > serializes slow photo I/O with permission revocation and denies the next issuance 184ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > rejects impossible Lagos day browsing filters with date_invalid 60ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29 correction above 2^53 keeps exact kobo and captured rate while original remains immutable 335ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects a stale-base proposal with current guards while preserving the intervening accepted revision 384ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > reports missing and pending evidence instead of approving the correction window 130ms
+✓ |integration| tests/integration/sales-reads.test.ts > M3 sales reads and private evidence > photo/search HTTP is private, no-store and rejects GET search or unknown query fields 38ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29 quantity correction retains precision 2 and rounds money once 303ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > never overwrites a staged resolution candidate; stale proposal rejection leaves it intact 334ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29 quantity correction retains precision 3 and rounds money once 275ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > numeric approval preserves unrelated price hold and zero contribution with its historical validation 318ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-37/I-38 a long offline original with a cross-day capture interval cannot reopen automatic correction 306ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > a automatic correction preserves a legitimately resolved price hold and its original history 306ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-39 stale purchase and foreign base guards cannot create correction history 273ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > a late correction preserves a legitimately resolved price hold and its original history 203ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-09 revocation during slow evidence validation fences the worker and terminates its proposal 129ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > correction audit records exact effective changes, actual operations and immutable executor/seller snapshots without private payloads 218ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-52 an expired worker lease can restart without allowing the stale worker to replace credit 103ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-52 a fifth-attempt crash with an expired lease reaches a durable terminal result 91ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: Call +2348000000099 110ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: token=fictional-private-value 203ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-52 lost storage configuration settles bounded durable work without a status GET 263ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: OTP: 123456 129ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-46 a later accepted correction marks reconciliation and leaves the finalized snapshot byte-identical 139ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: OTP 123456 106ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: token fictional-private-value 163ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > P-19 approve requires both grants and an independent reviewer without rewriting authorship 248ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: Call 080****0099 203ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > P-19 reject requires both grants and an independent reviewer without rewriting authorship 250ms
+✓ |integration| tests/integration/corrections.test.ts > M3 durable own correction processing > rejects private correction reason before audit persistence: Receipt https://private.example.test/object 91ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-09/P-19 a reviewer losing a grant during photo I/O cannot approve or consume the proposal 89ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-39 two independent reviewers racing approve and reject commit one decision 131ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-39 cancellation while evidence is in flight closes the proposal and prevents worker credit 78ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-29/I-41 accepted original money, captured rate and photo binding are immutable 47ms
+✓ |integration| tests/integration/corrections-adversarial.test.ts > M3 independent PostgreSQL correction adversaries > I-25 accepted evidence cannot be rebound to another purchase 108ms
+✓ |unit| src/server/modules/corrections/cutoff.time.test.ts > correction authoritative time > proves a day only from original bounded interval, never upload or phone time 3ms
 ✓ |unit| src/server/modules/corrections/cutoff.time.test.ts > correction authoritative time > classifies actual 23:59:59.999 before and exactly 00:00 late in Lagos 0ms
 ✓ |unit| src/server/adapters/sale-evidence.test.ts > private read-only sale evidence adapter > has no upload/final-write capability and rejects non-final paths 4ms
-✓ |unit| src/server/adapters/sale-evidence.test.ts > private read-only sale evidence adapter > checks actual object existence and exact length before allowing issuance 1ms
+✓ |unit| src/server/adapters/sale-evidence.test.ts > private read-only sale evidence adapter > checks actual object existence and exact length before allowing issuance 0ms
 ✓ |unit| src/server/adapters/sale-evidence.test.ts > private read-only sale evidence adapter > signs only GET with no-store and a server-enforced five-minute ceiling 1ms
 ✓ |unit| src/server/adapters/sale-evidence.test.ts > private read-only sale evidence adapter > preserves bounded read and exposes a safe missing-object error 0ms
-✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > opens no resources during build 3ms
-✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > opens no resources during no database 1ms
-✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > starts durable processing without storage configuration, never overlaps and drains before closing 2ms
-✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > drains correction work before invoking the process's previous shutdown listener 2ms
-✓ |unit| src/server/modules/sales/cursor.test.ts > M3 scoped sale cursors > preserves database receipt microseconds and binds actor/filter/collection scope 4ms
-✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > preserves exact amounts above JS safe integer and rejects an inexact counterpart 3ms
-✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > allows independently verified meter values while preserving original basis facts 0ms
-✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > accepts only the selected numeric input and rejects immutable fact edits 1ms
-✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > rejects admin and recovery narrative fields in attendant projections 2ms
-✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > rejects impossible calendar dates 0ms
-✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-37/P-22 rejects caller-controlled automaticEligible 3ms
+✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > opens no resources during build 2ms
+✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > opens no resources during no database 0ms
+✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > starts durable processing without storage configuration, never overlaps and drains before closing 4ms
+✓ |unit| tests/unit/correction-runtime.test.ts > I-52 automatic correction processing lifecycle > drains correction work before invoking the process's previous shutdown listener 3ms
+✓ |unit| src/server/modules/sales/cursor.test.ts > M3 scoped sale cursors > preserves database receipt microseconds and binds actor/filter/collection scope 7ms
+✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-37/P-22 rejects caller-controlled automaticEligible 2ms
 ✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-37/P-22 rejects caller-controlled serverReceivedAt 0ms
 ✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-37/P-22 rejects caller-controlled cutoffAtReceipt 0ms
 ✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-37/P-22 rejects caller-controlled verifiedSaleDate 0ms
@@ -130,6 +135,11 @@ sync, evidence, customer/card and station assertions remain intact.
 ✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-29 rejects nonpositive, inexact or dual-entry edits: {"basis":"quantity","enteredQuantity":"1.0000001"} 0ms
 ✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-29 rejects nonpositive, inexact or dual-entry edits: {"basis":"quantity","enteredQuantity":"1","enteredAmountKobo":"1"} 0ms
 ✓ |unit| tests/unit/correction-authority.test.ts > P-22 correction input cannot carry authority or capture changes > I-29 rejects nonpositive, inexact or dual-entry edits: {"basis":"amount","enteredAmountKobo":"1","quantity":"1"} 0ms
+✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > preserves exact amounts above JS safe integer and rejects an inexact counterpart 4ms
+✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > allows independently verified meter values while preserving original basis facts 1ms
+✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > accepts only the selected numeric input and rejects immutable fact edits 1ms
+✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > rejects admin and recovery narrative fields in attendant projections 3ms
+✓ |unit| src/shared/contracts/sales.test.ts > M3 strict sale contracts > rejects impossible calendar dates 0ms
 ```
 
 The full regression suite caught an unshipped migration replacing an existing
@@ -150,6 +160,36 @@ unchanged admin paths and showed an authenticated shell at Loading. An empty
 correction worker takes no security lock. Concurrent load is a hypothesis, not a
 confirmed root cause; [WHR-87](https://linear.app/phaneum/issue/WHR-87) records the
 investigation. No assertion, timeout or retry setting was changed.
+
+The final review-fix browser run used a newly migrated and seeded database
+(one role, three users, five pumps), two local workers and a dedicated artifact
+directory. A reused diagnostic database had accumulated 91 roles, 481 users and
+968 pumps; subsequent loading/pagination timeouts there are recorded in WHR-87.
+Reducing workers alone on that old database did not prove a pass, and its
+interrupted run is excluded. One diagnostic also collided with a concurrent
+Playwright configuration clearing the shared trace directory; the resulting
+ENOENT failures were an EM setup error. Final browser and storage checks ran
+sequentially. CI's retry policy, test assertions and timeouts remain unchanged.
+
+## Review regressions
+
+Round one reproduced two P1s: immutable original validation reasons incorrectly
+prevented corrections after a legitimate price-hold resolution, and correction
+audit rows omitted actual reasons, effective before/after values and decision
+operation identity. Automatic and late-review regressions failed before the fix
+and pass now. Current outstanding holds/blocks and durable resolution evidence
+control qualification; original validation history remains unchanged and unknown
+history stays blocked.
+
+New correction events store allowlisted exact effective values, the actual
+operation/reason, immutable actor and original-seller snapshots, and a system
+validation executor for asynchronous events. The additive snapshot columns stay
+nullable for unknown legacy identities; no historical identity is invented.
+Submission receipt audits retain the prior effective amount until validation.
+Privacy regressions reject sensitive reasons before any proposal, decision or
+audit write. [WHR-89](https://linear.app/phaneum/issue/WHR-89) tracks separate
+function-level gaps in the unchanged legacy access/station redactor; no endpoint
+exposure was reproduced for that follow-up.
 
 ## Limits
 
