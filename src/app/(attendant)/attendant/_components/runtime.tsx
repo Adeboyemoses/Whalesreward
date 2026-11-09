@@ -265,7 +265,11 @@ export function AccessGate({
   const { state, error } = useAttendant();
   const router = useRouter();
   useEffect(() => {
-    if (state?.access === "signed_out") go(router, "/attendant/sign-in", true);
+    if (
+      state?.access === "signed_out" ||
+      state?.access === "password_change_required"
+    )
+      go(router, "/attendant/sign-in", true);
     else if (state?.access === "expired" && !allowExpired)
       go(router, "/attendant/access-expired", true);
   }, [state?.access, allowExpired, router]);

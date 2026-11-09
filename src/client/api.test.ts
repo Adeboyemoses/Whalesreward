@@ -141,3 +141,74 @@ describe("M1 typed HTTP adapter", () => {
     );
   });
 });
+
+describe("M2 attendant restricted access", () => {
+  it("validates restricted responses without inventing ready capture data", async () => {
+    const restricted = {
+      state: "password_change_required",
+      account: session.account,
+      serverTime: session.serverTime,
+      sessionExpiresAt: new Date(
+        Date.parse(session.serverTime) + 900000,
+      ).toISOString(),
+    };
+    expect(
+      await new HttpAttendantApi(async () => reply(restricted)).session(),
+    ).toEqual(restricted);
+    await expect(
+      new HttpAttendantApi(async () =>
+        reply({ ...restricted, captureContextId: uuidv7() }),
+      ).session(),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+  });
+  it("posts exact first-password fields and accepts only an empty 204 completion", async () => {
+    const input = {
+      operationId: uuidv7(),
+      currentPassword: " fictional current ",
+      newPassword: " different 密碼 ",
+      confirmPassword: " different 密碼 ",
+    };
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    await new HttpAttendantApi(fetcher).completeFirstPassword(input);
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/attendant/first-password",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        credentials: "same-origin",
+        body: JSON.stringify(input),
+      }),
+    );
+    await expect(
+      new HttpAttendantApi(async () => reply(null)).completeFirstPassword(
+        input,
+      ),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+  });
+  it("keeps an unassigned sign-in failure generic instead of echoing server identity or history", async () => {
+    const api = new HttpAttendantApi(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "assignment_unavailable",
+              message: "private offboarding reason and pump",
+              retryable: false,
+            },
+          }),
+          { status: 422 },
+        ),
+    );
+    await expect(
+      api.signIn(
+        { username: "fictional", password: "fictional", deviceId: uuidv7() },
+        uuidv7(),
+      ),
+    ).rejects.toMatchObject({
+      code: "assignment_unavailable",
+      message: "Sign-in is unavailable. Ask a station manager for help.",
+    });
+  });
+});
