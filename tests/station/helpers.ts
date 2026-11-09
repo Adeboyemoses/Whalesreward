@@ -23,10 +23,10 @@ export async function stationFixture(page: Page, grants?: string[]) {
         "INSERT INTO role_permission(role_id,permission_code) VALUES($1,$2)",
         [roleId, permission],
       );
-    await f.db.query("UPDATE admin SET role_id=$1 WHERE id=$2", [
-      roleId,
-      f.adminId,
-    ]);
+    await f.db.query(
+      "UPDATE admin SET role_id=$1,version=version+1 WHERE id=$2",
+      [roleId, f.adminId],
+    );
   }
   const login = page.waitForResponse(
     (r) =>

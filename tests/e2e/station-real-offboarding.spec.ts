@@ -257,3 +257,56 @@ test("I-09 P-21 lost-response replay after reassignment never ends or revokes th
     await f.db.end();
   }
 });
+
+test("I-07 P-21 pumps-only end assignment uses narrow context and cannot read a broad attendant profile", async ({
+  page,
+}) => {
+  const owner = await stationFixture(page);
+  const child = await createAttendant(page);
+  await owner.db.end();
+  await page.context().clearCookies();
+  const f = await stationFixture(page, ["pumps"]);
+  const forbidden: string[] = [];
+  page.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (
+      path === "/api/admin/attendants/search" ||
+      /^\/api\/admin\/attendants\/[^/]+$/.test(path)
+    )
+      forbidden.push(path);
+  });
+  try {
+    await page.goto(`/admin/pumps/${seedId(14)}/end/${child.attendant.id}`);
+    await page.getByLabel(/Reason/).fill("Fictional pumps-only offboarding");
+    await page
+      .getByRole("button", { name: "Review end assignment", exact: true })
+      .click();
+    const completed = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/assignment/end") && r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Confirm end assignment", exact: true })
+      .click();
+    expect((await completed).status()).toBe(200);
+    await expect(
+      page.getByText("Assignment ended", { exact: false }).first(),
+    ).toBeVisible();
+    expect(forbidden).toEqual([]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT effective_until IS NOT NULL AS closed FROM assignment WHERE id=$1",
+          [child.attendant.assignment!.id],
+        )
+      ).rows[0].closed,
+    ).toBe(true);
+    expect(
+      (
+        await page.request.get(`/api/admin/attendants/${child.attendant.id}`)
+      ).status(),
+    ).toBe(403);
+  } finally {
+    await f.db.end();
+  }
+});
