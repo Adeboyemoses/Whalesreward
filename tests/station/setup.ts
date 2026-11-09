@@ -54,6 +54,20 @@ export default async function setup() {
     )
       .split("\n")
       .map((line) => {
+        if (line.startsWith("INSERT INTO pump ")) {
+          const match = line.match(/'PUMP(0[1-5])'/);
+          return match
+            ? line
+                .replace(
+                  "(id,station_id,code,product_id",
+                  "(id,station_id,code,name,product_id",
+                )
+                .replace(
+                  `'PUMP${match[1]}',`,
+                  `'PUMP${match[1]}','Pump ${match[1]}',`,
+                )
+            : line;
+        }
         if (!line.startsWith("INSERT INTO product_price_version")) return line;
         if (line.includes("000000000020'"))
           return line.replace("100000,'NGN',2", "100000,'NGN',3");
@@ -65,9 +79,6 @@ export default async function setup() {
       })
       .join("\n");
     await db.query(fixture);
-    await db.query(
-      "UPDATE pump SET name=CASE code WHEN 'PUMP01' THEN 'Pump 01' WHEN 'PUMP02' THEN 'Pump 02' WHEN 'PUMP03' THEN 'Pump 03' WHEN 'PUMP04' THEN 'Pump 04' WHEN 'PUMP05' THEN 'Pump 05' ELSE name END",
-    );
   } finally {
     await db.end();
   }
