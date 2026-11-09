@@ -1,3 +1,4 @@
+import { captureStorage } from "../station/helpers";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -454,8 +455,17 @@ test("I-09 online app reload revalidates the session and revocation locks captur
   fake.revoke();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Offline access expired", exact: true }),
+    page.getByRole("heading", { name: "Sign in", exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Amina Bello", { exact: true })).toHaveCount(0);
+  const retained = await captureStorage(page);
+  expect(retained.activeAccountId).toBeNull();
+  expect(retained.windows).toHaveLength(1);
+  expect(retained.windows[0]).toMatchObject({
+    locked: true,
+    lastOnlineSignInAt: anchor,
+  });
   expect(
     (await rows(page)).map(({ original, photoBlob, originatingAccountId }) => ({
       original,

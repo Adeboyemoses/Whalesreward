@@ -3,6 +3,9 @@ import type { AttendantApi } from "../../src/client/api";
 import {
   ClientError,
   type Session,
+  type AuthSession,
+  type ConfiguredAssignment,
+  type FirstPasswordInput,
   type Lookup,
   type SyncResult,
   type UploadPermission,
@@ -77,15 +80,30 @@ export class FakeAttendantApi implements AttendantApi {
     throw new ClientError("network_unavailable", "Unavailable");
   }
   revocationFails = false;
-  async signIn() {
+  async signIn(): Promise<AuthSession> {
     return structuredClone(this.current);
   }
   async signOut() {
     if (this.revocationFails)
       throw new ClientError("network_unavailable", "Unavailable");
   }
-  async session() {
+  async session(): Promise<AuthSession> {
     return structuredClone(this.current);
+  }
+  async completeFirstPassword(_input: FirstPasswordInput): Promise<void> {
+    void _input;
+  }
+  async configuredAssignment(): Promise<ConfiguredAssignment> {
+    return {
+      configured: {
+        ...this.current.assignment,
+        pump: { ...this.current.pump, name: this.current.pump.code },
+        product: this.current.product,
+        effectiveFrom: this.current.lastOnlineSignInAt,
+      },
+      acknowledgedAssignmentId: this.current.assignment.id,
+      reassignmentRequiresSignIn: this.current.reassignmentRequiresSignIn,
+    };
   }
   async lookup(
     input: { source: "code"; code: string } | { source: "qr"; qr: string },

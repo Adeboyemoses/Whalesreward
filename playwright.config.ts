@@ -17,6 +17,7 @@ export default defineConfig({
   webServer: {
     env: {
       WHR_ENV: "local",
+      WHR_TRUSTED_IP_HEADER: "x-test-ip",
       EMAIL_PROVIDER: "noop",
       BETTER_AUTH_URL: "http://127.0.0.1:3000",
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
