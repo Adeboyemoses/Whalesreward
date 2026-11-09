@@ -69,14 +69,19 @@ export function Sheet({
   title,
   children,
   quiet = false,
+  badge,
 }: {
   title: string;
   children: ReactNode;
   quiet?: boolean;
+  badge?: ReactNode;
 }) {
   return (
     <section className={quiet ? "wr-sheet wr-station-quiet" : "wr-sheet"}>
-      <h2>{title}</h2>
+      <h2>
+        {title}
+        {badge}
+      </h2>
       {children}
     </section>
   );

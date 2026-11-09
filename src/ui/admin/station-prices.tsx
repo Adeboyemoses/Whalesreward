@@ -230,6 +230,11 @@ export function PriceEditor({
         <>
           <div className="wr-two-col">
             <Sheet
+              badge={
+                reviewing && frozen ? (
+                  <span className="wr-pill wr-sm wr-held">Not yet applied</span>
+                ) : undefined
+              }
               title={
                 reviewing
                   ? "Confirm price change"
@@ -239,9 +244,6 @@ export function PriceEditor({
               {reviewing ? (
                 frozen ? (
                   <>
-                    <span className="wr-pill wr-sm wr-held">
-                      Not yet applied
-                    </span>
                     <KeyValueList
                       items={[
                         {

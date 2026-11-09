@@ -358,7 +358,7 @@ export function PumpDetails({ id }: { id: string }) {
                     </div>
                   ))}
                   <Link
-                    className="wr-btn wr-btn-secondary"
+                    className={`wr-btn wr-station-assign ${people.data?.length ? "wr-btn-secondary" : "wr-btn-primary"}`}
                     href={`/admin/pumps/${id}/assign`}
                   >
                     {people.data?.length
