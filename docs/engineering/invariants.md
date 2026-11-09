@@ -78,3 +78,9 @@ Every invariant here needs at least one automated test that fails when the rule 
 - I-50 Cache only minimal customer lookup data on the phone. Never bulk-cache phone numbers.
 - I-51 Retention deletion runs only under an approved policy, skips pending evidence and active holds, and records what it deleted.
 - I-52 Scheduled jobs are idempotent, bounded, leased and restartable. They never decide credit or enforce midnight.
+
+## Signed lookup refinement (P-23, Earl, WHR-91, 9 Nov 2026)
+
+- I-28a A server-HMAC lookup receipt binds server time T to the original capture context, account, station, card, customer and link. Valid evidence raises the lower bound to L=max(S,T); missing, invalid or mismatched evidence uses L=S without receipt-specific rejection. Preserve original S, first durable R and U=min(R,original offlineExpiresAt). Receipt use never renews the 24-hour capture window or upload authority. The accepted tampered-app boundary is the same as P-02.
+- I-28b Snapshot the receipt before draft composition and freeze it with the atomic original/photo save. Cache refresh, retries, relogin and recovery never replace it or its verified bound. Changed evidence under the same operation conflicts. Legacy records retain the S bound; cached receipts retain their original time/context. Server verification, never unsigned lookedUpAt or phone time, establishes T.
+- I-45b P-23 supersedes I-45a's unconditional S lower bound: evaluate card, price, assignment/revocation and campaign history over [L,U]. The signed card link must also remain in force at R. Varying answers still require the existing independent review; receipts never clear an existing hold/block. I-31, I-33–I-35, midnight/upload-deadline rules and M3 reviewer permissions remain unchanged. Q-528 client confirmation remains pending.
