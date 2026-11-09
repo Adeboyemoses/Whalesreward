@@ -41,6 +41,8 @@ Updated: 2026-11-09
 - WO-core-3 (WHR-4): READY on reviewed green staging merge of [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30). Better Auth username sign-in, revocable database sessions, immutable capture contexts, strict M1 wrappers, durable replay/throttling and safe fixture seeding. EM typecheck/lint/unit 77/build, fresh PostgreSQL integration 65, time 3 per timezone and real HTTP Playwright 1 passed; full browser CI required before merge because local Chromium startup is sandbox-blocked. Independent verdicts are in `.review/core__wo-3-attendant-auth.md`. Runbook: `docs/qa/smoke-2026-11-05-attendant-auth.md`. Stop at READY; Earl's acceptance and real-phone checks remain pending.
 
 ## In progress
+
+- WO-spec-3c (WHR-84): P-22 numeric-only retained-photo correction policy READY on reviewed green staging merge. M3 amendment and WHR-47 decision are specification only; independent verdicts, verification and merged PR are linked from WHR-84. WO-core-8 (WHR-14) implements separately. Stop at READY.
 - lane:spec is closing accepted WO-spec-2a through this documentation-only PR; WHR-79 moves to Done after its reviewed green merge. Stop after closure; no next work order is started.
 - lane:core stops after WHR-12 READY is posted. WHR-80 and WHR-12 remain In Review for Earl's verification; no next work order, main promotion or cloud action is authorized.
 - WO-app-5 is READY pending Earl’s staging smoke; this separate records merge completes the handoff. WHR-75 is Done through #76 (829902d). P-21 backend #77 and actual endpoint tests supersede the earlier fake-only dependency; the test fake remains separately identified.
@@ -54,13 +56,15 @@ Updated: 2026-11-09
 - WO-core-15 / WHR-28 stays READY until Earl reports staging checks. Authentication work did not provision cloud resources or change staging data.
 - WHR-57: nonblocking P2 authentication rate-bucket storage growth; separate follow-up, not part of WHR-4's accepted scope.
 - M4 policy gates: WHR-54 (reconciliation/complete-upload proof), WHR-55 (launch/start and timing changes), WHR-56 (stored photos/retention removal). Client dates/grace/duration stay unset; no finalization without approved policy, no automatic deletion. These do not prevent the specification handoff.
-- M3 policy gates: WHR-39 (other card retirement); WHR-38 build default approved in P-18, client Q-528 pending, WHR-47–50 (correction evidence, final manager recovery, OTP/device recovery policy, independent meter reconciliation). Specs preserve data and deny unsupported acceptance/mutations pending policy.
+- M3 policy gates: WHR-39 (other card retirement); WHR-38 build default approved in P-18, client Q-528 pending, WHR-48–50 (final manager recovery, OTP/device recovery policy, independent meter reconciliation); WHR-47 is resolved by P-22 for numeric-only retained-photo corrections (WO-spec-3c). Specs preserve data and deny unsupported acceptance/mutations pending policy.
 - M2 policy tracking: WHR-42 (production token/delivery configuration), WHR-43 (proposed role preset activation). T-17 supersedes T-15 with the confirmed US staging endpoint and acceptance contract; production mail stays off until WHR-42. Production activation and client consent Q-535 remain separate; no cloud operations were authorized or performed.
 - Client kickoff and contract: not yet confirmed.
 - Earl provisions temporary staging in Cloudrock’s existing account using docs/ops/staging.md. Client-owned production and account handover remain pending.
 - Launch date versus the December campaign start.
 
 ## Next up
+
+- Lane:spec stops at WO-spec-3c READY. Rook should mirror P-22 into product docs; no product-doc edits here. No next work order is started.
 - Offboarding implementation remains separate in WHR-80 and WO-app-5. Rook's P-21 product-doc mirroring waits on Earl's go under Q-527; attendant disable remains a possible later client addition. Lane:spec stops after the accepted closeout.
 - App: STOP at WO-app-5 READY and wait for Earl’s smoke acceptance. No next app work order selected. WHR-75 is Done through #76; WHR-9 is Done through #67; WHR-60 remains separate.
 - Core: the approved WHR-80 then WHR-12 sequence is READY; stop after WHR-12's READY post and await Earl's verification or a new approved work order.
