@@ -358,6 +358,8 @@ model CaptureContext {
 }
 
 model Customer {
+  registered_station_id String? @db.Uuid
+  registered_by_user_id String? @db.Uuid
   id                                        String                   @id @db.Uuid
   created_at                                DateTime                 @default(now()) @db.Timestamptz(6)
   customer_code                             String
@@ -377,6 +379,7 @@ model Customer {
 }
 
 model CardBatch {
+  name String?
   id                 String   @id @db.Uuid
   created_at         DateTime @default(now()) @db.Timestamptz(6)
   batch_code         String
@@ -940,4 +943,46 @@ model mutation_receipt {
 model security_state {
   id      Boolean @id @default(true)
   version BigInt  @default(1)
+}
+
+/// Immutable inventory snapshot, guarded by reviewed SQL.
+model CardExport {
+ id String @id @db.Uuid
+ created_at DateTime @default(now()) @db.Timestamptz(6)
+ batch_id String @db.Uuid
+ created_by String @db.Uuid
+ operation_id String @db.Uuid
+ format String
+ batch_version Int
+ batch_status String
+ batch_code String
+ batch_name String
+ snapshot_at DateTime @db.Timestamptz(6)
+ status String
+ prepared_at DateTime? @db.Timestamptz(6)
+ expires_at DateTime? @db.Timestamptz(6)
+ object_key String? @unique
+ sha256 String?
+ byte_size BigInt?
+ failure_code String?
+ lease_nonce String?
+ lease_until DateTime? @db.Timestamptz(6)
+ fencing_version BigInt @default(0)
+ attempts Int @default(0)
+ next_attempt_at DateTime? @db.Timestamptz(6)
+ @@unique([created_by,operation_id])
+ @@index([status,next_attempt_at])
+ @@map("card_export")
+}
+model CardExportItem {
+ export_id String @db.Uuid
+ card_id String @db.Uuid
+ ordinal Int
+ code String
+ qr_payload String
+ card_state String
+ assignment_eligible Boolean
+ @@id([export_id,card_id])
+ @@unique([export_id,ordinal])
+ @@map("card_export_item")
 }
