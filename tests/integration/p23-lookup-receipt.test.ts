@@ -1009,4 +1009,133 @@ describe("P-23 signed lookup lower bound with real PostgreSQL", () => {
     const id = (await response.json()).data.purchaseId;
     expect((await evidenceRow(id)).lookup_receipt_status).toBe("fallback");
   });
+  it("I-22 reordered Unicode evidence keys retry identically while changed values conflict", async () => {
+    const f = await fixture();
+    const svc = makeService();
+    const first = { ä: 1, "a\u0308": 2, nested: { é: 3, "e\u0301": 4 } };
+    const reordered = { nested: { "e\u0301": 4, é: 3 }, "a\u0308": 2, ä: 1 };
+    const submitted = await svc.submit(f.token, {
+      ...f.original,
+      lookupReceipt: first,
+    });
+    const retry = await svc.submit(f.token, {
+      ...f.original,
+      lookupReceipt: reordered,
+    });
+    expect(retry.created).toBe(false);
+    expect(retry.status.purchaseId).toBe(submitted.status.purchaseId);
+    await expect(
+      svc.submit(f.token, {
+        ...f.original,
+        lookupReceipt: { ...reordered, ä: 5 },
+      }),
+    ).rejects.toMatchObject({ code: "operation_conflict" });
+  });
+
+  it.each([false, true])(
+    "I-33 resolved replacement hold permits correction without clearing independent price hold=%s",
+    async (priceHeld) => {
+      const f = await fixture();
+      const c = await claims(f);
+      const next = await unusedCard();
+      f.original.lookupReceipt = sign(c);
+      const ended = new Date(f.start.getTime() + 2000);
+      await transaction(pool, async (db) => {
+        await db.query(
+          "UPDATE card_customer_link SET ended_at=$2 WHERE id=$1",
+          [c.cardCustomerLinkId, ended],
+        );
+        await db.query(
+          "UPDATE card SET state='retired',retired_at=$2,retirement_reason='Fictional verified replacement',replaced_by_card_id=$3,version=version+1 WHERE id=$1",
+          [c.cardId, ended, next.id],
+        );
+        await db.query(
+          "UPDATE card SET state='linked',version=version+1 WHERE id=$1",
+          [next.id],
+        );
+        await db.query(
+          "INSERT INTO card_customer_link(id,card_id,customer_id,linked_at,actor_user_id,reason) VALUES($1,$2,$3,$4,$5,'Fictional replacement')",
+          [newId(), next.id, c.customerId, ended, fixtureId(2)],
+        );
+      });
+      if (priceHeld)
+        await changePrice(pool, {
+          stationId: f.stationId,
+          start: new Date(f.start.getTime() + 1000),
+        });
+      const { result, upload } = await finish(f);
+      expect(result.state).toBe("held");
+      expect((await reasons(result.purchaseId)).sort()).toEqual(
+        priceHeld ? ["price_uncertain", "replaced_card"] : ["replaced_card"],
+      );
+      const original = (
+        await pool.query(
+          "SELECT id FROM purchase_revision WHERE purchase_id=$1 AND kind='original'",
+          [result.purchaseId],
+        )
+      ).rows[0];
+      // The later hold-review work order owns its endpoint. Seed its legitimate durable
+      // resolution exactly as the existing correction acceptance suite does.
+      await transaction(pool, async (db) => {
+        await db.query(
+          "UPDATE purchase_hold SET state='resolved',resolved_by=$2,resolution_operation_id=$3,resolution_reason='Trusted card eligibility confirmation',resolved_at=clock_timestamp(),resolution_revision_id=$4,version=version+1 WHERE purchase_id=$1 AND kind='card' AND state='open'",
+          [result.purchaseId, fixtureId(5), newId(), original.id],
+        );
+        await db.query(
+          "UPDATE purchase_revision SET state='accepted',version=version+1,decision_actor_id=$2,decision_reason='Trusted prior card review',decided_at=clock_timestamp() WHERE id=$1",
+          [original.id, fixtureId(2)],
+        );
+        await db.query(
+          "UPDATE purchase SET current_revision_id=$2,status=$3,version=version+1 WHERE id=$1",
+          [result.purchaseId, original.id, priceHeld ? "held" : "credited"],
+        );
+      });
+      const p = (
+        await pool.query("SELECT version FROM purchase WHERE id=$1", [
+          result.purchaseId,
+        ])
+      ).rows[0];
+      const svc = createCorrectionsService({ pool, storage });
+      const correction = await svc.submit(f.token, result.purchaseId, {
+        operationId: newId(),
+        expectedVersion: p.version,
+        basedOnRevisionId: original.id,
+        edit: { basis: "amount", enteredAmountKobo: "3000000" },
+        evidenceAssetId: upload.uploadId,
+        reason: "Corrected meter amount after card review",
+      });
+      await svc.processNext();
+      const current = (
+        await pool.query(
+          "SELECT p.status,r.amount_kobo::text FROM purchase p JOIN purchase_revision r ON r.id=p.current_revision_id WHERE p.id=$1",
+          [result.purchaseId],
+        )
+      ).rows[0];
+      expect(current).toEqual({
+        status: priceHeld ? "held" : "credited",
+        amount_kobo: "3000000",
+      });
+      expect(
+        (
+          await pool.query("SELECT state FROM correction_request WHERE id=$1", [
+            correction.data.id,
+          ])
+        ).rows[0].state,
+      ).toBe("accepted");
+      const holds = (
+        await pool.query(
+          "SELECT kind,state FROM purchase_hold WHERE purchase_id=$1 ORDER BY kind",
+          [result.purchaseId],
+        )
+      ).rows;
+      expect(holds).toEqual(
+        priceHeld
+          ? [
+              { kind: "card", state: "resolved" },
+              { kind: "price", state: "open" },
+            ]
+          : [{ kind: "card", state: "resolved" }],
+      );
+    },
+  );
 });

@@ -105,3 +105,13 @@ it("P-23 rejects signed noncanonical JSON, unknown claims, versions, purpose and
     }),
   ).toBeNull();
 });
+
+it("P-23 rejects a correctly MACed UTF-8 BOM-prefixed payload", () => {
+  const payload = Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf]),
+    Buffer.from(JSON.stringify(claims())),
+  ]);
+  const prefix = `lr1.test.${payload.toString("base64url")}`;
+  const encoded = `${prefix}.${createHmac("sha256", key).update(prefix).digest("base64url")}`;
+  expect(verifyLookupReceipt(encoded, ring) === null).toBe(true);
+});

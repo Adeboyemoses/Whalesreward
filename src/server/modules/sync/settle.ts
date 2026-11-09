@@ -93,6 +93,10 @@ export async function settle(
       ? {
           linkedAt: link.linked_at,
           endedAt: link.ended_at,
+          endedByReplacement:
+            card?.state === "retired" &&
+            card.retired_at_receipt &&
+            card.replaced_by_card_id !== null,
           customerMatches:
             link.customer_id === p.customer_id &&
             (!p.lookup_receipt_claims ||

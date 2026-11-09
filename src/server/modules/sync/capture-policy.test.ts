@@ -394,3 +394,25 @@ describe("P-23 shared lower bound", () => {
     );
   });
 });
+
+it("P-23 classifies replacement-ended linkage once while preserving independent history uncertainty", () => {
+  const f = fixture();
+  f.cardLink = {
+    linkedAt: at(0),
+    endedAt: at(2),
+    customerMatches: true,
+    endedByReplacement: true,
+  };
+  expect(evaluateCapturePolicy(f).reasons).toEqual(["replaced_card"]);
+  f.cardLink.customerMatches = false;
+  expect(evaluateCapturePolicy(f).reasons).toEqual(
+    expect.arrayContaining(["replaced_card", "card_policy_unresolved"]),
+  );
+  f.cardLink.customerMatches = true;
+  f.cardLink.linkedAt = at(2);
+  expect(evaluateCapturePolicy(f).reasons).toEqual(
+    expect.arrayContaining(["replaced_card", "card_policy_unresolved"]),
+  );
+  f.cardLink = null;
+  expect(evaluateCapturePolicy(f).reasons).toContain("card_policy_unresolved");
+});

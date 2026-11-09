@@ -24,6 +24,7 @@ export type CapturePolicyInput = {
     linkedAt: TrustedMicros;
     endedAt: TrustedMicros | null;
     customerMatches: boolean;
+    endedByReplacement?: boolean;
   } | null;
   receivedAt: TrustedMicros;
   offlineExpiresAt: TrustedMicros;
@@ -53,14 +54,17 @@ export function evaluateCapturePolicy(
   const u = r < expiry ? r : expiry;
   if (s < originalS || u < s)
     return { reasons: ["capture_history_incomplete"], campaignEligible: false };
-  if (
-    input.cardLink !== undefined &&
-    (!input.cardLink ||
-      !input.cardLink.customerMatches ||
-      micros(input.cardLink.linkedAt) > s ||
-      (input.cardLink.endedAt !== null && micros(input.cardLink.endedAt) <= r))
-  )
-    reasons.add("card_policy_unresolved");
+  if (input.cardLink !== undefined) {
+    const link = input.cardLink;
+    // A replacement has its own resolvable hold; do not add an unresolvable
+    // generic reason for that same ending. Independent bad history still blocks.
+    if (!link || !link.customerMatches || micros(link.linkedAt) > s)
+      reasons.add("card_policy_unresolved");
+    if (link && link.endedAt !== null && micros(link.endedAt) <= r)
+      reasons.add(
+        link.endedByReplacement ? "replaced_card" : "card_policy_unresolved",
+      );
+  }
   if (
     micros(input.assignment.effectiveFrom) > s ||
     (input.assignment.effectiveUntil !== null &&

@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 /** Recursively key-sorted JSON, using an explicit stack for bounded-size deeply nested evidence. */
-export function canonicalJson(value: unknown): string {
+function sortedJson(
+  value: unknown,
+  compareKeys: (a: string, b: string) => number,
+): string {
   type Task = { value: unknown } | { text: string };
   const pending: Task[] = [{ value }],
     output: string[] = [];
@@ -21,7 +24,7 @@ export function canonicalJson(value: unknown): string {
     } else if (v !== null && typeof v === "object") {
       output.push("{");
       pending.push({ text: "}" });
-      const entries = Object.entries(v).sort(([a], [b]) => a.localeCompare(b));
+      const entries = Object.entries(v).sort(([a], [b]) => compareKeys(a, b));
       for (let i = entries.length - 1; i >= 0; i--) {
         const [k, x] = entries[i]!;
         pending.push({ value: x }, { text: ":" }, { text: JSON.stringify(k) });
@@ -30,6 +33,10 @@ export function canonicalJson(value: unknown): string {
     } else output.push(JSON.stringify(v));
   }
   return output.join("");
+}
+/** New receipt evidence uses a locale-independent total ordering of distinct UTF-16 keys. */
+export function canonicalJson(value: unknown): string {
+  return sortedJson(value, (a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 /** Keep absent/null receipts in the legacy namespace; every other JSON value is immutable evidence. */
 export function payloadDigest(value: unknown): string {
@@ -45,7 +52,9 @@ export function payloadDigest(value: unknown): string {
     else namespace = "sync-v2-lookup";
   }
   return createHash("sha256")
-    .update(`${namespace}\0${canonicalJson(value)}`)
+    .update(
+      `${namespace}\0${namespace === "sync-v1" ? sortedJson(value, (a, b) => a.localeCompare(b)) : canonicalJson(value)}`,
+    )
     .digest("hex");
 }
 

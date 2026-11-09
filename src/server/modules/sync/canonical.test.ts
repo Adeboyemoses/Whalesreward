@@ -46,3 +46,26 @@ it("preserves JSONB-incompatible Unicode evidence losslessly without changing it
   for (const value of ["plain", "\\u0000", "😀", null, { good: [1, true] }])
     expect(jsonbRepresentable(value)).toBe(true);
 });
+
+it("P-23 Unicode-equivalent distinct keys have deterministic total ordering", () => {
+  const a = { ä: 1, "a\u0308": 2, nested: { é: 3, "e\u0301": 4 } };
+  const b = { nested: { "e\u0301": 4, é: 3 }, "a\u0308": 2, ä: 1 };
+  expect(canonicalJson(a)).toBe(canonicalJson(b));
+  expect(payloadDigest({ lookupReceipt: a })).toBe(
+    payloadDigest({ lookupReceipt: b }),
+  );
+  expect(payloadDigest({ lookupReceipt: a })).not.toBe(
+    payloadDigest({ lookupReceipt: { ...b, ä: 5 } }),
+  );
+});
+
+it("keeps the historical sync-v1 Unicode-key digest for legacy originals and recovery manifests", () => {
+  const manifest = {
+    operationId: "fictional-operation",
+    manifest: { ä: 1, "a\u0308": 2, z: 3 },
+  };
+  const legacy =
+    "3c273de54ffa08efddb257ced14ece4654adde3fc1a0afc13eeefb87c6a33c16";
+  expect(payloadDigest(manifest)).toBe(legacy);
+  expect(payloadDigest({ ...manifest, lookupReceipt: null })).toBe(legacy);
+});

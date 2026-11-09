@@ -82,7 +82,11 @@ export function verifyLookupReceipt(
     if (!timingSafeEqual(mac, expected)) return null;
     const json = new TextDecoder("utf-8", { fatal: true }).decode(payload);
     const claims = lookupReceiptClaimsSchema.safeParse(JSON.parse(json));
-    if (!claims.success || JSON.stringify(claims.data) !== json) return null;
+    if (
+      !claims.success ||
+      !Buffer.from(JSON.stringify(claims.data), "utf8").equals(payload)
+    )
+      return null;
     return claims.data;
   } catch {
     return null;
