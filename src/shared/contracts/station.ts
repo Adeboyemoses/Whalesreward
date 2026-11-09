@@ -50,6 +50,12 @@ export const assignAttendantSchema = z.strictObject({
   expectedPumpVersion: version,
   reason,
 });
+export const endAssignmentSchema = z.strictObject({
+  operationId: authId,
+  expectedVersion: version,
+  expectedAssignmentId: authId,
+  reason,
+});
 export const firstAttendantPasswordSchema = z.strictObject({
   operationId: authId,
   currentPassword: attendantPasswordSchema.min(1),
@@ -96,4 +102,17 @@ export const pumpSchema = z.strictObject({
   product: productSchema,
   price: priceSchema.nullable(),
   attendantCount: z.string().regex(/^\d+$/),
+});
+
+export const assignmentEndReceiptSchema = z.strictObject({
+  operationId: authId,
+  attendant: attendantSchema,
+  ended: z.strictObject({
+    assignmentId: authId,
+    assignmentVersion: version,
+    pumpId: authId,
+    effectiveUntil: z.iso.datetime({ offset: true }),
+    actor: z.strictObject({ id: authId, code: z.string(), name: z.string() }),
+    reason: z.string(),
+  }),
 });

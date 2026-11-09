@@ -29,9 +29,7 @@ export async function transaction<T>(
     db.release();
   }
 }
-export async function securityLock(db: pg.PoolClient) {
-  await db.query("SELECT id FROM security_state WHERE id=true FOR UPDATE");
-}
+export { securityLock } from "../../lib/security-lock";
 export type LiveAdmin = {
   id: string;
   user_id: string;

@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { lockAssignmentHistory } from "../../lib/assignment-history-lock";
 import { lockPriceHistory } from "../../lib/price-history-lock";
 import { hashPassword } from "better-auth/crypto";
 import { newId } from "../../lib/ids";
@@ -11,6 +12,8 @@ import type { PermissionCode } from "../../../shared/contracts/admin";
 import {
   activatePriceSchema,
   assignAttendantSchema,
+  endAssignmentSchema,
+  assignmentEndReceiptSchema,
   createAttendantSchema,
   createPumpSchema,
   attendantSearchSchema,
@@ -257,6 +260,121 @@ export async function stationWrite(
           return result;
         });
       }
+      if (action === "attendants-assignment-end") {
+        const parsed = endAssignmentSchema.parse(input);
+        return receipt(
+          db,
+          config,
+          actor,
+          action,
+          { ...parsed, targetId },
+          async () => {
+            // Security lock is first; lock identity, aggregate and interval in order.
+            const identity = (
+              await db.query("SELECT user_id FROM attendant WHERE id=$1", [
+                targetId,
+              ])
+            ).rows[0];
+            if (!identity) throw new AuthError("not_found", 404);
+            await lockAssignmentHistory(db, identity.user_id, "write");
+            const user = (
+              await db.query(
+                "SELECT u.id,u.auth_version,u.enabled FROM auth_user u JOIN attendant a ON a.user_id=u.id WHERE a.id=$1 FOR UPDATE OF u",
+                [targetId],
+              )
+            ).rows[0];
+            if (!user) throw new AuthError("not_found", 404);
+            await attendantView(db, targetId!, station);
+            if (!user.enabled)
+              throw new AuthError("attendant_unavailable", 422);
+            const a = (
+              await db.query("SELECT * FROM attendant WHERE id=$1 FOR UPDATE", [
+                targetId,
+              ])
+            ).rows[0];
+            checkVersion(a.version, parsed.expectedVersion);
+            const old = (
+              await db.query(
+                "SELECT * FROM assignment WHERE attendant_id=$1 AND effective_until IS NULL FOR UPDATE",
+                [a.id],
+              )
+            ).rows[0];
+            if (!old) throw new AuthError("no_change", 409);
+            if (old.id !== parsed.expectedAssignmentId)
+              throw new AuthError("version_conflict", 409);
+            const boundary = await trustedBoundary(db, "assignment", old.id);
+            const closed = await db.query(
+              "UPDATE assignment SET effective_until=$2 WHERE id=$1 AND effective_until IS NULL RETURNING effective_until",
+              [old.id, boundary],
+            );
+            const updated = await db.query(
+              "UPDATE attendant SET version=version+1 WHERE id=$1 AND version=$2",
+              [a.id, parsed.expectedVersion],
+            );
+            if (closed.rowCount !== 1 || updated.rowCount !== 1)
+              throw new AuthError("version_conflict", 409);
+            await db.query(
+              "UPDATE auth_user SET auth_version=auth_version+1,updated_at=$2 WHERE id=$1",
+              [user.id, boundary],
+            );
+            await db.query(
+              "UPDATE auth_session SET revoked_at=$2 WHERE user_id=$1 AND revoked_at IS NULL",
+              [user.id, boundary],
+            );
+            await db.query(
+              "UPDATE capture_context SET revoked_at=$2 WHERE attendant_id=$1 AND revoked_at IS NULL",
+              [a.id, boundary],
+            );
+            // Resolve the ending actor without changing the opening history.
+            const endActor = (
+              await db.query(
+                "SELECT admin_code,u.display_name FROM admin a JOIN auth_user u ON u.id=a.user_id WHERE a.id=$1",
+                [actor.admin_id],
+              )
+            ).rows[0];
+            const result = assignmentEndReceiptSchema.parse({
+              operationId: parsed.operationId,
+              attendant: await attendantView(db, a.id, station),
+              ended: {
+                assignmentId: old.id,
+                assignmentVersion: old.assignment_version,
+                pumpId: old.pump_id,
+                effectiveUntil: closed.rows[0].effective_until.toISOString(),
+                actor: {
+                  id: actor.admin_id,
+                  code: endActor.admin_code,
+                  name: endActor.display_name,
+                },
+                reason: parsed.reason,
+              },
+            });
+            await audit(
+              db,
+              actor.user_id,
+              "attendant",
+              a.id,
+              "assignment_ended",
+              parsed.reason,
+              {
+                assignmentId: old.id,
+                pumpId: old.pump_id,
+                effectiveUntil: null,
+                attendantVersion: String(a.version),
+                authVersion: String(user.auth_version),
+              },
+              {
+                assignmentId: null,
+                pumpId: null,
+                effectiveUntil: boundary,
+                attendantVersion: String(a.version + 1),
+                authVersion: String(user.auth_version + 1),
+              },
+              { operationId: parsed.operationId, occurredAt: boundary },
+            );
+            return result;
+          },
+        );
+      }
       if (action === "attendants-assignment") {
         const parsed = assignAttendantSchema.parse(input);
         return receipt(
@@ -266,6 +384,13 @@ export async function stationWrite(
           action,
           { ...parsed, targetId },
           async () => {
+            const identity = (
+              await db.query("SELECT user_id FROM attendant WHERE id=$1", [
+                targetId,
+              ])
+            ).rows[0];
+            if (!identity) throw new AuthError("not_found", 404);
+            await lockAssignmentHistory(db, identity.user_id, "write");
             const a = (
               await db.query(
                 "SELECT a.*,u.enabled FROM attendant a JOIN auth_user u ON u.id=a.user_id WHERE a.id=$1 FOR UPDATE OF a",
@@ -292,12 +417,31 @@ export async function stationWrite(
             );
             if (old?.pump_id === pump.id) throw new AuthError("no_change", 409);
             // Keep the actual boundary as a PostgreSQL timestamp, not a millisecond Date.
-            const boundary = await trustedBoundary(db, "assignment", old?.id);
+            const previous =
+              old ??
+              (
+                await db.query(
+                  "SELECT * FROM assignment WHERE attendant_id=$1 ORDER BY assignment_version DESC LIMIT 1",
+                  [a.id],
+                )
+              ).rows[0];
+            const boundary = await trustedBoundary(
+              db,
+              "assignment",
+              previous?.id,
+            );
             if (old)
               await db.query(
                 "UPDATE assignment SET effective_until=$2 WHERE id=$1 AND effective_until IS NULL",
                 [old.id, boundary],
               );
+            const latest = (
+              await db.query(
+                "SELECT assignment_version,id FROM assignment WHERE attendant_id=$1 ORDER BY assignment_version DESC LIMIT 1",
+                [a.id],
+              )
+            ).rows[0];
+            const nextVersion = (latest?.assignment_version ?? 0) + 1;
             const id = newId();
             await db.query(
               "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,changed_by,reason) VALUES($1,$2,$3,$4,$5,$6,$7)",
@@ -305,7 +449,7 @@ export async function stationWrite(
                 id,
                 a.id,
                 pump.id,
-                (old?.assignment_version ?? 0) + 1,
+                nextVersion,
                 boundary,
                 actor.admin_id,
                 parsed.reason,
@@ -334,7 +478,7 @@ export async function stationWrite(
               {
                 assignmentId: id,
                 pumpId: pump.id,
-                version: (old?.assignment_version ?? 0) + 1,
+                version: nextVersion,
               },
             );
             const change = assignmentChange(await eventView(db, id));
@@ -522,7 +666,7 @@ async function trustedBoundary(
   for (let i = 0; i < 3; i++) {
     const r = (
       await db.query(
-        `WITH trusted_now AS MATERIALIZED (SELECT clock_timestamp() AS t) SELECT t::text AS boundary,($1::uuid IS NULL OR t>(SELECT effective_from FROM ${table} WHERE id=$1)) AS later FROM trusted_now`,
+        `WITH trusted_now AS MATERIALIZED (SELECT clock_timestamp() AS t) SELECT to_char(t AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS boundary,($1::uuid IS NULL OR t>(SELECT greatest(effective_from${table === "assignment" ? ",effective_until" : ""}) FROM ${table} WHERE id=$1)) AS later FROM trusted_now`,
         [previous ?? null],
       )
     ).rows[0];
