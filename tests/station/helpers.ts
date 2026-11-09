@@ -28,8 +28,13 @@ export async function stationFixture(page: Page, grants?: string[]) {
       f.adminId,
     ]);
   }
+  const login = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/admin/sign-in") && r.request().method() === "POST",
+  );
   await signIn(page, f.username, f.password);
-  await expect(page).toHaveURL(/\/admin(?:\/[^?#]*)?$/);
+  expect((await login).status()).toBe(200);
+  await expect(page).not.toHaveURL(/\/admin\/(?:sign-in|first-password)$/);
   return f;
 }
 export async function api<T>(
