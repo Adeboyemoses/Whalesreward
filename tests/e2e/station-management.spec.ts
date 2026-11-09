@@ -529,7 +529,7 @@ test("I-32 a stale reviewed price cannot silently create a second configuration"
   try {
     const before = (
       await f.db.query(
-        "SELECT version FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
+        "SELECT version,rate_kobo::text FROM product_price_version WHERE product_id=$1 ORDER BY version DESC LIMIT 1",
         [product],
       )
     ).rows[0];
@@ -550,7 +550,7 @@ test("I-32 a stale reviewed price cannot silently create a second configuration"
       {
         operationId: v7(),
         expectedVersion: before.version,
-        rateKobo: "120002",
+        rateKobo: (BigInt(before.rate_kobo) + 1n).toString(),
         currency: "NGN",
         quantityPrecision: 2,
         reason: "Fictional intervening activation",

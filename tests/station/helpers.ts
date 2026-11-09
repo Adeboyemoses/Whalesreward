@@ -7,6 +7,12 @@ export const seedId = (n: number) =>
   `019a5000-0000-7000-8000-${String(n).padStart(12, "0")}`;
 export type StationFixture = Awaited<ReturnType<typeof stationFixture>>;
 export async function stationFixture(page: Page, grants?: string[]) {
+  // The local runner models a trusted proxy with a documentation-only IP per
+  // fictional account. Real capacities and account buckets remain unchanged.
+  const suffix = v7().replaceAll("-", "").slice(-12).match(/.{4}/g)!.join(":");
+  await page
+    .context()
+    .setExtraHTTPHeaders({ "x-test-ip": `2001:db8::${suffix}` });
   const f = await fixture();
   await f.db.query(
     "UPDATE auth_user SET must_change_password=false WHERE id=$1",
