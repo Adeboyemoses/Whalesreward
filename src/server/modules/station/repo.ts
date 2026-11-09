@@ -172,9 +172,10 @@ export async function audit(
   reason: string,
   before: unknown,
   after: unknown,
+  boundary?: { operationId: string; occurredAt: string },
 ) {
   await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6::jsonb,$7::jsonb,$8,clock_timestamp())`,
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,operation_id,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,coalesce($10::timestamptz,clock_timestamp()))`,
     [
       newId(),
       actor,
@@ -184,6 +185,8 @@ export async function audit(
       JSON.stringify(before),
       JSON.stringify(after),
       auditText(reason),
+      boundary?.operationId ?? null,
+      boundary?.occurredAt ?? null,
     ],
   );
 }

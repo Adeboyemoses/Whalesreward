@@ -325,6 +325,13 @@ export async function stationWrite(
               "UPDATE capture_context SET revoked_at=$2 WHERE attendant_id=$1 AND revoked_at IS NULL",
               [a.id, boundary],
             );
+            // Resolve the ending actor without changing the opening history.
+            const endActor = (
+              await db.query(
+                "SELECT admin_code,u.display_name FROM admin a JOIN auth_user u ON u.id=a.user_id WHERE a.id=$1",
+                [actor.admin_id],
+              )
+            ).rows[0];
             const result = assignmentEndReceiptSchema.parse({
               operationId: parsed.operationId,
               attendant: await attendantView(db, a.id, station),
@@ -333,47 +340,36 @@ export async function stationWrite(
                 assignmentVersion: old.assignment_version,
                 pumpId: old.pump_id,
                 effectiveUntil: closed.rows[0].effective_until.toISOString(),
-                actor: (await eventView(db, old.id)).actor,
+                actor: {
+                  id: actor.admin_id,
+                  code: endActor.admin_code,
+                  name: endActor.display_name,
+                },
                 reason: parsed.reason,
               },
             });
-            // The opening actor is immutable; the end receipt carries this actor.
-            const endActor = (
-              await db.query(
-                "SELECT admin_code,u.display_name FROM admin a JOIN auth_user u ON u.id=a.user_id WHERE a.id=$1",
-                [actor.admin_id],
-              )
-            ).rows[0];
-            result.ended.actor = {
-              id: actor.admin_id,
-              code: endActor.admin_code,
-              name: endActor.display_name,
-            };
-            await db.query(
-              `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,"before","after",reason,occurred_at)
-             VALUES($1,$2,'user','assignment_ended','attendant',$3,$4,$5::jsonb,$6::jsonb,$7,$8)`,
-              [
-                newId(),
-                actor.user_id,
-                a.id,
-                parsed.operationId,
-                JSON.stringify({
-                  assignmentId: old.id,
-                  pumpId: old.pump_id,
-                  effectiveUntil: null,
-                  attendantVersion: String(a.version),
-                  authVersion: String(user.auth_version),
-                }),
-                JSON.stringify({
-                  assignmentId: null,
-                  pumpId: null,
-                  effectiveUntil: boundary,
-                  attendantVersion: String(a.version + 1),
-                  authVersion: String(user.auth_version + 1),
-                }),
-                parsed.reason,
-                boundary,
-              ],
+            await audit(
+              db,
+              actor.user_id,
+              "attendant",
+              a.id,
+              "assignment_ended",
+              parsed.reason,
+              {
+                assignmentId: old.id,
+                pumpId: old.pump_id,
+                effectiveUntil: null,
+                attendantVersion: String(a.version),
+                authVersion: String(user.auth_version),
+              },
+              {
+                assignmentId: null,
+                pumpId: null,
+                effectiveUntil: boundary,
+                attendantVersion: String(a.version + 1),
+                authVersion: String(user.auth_version + 1),
+              },
+              { operationId: parsed.operationId, occurredAt: boundary },
             );
             return result;
           },
@@ -670,7 +666,7 @@ async function trustedBoundary(
   for (let i = 0; i < 3; i++) {
     const r = (
       await db.query(
-        `WITH trusted_now AS MATERIALIZED (SELECT clock_timestamp() AS t) SELECT t::text AS boundary,($1::uuid IS NULL OR t>(SELECT greatest(effective_from${table === "assignment" ? ",effective_until" : ""}) FROM ${table} WHERE id=$1)) AS later FROM trusted_now`,
+        `WITH trusted_now AS MATERIALIZED (SELECT clock_timestamp() AS t) SELECT to_char(t AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS boundary,($1::uuid IS NULL OR t>(SELECT greatest(effective_from${table === "assignment" ? ",effective_until" : ""}) FROM ${table} WHERE id=$1)) AS later FROM trusted_now`,
         [previous ?? null],
       )
     ).rows[0];
