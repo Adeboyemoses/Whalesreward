@@ -1,0 +1,20 @@
+{
+  "viewport": 390,
+  "documentWidth": 390,
+  "rootWidth": 390,
+  "bodyFont": "\"IBM Plex Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+  "focus": {
+    "tag": "BODY",
+    "width": "3px",
+    "style": "none",
+    "color": "rgb(0, 0, 0)"
+  },
+  "notices": [
+    {
+      "text": "A card that is not yet linked must first be registered. If the customer lost a card, an admin issues a replacement; the sale cannot be recorded against the old card.",
+      "background": "rgb(237, 244, 250)",
+      "width": 358
+    }
+  ],
+  "shortTargets": []
+}

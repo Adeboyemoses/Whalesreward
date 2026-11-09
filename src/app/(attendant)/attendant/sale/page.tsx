@@ -45,7 +45,10 @@ function Sale() {
   const [card, setCard] = useState("");
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const [resolvedCode, setResolvedCode] = useState("");
-  const [notFound, setNotFound] = useState(false);
+  const [notFound, setNotFound] = useState<{
+    cardCode: string;
+    source: "code" | "qr";
+  } | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [basis, setBasis] = useState<"amount" | "quantity">("amount");
@@ -164,7 +167,7 @@ function Sale() {
     setLookup(null);
     setResolvedCode("");
     setLookupError(null);
-    setNotFound(false);
+    setNotFound(null);
     try {
       const found = await client.lookup(code, source);
       if (
@@ -181,7 +184,9 @@ function Sale() {
       if (mounted.current && generation === request.current) {
         setLookupError(message(e));
         setNotFound(
-          e instanceof ClientError && e.code === "customer_not_found",
+          e instanceof ClientError && e.code === "customer_not_found"
+            ? { cardCode: code.trim().toUpperCase(), source }
+            : null,
         );
       }
     } finally {
@@ -189,7 +194,7 @@ function Sale() {
     }
   }
   function changeCard() {
-    setNotFound(false);
+    setNotFound(null);
     request.current++;
     setFinding(false);
     setLookup(null);
@@ -350,19 +355,19 @@ function Sale() {
                   <Button
                     variant="secondary"
                     icon={<UserRoundPlus aria-hidden />}
-                    onClick={() => go(router, "/attendant/register")}
+                    onClick={() => {
+                      handoff.offerRegistration({
+                        accountId,
+                        contextId,
+                        ...notFound,
+                      });
+                      go(router, "/attendant/register");
+                    }}
                   >
                     Register this customer
                   </Button>
                 </div>
               </>
-            )}
-            {lookupError && !notFound && (
-              <Notice>
-                A card that is not yet linked must first be registered. If the
-                customer lost a card, ask a station admin for help. A connection
-                problem can be retried.
-              </Notice>
             )}
           </>
         )}

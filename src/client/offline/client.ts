@@ -610,14 +610,26 @@ export class AttendantClient {
       throw error;
     }
     if (epoch !== this.authEpoch) throw this.accountChanged();
-    await this.db.transaction("r", this.db.meta, this.db.windows, async () =>
-      this.assertCurrentContext(session),
-    );
-    if (result.acknowledgedAssignmentId !== session.assignment.id)
-      throw new ClientError(
-        "invalid_response",
-        "The assignment response changed. Sign in online again.",
-      );
+    await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
+      if (epoch !== this.authEpoch) throw this.accountChanged();
+      await this.assertCurrentContext(session);
+      if (result.acknowledgedAssignmentId !== session.assignment.id)
+        throw new ClientError(
+          "invalid_response",
+          "The assignment response changed. Sign in online again.",
+        );
+      if (result.reassignmentRequiresSignIn) {
+        // Retain only the notice; the acknowledged capture context stays intact.
+        const row = (await this.db.windows.get(session.account.id))!;
+        await this.db.windows.update(session.account.id, {
+          session: { ...row.session, reassignmentRequiresSignIn: true },
+        });
+      }
+    });
+    if (result.reassignmentRequiresSignIn) {
+      this.signal();
+      await this.checkAccess();
+    }
     return result;
   }
   private accountChanged() {
@@ -721,7 +733,14 @@ export class AttendantClient {
           const advanced = this.advance(row, now);
           const next = {
             ...advanced,
-            session: fresh,
+            session: {
+              ...fresh,
+              // A same-context response may predate the configured-target read.
+              // Only explicit sign-in acknowledges a new assignment.
+              reassignmentRequiresSignIn:
+                row.session.reassignmentRequiresSignIn ||
+                fresh.reassignmentRequiresSignIn,
+            },
             lastTrustedServerTime: fresh.serverTime,
             elapsedAtCheckpointMs: Math.max(
               advanced.elapsedAtCheckpointMs,

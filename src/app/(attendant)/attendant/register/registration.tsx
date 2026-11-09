@@ -63,8 +63,14 @@ function RegistrationFlow() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [category, setCategory] = useState<Category | "">("");
-  const [card, setCard] = useState("");
-  const [source, setSource] = useState<"code" | "qr">("code");
+  const [candidate] = useState(() => handoff.registrationCandidate(session));
+  const [card, setCard] = useState(candidate?.cardCode ?? "");
+  const [source, setSource] = useState<"code" | "qr">(
+    candidate?.source ?? "code",
+  );
+  useEffect(() => {
+    handoff.clearRegistration();
+  }, [handoff]);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [camera, setCamera] = useState(false);
   const [busy, setBusy] = useState(false);

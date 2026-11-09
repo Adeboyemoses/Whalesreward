@@ -7,8 +7,14 @@ import {
   FakeAttendantApi,
   sessionFixture,
 } from "../../../tests/fixtures/attendant-client-fake";
-import { ClientError, type RestrictedSession } from "../types";
+import {
+  ClientError,
+  type ConfiguredAssignment,
+  type RestrictedSession,
+  type Session,
+} from "../types";
 let now: number;
+let online: boolean;
 let api: FakeAttendantApi;
 let db: CaptureDatabase;
 let client: AttendantClient;
@@ -31,13 +37,14 @@ function makeClient() {
     api,
     db,
     () => ({ wall: now, mono: now, runtimeId: "test" }),
-    () => true,
+    () => online,
   );
   clients.push(c);
   return c;
 }
 beforeEach(async () => {
   now = Date.parse("2026-11-09T10:00:00Z");
+  online = true;
   api = new FakeAttendantApi(sessionFixture(now));
   db = new CaptureDatabase("access-" + v7());
   client = makeClient();
@@ -146,29 +153,141 @@ it("P-21 observed revocation detaches protected identity and queue access but ke
   expect((await db.windows.get(account))?.locked).toBe(true);
 });
 
-it("A17 reads the configured target separately and never rewrites the acknowledged capture context or anchor", async () => {
-  await client.signIn("grace.okon", "fictional");
-  const original = structuredClone(client.getState().session!);
-  const window = await db.windows.get(original.account.id);
-  const configured = {
+function changedAssignment(original: Session): ConfiguredAssignment {
+  return {
     configured: {
       ...original.assignment,
       id: v7(),
       version: 2,
       pump: { id: v7(), code: "P04", name: "Pump 04" },
-      product: { id: v7(), code: "kerosene" as const, unit: "litre" as const },
+      product: { id: v7(), code: "kerosene", unit: "litre" },
       effectiveFrom: new Date(now).toISOString(),
     },
     acknowledgedAssignmentId: original.assignment.id,
     reassignmentRequiresSignIn: true,
   };
+}
+it("I-05 A17 warning survives an offline restart without rewriting capture context, anchor or queued evidence", async () => {
+  await client.signIn("grace.okon", "fictional");
+  const original = structuredClone(client.getState().session!);
+  const blob = new Blob(["fictional retained meter evidence"], {
+    type: "image/jpeg",
+  });
+  const digest = Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()),
+    ),
+    (b) => b.toString(16).padStart(2, "0"),
+  ).join("");
+  await client.saveCapture(await client.beginCapture(), {
+    cardCode: "C9P4T7M",
+    customerCache: await client.lookup("C9P4T7M"),
+    medium: "vehicle",
+    basis: "amount",
+    value: "20000",
+    photo: { blob, bytes: blob.size, mediaType: "image/jpeg", sha256: digest },
+  });
+  const window = await db.windows.get(original.account.id);
+  const queue = await db.outbox.toArray();
+  const configured = changedAssignment(original);
   api.configuredAssignment = async () => configured;
   expect(await client.configuredAssignment()).toEqual(configured);
-  expect(client.getState().session).toEqual(original);
-  expect((await db.windows.get(original.account.id))?.lastOnlineSignInAt).toBe(
-    window?.lastOnlineSignInAt,
+  const notified = { ...original, reassignmentRequiresSignIn: true };
+  expect(client.getState().session).toEqual(notified);
+  expect(await db.windows.get(original.account.id)).toEqual({
+    ...window,
+    session: notified,
+  });
+  online = false;
+  const restarted = makeClient();
+  await restarted.initialize();
+  expect(restarted.getState().session).toEqual(notified);
+  expect((await restarted.beginCapture()).session).toEqual(notified);
+  expect(await db.outbox.toArray()).toEqual(queue);
+  expect(await (await db.outbox.toArray())[0]!.photoBlob.text()).toBe(
+    await blob.text(),
   );
-  expect((await client.beginCapture()).session).toEqual(original);
+});
+it("I-05 a delayed false session refresh cannot clear A17 before a fresh online sign-in", async () => {
+  await client.signIn("grace.okon", "fictional");
+  const original = structuredClone(client.getState().session!);
+  let release!: (session: Session) => void;
+  api.session = () =>
+    new Promise((resolve) => {
+      release = resolve;
+    });
+  const refreshing = client.refresh();
+  await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+  api.configuredAssignment = async () => changedAssignment(original);
+  await client.configuredAssignment();
+  expect(client.getState().session?.reassignmentRequiresSignIn).toBe(true);
+  release(original);
+  await refreshing;
+  expect(client.getState().session?.reassignmentRequiresSignIn).toBe(true);
+  api.configuredAssignment = async () => ({
+    configured: {
+      ...original.assignment,
+      pump: { ...original.pump, name: "Pump 02" },
+      product: original.product,
+      effectiveFrom: original.lastOnlineSignInAt,
+    },
+    acknowledgedAssignmentId: original.assignment.id,
+    reassignmentRequiresSignIn: false,
+  });
+  await client.configuredAssignment();
+  expect(client.getState().session?.reassignmentRequiresSignIn).toBe(true);
+  await client.signOut();
+  api.current = sessionFixture(now, original.account.id);
+  await client.signIn("grace.okon", "fictional");
+  expect(client.getState().session?.captureContextId).not.toBe(
+    original.captureContextId,
+  );
+  expect(client.getState().session?.reassignmentRequiresSignIn).toBe(false);
+});
+it.each([false, true])(
+  "I-06 a delayed assignment response cannot mark a newer context (other account: %s)",
+  async (otherAccount) => {
+    await client.signIn("grace.okon", "fictional");
+    const original = structuredClone(client.getState().session!);
+    let release!: (value: ConfiguredAssignment) => void;
+    api.configuredAssignment = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    const pending = client.configuredAssignment();
+    const denied = expect(pending).rejects.toMatchObject({
+      code: "account_changed",
+    });
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+    const other = makeClient();
+    await other.initialize();
+    await other.signOut();
+    api.current = sessionFixture(
+      now,
+      otherAccount ? v7() : original.account.id,
+    );
+    await other.signIn("favour.test", "fictional");
+    const fresh = structuredClone(other.getState().session!);
+    release(changedAssignment(original));
+    await denied;
+    expect((await db.windows.get(fresh.account.id))?.session).toEqual(fresh);
+    expect(other.getState().session).toEqual(fresh);
+    expect(fresh.reassignmentRequiresSignIn).toBe(false);
+  },
+);
+it("I-05 an assignment response for an unexpected acknowledged assignment never persists a warning", async () => {
+  await client.signIn("grace.okon", "fictional");
+  const original = structuredClone(client.getState().session!);
+  api.configuredAssignment = async () => ({
+    ...changedAssignment(original),
+    acknowledgedAssignmentId: v7(),
+  });
+  await expect(client.configuredAssignment()).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+  expect((await db.windows.get(original.account.id))?.session).toEqual(
+    original,
+  );
 });
 it("WHR-77 a background check preserves the active restricted generation and in-flight completion", async () => {
   const response = restricted();

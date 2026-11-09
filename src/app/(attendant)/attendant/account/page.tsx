@@ -17,7 +17,7 @@ import {
   message,
 } from "../_components/runtime";
 function Account() {
-  const { client, state, online } = useAttendant();
+  const { client, state, online, reassignmentRequiresSignIn } = useAttendant();
   const { rows } = useOwnSales();
   const router = useRouter();
   const session = state!.session!;
@@ -52,8 +52,12 @@ function Account() {
     };
   }, [client, online, session.captureContextId, session.serverTime, retry]);
   const changed =
-    configured?.reassignmentRequiresSignIn ??
-    session.reassignmentRequiresSignIn;
+    reassignmentRequiresSignIn ||
+    session.reassignmentRequiresSignIn ||
+    !!configured?.reassignmentRequiresSignIn;
+  const newAssignment = configured?.reassignmentRequiresSignIn
+    ? configured.configured
+    : undefined;
   const pendingPumps = new Map<string, number>();
   for (const row of rows ?? [])
     if (needsUpload(row))
@@ -67,6 +71,8 @@ function Account() {
       title="Your account"
       context="This account is assigned to one pump."
       active="Account"
+      assignmentChanged={changed}
+      configuredAssignment={newAssignment}
       action={
         changed ? (
           <>
@@ -81,17 +87,6 @@ function Account() {
         ) : undefined
       }
     >
-      {changed && (
-        <Notice tone="warning">
-          <b>
-            {configured
-              ? `New pump assigned: ${configured.configured.pump.name} · ${productName[configured.configured.product.code]}.`
-              : "Your pump assignment has changed."}
-          </b>{" "}
-          Sign out and sign in online with your own account before using the new
-          pump. Pending sales keep their original details.
-        </Notice>
-      )}
       <div className="wr-card wr-quiet wr-person">
         <span className="wr-avatar wr-person-icon">
           <UserRound aria-hidden />
@@ -125,11 +120,11 @@ function Account() {
               label: changed ? "Current pump" : "Assigned pump",
               value: `${pumpName(session.pump.code)} · ${productName[session.product.code]}`,
             },
-            ...(changed && configured
+            ...(newAssignment
               ? [
                   {
                     label: "New assignment",
-                    value: `${configured.configured.pump.name} · ${productName[configured.configured.product.code]}`,
+                    value: `${newAssignment.pump.name} · ${productName[newAssignment.product.code]}`,
                   },
                 ]
               : []),

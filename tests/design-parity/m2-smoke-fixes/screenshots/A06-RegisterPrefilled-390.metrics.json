@@ -1,0 +1,14 @@
+{
+  "viewport": 390,
+  "documentWidth": 390,
+  "rootWidth": 390,
+  "bodyFont": "\"IBM Plex Sans\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+  "focus": {
+    "tag": "INPUT",
+    "width": "2px",
+    "style": "solid",
+    "color": "rgb(15, 76, 129)"
+  },
+  "notices": [],
+  "shortTargets": []
+}
