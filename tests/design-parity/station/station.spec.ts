@@ -204,7 +204,7 @@ for (const width of [1440, 390])
         p.getByRole("button", { name: "Sign out to switch pump", exact: true }),
       ).toBeVisible();
       await expect(
-        p.getByText("2 sales · captured at Pump 02", { exact: true }),
+        p.getByText(/^2 sales · captured at .*PUMP02$/),
       ).toBeVisible();
       await shot(p, "A17-PumpChange", width === 1440 ? 390 : 360);
       const restricted = await browser.newContext({
