@@ -1,0 +1,31 @@
+{
+  "viewport": 390,
+  "documentWidth": 390,
+  "sheetWidth": 358,
+  "notices": [
+    {
+      "text": "The service is unavailable. Retry the same request; do not assume it failed.",
+      "width": 316,
+      "background": "rgb(251, 227, 224)"
+    },
+    {
+      "text": "The result is uncertain. Retry the same confirmation to retrieve its original result. Do not start another change.",
+      "width": 316,
+      "background": "rgb(253, 240, 204)"
+    }
+  ],
+  "targets": [
+    {
+      "text": "Retry same confirmation",
+      "width": 316,
+      "height": 48,
+      "disabled": false
+    },
+    {
+      "text": "Cancel",
+      "width": 316,
+      "height": 48,
+      "disabled": true
+    }
+  ]
+}

@@ -10,7 +10,7 @@ The new browser regression `I-20 committed PDF preparation followed by 502 HTML 
 
 Against unchanged client source `170f9e9e80408ca2667474e20f0275954a665390`, the targeted Linux Chromium run reported **1 failed, 0 passed, zero retries**. It failed at `tests/e2e/customers-cards.spec.ts:1027`: expected zero “The result could not be verified” notices, received one. `adminRequest` attempts JSON decoding before checking HTTP success, so unreadable non-OK bodies become `invalid_response`. This is distinct from the existing valid-success receipt/schema/MIME/signature validation, which remains required.
 
-The producer requires unavailable copy with “do not assume it failed”, the existing uncertain/same-confirmation notice, disabled cancellation and no fresh-export review before reconciliation. Retrying must preserve the exact operation/body and server export ID, leave exactly one unchanged snapshot, and retain Generated/version-1 inventory. The existing malformed successful JSON/null regressions remain unchanged. Green verification waits for the separately built client fix; no production code was written by this checker.
+The producer requires unavailable copy with “do not assume it failed”, the existing uncertain/same-confirmation notice, disabled cancellation and no fresh-export review before reconciliation. Retrying must preserve the exact operation/body and server export ID, leave exactly one unchanged snapshot, and retain Generated/version-1 inventory. The existing malformed successful JSON/null regressions remain unchanged. No production code was written by this checker.
 
 Red command, with app and test runner together in a fresh local Linux container:
 
@@ -19,6 +19,16 @@ docker exec -w /app -e DATABASE_URL=postgresql://whr:whr@127.0.0.1:5433/whr_app6
 ```
 
 The runner uses `whr-upload-browser:lean`, a tracked `git archive` of the unchanged source plus only the new test file, locked dependency installation, the existing loopback-only Compose proxy, and a successful `pnpm build`. `/full-config.mts` imports the repository base and customers/cards configs, uses their real fixture setup and environment, and changes only server startup to reuse the production artifact (`pnpm start --hostname 127.0.0.1`). Host typecheck and scoped ESLint passed. No assertion, timeout or retry policy was weakened.
+
+### Green verification
+
+After integrating the separate client fix at `0abbf49e255a2fcd10c38f4c3a7712c21aea90c3`, the checker refreshed the Linux runner from an exact tracked-source archive and rebuilt production successfully. **8 passed, 0 failed, 0 skipped, zero retries (16.1 seconds)** across normal desktop and attendant projects, two workers. The eight cases are the new committed-prepare/502-HTML/replay regression, nominal real PDF/XLSX downloads with independent PDF QR decoding, and the retained successful truncated-JSON/null-envelope regressions, each in both projects.
+
+```sh
+docker exec -w /app -e DATABASE_URL=postgresql://whr:whr@127.0.0.1:5433/whr_app6_s02_502_green whr-app6a-s02-red pnpm exec playwright test --config /full-config.mts --grep 'committed PDF preparation followed by 502 HTML|malformed successful export|I-20 prepared PDF and XLSX downloads' --workers=2 --retries=0 --reporter=line
+```
+
+The new plain unavailable message and unchanged uncertain-operation controls passed, then the original request/body and server ID reconciled exactly once with unchanged ten-item snapshot, Generated/version-1 batch and reserved inventory. Existing successful-response validation remains intact. A separate 390-pixel screenshot check passed **1/1 (3.3 seconds)**: document width 390, preparation sheet width 358, both retry/cancel controls 48 pixels high, no overflow. Screenshot and metrics are in `tests/design-parity/m2-smoke-fixes/`; its report records the approved added state. This proves the local client classification/retry fix, not the proposed historical edge/deploy cause. EM full final-head gates and independent review remain separate.
 
 ## Initial normal-response matrix results
 

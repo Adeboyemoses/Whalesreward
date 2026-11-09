@@ -10,7 +10,7 @@ const server = base.webServer as {
 export default defineConfig({
   ...base,
   testDir: ".",
-  testMatch: "capture.spec.ts",
+  testMatch: ["capture.spec.ts", "export-unavailable.spec.ts"],
   globalSetup: "../../customers-cards/setup.ts",
   use: {
     ...base.use,

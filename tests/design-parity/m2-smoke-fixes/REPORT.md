@@ -41,3 +41,19 @@ DATABASE_URL=postgresql://whr:whr@127.0.0.1:5433/whr_app6_m2_parity WHR_USE_BUIL
 ```
 
 The first capture run had one checker failure: an exact “Uploads” accessible-name locator ignored the genuine “2 pending uploads” badge. Selecting the known route inside Main navigation corrected that locator; no assertion, timeout or retry count was relaxed. Earlier producer TypeScript errors (tuple inference and inherited web-server union) were corrected before the successful typecheck/build. No production source changed during either correction.
+
+## Resumed s02 unavailable notice
+
+Checked client fix `0abbf49e255a2fcd10c38f4c3a7712c21aea90c3` against the same local production build used for the eight passing normal/502/malformed-success browser regressions. Additional screenshot producer: **1 passed, 0 failed, 0 skipped, zero retries (3.3 seconds)**, Linux Chromium at 390 pixels and device scale factor 2. It fetches an actual committed 202 PDF preparation for ten fictional Generated/version-1 cards before substituting a 502 HTML transport response. This is an approved added error state without a dedicated board.
+
+| Board/state | Match | Differences | Severity |
+|---|---|---|---|
+| [s02 unavailable preparation](screenshots/s02-ExportUnavailable-390.built.png) | Approved added state | Existing red Notice explains service unavailable and original-request retry; existing yellow Notice preserves uncertainty and forbids a second change. Generated/version-1 review remains visible. Retry same confirmation is active; Cancel remains disabled. No could-not-be-verified copy. | note |
+
+The document measures 390 pixels, sheet 358 pixels and notices 316 pixels; both action targets measure 316×48 pixels. Notice colours remain existing danger `rgb(251, 227, 224)` and warning `rgb(253, 240, 204)`. Copy wraps within the card with no overflow; the screenshot is deliberately scrolled to the full preparation card. The subsequent wide history table keeps its existing internal scroll geometry. No new blocking drift found.
+
+Native-Linux command after a successful production build, using the existing local Compose proxy and isolated fictional database:
+
+```sh
+DATABASE_URL=postgresql://whr:whr@127.0.0.1:5433/whr_app6_s02_502_green WHR_USE_BUILT_APP=1 pnpm exec playwright test --config tests/design-parity/m2-smoke-fixes/playwright.config.ts --grep 's02 unavailable PDF preparation notice' --retries=0 --reporter=line
+```
