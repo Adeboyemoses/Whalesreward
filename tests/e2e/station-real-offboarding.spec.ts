@@ -22,6 +22,10 @@ test.use({
     ],
   },
 });
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "wait" });
+});
+
 async function reviewEnd(page: Page, id: string, reason: string) {
   await page.goto(`/admin/attendants/${id}/end`);
   await page.getByLabel(/Reason/).fill(reason);

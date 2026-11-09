@@ -12,6 +12,10 @@ import { installAssignmentEndFake } from "../station/assignment-end-fake";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "wait" });
+});
+
 test("I-04 station pump creation derives its product and cancellation creates nothing", async ({
   page,
 }) => {
@@ -208,9 +212,16 @@ test("I-05 reviewed reassignment keeps the personal identity and closes the orig
     await expect(
       page.getByText("Fictional pump maintenance", { exact: true }),
     ).toBeVisible();
+    const applied = page.waitForResponse(
+      (r) =>
+        /\/api\/admin\/attendants\/[^/]+\/assignment$/.test(
+          new URL(r.url()).pathname,
+        ) && r.request().method() === "POST",
+    );
     await page
       .getByRole("button", { name: "Confirm assignment", exact: true })
       .click();
+    expect((await applied).status()).toBe(200);
     await expect(
       page.getByText("Fresh online sign-in required", { exact: false }).first(),
     ).toBeVisible();
@@ -316,6 +327,7 @@ test("I-07 prices-only pump configuration never reads attendant identities", asy
     await expect(
       page.getByRole("heading", { name: "Station pumps", exact: true }),
     ).toBeVisible();
+    await expect(page.getByRole("table")).toBeVisible();
     await expect(page.getByText("Grace Okon", { exact: true })).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Add pump", exact: true }),
@@ -354,9 +366,16 @@ test("I-07 pumps-only assignment uses narrow candidates without broad account re
     await page
       .getByRole("button", { name: "Review assignment", exact: true })
       .click();
+    const applied = page.waitForResponse(
+      (r) =>
+        /\/api\/admin\/attendants\/[^/]+\/assignment$/.test(
+          new URL(r.url()).pathname,
+        ) && r.request().method() === "POST",
+    );
     await page
       .getByRole("button", { name: "Confirm assignment", exact: true })
       .click();
+    expect((await applied).status()).toBe(200);
     await expect(
       page.getByText("Fresh online sign-in required", { exact: false }).first(),
     ).toBeVisible();

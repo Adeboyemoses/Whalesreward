@@ -3,7 +3,13 @@ import { mkdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { v7 } from "uuid";
-import { stationFixture, seedId, attendantSignIn } from "../../station/helpers";
+import {
+  stationFixture,
+  seedId,
+  attendantSignIn,
+  api,
+  type Attendant,
+} from "../../station/helpers";
 import { fillSale, save, waitForWorker } from "../../fixtures/offline-browser";
 
 async function shot(page: Page, id: string, width: number) {
@@ -43,6 +49,16 @@ for (const width of [1440, 390])
     });
     const p = await phone.newPage();
     try {
+      const old = await api<Attendant>(page.request, `attendants/${seedId(6)}`);
+      if (old.assignment?.pump.id !== seedId(14))
+        await api(page.request, `attendants/${old.id}/assignment`, {
+          operationId: v7(),
+          expectedVersion: old.version,
+          expectedAssignmentId: old.assignment?.id ?? null,
+          pumpId: seedId(14),
+          expectedPumpVersion: 1,
+          reason: "Fictional second-viewport setup",
+        });
       await f.db.query(
         "UPDATE auth_user SET must_change_password=false WHERE id=$1",
         [seedId(3)],
@@ -70,6 +86,11 @@ for (const width of [1440, 390])
       await waitForWorker(p);
       await fillSale(p, { value: "20000.00" });
       await phone.setOffline(true);
+      await save(p);
+      await p
+        .getByRole("button", { name: "Record next sale", exact: true })
+        .click();
+      await fillSale(p, { value: "10000.00" });
       await save(p);
       await page.goto("/admin/pumps");
       await expect(
@@ -134,9 +155,8 @@ for (const width of [1440, 390])
         .getByLabel("Assign pump", { exact: true })
         .selectOption(seedId(17));
       await shot(page, "D02-CreateAttendant", width);
-      await page
-        .getByLabel("Password", { exact: true })
-        .fill(randomBytes(20).toString("hex"));
+      const temporary = randomBytes(20).toString("hex");
+      await page.getByLabel("Password", { exact: true }).fill(temporary);
       await page
         .getByRole("button", { name: "Create account", exact: true })
         .click();
@@ -145,6 +165,7 @@ for (const width of [1440, 390])
         page.getByText("Attendant created.", { exact: true }),
       ).toBeVisible();
       await shot(page, "D04-AttendantCreated", width);
+      const createdId = new URL(page.url()).pathname.split("/").at(-1)!;
       await page.goto(`/admin/attendants/${seedId(6)}`);
       await expect(
         page.getByRole("heading", { name: "Grace Okon", exact: true }),
@@ -178,6 +199,66 @@ for (const width of [1440, 390])
         p.getByRole("button", { name: "Sign out to switch pump", exact: true }),
       ).toBeVisible();
       await shot(p, "A17-PumpChange", width === 1440 ? 390 : 360);
+      const restricted = await browser.newContext({
+        baseURL: "http://127.0.0.1:3000",
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 2,
+      });
+      const rp = await restricted.newPage();
+      try {
+        await attendantSignIn(rp, username, temporary);
+        await expect(
+          rp.getByRole("heading", {
+            name: "Change your first password",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await shot(
+          rp,
+          "FirstPassword-contract-state",
+          width === 1440 ? 390 : 360,
+        );
+        await page.goto(`/admin/attendants/${createdId}/end`);
+        await page
+          .getByLabel(/Reason/)
+          .fill("Fictional parity assignment ending");
+        await shot(page, "P21-EndReason", width);
+        await page
+          .getByRole("button", { name: "Review end assignment", exact: true })
+          .click();
+        await expect(
+          page.getByRole("button", {
+            name: "Confirm end assignment",
+            exact: true,
+          }),
+        ).toBeVisible();
+        await shot(page, "P21-EndReview", width);
+        await page
+          .getByRole("button", { name: "Confirm end assignment", exact: true })
+          .click();
+        await expect(
+          page.getByText("Assignment ended.", { exact: true }),
+        ).toBeVisible();
+        await shot(page, "P21-EndResult", width);
+        await rp.reload();
+        await expect(
+          rp.getByRole("heading", { name: "Sign in", exact: true }),
+        ).toBeVisible();
+        await attendantSignIn(rp, username, temporary);
+        await expect(
+          rp.getByText(
+            "Sign-in is unavailable. Ask a station manager for help.",
+            { exact: true },
+          ),
+        ).toBeVisible();
+        await shot(
+          rp,
+          "NoAssignment-contract-state",
+          width === 1440 ? 390 : 360,
+        );
+      } finally {
+        await restricted.close();
+      }
     } finally {
       await phone.close();
       await f.db.end();
