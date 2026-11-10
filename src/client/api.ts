@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { observeServerBuild, UPDATE_MESSAGE } from "./sw/build-id";
 import { connection } from "./offline/connection";
 import {
   ClientError,
@@ -89,6 +90,14 @@ export class HttpAttendantApi implements AttendantApi {
     // Even a denial or server error proves transport worked. Authorization below
     // still consumes the original response; no short connectivity deadline aborts it.
     outcome(true);
+    const buildChanged = observeServerBuild(
+      response.headers.get("x-whr-build"),
+    );
+    const malformed = (message: string) =>
+      new ClientError(
+        buildChanged ? "app_update_required" : "invalid_response",
+        buildChanged ? UPDATE_MESSAGE : message,
+      );
     const retryAfterMs = readRetryAfter(response);
     if (metadata) metadata.retryAfterMs = retryAfterMs;
     if (response.status === 204 && schema === null) return undefined as T;
@@ -96,8 +105,7 @@ export class HttpAttendantApi implements AttendantApi {
     try {
       json = await response.json();
     } catch {
-      throw new ClientError(
-        "invalid_response",
+      throw malformed(
         "The service returned an unreadable response. Try again.",
       );
     }
@@ -111,6 +119,8 @@ export class HttpAttendantApi implements AttendantApi {
           }),
         })
         .safeParse(json);
+      if (!parsed.success && buildChanged)
+        throw malformed("Unexpected service response.");
       const code =
         parsed.success && ERROR_CODES.has(parsed.data.error.code)
           ? parsed.data.error.code
@@ -137,8 +147,7 @@ export class HttpAttendantApi implements AttendantApi {
         parsed.success && parsed.data.error.retryable,
       );
     }
-    if (!schema)
-      throw new ClientError("invalid_response", "Unexpected service response.");
+    if (!schema) throw malformed("Unexpected service response.");
     const result = z
       .strictObject({
         data: schema,
@@ -147,10 +156,7 @@ export class HttpAttendantApi implements AttendantApi {
       })
       .safeParse(json);
     if (!result.success)
-      throw new ClientError(
-        "invalid_response",
-        "The service returned an invalid response. Try again.",
-      );
+      throw malformed("The service returned an invalid response. Try again.");
     return result.data.data;
   }
   signIn(

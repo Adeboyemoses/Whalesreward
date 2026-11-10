@@ -9,6 +9,10 @@ import {
   Notice,
   PhotoCapture,
 } from "@/ui";
+import {
+  markCaptureEnded,
+  markCaptureStarted,
+} from "@/client/sw/update-safety";
 import { HttpRegistrationApi } from "@/client/registration-api";
 import { ClientError } from "@/client/types";
 import { parseNaira, parseKobo, formatNaira } from "@/shared/money";
@@ -77,6 +81,7 @@ function Sale() {
             setDraft(next);
             const pending = handoff.take(next.session);
             if (pending) {
+              markCaptureStarted();
               const generation = ++request.current;
               setCard(pending.cardCode);
               setFinding(true);
@@ -120,6 +125,7 @@ function Sale() {
     return () => {
       live = false;
       mounted.current = false;
+      markCaptureEnded();
     };
   }, [client, accountId, contextId, handoff]);
   useEffect(() => {
