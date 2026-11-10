@@ -4,6 +4,7 @@ import {
   fillRegistration,
 } from "../customers-cards/helpers";
 import { ensureLocalCardBucket } from "../customers-cards/storage";
+import { installLocalStorageBridge } from "../fixtures/local-storage-bridge";
 
 test.use({
   trace: "off",
@@ -22,6 +23,7 @@ test("P-23 s06+s08 real register then sell preserves evidence and credits once",
   page,
 }) => {
   await ensureLocalCardBucket();
+  await installLocalStorageBridge(page);
   const f = await registrationFixture(page);
   try {
     await page.goto("/attendant/register");

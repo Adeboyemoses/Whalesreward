@@ -163,6 +163,7 @@ export async function installSyncFake(
           "medium",
           "entry",
           "photo",
+          ...(Object.hasOwn(body, "lookupReceipt") ? ["lookupReceipt"] : []),
         ].sort(),
       );
       const original = body as OriginalSale;
