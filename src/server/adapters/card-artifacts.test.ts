@@ -80,3 +80,42 @@ it.each([
 ])("rejects invalid endpoints %s", (endpoint) => {
   expect(() => createCardArtifactStorage({ ...config, endpoint })).toThrow();
 });
+it("bounds a hung response body even when the stream ignores abort and destroys it", async () => {
+  vi.useFakeTimers();
+  const destroy = vi.fn();
+  fake.send.mockResolvedValue({
+    Body: {
+      destroy,
+      [Symbol.asyncIterator]() {
+        return { next: () => new Promise(() => {}) };
+      },
+    },
+  });
+  try {
+    const outcome = createCardArtifactStorage(config)
+      .read("final/card-exports/abc123", 100)
+      .catch((error) => error.code);
+    await vi.advanceTimersByTimeAsync(5001);
+    expect(await outcome).toBe("temporarily_unavailable");
+    expect(destroy).toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("bounds a hung write even when transport ignores abort", async () => {
+  vi.useFakeTimers();
+  fake.send.mockImplementation(() => new Promise(() => {}));
+  try {
+    const outcome = createCardArtifactStorage(config)
+      .write(
+        "final/card-exports/abc123",
+        new Uint8Array([1]),
+        "application/pdf",
+      )
+      .catch((error) => error.code);
+    await vi.advanceTimersByTimeAsync(5001);
+    expect(await outcome).toBe("temporarily_unavailable");
+  } finally {
+    vi.useRealTimers();
+  }
+});

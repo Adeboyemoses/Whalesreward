@@ -12,23 +12,8 @@ import {
   dependencies,
   type PermissionCode,
 } from "../../../shared/contracts/admin";
-export async function transaction<T>(
-  pool: pg.Pool,
-  run: (db: pg.PoolClient) => Promise<T>,
-): Promise<T> {
-  const db = await pool.connect();
-  try {
-    await db.query("BEGIN");
-    const r = await run(db);
-    await db.query("COMMIT");
-    return r;
-  } catch (e) {
-    await db.query("ROLLBACK");
-    throw e;
-  } finally {
-    db.release();
-  }
-}
+import { transaction } from "../../lib/transaction";
+export { transaction };
 export { securityLock } from "../../lib/security-lock";
 export type LiveAdmin = {
   id: string;

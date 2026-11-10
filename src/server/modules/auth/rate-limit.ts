@@ -1,3 +1,4 @@
+import { transaction } from "../../lib/transaction";
 import type pg from "pg";
 import { AuthError } from "./errors";
 import { hmac } from "./crypto";
@@ -7,10 +8,8 @@ export async function consumeLimits(
   secret: string,
   limits: { key: string; capacity: number }[],
 ) {
-  const db = await pool.connect();
   let retryAfter = 0;
-  try {
-    await db.query("BEGIN");
+  await transaction(pool, async (db) => {
     // Deterministic ordering prevents deadlocks when dimensions overlap.
     for (const limit of limits
       .map((l) => ({ ...l, key: hmac(secret, "rate-v1", l.key) }))
@@ -31,12 +30,6 @@ export async function consumeLimits(
       if (Number(result.rows[0]!.remaining) < 1)
         retryAfter = Math.max(retryAfter, result.rows[0]!.retry, 1);
     }
-    await db.query("COMMIT");
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  } finally {
-    db.release();
-  }
+  });
   if (retryAfter) throw new AuthError("rate_limited", 429, retryAfter);
 }

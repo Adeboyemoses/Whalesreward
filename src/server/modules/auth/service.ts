@@ -1,3 +1,4 @@
+import { transaction } from "../../lib/transaction";
 import type pg from "pg";
 import { APIError } from "better-auth/api";
 import type {
@@ -16,23 +17,6 @@ import { requireSession } from "../../lib/authz";
 import { consumeLimits } from "./rate-limit";
 
 type Config = { secret: string; origin: string };
-async function transaction<T>(
-  pool: pg.Pool,
-  run: (db: pg.PoolClient) => Promise<T>,
-): Promise<T> {
-  const db = await pool.connect();
-  try {
-    await db.query("BEGIN");
-    const result = await run(db);
-    await db.query("COMMIT");
-    return result;
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  } finally {
-    db.release();
-  }
-}
 type ConfiguredResult = { session: AttendantSession; token: string };
 type HttpResult = {
   session: AttendantSession | RestrictedAttendantSession;
