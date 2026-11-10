@@ -72,3 +72,17 @@ Regression evidence:
 Builder checks: typecheck and lint passed; unit 529/529 passed; complete cards integration 48/48 passed; after strengthening late-write assertions the six WHR-97 integration cases passed again (19.55 s); production build passed. Full migrated integration had 344 passed, one failed and 39 skipped solely because MinIO at localhost:9000 was unavailable (offboarding evidence write and sync suite setup). EM final-head verification and independent code/security/integrity review remain required.
 
 Escape gotcha: never await external storage while holding the global admin authority lock; deadline the whole body and re-authorize after I/O. The agent file is sandbox-protected, so this gotcha is recorded here for EM handling rather than editing `.codex`.
+
+## Review round 1: shared transaction timeout cleanup
+
+The code reviewer found a P0 in the first fix: the bounded request pool is shared by sync and auth, but only the admin transaction helper handled client/idle timeouts safely. The sync helper, auth service helper and manual rate-limit transaction could return a still-running/aborted connection to the pool; an idle-transaction termination could emit an unhandled client error.
+
+Red regression on that head: actual sync, auth `getSession`, and rate-limit `consumeLimits` each retained one pooled connection after a client read timeout (expected zero). Three failed, one passed, two skipped. This independently reproduces the review finding; the original hung-storage regression remains intact.
+
+All four transaction consumers now use `src/server/lib/transaction.ts`. Admin and sync retain their existing export APIs. The auth limiter still commits consumed dimensions before throwing `rate_limited`, exactly as before. A repository audit found no other production `pool.connect()` / explicit BEGIN sites under `src/server` outside this shared helper.
+
+Green: eight real-PostgreSQL timeout tests cover client and idle termination through admin, sync, auth session lookup and rate limiting. Actual auth/rate callers receive a controlled idle gap after BEGIN, causing the server to terminate the idle client; the shared handler prevents an unhandled process error and discards it. Every caller recovers on a fresh connection. A denied multi-dimension limit request still commits consumption of its otherwise-available dimension, proved by rejection of the subsequent request to that dimension.
+
+Also fixed P2 in the storage-lock diagnostic: it records duration when the waiting query resolves, before the intentional two-second observation sleep. The sleep no longer appears as lock time after the source fix.
+
+Builder verification after this round: typecheck and lint passed; unit 529/529 passed; full migrated integration with local MinIO 390/390 passed (24.08 s); production build passed. The corrected diagnostic reported no lock waiters and a 1 ms security-lock query while the storage write remained held for the two-second observation window. EM final-head gates and round-2 independent verdicts remain required. No timeout was removed or relaxed, no auth/sync policy changed, and no cloud resource was touched.

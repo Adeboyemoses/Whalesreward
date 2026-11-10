@@ -4,23 +4,7 @@ import { digest } from "../auth/crypto";
 import { AuthError } from "../auth/errors";
 import { SyncError } from "./errors";
 import type { SaleStatus } from "../../../shared/contracts/sync";
-export async function transaction<T>(
-  pool: pg.Pool,
-  run: (db: pg.PoolClient) => Promise<T>,
-): Promise<T> {
-  const db = await pool.connect();
-  try {
-    await db.query("BEGIN");
-    const result = await run(db);
-    await db.query("COMMIT");
-    return result;
-  } catch (e) {
-    await db.query("ROLLBACK");
-    throw e;
-  } finally {
-    db.release();
-  }
-}
+export { transaction } from "../../lib/transaction";
 export async function authority(
   db: pg.PoolClient,
   token: string | undefined,

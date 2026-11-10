@@ -43,9 +43,9 @@ try {
       }),
     ]);
     const start = Date.now();
-    const waiting = pool.query(
-      "SELECT id FROM security_state WHERE id=true FOR UPDATE",
-    );
+    const waiting = pool
+      .query("SELECT id FROM security_state WHERE id=true FOR UPDATE")
+      .then(() => Date.now() - start);
     await new Promise((r) => setTimeout(r, 2000));
     console.log(
       JSON.stringify({
@@ -57,10 +57,10 @@ try {
       }),
     );
     release();
-    await waiting;
+    const securityLockWaitMs = await waiting;
     console.log(
       JSON.stringify({
-        securityLockWaitMs: Date.now() - start,
+        securityLockWaitMs,
         preparation: await preparation,
       }),
     );
