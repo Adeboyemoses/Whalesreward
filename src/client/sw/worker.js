@@ -1,3 +1,4 @@
+import { installHandover } from "./handover.js";
 import {
   precacheAndRoute,
   matchPrecache,
@@ -47,3 +48,5 @@ registerRoute(
   },
 );
 // No runtime asset/API caching, background sync, personal responses or IndexedDB deletion.
+
+installHandover(self);

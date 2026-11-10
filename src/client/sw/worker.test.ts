@@ -22,6 +22,7 @@ describe("generic attendant navigation deadline", () => {
     vi.useFakeTimers();
     vi.stubGlobal("self", {
       __WB_MANIFEST: [],
+      addEventListener: vi.fn(),
       location: { origin: "https://fixture.example" },
     });
     vi.stubGlobal("fetch", () => new Promise<Response>(() => {}));
@@ -49,6 +50,7 @@ describe("generic attendant navigation deadline", () => {
     vi.useFakeTimers();
     vi.stubGlobal("self", {
       __WB_MANIFEST: [],
+      addEventListener: vi.fn(),
       location: { origin: "https://fixture.example" },
     });
     vi.stubGlobal("fetch", async () => new Response(new ReadableStream()));
@@ -70,6 +72,7 @@ describe("generic attendant navigation deadline", () => {
   it("preserves a received HTTP denial rather than falling back over it", async () => {
     vi.stubGlobal("self", {
       __WB_MANIFEST: [],
+      addEventListener: vi.fn(),
       location: { origin: "https://fixture.example" },
     });
     vi.stubGlobal("fetch", async () => new Response("Denied", { status: 403 }));
@@ -89,6 +92,7 @@ describe("generic attendant navigation deadline", () => {
 it("serves only the generic registration shell offline and never intercepts phone lookup APIs", async () => {
   vi.stubGlobal("self", {
     __WB_MANIFEST: [],
+    addEventListener: vi.fn(),
     location: { origin: "https://fixture.example" },
   });
   vi.stubGlobal("fetch", async () => {

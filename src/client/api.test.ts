@@ -212,3 +212,29 @@ describe("M2 attendant restricted access", () => {
     });
   });
 });
+
+describe("build mismatch", () => {
+  it.each(["session", "signIn"] as const)(
+    "explains a newer server shape for %s",
+    async (method) => {
+      const response = reply({ unknownNewState: true });
+      response.headers.set("x-whr-build", "new-server-build");
+      const api = new HttpAttendantApi(async () => response);
+      await expect(
+        method === "session"
+          ? api.session()
+          : api.signIn(
+              {
+                username: "grace.okon",
+                password: "fictional",
+                deviceId: uuidv7(),
+              },
+              uuidv7(),
+            ),
+      ).rejects.toMatchObject({
+        code: "app_update_required",
+        message: "A newer version is ready. Reload to continue.",
+      });
+    },
+  );
+});

@@ -68,6 +68,7 @@ export function message(error: unknown): string {
     : "Something went wrong. Please try again.";
 }
 export function AttendantProvider({ children }: { children: ReactNode }) {
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const saleHandoff = useRef<SaleHandoff | null>(null);
   const registrationHandoff = useRef<RegistrationHandoff | null>(null);
   const [handoff] = useState(() => ({
@@ -106,6 +107,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const client = getAttendantClient();
     let active = true;
+    let stopWorker = () => {};
     let initialized = false;
     let probing = false;
     let refreshingAssignment = false;
@@ -168,7 +170,12 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
       initialized = true;
       update();
       if (navigator.onLine) void client.refresh().then(update, fail);
-      void registerAttendantWorker().catch(fail);
+      void registerAttendantWorker(setUpdateMessage)
+        .then((stop) => {
+          if (active) stopWorker = stop;
+          else stop();
+        })
+        .catch(fail);
     })().catch(fail);
     const network = () => {
       connection.browserChanged();
@@ -221,6 +228,7 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", resume);
     return () => {
       active = false;
+      stopWorker();
       unsubscribe();
       unsubscribeConnection();
       stopSync();
@@ -234,6 +242,22 @@ export function AttendantProvider({ children }: { children: ReactNode }) {
   return (
     <RuntimeContext.Provider value={runtime}>
       <SaleHandoffContext.Provider value={handoff}>
+        {updateMessage && (
+          <Notice role="status">
+            {updateMessage}{" "}
+            <Button
+              onClick={() =>
+                window.dispatchEvent(new Event("whr-request-update"))
+              }
+            >
+              Reload when safe
+            </Button>
+            <p>
+              Finish recording and upload pending sales first. Other open
+              attendant tabs must also be idle.
+            </p>
+          </Notice>
+        )}
         {children}
       </SaleHandoffContext.Provider>
     </RuntimeContext.Provider>
@@ -390,7 +414,7 @@ export function AccessGate({
   children: ReactNode;
   allowExpired?: boolean;
 }) {
-  const { state, error } = useAttendant();
+  const { client, state, error } = useAttendant();
   const router = useRouter();
   useEffect(() => {
     if (
@@ -410,7 +434,9 @@ export function AccessGate({
     return (
       <Frame title="Whales Rewards" noNav>
         <Notice role="status">{error ?? "Checking access…"}</Notice>
-        {error && <Button onClick={() => location.reload()}>Try again</Button>}
+        {error && (
+          <Button onClick={() => void client?.refresh()}>Try again</Button>
+        )}
       </Frame>
     );
   return (
