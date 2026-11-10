@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { cardStorageDeadline } from "../../adapters/card-storage-deadline";
 import { createHash, randomBytes } from "node:crypto";
 import { transaction } from "../admin-access/repo";
 import {
@@ -118,6 +119,25 @@ export async function prepareCardExport(
       throw new Error("Artifact size invalid");
     const sha = createHash("sha256").update(rendered.bytes).digest("hex"),
       key = `final/card-exports/${randomBytes(32).toString("hex")}`;
+    // Verify the claim before uploading, but never hold database authority across I/O.
+    const current = await transaction(pool, async (db) => {
+      await securityLock(db);
+      const row = (
+        await db.query(
+          "SELECT id FROM card_export WHERE id=$1 AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp() FOR UPDATE",
+          [claim.id, claim.nonce, claim.fence],
+        )
+      ).rows[0];
+      if (!row) return false;
+      if (!(await creatorAllowed(db, claim.creator!)))
+        throw new Error("Creator authority revoked");
+      return true;
+    });
+    if (!current) return { processed: true, delivered: false };
+    // A late ignored-abort write can only leave this random, unpublished orphan.
+    await cardStorageDeadline((signal) =>
+      options.storage.write(key, rendered.bytes, rendered.contentType, signal),
+    );
     const delivered = await transaction(pool, async (db) => {
       await securityLock(db);
       const row = (
@@ -129,8 +149,6 @@ export async function prepareCardExport(
       if (!row) return false;
       if (!(await creatorAllowed(db, claim.creator!)))
         throw new Error("Creator authority revoked");
-      // Random key per lease: a stale renderer can only leave an unreachable orphan.
-      await options.storage.write(key, rendered.bytes, rendered.contentType);
       const lifetime =
         options.artifactLifetimeMs ?? CARD_POLICY.artifactLifetimeMs;
       if (!Number.isSafeInteger(lifetime) || lifetime <= 0)
@@ -179,41 +197,51 @@ export async function downloadCardExport(
   exportId: string,
   storage: CardArtifactStorage,
 ) {
-  return transaction(pool, async (db) => {
-    await securityLock(db);
-    const actor = await requireAdminSession(db, token);
-    requirePermission(actor, "cards");
-    requirePermission(actor, "cardExport");
-    const r = (
-      await db.query(
-        "SELECT *,expires_at<=clock_timestamp() AS expired FROM card_export WHERE id=$1 AND batch_id=$2",
-        [exportId, batchId],
-      )
-    ).rows[0];
-    if (!r) throw new AuthError("not_found", 404);
-    if (r.expired || r.status === "expired")
-      throw new AuthError("export_expired", 410);
-    if (r.status === "failed") throw new AuthError("export_failed", 503);
-    if (r.status !== "ready") throw new AuthError("export_not_ready", 409);
-    // The creator's current authority also gates artifacts prepared before revocation.
-    if (!(await creatorAllowed(db, r.created_by)))
-      throw new AuthError("permission_denied", 403);
-    const bytes = await storage.read(
-      r.object_key,
-      CARD_POLICY.maxArtifactBytes,
-    );
-    if (
-      BigInt(bytes.byteLength) !== BigInt(r.byte_size) ||
-      createHash("sha256").update(bytes).digest("hex") !== r.sha256
-    )
-      throw new AuthError("export_failed", 503);
-    return {
-      bytes,
-      contentType:
-        r.format === "pdf"
-          ? "application/pdf"
-          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      filename: `card-batch-${r.batch_code.replace(/[^A-Za-z0-9_-]/g, "_")}-${r.id}.${r.format}`,
-    };
-  });
+  const authorize = () =>
+    transaction(pool, async (db) => {
+      await securityLock(db);
+      const actor = await requireAdminSession(db, token);
+      requirePermission(actor, "cards");
+      requirePermission(actor, "cardExport");
+      const r = (
+        await db.query(
+          "SELECT *,expires_at<=clock_timestamp() AS expired FROM card_export WHERE id=$1 AND batch_id=$2",
+          [exportId, batchId],
+        )
+      ).rows[0];
+      if (!r) throw new AuthError("not_found", 404);
+      if (r.expired || r.status === "expired")
+        throw new AuthError("export_expired", 410);
+      if (r.status === "failed") throw new AuthError("export_failed", 503);
+      if (r.status !== "ready") throw new AuthError("export_not_ready", 409);
+      // The creator's current authority also gates artifacts prepared before revocation.
+      if (!(await creatorAllowed(db, r.created_by)))
+        throw new AuthError("permission_denied", 403);
+      return r;
+    });
+  const initial = await authorize();
+  const bytes = await cardStorageDeadline((signal) =>
+    storage.read(initial.object_key, CARD_POLICY.maxArtifactBytes, signal),
+  );
+  if (
+    BigInt(bytes.byteLength) !== BigInt(initial.byte_size) ||
+    createHash("sha256").update(bytes).digest("hex") !== initial.sha256
+  )
+    throw new AuthError("export_failed", 503);
+  // Recheck live session, grants, creator, expiry and artifact after untrusted I/O.
+  const current = await authorize();
+  if (
+    current.object_key !== initial.object_key ||
+    current.sha256 !== initial.sha256 ||
+    BigInt(current.byte_size) !== BigInt(initial.byte_size)
+  )
+    throw new AuthError("export_failed", 503);
+  return {
+    bytes,
+    contentType:
+      current.format === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    filename: `card-batch-${current.batch_code.replace(/[^A-Za-z0-9_-]/g, "_")}-${current.id}.${current.format}`,
+  };
 }

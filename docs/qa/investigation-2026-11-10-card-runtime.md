@@ -1,5 +1,7 @@
 # WHR-97 runtime investigation
 
+The initial investigation below is historical. See “Hung-storage source fix” for the subsequent reproduced defect and fix.
+
 No staging root cause established yet. Earl's staging logs/Insights are pending. No source fix, instance resize recommendation or READY claim follows from these local results.
 
 Source: staging 4cfcd46 plus investigation plan only. Fictional isolated databases, local Compose PostgreSQL/MinIO; no cloud access or secret-file reads.
@@ -45,3 +47,28 @@ Checks: host production build and typecheck passed; scoped diagnostics ESLint pa
 ## EM independent verification
 
 The same constrained Linux matrix independently passed **6/6, zero retries, 32.8 seconds** on 10 Nov 2026. Docker inspection confirmed 1,073,741,824-byte memory limit, one CPU, restart count zero and OOMKilled=false. Three observed pool constructors printed max=2. Sampled app RSS peaked at 218,365,952 bytes; sampled pool acquisition waiters remained zero. Log: `/tmp/whr97-em.log` (local temporary evidence). This does not reproduce the staging incident or establish its cause. Earl's staging evidence remains the next required input; no PR or READY claim.
+
+## Hung-storage source fix
+
+Earl subsequently reported flat staging memory (~15.5%) and CPU (~3%); historical request logs were no longer available. The authorized next step was a hung-storage regression and source fix, not an instance resize. Local reproduction establishes a real cross-request blocking defect; it does not reconstruct the exact old platform response without those logs.
+
+Root cause reproduced: export preparation held `security_state FOR UPDATE` while awaiting storage. A never-resolving storage promise therefore blocked independent admin reads. Download likewise retained authority locks while reading storage. Request database pools also had no acquisition, lock or statement deadline, allowing that queue to exceed a platform response budget.
+
+Red before the source change: `WHR-97 hung storage releases admin authority and leaves a retryable export` failed with `expected false to be true` at the independent admin read responsiveness assertion after 500 ms; one failed, 42 skipped. The test adapter never resolves until cleanup, so this is a hung operation, not a slow two-second success.
+
+The fix releases every database transaction before storage I/O. Preparation checks the claim before upload and publishes only after a fresh lock, live creator authorization, matching lease nonce/fence and unexpired lease. A five-second abort plus promise race bounds ignored cancellation. A late write uses an unpublished random key and cannot resume publication. Downloads validate bytes/checksum outside the transaction, then recheck current session, permissions, creator, expiry and artifact identity before returning bytes. The adapter bounds both headers and the entire body and destroys a stalled stream.
+
+Request database bounds: acquisition 5 s, server lock wait 3 s, server statement 5 s, client query 6 s, idle transaction 15 s. Client query timeouts discard the connection rather than enqueue rollback behind a still-running query; failed rollback and asynchronous client errors also discard it. Idle pool errors are handled with a generic log event. Server statement cancellation retains normal rollback semantics.
+
+Regression evidence:
+
+- Hung upload under a two-connection pool: independent admin read completes within 500 ms; export exits failed with no lease within the five-second storage bound; retry succeeds; the original ignored-abort write can finish afterward without changing the published artifact.
+- Hung download: independent admin read remains responsive; download fails `temporarily_unavailable`, and retry with working storage succeeds.
+- Upload authorization revocation / lease expiry during storage cannot publish; session revocation during download cannot release bytes.
+- Real local HTTP storage response sends headers and one byte then never finishes: timeout returns `temporarily_unavailable` and the socket closes. Separate mocked transport tests cover completely ignored aborts.
+- Real PostgreSQL held authority lock and exhausted request pool return JSON 503 with `temporarily_unavailable`, `retryable:true`, then recover.
+- Real PostgreSQL client read timeout discards the active connection; idle transaction termination produces no unhandled client error and a fresh transaction succeeds.
+
+Builder checks: typecheck and lint passed; unit 529/529 passed; complete cards integration 48/48 passed; after strengthening late-write assertions the six WHR-97 integration cases passed again (19.55 s); production build passed. Full migrated integration had 344 passed, one failed and 39 skipped solely because MinIO at localhost:9000 was unavailable (offboarding evidence write and sync suite setup). EM final-head verification and independent code/security/integrity review remain required.
+
+Escape gotcha: never await external storage while holding the global admin authority lock; deadline the whole body and re-authorize after I/O. The agent file is sandbox-protected, so this gotcha is recorded here for EM handling rather than editing `.codex`.

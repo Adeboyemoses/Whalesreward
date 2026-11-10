@@ -10,6 +10,7 @@ import {
   expect,
   vi,
 } from "vitest";
+import { database } from "../../src/server/lib/db";
 import { newId } from "../../src/server/lib/ids";
 import { digest, sessionSecret } from "../../src/server/modules/auth/crypto";
 import { adminConfig } from "../../src/server/modules/admin-access/config";
@@ -403,6 +404,265 @@ describe("M2 atomic customers and card inventory", () => {
       pending: { amountKobo: "0", count: "0" },
     });
     expect(profile).not.toHaveProperty("phone");
+  });
+  it("WHR-97 bounded lock waits return retryable JSON without poisoning the request pool", async () => {
+    const holder = await pool.connect();
+    await holder.query("BEGIN");
+    await holder.query(
+      "SELECT id FROM security_state WHERE id=true FOR UPDATE",
+    );
+    try {
+      const { response, body } = await call("cards", "list");
+      expect(response.status).toBe(503);
+      expect(response.headers.get("content-type")).toContain(
+        "application/json",
+      );
+      expect(body.error).toMatchObject({
+        code: "temporarily_unavailable",
+        retryable: true,
+      });
+    } finally {
+      await holder.query("ROLLBACK");
+      holder.release();
+    }
+    expect((await call("cards", "list")).response.status).toBe(200);
+  });
+  it("WHR-97 exhausted request pool returns retryable JSON and recovers", async () => {
+    const requestPool = database();
+    const clients = [];
+    try {
+      for (let n = 0; n < requestPool.options.max!; n++)
+        clients.push(await requestPool.connect());
+      const { response, body } = await call("cards", "list");
+      expect(response.status).toBe(503);
+      expect(body.error).toMatchObject({
+        code: "temporarily_unavailable",
+        retryable: true,
+      });
+    } finally {
+      for (const client of clients) client.release();
+    }
+    expect((await call("cards", "list")).response.status).toBe(200);
+  });
+  it("WHR-97 hung storage releases admin authority and leaves a retryable export", async () => {
+    const b = await batch(5);
+    const e = (
+      await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        {
+          operationId: newId(),
+          expectedVersion: b.version,
+          format: "xlsx",
+        },
+        b.id,
+      )
+    ).data as { id: string };
+    const two = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 2,
+    });
+    let entered!: () => void, finish!: () => void, completed!: () => void;
+    let lateKey = "";
+    const lateWrite = new Promise<void>((r) => (completed = r));
+    const started = new Promise<void>((r) => (entered = r));
+    const hung = new Promise<void>((r) => (finish = r));
+    const worker = prepareCardExport(
+      two,
+      {
+        storage: {
+          ...storage,
+          write: async (key, bytes, type) => {
+            lateKey = key;
+            entered();
+            await hung;
+            await storage.write(key, bytes, type);
+            completed();
+          },
+        },
+      },
+      e.id,
+    );
+    await started;
+    try {
+      const responsive = await Promise.race([
+        cardsRead(two, adminConfig(), adminToken, "cards", {}, b.id).then(
+          () => true,
+        ),
+        new Promise<boolean>((r) => setTimeout(() => r(false), 500)),
+      ]);
+      expect(responsive).toBe(true);
+      expect(
+        await Promise.race([
+          worker,
+          new Promise((r) => setTimeout(() => r("hung"), 6500)),
+        ]),
+      ).toEqual({ processed: true, delivered: false });
+      expect(
+        (
+          await pool.query(
+            "SELECT status,lease_nonce FROM card_export WHERE id=$1",
+            [e.id],
+          )
+        ).rows[0],
+      ).toMatchObject({ status: "failed", lease_nonce: null });
+      await pool.query(
+        "UPDATE card_export SET next_attempt_at=clock_timestamp() WHERE id=$1",
+        [e.id],
+      );
+      expect(await prepareCardExport(pool, options, e.id)).toEqual({
+        processed: true,
+        delivered: true,
+      });
+      const ready = (
+        await pool.query("SELECT object_key FROM card_export WHERE id=$1", [
+          e.id,
+        ])
+      ).rows[0];
+      finish();
+      await lateWrite;
+      await worker;
+      expect(files.has(lateKey)).toBe(true);
+      expect(lateKey).not.toBe(ready.object_key);
+      expect(
+        (
+          await pool.query("SELECT object_key FROM card_export WHERE id=$1", [
+            e.id,
+          ])
+        ).rows[0],
+      ).toEqual(ready);
+    } finally {
+      finish();
+      await worker;
+      await two.end();
+    }
+  });
+  it("WHR-97 hung download is bounded while independent admin requests remain responsive", async () => {
+    const b = await batch(5);
+    const e = (
+      await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+        b.id,
+      )
+    ).data as { id: string };
+    await prepareCardExport(pool, options, e.id);
+    let entered!: () => void;
+    const started = new Promise<void>((r) => (entered = r));
+    const download = downloadCardExport(pool, adminToken, b.id, e.id, {
+      ...storage,
+      read: async () => {
+        entered();
+        return new Promise<Uint8Array>(() => {});
+      },
+    });
+    const outcome = download.then(
+      () => "unexpected",
+      (error) => error.code,
+    );
+    await started;
+    expect(
+      await Promise.race([
+        cardsRead(pool, adminConfig(), adminToken, "cards", {}, b.id).then(
+          () => true,
+        ),
+        new Promise((r) => setTimeout(() => r(false), 500)),
+      ]),
+    ).toBe(true);
+    expect(await outcome).toBe("temporarily_unavailable");
+    expect(
+      (await downloadCardExport(pool, adminToken, b.id, e.id, storage)).bytes
+        .length,
+    ).toBeGreaterThan(0);
+  });
+  it("WHR-97 upload rechecks authority and lease after storage returns", async () => {
+    for (const invalidation of ["revoke", "expire"] as const) {
+      const b = await batch();
+      const e = (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+          b.id,
+        )
+      ).data as { id: string };
+      const result = await prepareCardExport(
+        pool,
+        {
+          storage: {
+            ...storage,
+            write: async (key, bytes, type) => {
+              await storage.write(key, bytes, type);
+              if (invalidation === "revoke")
+                await pool.query(
+                  "UPDATE auth_user SET enabled=false WHERE id=$1",
+                  [id(2)],
+                );
+              else
+                await pool.query(
+                  "UPDATE card_export SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",
+                  [e.id],
+                );
+            },
+          },
+        },
+        e.id,
+      );
+      await pool.query("UPDATE auth_user SET enabled=true WHERE id=$1", [
+        id(2),
+      ]);
+      expect(result).toEqual({ processed: true, delivered: false });
+      expect(
+        (
+          await pool.query("SELECT object_key FROM card_export WHERE id=$1", [
+            e.id,
+          ])
+        ).rows[0].object_key,
+      ).toBeNull();
+      await pool.query(
+        "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=3,lease_nonce=NULL,lease_until=NULL WHERE id=$1",
+        [e.id],
+      );
+    }
+  });
+  it("WHR-97 download does not release bytes after session revocation during storage read", async () => {
+    const b = await batch();
+    const e = (
+      await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+        b.id,
+      )
+    ).data as { id: string };
+    await prepareCardExport(pool, options, e.id);
+    try {
+      await expect(
+        downloadCardExport(pool, adminToken, b.id, e.id, {
+          ...storage,
+          read: async (key, limit) => {
+            const bytes = await storage.read(key, limit);
+            await pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
+              id(2),
+            ]);
+            return bytes;
+          },
+        }),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+    } finally {
+      await pool.query("UPDATE auth_user SET enabled=true WHERE id=$1", [
+        id(2),
+      ]);
+    }
   });
   it("I-20 immutable XLSX snapshots prepare privately with checksum and never mutate inventory", async () => {
     const b = await active(),

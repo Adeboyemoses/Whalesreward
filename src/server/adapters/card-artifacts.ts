@@ -4,9 +4,19 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { storageConfig, type StorageConfig } from "./storage";
+import { cardStorageDeadline } from "./card-storage-deadline";
 export interface CardArtifactStorage {
-  write(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
-  read(key: string, maxBytes: number): Promise<Uint8Array>;
+  write(
+    key: string,
+    bytes: Uint8Array,
+    contentType: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  read(
+    key: string,
+    maxBytes: number,
+    signal?: AbortSignal,
+  ): Promise<Uint8Array>;
 }
 export function createCardArtifactStorage(
   config: StorageConfig = storageConfig(),
@@ -38,41 +48,57 @@ export function createCardArtifactStorage(
       throw new Error("Invalid artifact key");
   };
   return {
-    async write(key, bytes, contentType) {
+    async write(key, bytes, contentType, signal) {
       check(key);
-      await client.send(
-        new PutObjectCommand({
-          Bucket: config.bucket,
-          Key: key,
-          Body: bytes,
-          ContentType: contentType,
-        }),
-        { abortSignal: AbortSignal.timeout(30000) },
+      await cardStorageDeadline(async (deadline) =>
+        client.send(
+          new PutObjectCommand({
+            Bucket: config.bucket,
+            Key: key,
+            Body: bytes,
+            ContentType: contentType,
+          }),
+          {
+            abortSignal: signal
+              ? AbortSignal.any([signal, deadline])
+              : deadline,
+          },
+        ),
       );
     },
-    async read(key, maxBytes) {
+    async read(key, maxBytes, signal) {
       check(key);
-      const r = await client.send(
-        new GetObjectCommand({ Bucket: config.bucket, Key: key }),
-        { abortSignal: AbortSignal.timeout(30000) },
-      );
-      const stream = r.Body as
-        (AsyncIterable<Uint8Array> & { destroy?: () => void }) | undefined;
-      if (!stream) throw new Error("Missing artifact");
-      const chunks: Buffer[] = [];
-      let size = 0;
-      try {
-        if (r.ContentLength !== undefined && r.ContentLength > maxBytes)
-          throw new Error("Artifact too large");
-        for await (const chunk of stream) {
-          size += chunk.length;
-          if (size > maxBytes) throw new Error("Artifact too large");
-          chunks.push(Buffer.from(chunk));
+      return cardStorageDeadline(async (deadline) => {
+        const abortSignal = signal
+          ? AbortSignal.any([signal, deadline])
+          : deadline;
+        const r = await client.send(
+          new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+          { abortSignal },
+        );
+        const stream = r.Body as
+          (AsyncIterable<Uint8Array> & { destroy?: () => void }) | undefined;
+        if (!stream) throw new Error("Missing artifact");
+        const destroy = () => stream.destroy?.();
+        abortSignal.addEventListener("abort", destroy, { once: true });
+        try {
+          abortSignal.throwIfAborted();
+          if (r.ContentLength !== undefined && r.ContentLength > maxBytes)
+            throw new Error("Artifact too large");
+          const chunks: Buffer[] = [];
+          let size = 0;
+          for await (const chunk of stream) {
+            abortSignal.throwIfAborted();
+            size += chunk.length;
+            if (size > maxBytes) throw new Error("Artifact too large");
+            chunks.push(Buffer.from(chunk));
+          }
+          return Buffer.concat(chunks);
+        } finally {
+          abortSignal.removeEventListener("abort", destroy);
+          destroy();
         }
-      } finally {
-        stream.destroy?.();
-      }
-      return Buffer.concat(chunks);
+      });
     },
   };
 }
