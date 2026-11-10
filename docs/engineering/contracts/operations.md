@@ -14,3 +14,50 @@ Public, read-only health probe for App Platform. No authentication, request body
 `version` is `APP_VERSION` when supplied by deployment settings, otherwise the package version. The staging web component binds it to its source commit so Earl can compare the response with GitHub. It is a build identifier, never a credential.
 
 Responses use `Cache-Control: no-store`. Staging responses also carry `X-Robots-Tag: noindex`. Errors never include connection strings, database hosts, exception text or stack traces. A successful probe confirms database connectivity; it does not prove that seed jobs, application workflows or storage uploads succeeded. Check deployment job results separately.
+
+### Configuration status — WO-spec-3f / WHR-100
+
+This amendment extends the probe above. Every response adds `fullyConfigured:boolean`. It is true only when every policy in the closed allowlist below is `configured`, including policies whose domain endpoints are not yet implemented. An unavailable evaluator reports `unconfigured`, never an omitted key or assumed success. `ok`, `db`, `version` and HTTP status retain their existing database-probe meanings. Missing policy alone returns 200 with `fullyConfigured:false`; database failure remains 503 even if all policies are configured. Do not rely on a 503 body surviving the platform edge.
+
+Unauthenticated callers see exactly `{ok,version,db,fullyConfigured}`. They receive no policy names, individual statuses, missing-policy counts or diagnostic reasons. The same projection applies to attendants, restricted first-password/recovery sessions, invalid/expired/revoked sessions and admins without `settings`. This limits disclosure of specific security-policy gaps while keeping the deployment probe public. It supersedes WHR-99's public top-level `cardPrint` exposure: that status moves into the protected `policies` object.
+
+Only a full, live admin session with an enabled account and role, matching current auth version and current `settings` permission receives `{ok,version,db,fullyConfigured,policies}`. Recheck authority for each response; never trust cookie claims or a caller-selected role. If authority cannot be established, return only the public projection. No query/header option, attendant cookie or recovery grant selects the protected projection. Earl can inspect the complete listing while signed into the admin portal with `settings` permission. Missing auth configuration never creates a diagnostics bypass.
+
+```ts
+type PolicyStatus = 'configured' | 'unconfigured';
+type HealthPolicies = {
+  auth: PolicyStatus;
+  delivery: PolicyStatus;
+  delegation: PolicyStatus;
+  phone: PolicyStatus;
+  meter: PolicyStatus;
+  phoneVerification: PolicyStatus;
+  recovery: PolicyStatus;
+  reconciliation: PolicyStatus;
+  timing: PolicyStatus;
+  cardPrint: PolicyStatus;
+};
+```
+
+| Policy name | Configuration gate represented |
+|---|---|
+| `auth` | M2 authentication/session policy and required auth configuration; `auth_policy_unconfigured` |
+| `delivery` | M2 email delivery adapter and required valid configuration; `delivery_unconfigured` |
+| `delegation` | M2 approved delegation policy; `delegation_policy_unconfigured` |
+| `phone` | M2/M3 phone normalization and validation policy; `phone_policy_unconfigured` |
+| `meter` | M3 independent meter evidence/reconciliation policy; `meter_policy_unconfigured` |
+| `phoneVerification` | M3 phone verification delivery, expiry and attempt policy; `phone_verification_unconfigured` |
+| `recovery` | M3 recovery session/grant expiry and device-binding policy; `recovery_policy_unconfigured` |
+| `reconciliation` | M4 reconciliation checklist and complete-photo receipt evidence policy; `reconciliation_policy_unconfigured` |
+| `timing` | M4 approved timing/provisioning/change-window policy; `timing_policy_unconfigured` |
+| `cardPrint` | Valid PDF layout under the existing card print validator; `print_layout_unconfigured` |
+
+Each status uses the same environment-aware validation and policy activation decision as its domain gate. `configured` means every required setting is present and valid and the policy is enabled for that environment; a populated variable alone is insufficient. Missing, malformed, unsupported or inactive configuration reports `unconfigured`. Explicitly permitted development/staging proposals count only in their permitted environment. No fixture, placeholder, health check or environment default approves a production policy. This work does not authorize activating the unimplemented M3/M4 gates just to make staging green.
+
+Evaluate the allowlist from one configuration snapshot per request. Isolate each evaluator: a malformed policy marks that policy unconfigured without hiding the other results or breaking the database probe. Evaluation is bounded, read-only and causes no delivery, export, token issuance, queue mutation or provider/storage probe. `delivery_unavailable`, `storage_unavailable`, allocation exhaustion and individual failed exports are transient or resource states, not policy flags. A provider outage does not by itself change valid configuration to unconfigured; no health flag promises that an operation will succeed.
+
+Return only the fixed names and status enum in `policies`. Never serialize policy objects, environment-variable names or values, versions, thresholds, URLs, recipient lists, credentials, parser errors or exception text. Existing deployment `version` remains the sole build identifier, not a policy value. `fullyConfigured` is the conjunction of the ten statuses, not campaign readiness, evidence-retention approval or acceptance authority. It cannot clear holds, start deletion, authorize recovery, credit purchases or finalize a giveaway. Domain gates still run independently on every operation.
+
+Both projections use `Cache-Control: no-store` and `Vary: Cookie`; browser, intermediary and service-worker caches must not retain either response. Keep the existing staging noindex header. Projection and redaction also apply to database-failure responses; failure must never expose a protected listing to an unauthorized caller. The health endpoint keeps its direct JSON shape, outside M1's domain envelope; the ten remapped domain errors keep their existing envelope.
+
+Required implementation verification: all ten configured; each missing/invalid/inactive policy in turn; absent evaluator; aggregate equality; permitted staging versus production gates; public, attendant, first-password, recovery, invalid/revoked and insufficient-permission projections; permission revoked before response; no values in successful or failed responses; database failure with each projection; no caching or side effects. Test that `cardPrint` is absent publicly and present only inside authorized `policies`. Separately test each domain remap, its unchanged message/envelope and fail-closed state. Specification review does not claim these runtime tests have passed.
