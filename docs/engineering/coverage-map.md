@@ -655,3 +655,16 @@ Rook to draft Core: P-23 receipt issuance and settlement, then App: P-23 draft a
 | I-22, I-27 | Masked transport failures retain local data and reconcile the same operation identity; missing bodies do not prove rollback | Existing semantics preserved; independent integrity PASS |
 
 The M2 rule requires non-5xx status for every domain error the UI must explain. Other listed mappings await Rook's review; generic temporarily_unavailable remains 503. WHR-99 stays open for its separate core part. No implementation, acceptance, cloud configuration or physical print verification is inferred.
+
+
+## WO-spec-3f / WHR-100 policy errors and health READY — 11 Nov 2026
+
+[Spec PR #101](https://github.com/Adeboyemoses/Whalesreward/pull/101) merged into staging at 25ecdc9 with five green checks. Independent code/security/integrity PASS at 81be239, round 2; export lifecycle ambiguity resolved. EM typecheck/lint, 536 existing unit tests, build and evidence PASS. Inventory confirms ten remapped codes across 21 explicit endpoint occurrences, three retained 503 codes across four occurrences, and ten health keys. Maximum prose paragraph length across the amended contracts is 119 words. Specification coverage only; no new runtime tests or board parity claimed.
+
+| Invariants | Specification verification / future implementation | Status |
+|---|---|---|
+| I-07, I-09, I-12, I-49 | Live settings permission for named health statuses; public aggregate; no values, caching or reset enumeration changes | Spec on staging; WO-core-7d implementation tests pending |
+| I-20, I-22, I-27, I-52 | Remapped envelopes and immutable replay; terminal export failure needs new preparation, pending worker retries stay bounded; saved sales retained | Spec on staging; WO-core-7d and M3/M4 runtime tests pending |
+| I-26, I-35, I-36, I-45, I-46 | Unconfigured policies remain fail-closed; health grants no credit, hold clearance, recovery, deletion or finalization authority | Existing semantics preserved; independent integrity PASS |
+
+WO-core-7d implements current M2/export mappings and health; M3/M4 mappings ship with their own work orders. The health contract requires absent evaluators to report unconfigured; no deployment may infer approval from this specification. WHR-100 stays open for its separate core part. Stop at READY, with no acceptance or live staging configuration claim.
