@@ -13,7 +13,7 @@ export class CaptureDatabase extends Dexie {
   outbox!: Table<OutboxRow, [string, string]>;
   windows!: Table<OfflineWindow, string>;
   customers!: Table<
-    Lookup & { originatingAccountId: string },
+    Lookup & { originatingAccountId: string; captureContextId?: string },
     [string, string]
   >;
   meta!: Table<Installation, string>;

@@ -40,7 +40,7 @@ function advance(ms = 70000) {
   now += ms;
   mono += ms;
 }
-async function save() {
+async function save(evidence?: string) {
   const blob = new Blob(["jpeg"], { type: "image/jpeg" });
   const sha256 = Array.from(
     new Uint8Array(
@@ -48,14 +48,24 @@ async function save() {
     ),
     (x) => x.toString(16).padStart(2, "0"),
   ).join("");
-  return client.saveCapture(await client.beginCapture(), {
-    cardCode: "A7K3M9X",
-    customerCache: await client.lookup("A7K3M9X"),
-    medium: "vehicle",
-    basis: "amount",
-    value: "20000",
-    photo: { blob, sha256, bytes: blob.size, mediaType: "image/jpeg" },
-  });
+  const found = await client.lookup("A7K3M9X");
+  const draft = await client.beginCapture();
+  return client.saveCapture(
+    evidence
+      ? client.selectLookup(draft, "A7K3M9X", {
+          ...found!,
+          lookupReceipt: evidence,
+        })
+      : draft,
+    {
+      cardCode: "A7K3M9X",
+      customerCache: found,
+      medium: "vehicle",
+      basis: "amount",
+      value: "20000",
+      photo: { blob, sha256, bytes: blob.size, mediaType: "image/jpeg" },
+    },
+  );
 }
 function deferred() {
   let resolve!: () => void;
@@ -370,4 +380,41 @@ describe("durable sync", () => {
     expect(resolved.finalizeRequest).toEqual(rejected.finalizeRequest);
     expect(api.calls.filter((call) => call !== "status")).toEqual(writes);
   });
+});
+
+describe("P-23 delivery evidence", () => {
+  it.each(["submit", "finalize"] as const)(
+    "preserves evidence through lost %s response, restart and fresh upload context",
+    async (lost) => {
+      const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+      const row = await save(evidence);
+      if (lost === "submit") api.loseSubmit = true;
+      else api.loseFinalize = true;
+      await client.retryUploads();
+      client.close();
+      advance();
+      api.current = { ...api.current, captureContextId: uuidv7() };
+      client = new AttendantClient(
+        api,
+        new CaptureDatabase(db.name),
+        () => ({ wall: now, mono, runtimeId: "evidence-restart" }),
+        () => true,
+      );
+      clients.push(client);
+      await client.initialize();
+      await client.signIn("grace", "fictional");
+      await client.lookup("A7K3M9X");
+      await client.retryUploads();
+      const retained = (await client.ownSale(row.operationId))!;
+      expect(retained.original.lookupReceipt === evidence).toBe(true);
+      expect(
+        api.originals.get(row.operationId)?.lookupReceipt === evidence,
+      ).toBe(true);
+      expect(
+        JSON.stringify(retained.original) === JSON.stringify(row.original),
+      ).toBe(true);
+      expect(retained.state).toBe("credited");
+      expect(api.originals.size).toBe(1);
+    },
+  );
 });

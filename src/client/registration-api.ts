@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   registrationSchema,
   registrationReceiptSchema,
+  registrationReceiptWithLookupSchema,
   phoneLookupSchema,
   customerLookupSchema,
 } from "../shared/contracts/customers-cards";
@@ -9,7 +10,13 @@ import { HttpAttendantApi } from "./api";
 import { ClientError, type Lookup } from "./types";
 import { connection } from "./offline/connection";
 export type RegistrationInput = z.infer<typeof registrationSchema>;
-export type RegistrationReceipt = z.infer<typeof registrationReceiptSchema>;
+const receiptResponseSchema = z
+  .union([registrationReceiptWithLookupSchema, registrationReceiptSchema])
+  .transform((value) => ({
+    ...value,
+    lookupReceipt: "lookupReceipt" in value ? value.lookupReceipt : null,
+  }));
+export type RegistrationReceipt = z.infer<typeof receiptResponseSchema>;
 export type ExistingCustomer = z.infer<typeof customerLookupSchema>;
 const errors: Record<string, string> = {
   phone_in_use: "This phone number already has an account.",
@@ -71,6 +78,9 @@ export class HttpRegistrationApi {
         headers: {
           "Content-Type": "application/json",
           ...(key ? { "Idempotency-Key": key } : {}),
+          ...(path === "/api/attendant/customers"
+            ? { "X-WR-Lookup-Receipt": "1" }
+            : {}),
         },
         body: JSON.stringify(body),
       });
@@ -128,7 +138,7 @@ export class HttpRegistrationApi {
     const receipt = await this.post(
       "/api/attendant/customers",
       body,
-      registrationReceiptSchema,
+      receiptResponseSchema,
       body.operationId,
     );
     if (receipt.operationId !== body.operationId)
