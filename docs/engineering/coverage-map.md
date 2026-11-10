@@ -643,3 +643,15 @@ P-22 is configured for numeric retained-photo corrections; no extra activation g
 | I-50 | Minimal account-partitioned receipt cache, no registration PII/SW cache; security PASS | Spec on staging; app storage tests pending |
 
 Rook to draft Core: P-23 receipt issuance and settlement, then App: P-23 draft and outbox evidence. Required scenarios are in M1's follow-on list. WHR-38 remains closed, client Q-528 pending, and WO-core-9/WHR-16 retains independent hold/capture review. WHR-91 stays In Review at READY; neither acceptance nor implementation is inferred.
+
+
+## WO-spec-3e / WHR-99 edge-safe domain errors READY — 10 Nov 2026
+
+[Spec PR #98](https://github.com/Adeboyemoses/Whalesreward/pull/98) merged into staging at 112da2e with all five checks green. Code/security/integrity PASS at a2414fa, round 1, no findings. EM typecheck/lint, 529 existing unit tests and build PASS. Inventory matches 13 other named 503 codes; added prose is at most 88 words per paragraph. Specification coverage only; no new automated runtime coverage or board parity claimed.
+
+| Invariants | Specification verification / future implementation | Status |
+|---|---|---|
+| I-20 | Missing PDF layout returns 409, no export/success receipt or batch/card mutation; Excel remains available | Spec on staging; WO-core-7c runtime tests pending |
+| I-22, I-27 | Masked transport failures retain local data and reconcile the same operation identity; missing bodies do not prove rollback | Existing semantics preserved; independent integrity PASS |
+
+The M2 rule requires non-5xx status for every domain error the UI must explain. Other listed mappings await Rook's review; generic temporarily_unavailable remains 503. WHR-99 stays open for its separate core part. No implementation, acceptance, cloud configuration or physical print verification is inferred.
