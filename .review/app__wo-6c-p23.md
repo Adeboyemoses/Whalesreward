@@ -4,7 +4,7 @@ linear: WHR-94
 tier: high
 plan:
   goal: preserve P-23 lookup evidence from customer selection through immutable sale delivery
-  files: src/client/**, src/app/(attendant)/attendant/**, tests/e2e/**, playwright.config.ts, docs/briefs/**, docs/qa/**
+  files: src/client/**, src/app/(attendant)/attendant/**, tests/e2e/**, tests/fixtures/**, playwright.config.ts, docs/briefs/**, docs/qa/**
   approach: accept strict legacy and capable shapes; opt in after merged core; partition minimal cached evidence by account and context; freeze selected evidence before photo and atomic save; never refresh saved originals
   tests: offline cache and restart; account/context changes; registration replay; draft refresh race; legacy rows; quota rollback; lost-response retry; browser registration-to-sale
   risks: later evidence attached to earlier captures; cross-context reuse; mutated retries; PII persistence; transition decoding; receipt disclosure
