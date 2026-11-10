@@ -14,7 +14,7 @@ export type CardOptions = {
   codeGenerator?: () => string;
   artifactLifetimeMs?: number;
 };
-export function cardOptions(): CardOptions {
+export function cardPrintLayout(): CardPrintLayout | undefined {
   const raw = process.env.WHR_CARD_PRINT_LAYOUT;
   let layout: CardPrintLayout | undefined;
   if (raw) {
@@ -46,6 +46,10 @@ export function cardOptions(): CardOptions {
       layout = undefined;
     }
   }
+  return layout;
+}
+export function cardOptions(): CardOptions {
+  const layout = cardPrintLayout();
   const lifetime = process.env.WHR_CARD_EXPORT_LIFETIME_SECONDS;
   if (lifetime && !/^[1-9][0-9]{0,6}$/.test(lifetime))
     throw new AuthError("temporarily_unavailable", 503);

@@ -1,3 +1,4 @@
+import { cardPrintLayout } from "../cards/config";
 import pg from "pg";
 import { version } from "../../../../package.json";
 
@@ -22,11 +23,17 @@ async function probeDatabase(): Promise<void> {
 }
 
 export async function getHealth(probe: () => Promise<void> = probeDatabase) {
+  const cardPrint = cardPrintLayout() ? "configured" : "unconfigured";
   const deployedVersion = process.env.APP_VERSION || version;
   try {
     await probe();
-    return { ok: true, version: deployedVersion, db: "ok" };
+    return { ok: true, version: deployedVersion, db: "ok", cardPrint };
   } catch {
-    return { ok: false, version: deployedVersion, db: "unavailable" };
+    return {
+      ok: false,
+      version: deployedVersion,
+      db: "unavailable",
+      cardPrint,
+    };
   }
 }

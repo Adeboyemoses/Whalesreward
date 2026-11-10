@@ -744,6 +744,77 @@ describe("M2 atomic customers and card inventory", () => {
       downloadCardExport(pool, adminToken, b.id, e.id, storage),
     ).rejects.toMatchObject({ code: "export_failed" });
   });
+  it.each([undefined, "{bad-json", JSON.stringify({ pageWidthMm: 0 })])(
+    "WHR-99 PDF configuration error is JSON 409 without mutation: %s",
+    async (raw) => {
+      vi.stubEnv("WHR_CARD_PRINT_LAYOUT", raw);
+      vi.stubEnv("STORAGE_ENDPOINT", "http://127.0.0.1:9000");
+      vi.stubEnv("STORAGE_REGION", "us-east-1");
+      vi.stubEnv("STORAGE_BUCKET", "whr-e2e-cards");
+      vi.stubEnv("STORAGE_ACCESS_KEY_ID", "whr-local");
+      vi.stubEnv("STORAGE_SECRET_ACCESS_KEY", "local-development-only");
+      try {
+        const b = await batch();
+        const before = await codes(b.id);
+        const operationId = newId();
+        const result = await call(
+          "cards",
+          "export",
+          { operationId, expectedVersion: b.version, format: "pdf" },
+          b.id,
+        );
+        expect(result.body.error.code).toBe("print_layout_unconfigured");
+        expect(result.response.status).toBe(409);
+        expect(result.response.headers.get("content-type")).toContain(
+          "application/json",
+        );
+        expect(result.body.error).toMatchObject({
+          code: "print_layout_unconfigured",
+          retryable: false,
+        });
+        expect(
+          (
+            await pool.query("SELECT 1 FROM card_export WHERE batch_id=$1", [
+              b.id,
+            ])
+          ).rowCount,
+        ).toBe(0);
+        expect(
+          (
+            await pool.query(
+              "SELECT 1 FROM mutation_receipt WHERE operation_id=$1",
+              [operationId],
+            )
+          ).rowCount,
+        ).toBe(0);
+        expect(await codes(b.id)).toEqual(before);
+        expect(
+          (
+            await pool.query(
+              "SELECT status,version FROM card_batch WHERE id=$1",
+              [b.id],
+            )
+          ).rows[0],
+        ).toEqual({ status: "generated", version: 1 });
+        const excel = await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+          b.id,
+        );
+        expect(excel.data).toMatchObject({ format: "xlsx" });
+        await prepareCardExport(
+          pool,
+          options,
+          (excel.data as { id: string }).id,
+        );
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
   it("D08 PDF requires configured layout; preparation failures retain the same snapshot and bounded retry", async () => {
     const b = await batch();
     await expect(
@@ -755,7 +826,7 @@ describe("M2 atomic customers and card inventory", () => {
         { operationId: newId(), expectedVersion: 1, format: "pdf" },
         b.id,
       ),
-    ).rejects.toMatchObject({ code: "print_layout_unconfigured" });
+    ).rejects.toMatchObject({ code: "print_layout_unconfigured", status: 409 });
     const e = (
       await cardsWrite(
         pool,
@@ -827,7 +898,7 @@ describe("M2 atomic customers and card inventory", () => {
       cardsWrite(pool, adminConfig(), adminToken, "export", input, b.id, {
         layout: invalid,
       }),
-    ).rejects.toMatchObject({ code: "print_layout_unconfigured" });
+    ).rejects.toMatchObject({ code: "print_layout_unconfigured", status: 409 });
     expect(
       (
         await pool.query("SELECT 1 FROM card_export WHERE operation_id=$1", [
