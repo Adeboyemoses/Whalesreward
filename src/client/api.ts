@@ -3,7 +3,7 @@ import { observeServerBuild, UPDATE_MESSAGE } from "./sw/build-id";
 import { connection } from "./offline/connection";
 import {
   ClientError,
-  lookupSchema,
+  lookupResponseSchema,
   authSessionSchema,
   configuredAssignmentSchema,
   type Lookup,
@@ -76,6 +76,9 @@ export class HttpAttendantApi implements AttendantApi {
         headers: {
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
           ...(key ? { "Idempotency-Key": key } : {}),
+          ...(path === "/api/attendant/cards/lookup"
+            ? { "X-WR-Lookup-Receipt": "1" }
+            : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
@@ -188,7 +191,11 @@ export class HttpAttendantApi implements AttendantApi {
   lookup(
     input: { source: "code"; code: string } | { source: "qr"; qr: string },
   ) {
-    return this.request("/api/attendant/cards/lookup", lookupSchema, input);
+    return this.request(
+      "/api/attendant/cards/lookup",
+      lookupResponseSchema,
+      input,
+    );
   }
   private async syncRequest(
     path: string,

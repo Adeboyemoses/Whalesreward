@@ -842,6 +842,10 @@ export class AttendantClient {
             cardCode: cached.cardCode,
             customer: cached.customer,
             lookedUpAt: cached.lookedUpAt,
+            lookupReceipt:
+              cached.captureContextId === session.captureContextId
+                ? (cached.lookupReceipt ?? null)
+                : null,
           };
         },
       );
@@ -876,8 +880,16 @@ export class AttendantClient {
       async () => {
         await this.assertCurrentContext(session);
         await this.db.customers.put({
-          ...found,
+          cardCode: found.cardCode,
+          customer: {
+            id: found.customer.id,
+            name: found.customer.name,
+            category: found.customer.category,
+          },
+          lookedUpAt: found.lookedUpAt,
+          lookupReceipt: found.lookupReceipt ?? null,
           originatingAccountId: session.account.id,
+          captureContextId: session.captureContextId,
         });
       },
     );
@@ -893,6 +905,25 @@ export class AttendantClient {
       row.locked
     )
       throw new ClientError("account_changed", "Sign in again to continue.");
+  }
+  /** Select before taking a photo. Later cache refreshes cannot change this snapshot. */
+  selectLookup(
+    draft: CaptureDraft,
+    value: string,
+    lookup: Lookup | null,
+  ): CaptureDraft {
+    const cardCode = normalizeCardCode(value);
+    if (lookup && lookup.cardCode !== cardCode)
+      throw new ClientError("lookup_required", "Look up this card again.");
+    const customer = lookup ? structuredClone(lookup) : null;
+    return {
+      ...draft,
+      selectedLookup: {
+        cardCode,
+        lookupReceipt: lookup?.lookupReceipt ?? null,
+        customer,
+      },
+    };
   }
   async beginCapture(): Promise<CaptureDraft> {
     const session = await this.active();
@@ -943,7 +974,9 @@ export class AttendantClient {
       void this.lookup(code).catch(() => {
         /* Lookup handles authority denials; the saved row remains retryable. */
       });
-    const customer = input.customerCache;
+    if (draft.selectedLookup && draft.selectedLookup.cardCode !== code)
+      throw new ClientError("lookup_required", "Look up this card again.");
+    const customer = draft.selectedLookup?.customer ?? input.customerCache;
     const p = draft.session.price;
     const rate = parseKobo(p.rateKobo);
     const amount =
@@ -979,6 +1012,9 @@ export class AttendantClient {
       originatingAccountId: session.account.id,
       operationId: draft.operationId,
       original: {
+        ...(draft.selectedLookup
+          ? { lookupReceipt: draft.selectedLookup.lookupReceipt }
+          : {}),
         operationId: draft.operationId,
         captureContextId: draft.session.captureContextId,
         assignmentId: draft.session.assignment.id,

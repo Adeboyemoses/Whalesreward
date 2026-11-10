@@ -650,3 +650,95 @@ describe("durable account partition", () => {
     expect(await client.ownSales()).toHaveLength(0);
   });
 });
+
+describe("P-23 immutable composition evidence", () => {
+  const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+  async function selected() {
+    const form = await input();
+    form.customerCache = { ...form.customerCache!, lookupReceipt: evidence };
+    api.lookup = async () => structuredClone(form.customerCache!);
+    const found = await client.lookup(form.cardCode);
+    const draft = client.selectLookup(
+      await client.beginCapture(),
+      form.cardCode,
+      found,
+    );
+    return { form, draft };
+  }
+  it("retains cached evidence and original timestamp through offline restart", async () => {
+    const { form } = await selected();
+    client.close();
+    online = false;
+    const reopened = new AttendantClient(
+      api,
+      new CaptureDatabase(db.name),
+      () => ({ wall: now, mono, runtimeId: "restart" }),
+      () => false,
+    );
+    open.push(reopened);
+    await reopened.initialize();
+    const found = await reopened.lookup(form.cardCode);
+    expect(found?.lookupReceipt === evidence).toBe(true);
+    expect(found?.lookedUpAt).toBe(form.customerCache?.lookedUpAt);
+  });
+  it("does not reuse cached evidence across contexts or accounts", async () => {
+    const { form } = await selected();
+    const original = api.current;
+    api.current = { ...original, captureContextId: uuidv7() };
+    await client.signIn("grace", "fictional");
+    online = false;
+    expect((await client.lookup(form.cardCode))?.lookupReceipt).toBeNull();
+    online = true;
+    await client.signOut();
+    api.current = sessionFixture(now);
+    await client.signIn("other", "fictional");
+    online = false;
+    expect(await client.lookup(form.cardCode)).toBeNull();
+  });
+  it("freezes selected evidence before photo/save while lookup refreshes and inputs mutate", async () => {
+    const { form, draft } = await selected();
+    const newer = `lr1.test.bmV3ZXI.${"B".repeat(43)}`;
+    form.customerCache!.lookupReceipt = newer;
+    await client.lookup(form.cardCode);
+    const saved = await client.saveCapture(draft, form);
+    expect(saved.original.lookupReceipt === evidence).toBe(true);
+    expect(
+      (await client.ownSale(saved.operationId))?.original.lookupReceipt ===
+        evidence,
+    ).toBe(true);
+  });
+  it("quota rollback retains draft evidence and retries it unchanged despite a newer cache", async () => {
+    const { form, draft } = await selected();
+    const hook = () => {
+      throw new DOMException("full", "QuotaExceededError");
+    };
+    db.outbox.hook("creating", hook);
+    await expect(client.saveCapture(draft, form)).rejects.toMatchObject({
+      code: "storage_failed",
+    });
+    expect(await db.outbox.count()).toBe(0);
+    db.outbox.hook("creating").unsubscribe(hook);
+    form.customerCache!.lookupReceipt = null;
+    const row = await client.saveCapture(draft, form);
+    expect(row.original.lookupReceipt === evidence).toBe(true);
+    expect(row.photoBlob.size).toBe(form.photo.bytes);
+  });
+  it("legacy drafts do not acquire later evidence and originals survive database reopen unchanged", async () => {
+    const draft = await client.beginCapture();
+    const form = await input();
+    form.customerCache!.lookupReceipt = evidence;
+    const saved = await client.saveCapture(draft, form);
+    expect(Object.hasOwn(saved.original, "lookupReceipt")).toBe(false);
+    const serialized = JSON.stringify(saved.original);
+    client.close();
+    const reopened = new CaptureDatabase(db.name);
+    await reopened.open();
+    const retained = await reopened.outbox.get([
+      saved.originatingAccountId,
+      saved.operationId,
+    ]);
+    expect(JSON.stringify(retained?.original) === serialized).toBe(true);
+    expect(retained?.photoBlob.size).toBe(form.photo.bytes);
+    reopened.close();
+  });
+});

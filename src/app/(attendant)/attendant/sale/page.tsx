@@ -13,7 +13,6 @@ import {
   markCaptureEnded,
   markCaptureStarted,
 } from "@/client/sw/update-safety";
-import { HttpRegistrationApi } from "@/client/registration-api";
 import { ClientError } from "@/client/types";
 import { parseNaira, parseKobo, formatNaira } from "@/shared/money";
 import {
@@ -85,8 +84,8 @@ function Sale() {
               const generation = ++request.current;
               setCard(pending.cardCode);
               setFinding(true);
-              void new HttpRegistrationApi()
-                .currentCard(pending.cardCode, pending.customerId)
+              void client
+                .lookup(pending.cardCode)
                 .then(
                   (found) => {
                     if (
@@ -95,6 +94,15 @@ function Sale() {
                       client.getState().access === "active" &&
                       client.getState().session?.captureContextId === contextId
                     ) {
+                      if (!found || found.customer.id !== pending.customerId) {
+                        setLookupError(
+                          "This customer has no usable matching card. Ask a station manager for help.",
+                        );
+                        return;
+                      }
+                      setDraft(
+                        client.selectLookup(next, found.cardCode, found),
+                      );
                       setLookup(found);
                       setResolvedCode(found.cardCode);
                     }
@@ -170,6 +178,8 @@ function Sale() {
     if (!client || saving.current) return;
     const generation = ++request.current;
     setFinding(true);
+    setPhoto(null);
+    setPhotoUrl(undefined);
     setLookup(null);
     setResolvedCode("");
     setLookupError(null);
@@ -186,6 +196,9 @@ function Sale() {
       setCard(normalized);
       setResolvedCode(normalized);
       setLookup(found);
+      setDraft((current) =>
+        current ? client.selectLookup(current, normalized, found) : current,
+      );
     } catch (e) {
       if (mounted.current && generation === request.current) {
         setLookupError(message(e));
@@ -200,6 +213,8 @@ function Sale() {
     }
   }
   function changeCard() {
+    setPhoto(null);
+    setPhotoUrl(undefined);
     setNotFound(null);
     request.current++;
     setFinding(false);
@@ -467,7 +482,7 @@ function Sale() {
           src={photoUrl}
           takenAt={photoTime}
           onCapture={() => void startCamera("photo")}
-          disabled={busy || !draft}
+          disabled={busy || !draft || !customerReady || finding}
         />
       </section>
       {camera && (

@@ -259,7 +259,12 @@ function RegistrationFlow() {
     try {
       await client.checkAccess();
       if (!live(request, route) || !navigator.onLine) return;
-      await api.currentCard(code, customerId);
+      const found = await client.lookup(code);
+      if (!found || found.customer.id !== customerId)
+        throw new ClientError(
+          "card_unavailable",
+          "This customer has no usable matching card. Ask a station manager for help.",
+        );
       if (!live(request, route) || !navigator.onLine) return;
       handoff.offer({
         accountId: session.account.id,
