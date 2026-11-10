@@ -9,7 +9,11 @@ const source = (
 ).replace("self.__WB_MANIFEST", JSON.stringify(manifest));
 await mkdir(path.join(root, "public/attendant"), { recursive: true });
 const result = await build({
-  stdin: { contents: source, resolveDir: root, loader: "js" },
+  stdin: {
+    contents: source,
+    resolveDir: path.join(root, "src/client/sw"),
+    loader: "js",
+  },
   bundle: true,
   minify: true,
   write: false,

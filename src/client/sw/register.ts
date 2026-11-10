@@ -32,8 +32,18 @@ export async function registerAttendantWorker(
     /^\/attendant\/(sign-in|sale(?:\/[^/]+\/recorded)?|uploads|account)\/?$/.test(
       location.pathname,
     );
-  const safe = async () =>
-    safeRoute() && !isCaptureActive() && !(await hasPendingSales(db));
+  const stillPrepared = (token: string) =>
+    !stopped &&
+    prepared === token &&
+    isUpdateFrozen() &&
+    document.documentElement.inert &&
+    safeRoute() &&
+    !isCaptureActive();
+  const safe = async (token: string) => {
+    if (!stillPrepared(token)) return false;
+    const pending = await hasPendingSales(db);
+    return !pending && stillPrepared(token);
+  };
   const freeze = () => {
     setUpdateFrozen(true);
     document.documentElement.inert = true;
@@ -80,16 +90,18 @@ export async function registerAttendantWorker(
         return;
       }
       const port = event.ports[0];
-      prepared = event.data.token;
+      const token = event.data.token;
+      prepared = token;
       freeze();
-      void safe().then(
+      void safe(token).then(
         (ready) => {
-          port.postMessage(ready && !stopped && !!prepared);
-          if (!ready) unfreeze();
+          const accepted = ready && stillPrepared(token);
+          port.postMessage(accepted);
+          if (!accepted && prepared === token) unfreeze();
         },
         () => {
           port.postMessage(false);
-          unfreeze();
+          if (prepared === token) unfreeze();
         },
       );
     } else if (
@@ -109,12 +121,18 @@ export async function registerAttendantWorker(
   const reloadPrepared = () => {
     // A new/unknown tab did not participate, so it cannot be reloaded here.
     if (!prepared || reloading) return;
-    void safe().then((ready) => {
-      if (ready && prepared && !stopped) {
-        reloading = true;
-        location.reload();
-      } else unfreeze();
-    }, unfreeze);
+    const token = prepared;
+    void safe(token).then(
+      (ready) => {
+        if (ready && stillPrepared(token)) {
+          reloading = true;
+          location.reload();
+        } else if (prepared === token) unfreeze();
+      },
+      () => {
+        if (prepared === token) unfreeze();
+      },
+    );
   };
   const changed = () => {
     if (!hadController) {

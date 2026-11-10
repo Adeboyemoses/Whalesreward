@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CaptureDatabase } from "../offline/db";
 import { registerAttendantWorker } from "./register";
+import * as safety from "./update-safety";
 import {
   markCaptureStarted,
   markCaptureEnded,
@@ -55,6 +56,7 @@ beforeEach(async () => {
   stop = await registerAttendantWorker();
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
   stop();
   markCaptureEnded();
   await db.delete();
@@ -101,4 +103,36 @@ it("marks a capture before React receives the input event", async () => {
   location.pathname = "/attendant/sale";
   document.dispatchEvent(event("pointerdown"));
   expect(await prepare()).toBe(false);
+});
+
+it("refuses preparation if an asynchronous handoff starts capture during the outbox read", async () => {
+  let finish!: (pending: boolean) => void;
+  const reading = vi.spyOn(safety, "hasPendingSales").mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const result = prepare();
+  await vi.waitFor(() => expect(reading).toHaveBeenCalled());
+  markCaptureStarted();
+  finish(false);
+  expect(await result).toBe(false);
+  expect(reload).not.toHaveBeenCalled();
+});
+it("never reloads if capture starts during the final asynchronous outbox read", async () => {
+  expect(await prepare()).toBe(true);
+  let finish!: (pending: boolean) => void;
+  const reading = vi.spyOn(safety, "hasPendingSales").mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  sw.dispatchEvent(event("controllerchange"));
+  await vi.waitFor(() => expect(reading).toHaveBeenCalled());
+  markCaptureStarted();
+  finish(false);
+  await vi.waitFor(() => expect(isUpdateFrozen()).toBe(false));
+  expect(reload).not.toHaveBeenCalled();
 });
