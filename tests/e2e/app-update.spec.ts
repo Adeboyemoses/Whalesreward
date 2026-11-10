@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { v7 } from "uuid";
 import {
   installAttendantFake,
@@ -173,6 +173,47 @@ test("upgraded worker reads newer first-password sign-in and session responses",
   });
   await nextWorker(page, "first-password");
   await oldDocumentGone(page);
+  // The replacement provider registers the canonical worker again. Wait for
+  // that guarded handover before filling an ephemeral controlled form.
+  const deadline = performance.now() + 5000;
+  const remaining = () => {
+    const milliseconds = Math.ceil(deadline - performance.now());
+    if (milliseconds <= 0)
+      throw new Error(
+        "Worker handover and sign-in readiness exceeded five seconds",
+      );
+    return milliseconds;
+  };
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(async () => {
+            const registration =
+              await navigator.serviceWorker.getRegistration("/attendant/");
+            const controller = navigator.serviceWorker.controller;
+            if (!controller) return false;
+            const url = new URL(controller.scriptURL);
+            return (
+              url.pathname === "/attendant/sw.js" &&
+              !url.search &&
+              !registration?.installing &&
+              !registration?.waiting &&
+              !document.documentElement.inert
+            );
+          });
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message.includes("Execution context was destroyed")
+          )
+            return false;
+          throw error;
+        }
+      },
+      { timeout: remaining() },
+    )
+    .toBe(true);
   const session = sessionFixture();
   const restricted = {
     state: "password_change_required",
@@ -180,32 +221,47 @@ test("upgraded worker reads newer first-password sign-in and session responses",
     serverTime: session.serverTime,
     sessionExpiresAt: new Date(Date.now() + 900000).toISOString(),
   };
-  for (const path of ["sign-in", "session"])
-    await context.route(`**/api/attendant/${path}`, async (route) =>
-      route.fulfill({
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "x-whr-build": "newer-first-password-server",
-        },
-        body: JSON.stringify({
-          data: restricted,
-          serverTime: session.serverTime,
-          requestId: v7(),
-        }),
+  const restrictedResponse = (route: Route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "x-whr-build": "newer-first-password-server",
+      },
+      body: JSON.stringify({
+        data: restricted,
+        serverTime: session.serverTime,
+        requestId: v7(),
       }),
-    );
-  await page.getByLabel("Username", { exact: true }).fill("grace.okon");
+    });
+  let signInRequests = 0;
+  await context.route("**/api/attendant/sign-in", (route) => {
+    expect(route.request().method()).toBe("POST");
+    signInRequests++;
+    return restrictedResponse(route);
+  });
+  await page
+    .getByLabel("Username", { exact: true })
+    .fill("grace.okon", { timeout: remaining() });
   await page
     .getByLabel("Password", { exact: true })
-    .fill("fictional-test-password");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    .fill("fictional-test-password", { timeout: remaining() });
+  const signInButton = page.getByRole("button", {
+    name: "Sign in",
+    exact: true,
+  });
+  await expect(signInButton).toBeEnabled({ timeout: remaining() });
+  await signInButton.click({ timeout: remaining() });
   await expect(
     page.getByRole("heading", {
       name: "Change your first password",
       exact: true,
     }),
   ).toBeVisible();
+  expect(signInRequests).toBe(1);
+  // Initial background refresh must remain signed out. Only the explicit
+  // reload after the sign-in response replays this restricted session.
+  await context.route("**/api/attendant/session", restrictedResponse);
   await page.reload();
   await expect(
     page.getByRole("heading", {
