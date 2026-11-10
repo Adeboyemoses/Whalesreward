@@ -69,7 +69,7 @@ export async function registerAttendantWorker(
     if (stopped || !navigator.onLine) return;
     if (controllerNeedsReload && registration.active) {
       registration.active.postMessage({ type: "WHR_REQUEST_RELOAD" });
-    } else if (registration.waiting) {
+    } else if (registration.waiting && sw.controller) {
       notify(UPDATE_MESSAGE);
       registration.waiting.postMessage({ type: "WHR_REQUEST_UPDATE" });
     }
@@ -137,6 +137,9 @@ export async function registerAttendantWorker(
   const changed = () => {
     if (!hadController) {
       hadController = true;
+      // First installation claims an already current page without a reload.
+      // Release a preparation initiated by another controlled tab, if any.
+      unfreeze();
       return;
     }
     controllerNeedsReload = true;

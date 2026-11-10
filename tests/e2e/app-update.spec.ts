@@ -23,6 +23,30 @@ test.use({
   },
 });
 
+async function oldDocumentGone(page: import("@playwright/test").Page) {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(
+            () =>
+              (window as unknown as { oldDocument?: boolean }).oldDocument ===
+              undefined,
+          );
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message.includes("Execution context was destroyed")
+          )
+            return false;
+          throw error;
+        }
+      },
+      { timeout: 15000 },
+    )
+    .toBe(true);
+}
+
 async function nextWorker(page: import("@playwright/test").Page, tag: string) {
   await page.evaluate(async (tag) => {
     await navigator.serviceWorker.register(
@@ -42,6 +66,9 @@ test("safe worker handover waits for capture to end before replacing the control
   await page
     .getByLabel("Or enter the card number", { exact: true })
     .fill("A7K3M9Q");
+  await expect(
+    page.getByLabel("Or enter the card number", { exact: true }),
+  ).toHaveValue("A7K3M9Q");
   await page.evaluate(() => {
     (window as unknown as { oldDocument: boolean }).oldDocument = true;
   });
@@ -67,15 +94,7 @@ test("safe worker handover waits for capture to end before replacing the control
     page.getByLabel("Or enter the card number", { exact: true }),
   ).toHaveValue("A7K3M9Q");
   await page.getByRole("link", { name: "Account", exact: true }).click();
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () => (window as unknown as { oldDocument?: boolean }).oldDocument,
-        ),
-      { timeout: 15000 },
-    )
-    .toBeUndefined();
+  await oldDocumentGone(page);
   await expect(
     page.getByRole("heading", { name: "Your account", exact: true }),
   ).toBeVisible();
@@ -120,7 +139,26 @@ test("waiting worker preserves queued sale and JPEG instead of reloading", async
       () => (window as unknown as { queuedDocument: boolean }).queuedDocument,
     ),
   ).toBe(true);
-  expect(await rows(page)).toEqual(before);
+  const after = await rows(page);
+  const originals = (records: Awaited<ReturnType<typeof rows>>) =>
+    records.map((row) => ({
+      originatingAccountId: row.originatingAccountId,
+      operationId: row.operationId,
+      original: row.original,
+      photoBlob: row.photoBlob,
+      photoDigest: row.photoDigest,
+      captureDisplay: row.captureDisplay,
+      localSavedAt: row.localSavedAt,
+    }));
+  // Foreground retries legitimately update attempts/backoff/leases while waiting.
+  // Every saved original, seller, ID and photo must remain exactly unchanged.
+  expect(originals(after)).toEqual(originals(before));
+  expect(after).toHaveLength(1);
+  expect(after[0]).toMatchObject({
+    state: "saved",
+    serverStatus: null,
+    purchaseId: null,
+  });
 });
 
 test("upgraded worker reads newer first-password sign-in and session responses", async ({
@@ -134,15 +172,7 @@ test("upgraded worker reads newer first-password sign-in and session responses",
     (window as unknown as { oldDocument: boolean }).oldDocument = true;
   });
   await nextWorker(page, "first-password");
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () => (window as unknown as { oldDocument?: boolean }).oldDocument,
-        ),
-      { timeout: 15000 },
-    )
-    .toBeUndefined();
+  await oldDocumentGone(page);
   const session = sessionFixture();
   const restricted = {
     state: "password_change_required",

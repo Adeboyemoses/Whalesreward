@@ -136,3 +136,25 @@ it("never reloads if capture starts during the final asynchronous outbox read", 
   await vi.waitFor(() => expect(isUpdateFrozen()).toBe(false));
   expect(reload).not.toHaveBeenCalled();
 });
+it("does not freeze or request handover for the first worker installation", async () => {
+  stop();
+  waiting.postMessage.mockClear();
+  sw.controller = null;
+  stop = await registerAttendantWorker();
+  expect(waiting.postMessage).not.toHaveBeenCalled();
+  expect(isUpdateFrozen()).toBe(false);
+  sw.controller = {};
+  sw.dispatchEvent(event("controllerchange"));
+  expect(isUpdateFrozen()).toBe(false);
+  expect(reload).not.toHaveBeenCalled();
+});
+it("releases another tab's preparation when an uncontrolled page is claimed for the first time", async () => {
+  stop();
+  sw.controller = null;
+  stop = await registerAttendantWorker();
+  expect(await prepare()).toBe(true);
+  sw.controller = {};
+  sw.dispatchEvent(event("controllerchange"));
+  expect(isUpdateFrozen()).toBe(false);
+  expect(reload).not.toHaveBeenCalled();
+});
