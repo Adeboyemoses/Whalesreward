@@ -819,13 +819,36 @@ export class AttendantClient {
       );
     return state.session;
   }
-  async lookup(
+  lookup(
     value: string,
     source: "code" | "qr" = "code",
   ): Promise<Lookup | null> {
+    return this.resolveLookup(value, source, false);
+  }
+  /** Registration/replay handoffs must revalidate online, even during an inferred outage. */
+  async lookupCurrent(value: string): Promise<Lookup> {
+    const found = await this.resolveLookup(value, "code", true);
+    // The online path never returns a cache miss; keep that guarantee explicit.
+    if (!found)
+      throw new ClientError(
+        "network_unavailable",
+        "Connect and look up this card again.",
+      );
+    return found;
+  }
+  private async resolveLookup(
+    value: string,
+    source: "code" | "qr",
+    requireOnline: boolean,
+  ): Promise<Lookup | null> {
     const session = await this.active();
     const code = normalizeCardCode(value);
-    if (!this.reachable()) {
+    if (requireOnline && !this.online())
+      throw new ClientError(
+        "network_unavailable",
+        "Connect and look up this card again.",
+      );
+    if (!requireOnline && !this.reachable()) {
       return this.db.transaction(
         "r",
         this.db.meta,

@@ -742,3 +742,74 @@ describe("P-23 immutable composition evidence", () => {
     reopened.close();
   });
 });
+
+describe("mandatory current card lookup", () => {
+  it("never uses saved customer evidence when browser is online but reachability falls during a handoff", async () => {
+    const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+    const found = {
+      ...(await api.lookup({ source: "code", code: "A7K3M9X" })),
+      lookupReceipt: evidence,
+    };
+    api.lookup = async () => structuredClone(found);
+    await client.lookup(found.cardCode);
+    let reachable = true;
+    const handoff = new AttendantClient(
+      api,
+      new CaptureDatabase(db.name),
+      () => ({ wall: now, mono, runtimeId: "current-handoff" }),
+      () => true,
+      () => reachable,
+    );
+    open.push(handoff);
+    await handoff.initialize();
+    reachable = false;
+    let requests = 0;
+    api.lookup = async () => {
+      requests++;
+      throw new ClientError("network_unavailable", "Unavailable");
+    };
+    expect(
+      (await handoff.lookup(found.cardCode))?.lookupReceipt === evidence,
+    ).toBe(true);
+    await expect(handoff.lookupCurrent(found.cardCode)).rejects.toMatchObject({
+      code: "network_unavailable",
+    });
+    expect(requests).toBe(1);
+    const newer = {
+      ...found,
+      lookupReceipt: `lr1.test.bmV3.${"B".repeat(43)}`,
+    };
+    api.lookup = async () => {
+      requests++;
+      return structuredClone(newer);
+    };
+    expect(
+      (await handoff.lookupCurrent(found.cardCode)).lookupReceipt ===
+        newer.lookupReceipt,
+    ).toBe(true);
+    expect(
+      (await handoff.lookup(found.cardCode))?.lookupReceipt ===
+        newer.lookupReceipt,
+    ).toBe(true);
+    expect(requests).toBe(2);
+  });
+  it("fences a mandatory current response after a new capture context without overwriting cache", async () => {
+    const found = await api.lookup({ source: "code", code: "A7K3M9X" });
+    const entered = deferred<void>();
+    const response = deferred<typeof found>();
+    api.lookup = () => {
+      entered.resolve();
+      return response.promise;
+    };
+    const pending = client.lookupCurrent(found.cardCode);
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: "account_changed",
+    });
+    await entered.promise;
+    api.current = { ...api.current, captureContextId: uuidv7() };
+    await client.signIn("grace", "fictional");
+    response.resolve(found);
+    await rejected;
+    expect(await db.customers.count()).toBe(0);
+  });
+});

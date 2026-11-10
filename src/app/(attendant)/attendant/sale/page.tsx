@@ -85,7 +85,7 @@ function Sale() {
               setCard(pending.cardCode);
               setFinding(true);
               void client
-                .lookup(pending.cardCode)
+                .lookupCurrent(pending.cardCode)
                 .then(
                   (found) => {
                     if (

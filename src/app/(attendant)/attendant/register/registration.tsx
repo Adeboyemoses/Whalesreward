@@ -259,7 +259,7 @@ function RegistrationFlow() {
     try {
       await client.checkAccess();
       if (!live(request, route) || !navigator.onLine) return;
-      const found = await client.lookup(code);
+      const found = await client.lookupCurrent(code);
       if (!found || found.customer.id !== customerId)
         throw new ClientError(
           "card_unavailable",
