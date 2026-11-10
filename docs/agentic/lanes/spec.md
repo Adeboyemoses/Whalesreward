@@ -18,4 +18,4 @@ WO-spec-3f (WHR-100 spec part) policy error status and health: READY since 2026-
 - No cloud changes or main promotion. Client card-stock specification Q-553 remains pending.
 - Full runtime model ID unavailable. Metrics include the separate records review.
 
-dispatches=7 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=8 prs=2 rounds_max=2 escalations=0 model=unavailable

@@ -659,7 +659,7 @@ The M2 rule requires non-5xx status for every domain error the UI must explain. 
 
 ## WO-spec-3f / WHR-100 policy errors and health READY — 11 Nov 2026
 
-[Spec PR #101](https://github.com/Adeboyemoses/Whalesreward/pull/101) merged into staging at 25ecdc9 with five green checks. Independent code/security/integrity PASS at 81be239, round 2; export lifecycle ambiguity resolved. EM typecheck/lint, 536 existing unit tests, build and evidence PASS. Inventory confirms ten remapped codes across 21 explicit endpoint occurrences, three retained 503 codes across four occurrences, and ten health keys. Maximum prose paragraph length across the amended contracts is 119 words. Specification coverage only; no new runtime tests or board parity claimed.
+[Spec PR #101](https://github.com/Adeboyemoses/Whalesreward/pull/101) merged into staging at 25ecdc9 with five green checks. Independent code/security/integrity PASS at 81be239, round 2; export lifecycle ambiguity resolved. EM typecheck/lint, 536 existing unit tests, build and evidence PASS. Inventory confirms ten remapped codes across 21 explicit endpoint occurrences, three retained 503 codes across five endpoint occurrences, and ten health keys. Maximum prose paragraph length across the amended contracts is 119 words. Specification coverage only; no new runtime tests or board parity claimed.
 
 | Invariants | Specification verification / future implementation | Status |
 |---|---|---|
@@ -668,3 +668,5 @@ The M2 rule requires non-5xx status for every domain error the UI must explain. 
 | I-26, I-35, I-36, I-45, I-46 | Unconfigured policies remain fail-closed; health grants no credit, hold clearance, recovery, deletion or finalization authority | Existing semantics preserved; independent integrity PASS |
 
 WO-core-7d implements current M2/export mappings and health; M3/M4 mappings ship with their own work orders. The health contract requires absent evaluators to report unconfigured; no deployment may infer approval from this specification. WHR-100 stays open for its separate core part. Stop at READY, with no acceptance or live staging configuration claim.
+
+Inventory correction: the earlier four-occurrence verification counted table rows only. M1 finalize also names `storage_unavailable` in prose, making five retained 503 endpoint occurrences. Its status was unchanged throughout; no endpoint mapping was missed.
