@@ -1,9 +1,10 @@
 # STATUS.md
-Updated: 2026-11-09
+Updated: 2026-11-10
 
 ## Milestone: M1 phone exit accepted; last M2 registration/customer/card screens READY; batched M2 staging smoke pending (docs/engineering/roadmap.md); M3 corrections backend READY
 
 ## Done this week
+- WO-spec-3e (WHR-99 spec part): [PR #98](https://github.com/Adeboyemoses/Whalesreward/pull/98) merged into staging at 112da2e with all five CI checks green. READY after this separate records merge. M2 specifies 409 for print_layout_unconfigured and non-5xx statuses for UI-explained domain errors. Code/security/integrity PASS round 1; EM typecheck/lint, 529 unit tests, build, inventory and paragraph checks PASS. Rook has the 13-code remaining 503 inventory in M2 and WHR-99. No runtime implementation claimed; WO-core-7c remains separate.
 - WO-spec-3d (WHR-91): READY through [spec #91](https://github.com/Adeboyemoses/Whalesreward/pull/91), merged into staging with five green checks, and this separate records PR. P-23 signed lookup evidence raises the capture lower bound to max(S,T), preserving the P-20 cap and independent review. Code/security/integrity PASS round 2; EM typecheck/lint, 454 unit tests, build and evidence PASS. No runtime change claimed. Rook should draft the listed core receipt/settlement and app draft/outbox work orders and mirror P-23 in product docs. WHR-91 remains In Review; Q-528 and WHR-16 boundaries persist.
 - WO-core-8 (WHR-14): READY after this separate records merge. [Feature #89](https://github.com/Adeboyemoses/Whalesreward/pull/89) merged at `83be123` with five green checks. P-22 recorded-basis numeric corrections, durable Lagos midnight classification, immutable replay/CAS, independent P-19 review, preserved holds and one accepted contribution, bounded validation, scoped sales/history and private evidence reads implement merged M3. Prior P1s have red/green regressions; Earl approved only the extra code/security review of6059568..3a003d4, both PASS with prior integrity PASS retained. Exact approval is committed in evidence; no further feature edit followed3a003d4 and all 40 feature files remained identical through required base integration. EM combined454 unit/330 PostgreSQL/111 named/time5+5/browser214+four existing skips/zero retries/storage1 and feature CI454/330/214+storage1 PASS. Named output: docs/qa/verification-2026-11-09-corrections.md. WHR-14/80/12 stay In Review for batched verification; no acceptance inferred.
 - WO-spec-3c (WHR-84): ACCEPTED by Earl on 9 November 2026; he instructed closure, then stop. P-22/M3 amendment [#84](https://github.com/Adeboyemoses/Whalesreward/pull/84), ebe3416, and READY records [#85](https://github.com/Adeboyemoses/Whalesreward/pull/85), 6b81b8b, merged with all five checks green and independent review. This docs-only closeout makes closure effective on its reviewed green staging merge; then WHR-84 moves to Done. No correction implementation or screen parity claimed.
@@ -45,6 +46,7 @@ Updated: 2026-11-09
 - WO-core-3 (WHR-4): READY on reviewed green staging merge of [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30). Better Auth username sign-in, revocable database sessions, immutable capture contexts, strict M1 wrappers, durable replay/throttling and safe fixture seeding. EM typecheck/lint/unit 77/build, fresh PostgreSQL integration 65, time 3 per timezone and real HTTP Playwright 1 passed; full browser CI required before merge because local Chromium startup is sandbox-blocked. Independent verdicts are in `.review/core__wo-3-attendant-auth.md`. Runbook: `docs/qa/smoke-2026-11-05-attendant-auth.md`. Stop at READY; Earl's acceptance and real-phone checks remain pending.
 
 ## In progress
+- WHR-99 remains open: WO-spec-3e is READY; WO-core-7c implementation is still pending. This spec session stops without starting it.
 
 - lane:spec is closing accepted WO-spec-2a through this documentation-only PR; WHR-79 moves to Done after its reviewed green merge. Stop after closure; no next work order is started.
 - lane:core stops after WHR-14 READY is posted. WHR-14, WHR-80 and WHR-12 remain In Review for Earl's batched verification; no next work order, main promotion or cloud action is authorized.
@@ -54,6 +56,7 @@ Updated: 2026-11-09
 - WO-app-0 (WHR-33): ACCEPTED by Earl on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Six briefs and three draft phone runbooks merged in PRs #2 and #9; documentation closeout takes effect on green staging merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- WHR-99: Rook reviews 13 other named 503 codes for required UI explanations and follow-on remapping. Existing mappings remain unchanged; generic temporarily_unavailable may stay 503. Q-553 physical card-stock values remain pending.
 - WO-app-6 has no open implementation decision. D08 phone/physical-print approval/configuration gates remain; UI handles unavailable policy safely and Excel stays independent. Earl’s combined staging workbook acceptance is pending.
 - WHR-12 D08: phone numbering and physical print specifications remain approval/configuration boundaries. Production registration and PDF preparation fail closed when unset; XLSX is independent. Legacy unrecorded provenance stays null. These existing pilot gates do not add UI, phone-change or card-replacement scope.
 - P-21 offboarding is implemented by WHR-80 within M2, extending the accepted WO-core-6 boundary without disable/reset/deactivation endpoints. WHR-77 first-password UI is implemented on staging in #80; WO-app-5 awaits Earl’s screen smoke acceptance. Full M3 recovery/review and client Q-528 confirmation remain later work.
@@ -67,6 +70,7 @@ Updated: 2026-11-09
 - Launch date versus the December campaign start.
 
 ## Next up
+- WO-core-7c may follow the merged WHR-99 spec: implement the 409 path, staging layout declaration and health flag with tests, under its own session. No core or cloud action is part of this records update.
 
 - Lane:spec stops after accepted WO-spec-3c closes. Rook should mirror P-22 into product docs; no product-doc edits here. No next work order is started.
 - Offboarding implementation remains separate in WHR-80 and WO-app-5. Rook's P-21 product-doc mirroring waits on Earl's go under Q-527; attendant disable remains a possible later client addition. Lane:spec stops after the accepted closeout.
