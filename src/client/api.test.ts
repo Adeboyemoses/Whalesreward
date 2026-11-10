@@ -238,3 +238,37 @@ describe("build mismatch", () => {
     },
   );
 });
+
+describe("P-23 lookup rollout", () => {
+  const found = {
+    cardCode: "A7K3M9X",
+    customer: { id: uuidv7(), name: "Amina Bello", category: "car_owner" },
+    lookedUpAt: session.serverTime,
+  };
+  const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+  it.each([undefined, null, evidence])(
+    "accepts either strict projection and opts in after core",
+    async (lookupReceipt) => {
+      const data =
+        lookupReceipt === undefined ? found : { ...found, lookupReceipt };
+      const transport = vi.fn<typeof fetch>(async () => reply(data));
+      const result = await new HttpAttendantApi(transport).lookup({
+        source: "code",
+        code: found.cardCode,
+      });
+      expect(result.lookupReceipt === (lookupReceipt ?? null)).toBe(true);
+      expect(transport.mock.calls[0]?.[1]?.headers).toMatchObject({
+        "X-WR-Lookup-Receipt": "1",
+      });
+    },
+  );
+  it("rejects unknown fields in both projections without exposing evidence", async () => {
+    for (const data of [found, { ...found, lookupReceipt: evidence }]) {
+      await expect(
+        new HttpAttendantApi(async () =>
+          reply({ ...data, extra: true }),
+        ).lookup({ source: "code", code: found.cardCode }),
+      ).rejects.toMatchObject({ code: "invalid_response" });
+    }
+  });
+});

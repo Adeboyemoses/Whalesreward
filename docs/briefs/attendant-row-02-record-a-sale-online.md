@@ -1,5 +1,7 @@
 # Attendant row 02: Record a sale online
 
+P-23 amendment (WHR-94, 10 November 2026): M1's signed lookup lower bound governs evidence wiring. Accept both strict response projections, normalize absent evidence to null, and enable the capability only after core PR #94. Snapshot the selected evidence before photo/save; cache refreshes cannot rewrite a composed draft or saved original. Store only the minimal account/context-partitioned lookup projection. Preserve legacy originals and photos unchanged. Existing boards, copy and layout apply.
+
 Boards: A02-Sale, A24-SaleCustomerNotFound, A03-SaleFilled, A04-SaleSynced
 Feature: F03–F05 · Invariants: I-03, I-04, I-16–I-17, I-22–I-30 · Work order: WO-app-2 (WHR-5), capture subset
 

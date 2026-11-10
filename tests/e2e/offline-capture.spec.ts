@@ -335,6 +335,11 @@ test("I-24 denied camera keeps the form and cannot claim a saved photo or sale",
     };
   });
   await signIn(page);
+  await page
+    .getByLabel("Or enter the card number", { exact: true })
+    .fill("A7K3M9Q");
+  await page.getByRole("button", { name: "Find", exact: true }).click();
+  await expect(page.getByText("Amina Bello", { exact: true })).toBeVisible();
   await page.getByLabel("Amount in naira", { exact: true }).fill("20000.01");
   await page.getByRole("button", { name: /^Take meter photo/ }).click();
   await expect(

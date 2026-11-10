@@ -30,6 +30,11 @@ export default defineConfig({
       EMAIL_PROVIDER: "noop",
       BETTER_AUTH_URL: "http://127.0.0.1:3000",
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+      // Ephemeral local signing configuration exercises P-23 in ordinary CI.
+      WHR_LOOKUP_RECEIPT_KEYS: JSON.stringify({
+        browser: randomBytes(32).toString("base64url"),
+      }),
+      WHR_LOOKUP_RECEIPT_ACTIVE_KID: "browser",
     },
     command: "pnpm build && pnpm start --hostname 127.0.0.1",
     url: "http://127.0.0.1:3000",

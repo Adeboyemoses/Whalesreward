@@ -1,5 +1,7 @@
 # Attendant row 4: Register a customer
 
+P-23 amendment (WHR-94, 10 November 2026): accept strict legacy and receipt-capable registration results, normalizing missing lookup evidence to null. An initial result may seed the minimal lookup projection for a new sale; a replay remains historical and requires current card lookup before composition. Exact-phone results always require current card lookup. Freeze the selected evidence before photo/save, with no registration PII persisted. M1/M2 P-23 supersedes any older evidence behavior below; boards, copy and layout remain unchanged.
+
 Boards: A06-Register, A25-RegisterDuplicatePhone, A07-RegisterSuccess; A24 entry integration. Feature: F02/F03. Invariants: I-02, I-06, I-14–I-19, I-49/I-50.
 Decision note: product-docs/04 UI Design/Attendant Mobile/Customer Registration Screen Decisions.md. HTML structure and PNGs inspected before dispatch.
 

@@ -218,3 +218,83 @@ describe("online memory-only registration", () => {
     expect(new ClientError("test", "safe").message).toBe("safe");
   });
 });
+
+describe("P-23 registration rollout", () => {
+  const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+  it.each([undefined, null, evidence])(
+    "accepts both strict registration shapes",
+    async (lookupReceipt) => {
+      const body = input();
+      const legacy = receipt(body.operationId);
+      const data =
+        lookupReceipt === undefined ? legacy : { ...legacy, lookupReceipt };
+      const transport = vi.fn<typeof fetch>(async () => envelope(data));
+      const result = await new HttpRegistrationApi(
+        transport,
+        () => () => {},
+      ).register(body);
+      expect(result.lookupReceipt === (lookupReceipt ?? null)).toBe(true);
+      expect(transport.mock.calls[0]?.[1]?.headers).toMatchObject({
+        "X-WR-Lookup-Receipt": "1",
+      });
+    },
+  );
+});
+
+describe("P-23 historical registration evidence", () => {
+  it("replays the original registration response then obtains current evidence before another sale", async () => {
+    const body = input();
+    const historical = {
+      ...receipt(body.operationId),
+      lookupReceipt: `lr1.test.b2xk.${"A".repeat(43)}`,
+    };
+    const current = {
+      cardCode: historical.cardCode,
+      customer: {
+        id: historical.customer.id,
+        name: historical.customer.name,
+        category: "car_owner",
+      },
+      lookedUpAt: "2026-11-09T11:00:00Z",
+      lookupReceipt: `lr1.test.bmV3.${"B".repeat(43)}`,
+    };
+    let attempts = 0;
+    const transport = vi.fn<typeof fetch>(async (path) => {
+      if (path === "/api/attendant/cards/lookup") return envelope(current);
+      if (++attempts === 1) throw new TypeError("lost response");
+      return envelope(historical);
+    });
+    const api = new HttpRegistrationApi(transport, () => () => {});
+    const operation = new RegistrationOperation(
+      body,
+      "account:context",
+      () => "account:context",
+    );
+    await expect(operation.send(api)).rejects.toMatchObject({
+      code: "network_unavailable",
+    });
+    const replay = await operation.send(api);
+    expect(replay.lookupReceipt === historical.lookupReceipt).toBe(true);
+    const selected = await api.currentCard(replay.cardCode, replay.customer.id);
+    expect(selected.lookupReceipt === current.lookupReceipt).toBe(true);
+    expect(selected.lookupReceipt === replay.lookupReceipt).toBe(false);
+    expect(
+      transport.mock.calls[0]?.[1]?.body === transport.mock.calls[1]?.[1]?.body,
+    ).toBe(true);
+  });
+  it("rejects extra fields in capable registration without returning receipt bytes", async () => {
+    const body = input();
+    const api = new HttpRegistrationApi(
+      async () =>
+        envelope({
+          ...receipt(body.operationId),
+          lookupReceipt: null,
+          extra: true,
+        }),
+      () => () => {},
+    );
+    await expect(api.register(body)).rejects.toMatchObject({
+      code: "invalid_response",
+    });
+  });
+});

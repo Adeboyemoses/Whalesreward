@@ -650,3 +650,166 @@ describe("durable account partition", () => {
     expect(await client.ownSales()).toHaveLength(0);
   });
 });
+
+describe("P-23 immutable composition evidence", () => {
+  const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+  async function selected() {
+    const form = await input();
+    form.customerCache = { ...form.customerCache!, lookupReceipt: evidence };
+    api.lookup = async () => structuredClone(form.customerCache!);
+    const found = await client.lookup(form.cardCode);
+    const draft = client.selectLookup(
+      await client.beginCapture(),
+      form.cardCode,
+      found,
+    );
+    return { form, draft };
+  }
+  it("retains cached evidence and original timestamp through offline restart", async () => {
+    const { form } = await selected();
+    client.close();
+    online = false;
+    const reopened = new AttendantClient(
+      api,
+      new CaptureDatabase(db.name),
+      () => ({ wall: now, mono, runtimeId: "restart" }),
+      () => false,
+    );
+    open.push(reopened);
+    await reopened.initialize();
+    const found = await reopened.lookup(form.cardCode);
+    expect(found?.lookupReceipt === evidence).toBe(true);
+    expect(found?.lookedUpAt).toBe(form.customerCache?.lookedUpAt);
+  });
+  it("does not reuse cached evidence across contexts or accounts", async () => {
+    const { form } = await selected();
+    const original = api.current;
+    api.current = { ...original, captureContextId: uuidv7() };
+    await client.signIn("grace", "fictional");
+    online = false;
+    expect((await client.lookup(form.cardCode))?.lookupReceipt).toBeNull();
+    online = true;
+    await client.signOut();
+    api.current = sessionFixture(now);
+    await client.signIn("other", "fictional");
+    online = false;
+    expect(await client.lookup(form.cardCode)).toBeNull();
+  });
+  it("freezes selected evidence before photo/save while lookup refreshes and inputs mutate", async () => {
+    const { form, draft } = await selected();
+    const newer = `lr1.test.bmV3ZXI.${"B".repeat(43)}`;
+    form.customerCache!.lookupReceipt = newer;
+    await client.lookup(form.cardCode);
+    const saved = await client.saveCapture(draft, form);
+    expect(saved.original.lookupReceipt === evidence).toBe(true);
+    expect(
+      (await client.ownSale(saved.operationId))?.original.lookupReceipt ===
+        evidence,
+    ).toBe(true);
+  });
+  it("quota rollback retains draft evidence and retries it unchanged despite a newer cache", async () => {
+    const { form, draft } = await selected();
+    const hook = () => {
+      throw new DOMException("full", "QuotaExceededError");
+    };
+    db.outbox.hook("creating", hook);
+    await expect(client.saveCapture(draft, form)).rejects.toMatchObject({
+      code: "storage_failed",
+    });
+    expect(await db.outbox.count()).toBe(0);
+    db.outbox.hook("creating").unsubscribe(hook);
+    form.customerCache!.lookupReceipt = null;
+    const row = await client.saveCapture(draft, form);
+    expect(row.original.lookupReceipt === evidence).toBe(true);
+    expect(row.photoBlob.size).toBe(form.photo.bytes);
+  });
+  it("legacy drafts do not acquire later evidence and originals survive database reopen unchanged", async () => {
+    const draft = await client.beginCapture();
+    const form = await input();
+    form.customerCache!.lookupReceipt = evidence;
+    const saved = await client.saveCapture(draft, form);
+    expect(Object.hasOwn(saved.original, "lookupReceipt")).toBe(false);
+    const serialized = JSON.stringify(saved.original);
+    client.close();
+    const reopened = new CaptureDatabase(db.name);
+    await reopened.open();
+    const retained = await reopened.outbox.get([
+      saved.originatingAccountId,
+      saved.operationId,
+    ]);
+    expect(JSON.stringify(retained?.original) === serialized).toBe(true);
+    expect(retained?.photoBlob.size).toBe(form.photo.bytes);
+    reopened.close();
+  });
+});
+
+describe("mandatory current card lookup", () => {
+  it("never uses saved customer evidence when browser is online but reachability falls during a handoff", async () => {
+    const evidence = `lr1.test.cGF5bG9hZA.${"A".repeat(43)}`;
+    const found = {
+      ...(await api.lookup({ source: "code", code: "A7K3M9X" })),
+      lookupReceipt: evidence,
+    };
+    api.lookup = async () => structuredClone(found);
+    await client.lookup(found.cardCode);
+    let reachable = true;
+    const handoff = new AttendantClient(
+      api,
+      new CaptureDatabase(db.name),
+      () => ({ wall: now, mono, runtimeId: "current-handoff" }),
+      () => true,
+      () => reachable,
+    );
+    open.push(handoff);
+    await handoff.initialize();
+    reachable = false;
+    let requests = 0;
+    api.lookup = async () => {
+      requests++;
+      throw new ClientError("network_unavailable", "Unavailable");
+    };
+    expect(
+      (await handoff.lookup(found.cardCode))?.lookupReceipt === evidence,
+    ).toBe(true);
+    await expect(handoff.lookupCurrent(found.cardCode)).rejects.toMatchObject({
+      code: "network_unavailable",
+    });
+    expect(requests).toBe(1);
+    const newer = {
+      ...found,
+      lookupReceipt: `lr1.test.bmV3.${"B".repeat(43)}`,
+    };
+    api.lookup = async () => {
+      requests++;
+      return structuredClone(newer);
+    };
+    expect(
+      (await handoff.lookupCurrent(found.cardCode)).lookupReceipt ===
+        newer.lookupReceipt,
+    ).toBe(true);
+    expect(
+      (await handoff.lookup(found.cardCode))?.lookupReceipt ===
+        newer.lookupReceipt,
+    ).toBe(true);
+    expect(requests).toBe(2);
+  });
+  it("fences a mandatory current response after a new capture context without overwriting cache", async () => {
+    const found = await api.lookup({ source: "code", code: "A7K3M9X" });
+    const entered = deferred<void>();
+    const response = deferred<typeof found>();
+    api.lookup = () => {
+      entered.resolve();
+      return response.promise;
+    };
+    const pending = client.lookupCurrent(found.cardCode);
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: "account_changed",
+    });
+    await entered.promise;
+    api.current = { ...api.current, captureContextId: uuidv7() };
+    await client.signIn("grace", "fictional");
+    response.resolve(found);
+    await rejected;
+    expect(await db.customers.count()).toBe(0);
+  });
+});

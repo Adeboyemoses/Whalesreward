@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lookupReceiptSchema } from "../shared/contracts/lookup-receipt";
 const id = z.uuidv7();
 const instant = z.iso.datetime({ offset: true });
 const label = z
@@ -140,7 +141,20 @@ export const lookupSchema = z.strictObject({
   lookedUpAt: instant,
 });
 export type Session = z.infer<typeof sessionSchema>;
-export type Lookup = z.infer<typeof lookupSchema>;
+export const lookupResponseSchema = z
+  .union([
+    lookupSchema
+      .extend({ lookupReceipt: lookupReceiptSchema.nullable() })
+      .strict(),
+    lookupSchema,
+  ])
+  .transform((value) => ({
+    ...value,
+    lookupReceipt: "lookupReceipt" in value ? value.lookupReceipt : null,
+  }));
+export type Lookup = z.infer<typeof lookupSchema> & {
+  lookupReceipt?: string | null;
+};
 export type Medium = "vehicle" | "keg" | "three_wheeler" | "bike" | "cylinder";
 export type Entry =
   | {
@@ -156,6 +170,7 @@ export type Entry =
       quantity: string;
     };
 export type OriginalSale = {
+  lookupReceipt?: string | null;
   operationId: string;
   captureContextId: string;
   assignmentId: string;
@@ -263,6 +278,12 @@ export type CapturedPhoto = {
   mediaType: "image/jpeg";
 };
 export type CaptureDraft = {
+  // Absent on legacy drafts: never infer evidence at save time.
+  selectedLookup?: {
+    cardCode: string;
+    lookupReceipt: string | null;
+    customer: Lookup | null;
+  };
   operationId: string;
   appCapturedAt: string;
   session: Session;
