@@ -38,3 +38,20 @@ it("removes the unusable CORS ETag step and warns against replacing live secrets
   );
   expect(runbook).toContain("about $32/month baseline");
 });
+
+it("WHR-99 declares the non-secret Q-553 print placeholder on the web service", () => {
+  const web = spec.slice(spec.indexOf("services:"), spec.indexOf("jobs:"));
+  expect(web).toContain("Q-553");
+  const entry = web.match(
+    /key: WHR_CARD_PRINT_LAYOUT\n\s+scope: RUN_TIME\n\s+value: '([^']+)'/,
+  );
+  expect(entry).not.toBeNull();
+  expect(JSON.parse(entry![1]!)).toEqual({
+    pageWidthMm: 210,
+    pageHeightMm: 297,
+    cardWidthMm: 85.6,
+    cardHeightMm: 54,
+    marginMm: 10,
+    gapMm: 2,
+  });
+});

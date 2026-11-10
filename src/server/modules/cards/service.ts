@@ -191,11 +191,11 @@ export async function cardsWrite(
           const body = createExportSchema.parse(parsed);
           if (body.format === "pdf") {
             if (!options.layout)
-              throw new AuthError("print_layout_unconfigured", 503);
+              throw new AuthError("print_layout_unconfigured", 409);
             try {
               validateCardPrintLayout(options.layout);
             } catch {
-              throw new AuthError("print_layout_unconfigured", 503);
+              throw new AuthError("print_layout_unconfigured", 409);
             }
           }
           const active = (

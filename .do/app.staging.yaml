@@ -74,6 +74,10 @@ services:
       - key: APP_VERSION
         scope: RUN_TIME
         value: ${_self.COMMIT_HASH}
+      # Staging placeholder: bank-card size on A4, pending client card stock Q-553.
+      - key: WHR_CARD_PRINT_LAYOUT
+        scope: RUN_TIME
+        value: '{"pageWidthMm":210,"pageHeightMm":297,"cardWidthMm":85.6,"cardHeightMm":54,"marginMm":10,"gapMm":2}'
     health_check:
       http_path: /api/health
       initial_delay_seconds: 15
