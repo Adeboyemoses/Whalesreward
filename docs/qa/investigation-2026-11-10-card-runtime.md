@@ -41,3 +41,7 @@ The container uses `whr-upload-browser:lean`, a tracked-source archive, `pnpm in
 The controlled storage probe is `scripts/diagnostics/card-storage-lock.ts`. Bundle it with esbuild (`--bundle --platform=node --format=esm --packages=external`) to a temporary `.mjs` inside the repository (for dependency resolution), then run with DATABASE_URL pointing to an already-populated isolated localhost `whr_app6_whr97_...` matrix database. It creates one fictional pending export and uses a deliberately gated fake write, so never use that database for subsequent download assertions. It measures lock duration, not real Spaces latency.
 
 Checks: host production build and typecheck passed; scoped diagnostics ESLint passed. Unit/integration suites not run: no product fix selected. Pending: staging incident logs/Insights and correlation; no regression can honestly be named as reproducing the incident yet.
+
+## EM independent verification
+
+The same constrained Linux matrix independently passed **6/6, zero retries, 32.8 seconds** on 10 Nov 2026. Docker inspection confirmed 1,073,741,824-byte memory limit, one CPU, restart count zero and OOMKilled=false. Three observed pool constructors printed max=2. Sampled app RSS peaked at 218,365,952 bytes; sampled pool acquisition waiters remained zero. Log: `/tmp/whr97-em.log` (local temporary evidence). This does not reproduce the staging incident or establish its cause. Earl's staging evidence remains the next required input; no PR or READY claim.
