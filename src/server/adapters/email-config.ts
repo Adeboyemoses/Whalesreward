@@ -32,6 +32,21 @@ export function normalizedEmail(value: string): string | undefined {
   return address.safeParse(normalized).success ? normalized : undefined;
 }
 /** No values in configuration errors: these variables contain private inboxes and credentials. */
+export function mailpitOrigin(raw: string = "http://127.0.0.1:8025"): string {
+  try {
+    const url = new URL(raw);
+    if (
+      !["localhost", "127.0.0.1", "mailpit"].includes(url.hostname) ||
+      url.protocol !== "http:" ||
+      url.username ||
+      url.password
+    )
+      throw new Error();
+    return url.toString();
+  } catch {
+    throw new EmailConfigError("MAILPIT_URL");
+  }
+}
 export function emailConfig(
   env: Record<string, string | undefined> = process.env,
 ): EmailOptions {

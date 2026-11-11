@@ -5,9 +5,11 @@ export const AUTH_POLICY = Object.freeze({
   replayMs: 300000,
   tombstoneMs: 86400000,
 });
-export function authConfig() {
-  const secret = process.env.BETTER_AUTH_SECRET;
-  const raw = process.env.BETTER_AUTH_URL;
+export function authConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const secret = env.BETTER_AUTH_SECRET;
+  const raw = env.BETTER_AUTH_URL;
   if (!secret || secret.length < 32 || !raw)
     throw new Error("Authentication configuration is unavailable");
   const url = new URL(raw);
@@ -27,6 +29,6 @@ export function authConfig() {
   return {
     secret,
     origin: url.origin,
-    trustedIpHeader: process.env.WHR_TRUSTED_IP_HEADER,
+    trustedIpHeader: env.WHR_TRUSTED_IP_HEADER,
   };
 }

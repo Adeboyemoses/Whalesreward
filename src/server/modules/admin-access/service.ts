@@ -270,7 +270,7 @@ export async function adminWrite(
         const user = await userView(db, targetId!);
         delegation(config, actor, user.role);
         if (!deliveryConfigured(config))
-          throw new AuthError("delivery_unconfigured", 503);
+          throw new AuthError("delivery_unconfigured", 409);
         return receipt(
           db,
           config,

@@ -14,8 +14,10 @@ export type CardOptions = {
   codeGenerator?: () => string;
   artifactLifetimeMs?: number;
 };
-export function cardPrintLayout(): CardPrintLayout | undefined {
-  const raw = process.env.WHR_CARD_PRINT_LAYOUT;
+export function cardPrintLayout(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): CardPrintLayout | undefined {
+  const raw = env.WHR_CARD_PRINT_LAYOUT;
   let layout: CardPrintLayout | undefined;
   if (raw) {
     try {

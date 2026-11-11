@@ -3,6 +3,7 @@ import {
   emailConfig,
   EmailConfigError,
   normalizedEmail,
+  mailpitOrigin,
   type EmailOptions,
   type EmailSetting,
 } from "./email-config";
@@ -156,14 +157,7 @@ export async function sendEmail(
     };
   } else {
     try {
-      const base = new URL(options.mailpitUrl ?? "http://127.0.0.1:8025");
-      if (
-        !["localhost", "127.0.0.1", "mailpit"].includes(base.hostname) ||
-        base.protocol !== "http:" ||
-        base.username ||
-        base.password
-      )
-        throw new EmailConfigError("MAILPIT_URL");
+      const base = mailpitOrigin(options.mailpitUrl);
       url = new URL("/api/v1/send", base).toString();
     } catch {
       return failed("config_invalid", { setting: "MAILPIT_URL" });

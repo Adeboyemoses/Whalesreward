@@ -38,13 +38,13 @@ export async function prepareCardExport(
     // leases remain owned by their renderer, regardless of local configuration.
     const unavailable = (
       await db.query(
-        "SELECT id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND status IN('pending','failed') AND((attempts>=$2 AND(status='pending' OR lease_nonce IS NOT NULL)) OR(format='pdf' AND NOT $3::boolean AND attempts<$2)) AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
+        "SELECT id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND status='pending' AND(attempts>=$2 OR(format='pdf' AND NOT $3::boolean)) AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
         [exportId ?? null, CARD_POLICY.maxAttempts, !!options.layout],
       )
     ).rows[0];
     if (unavailable) {
       const recovered = await db.query(
-        "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=greatest(attempts,$2),lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL,fencing_version=fencing_version+1 WHERE id=$1 AND status IN('pending','failed') AND((attempts>=$2 AND(status='pending' OR lease_nonce IS NOT NULL)) OR(format='pdf' AND NOT $5::boolean AND attempts<$2)) AND fencing_version=$3 AND lease_nonce IS NOT DISTINCT FROM $4 AND(lease_until IS NULL OR lease_until<=clock_timestamp())",
+        "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=greatest(attempts,$2),lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL,fencing_version=fencing_version+1 WHERE id=$1 AND status='pending' AND(attempts>=$2 OR(format='pdf' AND NOT $5::boolean)) AND fencing_version=$3 AND lease_nonce IS NOT DISTINCT FROM $4 AND(lease_until IS NULL OR lease_until<=clock_timestamp())",
         [
           unavailable.id,
           CARD_POLICY.maxAttempts,
@@ -57,7 +57,7 @@ export async function prepareCardExport(
     }
     const r = (
       await db.query(
-        `SELECT e.* FROM card_export e WHERE($1::uuid IS NULL OR e.id=$1) AND e.status IN('pending','failed') AND e.attempts<$2 AND(e.next_attempt_at IS NULL OR e.next_attempt_at<=clock_timestamp()) AND(e.lease_until IS NULL OR e.lease_until<=clock_timestamp()) AND(e.format='xlsx' OR $3::boolean) ORDER BY e.created_at,e.id LIMIT 1 FOR UPDATE SKIP LOCKED`,
+        `SELECT e.* FROM card_export e WHERE($1::uuid IS NULL OR e.id=$1) AND e.status='pending' AND e.attempts<$2 AND(e.next_attempt_at IS NULL OR e.next_attempt_at<=clock_timestamp()) AND(e.lease_until IS NULL OR e.lease_until<=clock_timestamp()) AND(e.format='xlsx' OR $3::boolean) ORDER BY e.created_at,e.id LIMIT 1 FOR UPDATE SKIP LOCKED`,
         [exportId ?? null, CARD_POLICY.maxAttempts, !!options.layout],
       )
     ).rows[0];
@@ -124,7 +124,7 @@ export async function prepareCardExport(
       await securityLock(db);
       const row = (
         await db.query(
-          "SELECT id FROM card_export WHERE id=$1 AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp() FOR UPDATE",
+          "SELECT id FROM card_export WHERE id=$1 AND status='pending' AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp() FOR UPDATE",
           [claim.id, claim.nonce, claim.fence],
         )
       ).rows[0];
@@ -142,7 +142,7 @@ export async function prepareCardExport(
       await securityLock(db);
       const row = (
         await db.query(
-          "SELECT * FROM card_export WHERE id=$1 AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp() FOR UPDATE",
+          "SELECT * FROM card_export WHERE id=$1 AND status='pending' AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp() FOR UPDATE",
           [claim.id, claim.nonce, claim.fence],
         )
       ).rows[0];
@@ -154,7 +154,7 @@ export async function prepareCardExport(
       if (!Number.isSafeInteger(lifetime) || lifetime <= 0)
         throw new Error("Artifact lifetime invalid");
       const updated = await db.query(
-        "UPDATE card_export SET status='ready',prepared_at=clock_timestamp(),expires_at=clock_timestamp()+($4::bigint*interval '1 millisecond'),object_key=$5,sha256=$6,byte_size=$7,failure_code=NULL,lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL WHERE id=$1 AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp()",
+        "UPDATE card_export SET status='ready',prepared_at=clock_timestamp(),expires_at=clock_timestamp()+($4::bigint*interval '1 millisecond'),object_key=$5,sha256=$6,byte_size=$7,failure_code=NULL,lease_nonce=NULL,lease_until=NULL,next_attempt_at=NULL WHERE id=$1 AND status='pending' AND lease_nonce=$2 AND fencing_version=$3 AND lease_until>clock_timestamp()",
         [
           claim.id,
           claim.nonce,
@@ -183,8 +183,14 @@ export async function prepareCardExport(
     await transaction(pool, async (db) => {
       await securityLock(db);
       await db.query(
-        "UPDATE card_export SET status='failed',failure_code='preparation_failed',lease_nonce=NULL,lease_until=NULL,next_attempt_at=clock_timestamp()+($4::bigint*interval '1 millisecond') WHERE id=$1 AND lease_nonce=$2 AND fencing_version=$3",
-        [claim.id, claim.nonce, claim.fence, CARD_POLICY.retryMs],
+        "UPDATE card_export SET status=CASE WHEN attempts>=$5 THEN 'failed' ELSE 'pending' END,failure_code=CASE WHEN attempts>=$5 THEN 'preparation_failed' ELSE NULL END,lease_nonce=NULL,lease_until=NULL,next_attempt_at=CASE WHEN attempts>=$5 THEN NULL ELSE clock_timestamp()+($4::bigint*interval '1 millisecond') END WHERE id=$1 AND status='pending' AND lease_nonce=$2 AND fencing_version=$3",
+        [
+          claim.id,
+          claim.nonce,
+          claim.fence,
+          CARD_POLICY.retryMs,
+          CARD_POLICY.maxAttempts,
+        ],
       );
     });
     return { processed: true, delivered: false };
@@ -212,7 +218,7 @@ export async function downloadCardExport(
       if (!r) throw new AuthError("not_found", 404);
       if (r.expired || r.status === "expired")
         throw new AuthError("export_expired", 410);
-      if (r.status === "failed") throw new AuthError("export_failed", 503);
+      if (r.status === "failed") throw new AuthError("export_failed", 409);
       if (r.status !== "ready") throw new AuthError("export_not_ready", 409);
       // The creator's current authority also gates artifacts prepared before revocation.
       if (!(await creatorAllowed(db, r.created_by)))
@@ -227,7 +233,7 @@ export async function downloadCardExport(
     BigInt(bytes.byteLength) !== BigInt(initial.byte_size) ||
     createHash("sha256").update(bytes).digest("hex") !== initial.sha256
   )
-    throw new AuthError("export_failed", 503);
+    throw new AuthError("export_failed", 409);
   // Recheck live session, grants, creator, expiry and artifact after untrusted I/O.
   const current = await authorize();
   if (
@@ -235,7 +241,7 @@ export async function downloadCardExport(
     current.sha256 !== initial.sha256 ||
     BigInt(current.byte_size) !== BigInt(initial.byte_size)
   )
-    throw new AuthError("export_failed", 503);
+    throw new AuthError("export_failed", 409);
   return {
     bytes,
     contentType:

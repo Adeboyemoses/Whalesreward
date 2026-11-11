@@ -12,6 +12,7 @@ import {
 import { adminWrite } from "../../src/server/modules/admin-access/service";
 import { processMail } from "../../src/server/modules/admin-access/mail";
 import { adminConfig } from "../../src/server/modules/admin-access/config";
+import * as accessPolicy from "../../src/server/modules/admin-access/config";
 import { digest } from "../../src/server/modules/auth/crypto";
 import { handleAdmin } from "../../src/server/modules/admin-access/http";
 
@@ -1251,5 +1252,114 @@ describe("independent M2 admin access adversarial checks", () => {
         )
       ).rows[0].count,
     ).toBe(1);
+  });
+  it("WHR-100 M2 policy errors stay fail closed with JSON 409 and generic public reset", async () => {
+    const member = await account(await role(["overview"]));
+    const administrator = await account(await role(catalogue));
+    const before = (
+      await pool.query(
+        "SELECT (SELECT count(*) FROM auth_session) AS sessions,(SELECT count(*) FROM role) AS roles,(SELECT count(*) FROM mutation_receipt) AS receipts,(SELECT count(*) FROM mail_request) AS mail",
+      )
+    ).rows[0];
+    vi.stubEnv("WHR_ENV", "production");
+    vi.stubEnv("EMAIL_PROVIDER", "noop");
+    vi.stubEnv("EMAIL_ALLOWED_RECIPIENTS", undefined);
+    try {
+      const auth = await call("sign-in", {
+        body: { username: "ada.williams", password },
+      });
+      for (const result of [
+        await call("assignable-roles", { cookie: administrator.cookie }),
+        await call("roles-create", {
+          cookie: administrator.cookie,
+          body: {
+            operationId: newId(),
+            name: "Still blocked",
+            permissions: ["overview"],
+            reason: "Fictional test",
+          },
+        }),
+      ]) {
+        expect(result.body.error).toMatchObject({
+          code: "auth_policy_unconfigured",
+          retryable: false,
+        });
+        expect(result.response.status).toBe(409);
+      }
+      // Production's earlier auth gate is independently covered above. Isolate
+      // the downstream delegation gate to verify its unchanged HTTP envelope.
+      const requirePolicy = accessPolicy.requirePolicy;
+      const policySpy = vi
+        .spyOn(accessPolicy, "requirePolicy")
+        .mockImplementation((config, delegation) => {
+          if (delegation) requirePolicy(config, true);
+        });
+      const delegation = await call("assignable-roles", {
+        cookie: administrator.cookie,
+      });
+      const create = await call("roles-create", {
+        cookie: administrator.cookie,
+        body: {
+          operationId: newId(),
+          name: "Must not exist",
+          permissions: ["overview"],
+          reason: "Fictional test",
+        },
+      });
+      for (const [result, code] of [
+        [auth, "auth_policy_unconfigured"],
+        [delegation, "delegation_policy_unconfigured"],
+        [create, "delegation_policy_unconfigured"],
+      ] as const) {
+        expect(result.body.error.code).toBe(code);
+        expect(result.response.status).toBe(409);
+        expect(result.body.error).toEqual({
+          code,
+          message: "This request could not be completed.",
+          retryable: false,
+        });
+        expect(result.response.headers.get("cache-control")).toBe("no-store");
+        expect(result.response.headers.get("content-type")).toContain(
+          "application/json",
+        );
+        expect(result.cookie).toBeUndefined();
+      }
+      policySpy.mockRestore();
+      vi.stubEnv("WHR_ENV", "local");
+      const delivery = await call("verification-requests", {
+        cookie: administrator.cookie,
+        target: member.adminId,
+        body: { operationId: newId(), expectedVersion: 1 },
+      });
+      expect(delivery.body.error.code).toBe("delivery_unconfigured");
+      expect(delivery.response.status).toBe(409);
+      expect(delivery.body.error).toEqual({
+        code: "delivery_unconfigured",
+        message: "This request could not be completed.",
+        retryable: false,
+      });
+      expect(
+        (
+          await pool.query(
+            "SELECT (SELECT count(*) FROM auth_session) AS sessions,(SELECT count(*) FROM role) AS roles,(SELECT count(*) FROM mutation_receipt) AS receipts,(SELECT count(*) FROM mail_request) AS mail",
+          )
+        ).rows[0],
+      ).toEqual(before);
+      const known = await call("password-reset-requests", {
+        body: { email: member.email },
+      });
+      const absent = await call("password-reset-requests", {
+        body: { email: "absent-policy@example.com" },
+      });
+      expect(known.response.status).toBe(202);
+      expect(absent.response.status).toBe(202);
+      expect(known.body.data).toEqual(absent.body.data);
+      expect(
+        (await pool.query("SELECT count(*) AS n FROM mail_request")).rows[0].n,
+      ).toBe(before.mail);
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllEnvs();
+    }
   });
 });
