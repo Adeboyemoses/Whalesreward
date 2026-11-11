@@ -681,7 +681,9 @@ test("I-06 pending correction and server history stay with originating account a
       .getByRole("button", { name: "Sign out / hand over device", exact: true })
       .click();
     await f.phone
-      .getByRole("button", { name: /^Sign out(?: with pending sales)?$/ })
+      .getByRole("button", {
+        name: /^Sign out(?: with pending (?:sales|changes))?$/,
+      })
       .click();
     await expect(f.phone).toHaveURL(/\/attendant\/sign-in$/);
     await f.context.setOffline(false);
@@ -839,6 +841,25 @@ test("I-06 correction-only handover warns and upload-first waits for a durable c
     await expect(upload).toBeVisible();
     await expect(upload).toBeDisabled();
     await expect(f.phone.getByRole("main")).toContainText(/1.*correction/i);
+    for (const width of [390, 360]) {
+      await f.phone.setViewportSize({ width, height: 844 });
+      expect(
+        await f.phone.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(width);
+      const shortTargets = await f.phone
+        .locator("button,a")
+        .evaluateAll((elements) =>
+          elements
+            .map((el) => ({
+              label: el.textContent?.trim(),
+              height: el.getBoundingClientRect().height,
+              width: el.getBoundingClientRect().width,
+            }))
+            .filter((el) => el.width > 0 && el.height > 0 && el.height < 48),
+        );
+      expect(shortTargets).toEqual([]);
+    }
+    await f.phone.setViewportSize({ width: 390, height: 844 });
     await f.phone.route(
       `**/api/attendant/sales/${sale.detail.id}/corrections`,
       (route) =>
@@ -878,6 +899,27 @@ test("I-06 correction-only handover warns and upload-first waits for a durable c
     hookInstalled = true;
     await f.phone.unroute(
       `**/api/attendant/sales/${sale.detail.id}/corrections`,
+    );
+    await f.phone.route(
+      `**/api/attendant/sales/${sale.detail.id}/corrections`,
+      async (route) => {
+        const receipt = await route.fetch();
+        expect(receipt.status()).toBe(201);
+        // Hold delivery, not authority or validation: the real worker settles the late proposal first.
+        await expect
+          .poll(
+            async () =>
+              (
+                await f.db.query(
+                  "SELECT state FROM correction_request WHERE purchase_id=$1",
+                  [sale.detail.id],
+                )
+              ).rows[0]?.state,
+            { timeout: 30000 },
+          )
+          .toBe("awaiting_review");
+        await route.fulfill({ response: receipt });
+      },
     );
     await expect
       .poll(
