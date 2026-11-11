@@ -572,6 +572,14 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       "ALTER TABLE review_evidence_configuration RENAME TO unavailable_health_configuration",
     );
     try {
+      // Keep the name occupied in this schema: a missing relation would fall
+      // through search_path to a separately migrated public database table.
+      await pool.query(
+        "CREATE VIEW review_evidence_configuration AS SELECT NULL::uuid AS id",
+      );
+      await expect(
+        pool.query("SELECT station_id FROM review_evidence_configuration"),
+      ).rejects.toMatchObject({ code: "42703" });
       const body = await call(adminCookie(a.token), true, async () => {
         await pool.query("SELECT 1");
       });
@@ -582,6 +590,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
         }),
       );
     } finally {
+      await pool.query("DROP VIEW IF EXISTS review_evidence_configuration");
       await pool.query(
         "ALTER TABLE unavailable_health_configuration RENAME TO review_evidence_configuration",
       );
@@ -594,9 +603,14 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       "ALTER TABLE auth_session RENAME TO unavailable_health_session",
     );
     try {
+      await pool.query("CREATE VIEW auth_session AS SELECT NULL::uuid AS id");
+      await expect(
+        pool.query("SELECT user_id FROM auth_session"),
+      ).rejects.toMatchObject({ code: "42703" });
       for (const failure of [false, true])
         expectPublic(await call(adminCookie(a.token), failure));
     } finally {
+      await pool.query("DROP VIEW IF EXISTS auth_session");
       await pool.query(
         "ALTER TABLE unavailable_health_session RENAME TO auth_session",
       );
