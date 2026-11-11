@@ -1,3 +1,13 @@
+import {
+  pinReviewEvidencePolicy,
+  reviewEvidenceApprovalValid,
+  type ReviewEnvironment,
+} from "./config";
+import {
+  evaluateEvidenceV1,
+  reviewEvidenceV1Installed,
+  recheckEvidenceSources,
+} from "./evidence-evaluator";
 import type pg from "pg";
 import { parseQuantity } from "../../../shared/quantity";
 import { z } from "zod";
@@ -19,7 +29,6 @@ import { enqueueDuplicateDetection } from "../duplicates/service";
 import * as sql from "../sales/projections";
 import {
   inspectReviewEvidence,
-  evaluateReviewEvidence,
   type ReviewEvidencePolicy,
   type ReviewEvidence,
   type ReviewConclusion,
@@ -258,7 +267,7 @@ async function record(
     flagId?: string;
     evidence?: ReviewEvidence;
     conclusion?: ReviewConclusion;
-    evaluation?: unknown;
+    evaluation?: Record<string, unknown>;
     replay?: (response: wire.Decision) => Promise<unknown>;
   } = {},
 ) {
@@ -339,13 +348,33 @@ async function record(
       JSON.stringify(
         auditValue(before, p.current_revision_id, p.status === "credited"),
       ),
-      JSON.stringify(
-        auditValue(
+      JSON.stringify({
+        ...auditValue(
           after,
           current.current_revision_id,
           current.status === "credited",
         ),
-      ),
+        ...(extra.evaluation
+          ? {
+              reviewPolicy: (() => {
+                const policy = extra.evaluation.policy as {
+                  release: string;
+                  digest: string;
+                  revision: number;
+                };
+                return {
+                  release: policy.release,
+                  digest: policy.digest,
+                  revision: policy.revision,
+                };
+              })(),
+              reviewConclusions: (
+                extra.evaluation.conclusions as { tag: string }[]
+              ).map((c) => c.tag),
+              reviewEvaluationId: did,
+            }
+          : {}),
+      }),
       body.reason,
       now,
       JSON.stringify({
@@ -382,7 +411,7 @@ async function record(
     policyBlocks: blocks,
   });
   await db.query(
-    `INSERT INTO sale_decision(id,purchase_id,operation_id,actor_user_id,payload_digest,kind,outcome,expected_purchase_version,expected_revision_id,result_revision_id,applied_purchase_version,before_values,after_values,evidence_asset_id,reason,decided_at,audit_event_id,response,hold_id,flag_id,evidence_evaluation,replay_response) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+    `INSERT INTO sale_decision(id,purchase_id,operation_id,actor_user_id,payload_digest,kind,outcome,expected_purchase_version,expected_revision_id,result_revision_id,applied_purchase_version,before_values,after_values,evidence_asset_id,reason,decided_at,audit_event_id,response,hold_id,flag_id,evidence_evaluation,replay_response,capture_evaluation,resolved_capture_block_ids) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
     [
       did,
       p.id,
@@ -413,8 +442,39 @@ async function record(
           })
         : null,
       extra.replay ? JSON.stringify(await extra.replay(response)) : null,
+      kind === "capture" ? JSON.stringify(extra.evaluation) : null,
+      kind === "capture"
+        ? (
+            extra.evaluation?.target as { captureBlocks: { id: string }[] }
+          ).captureBlocks.map((b) => b.id)
+        : [],
     ],
   );
+  if (extra.evaluation) {
+    await db.query(
+      "INSERT INTO review_evaluation(decision_id,purchase_id,provenance) VALUES($1,$2,$3)",
+      [
+        did,
+        p.id,
+        JSON.stringify({
+          ...extra.evaluation,
+          result: {
+            actorId: a.user_id,
+            reason: body.reason,
+            decidedAt: now.toISOString(),
+            evidenceAssetId: extra.evidence!.assetId,
+            notes: extra.evidence!.notes,
+            resultingRevisionId: current.current_revision_id,
+            appliedPurchaseVersion: current.version,
+            remainingHolds: holds,
+            remainingBlocks: blocks,
+            credited: response.creditedAfter,
+            closure: outcome === "cancel" ? "cancelled" : "confirmed",
+          },
+        }),
+      ],
+    );
+  }
   await db.query(
     "INSERT INTO duplicate_reporting_state(station_id,generation) VALUES($1,1) ON CONFLICT(station_id) DO UPDATE SET generation=duplicate_reporting_state.generation+1",
     [p.station_id],
@@ -424,11 +484,12 @@ async function record(
 export function createReviewsService({
   pool,
   storage,
-  evidencePolicy,
+  env = process.env,
 }: {
   pool: pg.Pool;
   storage: EvidenceStorage;
   evidencePolicy?: ReviewEvidencePolicy;
+  env?: ReviewEnvironment;
 }) {
   async function decide(
     kind: Exclude<Kind, "duplicate">,
@@ -476,7 +537,7 @@ export function createReviewsService({
       return null;
     });
     if (historical) return historical;
-    await transaction(pool, (db) =>
+    const photo = await transaction(pool, (db) =>
       inspectReviewEvidence(db, storage, purchaseId, body.evidence),
     );
     return transaction(pool, async (db) => {
@@ -511,8 +572,8 @@ export function createReviewsService({
           throw new AuthError("version_conflict", 409);
       }
       const captureRows = (
-        await db.query<{ id: string; code: string }>(
-          "SELECT id,code FROM purchase_validation_block WHERE purchase_id=$1 AND resolved_at IS NULL AND code IN ('capture_authorization_unresolved','capture_time_unresolved') ORDER BY code FOR UPDATE",
+        await db.query<{ id: string; code: string; version: number }>(
+          "SELECT id,code,version FROM purchase_validation_block WHERE purchase_id=$1 AND resolved_at IS NULL AND code IN ('capture_authorization_unresolved','capture_time_unresolved') ORDER BY code FOR UPDATE",
           [p.id],
         )
       ).rows;
@@ -529,13 +590,38 @@ export function createReviewsService({
         [body.evidence.assetId, p.id],
       );
       if (!bound.rowCount) throw new AuthError("evidence_unavailable", 422);
-      const conclusion = await evaluateReviewEvidence(
-        db,
-        evidencePolicy,
-        p.id,
+      if (!reviewEvidenceV1Installed())
+        throw new AuthError("evidence_insufficient", 422);
+      const policy = await pinReviewEvidencePolicy(db, a.stationId, env);
+      if (kind === "card" && hold!.reason_code !== "replaced_card")
+        throw new AuthError("policy_review_required", 422);
+      const conclusion = await evaluateEvidenceV1(db, {
+        purchaseId: p.id,
         kind,
-        body.evidence,
+        outcome,
+        evidence: body.evidence,
+        decisionId: did,
+        policy,
+        ...("verifiedSaleDate" in body
+          ? { verifiedSaleDate: body.verifiedSaleDate }
+          : {}),
+      });
+      const evaluatedRevisionId = r.id;
+      const originalRevision = (
+        await db.query<{ id: string }>(
+          "SELECT id FROM purchase_revision WHERE purchase_id=$1 AND kind='original'",
+          [p.id],
+        )
+      ).rows[0];
+      if (!originalRevision) throw new AuthError("evidence_insufficient", 422);
+      await recheckEvidenceSources(
+        db,
+        p.id,
+        conclusion.historyGeneration,
+        body.evidence.assetId,
       );
+      if (!(await reviewEvidenceApprovalValid(db, policy)))
+        throw new AuthError("evidence_insufficient", 422);
       // Re-read live session after slow evidence I/O while security-state lock remains held.
       const live = await requireAdminSession(db, token);
       requirePermission(live, "sales");
@@ -577,8 +663,8 @@ export function createReviewsService({
           if (conclusion.beforeReplacement !== true)
             throw new AuthError("evidence_insufficient", 422);
           const link = await db.query(
-            "SELECT l.id FROM card_customer_link l JOIN card c ON c.id=l.card_id WHERE c.id=$1 AND l.customer_id=$2 AND c.state='retired' AND c.replaced_by_card_id IS NOT NULL AND l.ended_at IS NOT NULL AND l.ended_at<= $3 FOR SHARE OF c,l",
-            [p.card_id, p.customer_id, p.server_received_at],
+            "SELECT l.id FROM card_customer_link l JOIN card c ON c.id=l.card_id WHERE c.id=$1 AND l.customer_id=$2 AND c.state='retired' AND c.replaced_by_card_id IS NOT NULL AND l.ended_at IS NOT NULL AND l.ended_at<=(SELECT server_received_at FROM purchase WHERE id=$3) FOR SHARE OF c,l",
+            [p.card_id, p.customer_id, p.id],
           );
           if (!link.rowCount)
             throw new AuthError("policy_review_required", 422);
@@ -636,12 +722,6 @@ export function createReviewsService({
         }
         await accept(db, p, r, a.user_id, body.reason);
       }
-      const context = (
-        await db.query(
-          "SELECT v.capture_evidence,p.capture_policy_version,p.lookup_receipt_claims,p.server_received_at,c.signed_in_at,c.offline_expires_at,p.capture_lower_bound FROM purchase p JOIN capture_context c ON c.id=p.capture_context_id LEFT JOIN sync_validation v ON v.purchase_id=p.id WHERE p.id=$1",
-          [p.id],
-        )
-      ).rows[0];
       return record(
         db,
         a,
@@ -658,9 +738,21 @@ export function createReviewsService({
           evidence: body.evidence,
           conclusion,
           evaluation: {
-            ...context,
-            resolvedCaptureBlockIds:
-              kind === "capture" ? captureRows.map((x) => x.id) : [],
+            ...conclusion,
+            policy,
+            evidenceDigest: photo.digest,
+            target: {
+              decisionId: did,
+              purchaseId: p.id,
+              originalRevisionId: originalRevision.id,
+              evaluatedRevisionId,
+              expectedPurchaseVersion: p.version,
+              expectedRevisionId: p.current_revision_id,
+              kind,
+              outcome,
+              hold: hold ? { id: hold.id, version: hold.version } : null,
+              captureBlocks: kind === "capture" ? captureRows : [],
+            },
           },
         },
       );

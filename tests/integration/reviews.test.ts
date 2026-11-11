@@ -1,3 +1,9 @@
+import {
+  legacyReviewFixture,
+  earlierReplacement,
+  unauthorizedCapture,
+} from "../helpers/legacy-review-evidence-fixture";
+import { seedHistorical } from "../helpers/review-evidence-fixture";
 import { runDuplicateBatch } from "../../src/server/modules/duplicates/service";
 import { readFile, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
@@ -6,7 +12,7 @@ import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { reviewFixtureHarness } from "../helpers/review-fixture";
 
 import { createReviewsService } from "../../src/server/modules/reviews/service";
-import { changePrice, fixtureId } from "../helpers/sync-fixture";
+import { fixtureId } from "../helpers/sync-fixture";
 import { newId } from "../../src/server/lib/ids";
 const root = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const schema = `reviews_${randomBytes(6).toString("hex")}`;
@@ -48,63 +54,14 @@ describe("M3 real-Postgres independent review decisions", () => {
   });
 
   async function held() {
-    await pool.query("TRUNCATE station,card CASCADE");
-    await pool.query(
-      (
-        await readFile(
-          new URL("../../prisma/fixtures.sql", import.meta.url),
-          "utf8",
-        )
-      )
-        .split("\n")
-        .filter((line) =>
-          /^(INSERT INTO (customer|card)|UPDATE card)/.test(line),
-        )
-        .join("\n"),
-    );
-    const bytes = await h.image(),
-      f = await h.context(bytes);
-    await changePrice(pool, f);
-    const sale = await h.settle(f, bytes);
-    const hold = (
-      await pool.query(
-        "SELECT * FROM purchase_hold WHERE purchase_id=$1 AND kind='price'",
-        [sale.purchaseId],
-      )
-    ).rows[0];
-    const reference = (
-      await pool.query(
-        "SELECT id FROM audit_event WHERE target_id=$1 ORDER BY occurred_at LIMIT 1",
-        [sale.purchaseId],
-      )
-    ).rows[0].id;
-    const body = {
-      ...(await h.guard(sale.purchaseId)),
-      expectedHoldVersion: hold.version,
-      decision: { outcome: "accept_captured" as const },
-      evidence: {
-        assetId: sale.assetId,
-        notes: "Inspected retained evidence",
-        referenceIds: [reference],
-      },
-    };
-    return { f, sale, hold, body };
+    const x = await legacyReviewFixture(pool);
+    h = x.h;
+    return x;
   }
-  function service(approved = true) {
+  function service() {
     return createReviewsService({
       pool,
       storage: h.storage,
-      evidencePolicy: approved
-        ? {
-            async evaluate(_db, context) {
-              return {
-                policyVersion: "fixture-v1",
-                referenceIds: [...context.referenceIds],
-                validPrice: true,
-              };
-            },
-          }
-        : undefined,
     });
   }
   it("price acceptance uses captured values and historical replay cannot apply twice", async () => {
@@ -134,8 +91,9 @@ describe("M3 real-Postgres independent review decisions", () => {
   });
   it("unset evidence policy leaves price hold and contribution unchanged", async () => {
     const { sale, hold, body } = await held();
+    vi.stubEnv("WHR_REVIEW_EVIDENCE_POLICY", "");
     await expect(
-      service(false).decidePrice(
+      service().decidePrice(
         await h.adminToken(),
         sale.purchaseId,
         hold.id,
@@ -266,15 +224,6 @@ describe("M3 real-Postgres independent review decisions", () => {
           return bytes;
         },
       },
-      evidencePolicy: {
-        async evaluate(_db, c) {
-          return {
-            policyVersion: "fixture",
-            referenceIds: [...c.referenceIds],
-            validPrice: true,
-          };
-        },
-      },
     });
     await expect(
       svc.decidePrice(token, sale.purchaseId, hold.id, body),
@@ -300,7 +249,7 @@ describe("M3 real-Postgres independent review decisions", () => {
     return f;
   }
   it("capture confirm requires every block, preserves unrelated holds and immutable capture bounds", async () => {
-    const { sale, body } = await captureFixture(),
+    const { sale, body, f } = await captureFixture(),
       token = await h.adminToken();
     const original = (
       await pool.query(
@@ -316,32 +265,25 @@ describe("M3 real-Postgres independent review decisions", () => {
     const incomplete = createReviewsService({
       pool,
       storage: h.storage,
-      evidencePolicy: {
-        async evaluate(_db, c) {
-          return {
-            policyVersion: "fixture",
-            referenceIds: [...c.referenceIds],
-            authorizedCapture: true,
-          };
-        },
-      },
     });
+    await seedHistorical(
+      pool,
+      "settings_version",
+      "UPDATE settings_version SET purchase_cutoff='2026-11-10T12:30:00Z' WHERE station_id=$1",
+      [f.stationId],
+    );
     await expect(
       incomplete.decideCapture(token, sale.purchaseId, capture),
     ).rejects.toMatchObject({ code: "evidence_insufficient", status: 422 });
+    await seedHistorical(
+      pool,
+      "settings_version",
+      "UPDATE settings_version SET purchase_cutoff='2026-12-01T00:00:00Z' WHERE station_id=$1",
+      [f.stationId],
+    );
     const complete = createReviewsService({
       pool,
       storage: h.storage,
-      evidencePolicy: {
-        async evaluate(_db, c) {
-          return {
-            policyVersion: "fixture",
-            referenceIds: [...c.referenceIds],
-            authorizedCapture: true,
-            campaignEligible: true,
-          };
-        },
-      },
     });
     const result = await complete.decideCapture(
       token,
@@ -369,7 +311,7 @@ describe("M3 real-Postgres independent review decisions", () => {
     ).toEqual(original);
   });
   it("capture cancellation needs affirmative invalidity proof rather than uncertainty", async () => {
-    const { sale, body } = await captureFixture(),
+    const { sale, body, f } = await captureFixture(),
       token = await h.adminToken();
     const capture = {
       ...(await h.guard(sale.purchaseId)),
@@ -382,16 +324,8 @@ describe("M3 real-Postgres independent review decisions", () => {
     const svc = createReviewsService({
       pool,
       storage: h.storage,
-      evidencePolicy: {
-        async evaluate(_db, c) {
-          return {
-            policyVersion: "fixture",
-            referenceIds: [...c.referenceIds],
-            invalidSale: true,
-          };
-        },
-      },
     });
+    await unauthorizedCapture(pool, f);
     const result = await svc.decideCapture(token, sale.purchaseId, capture);
     expect(result.creditedAfter).toBe(false);
     expect(await svc.decideCapture(token, sale.purchaseId, capture)).toEqual(
@@ -542,21 +476,10 @@ describe("M3 real-Postgres independent review decisions", () => {
   ])(
     "independent hold order %s stages until every hold resolves",
     async (order) => {
-      const { sale, hold, body } = await held(),
-        replacement = newId(),
+      const x = await held();
+      const { sale, hold, body } = x,
         token = await h.adminToken();
-      await pool.query(
-        "INSERT INTO card(id,batch_id,code,qr_payload,state,version) VALUES($1,$2,'C7K3M9Q','C7K3M9Q','unassigned',1)",
-        [replacement, fixtureId(28)],
-      );
-      await pool.query(
-        "UPDATE card_customer_link SET ended_at='2026-11-05T00:00:00Z' WHERE card_id=$1 AND ended_at IS NULL",
-        [fixtureId(29)],
-      );
-      await pool.query(
-        "UPDATE card SET state='retired',retired_at='2026-11-05T00:00:00Z',retirement_reason='replaced',replaced_by_card_id=$2,version=version+1 WHERE id=$1",
-        [fixtureId(29), replacement],
-      );
+      await earlierReplacement(x);
       const ids: Record<string, string> = {
         price: hold.id,
         card: newId(),
@@ -573,21 +496,10 @@ describe("M3 real-Postgres independent review decisions", () => {
             kind === "card" ? "replaced_card" : "capture_date_uncertain",
           ],
         );
-      const date = "2026-11-05";
+      const date = "2026-11-10";
       const svc = createReviewsService({
         pool,
         storage: h.storage,
-        evidencePolicy: {
-          async evaluate(_db, c) {
-            return {
-              policyVersion: "fixture",
-              referenceIds: [...c.referenceIds],
-              validPrice: true,
-              beforeReplacement: true,
-              verifiedSaleDate: date,
-            };
-          },
-        },
       });
       const kinds = order.split(",");
       for (let n = 0; n < kinds.length; n++) {
@@ -651,15 +563,6 @@ describe("M3 real-Postgres independent review decisions", () => {
       const svc = createReviewsService({
         pool,
         storage: h.storage,
-        evidencePolicy: {
-          async evaluate(_db, c) {
-            return {
-              policyVersion: "fixture",
-              referenceIds: [...c.referenceIds],
-              verifiedSaleDate: date,
-            };
-          },
-        },
       });
       const before = await h.guard(sale.purchaseId);
       await expect(

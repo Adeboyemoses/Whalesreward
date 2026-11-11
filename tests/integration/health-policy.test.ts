@@ -16,6 +16,8 @@ import { policyNames } from "../../src/server/modules/health/policies";
 import { digest } from "../../src/server/modules/auth/crypto";
 import { newId } from "../../src/server/lib/ids";
 import { transaction } from "../../src/server/lib/transaction";
+import { activate } from "../helpers/review-evidence-fixture";
+import * as evaluator from "../../src/server/modules/reviews/evidence-evaluator";
 import { securityLock } from "../../src/server/lib/authz";
 
 const schema = `health_policy_${randomBytes(6).toString("hex")}`;
@@ -142,6 +144,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
     );
   });
   beforeEach(() => {
+    vi.stubEnv("WHR_REVIEW_EVIDENCE_POLICY", undefined);
     vi.stubEnv("WHR_ENV", "staging");
     vi.stubEnv("BETTER_AUTH_SECRET", secret);
     vi.stubEnv("BETTER_AUTH_URL", origin);
@@ -153,7 +156,10 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       '{"pageWidthMm":210,"pageHeightMm":297,"cardWidthMm":85.6,"cardHeightMm":54,"marginMm":10,"gapMm":2}',
     );
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
   afterAll(async () => {
     await pool?.end();
     await root.query(`DROP SCHEMA ${schema} CASCADE`);
@@ -180,6 +186,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
         auth: "configured",
         delivery: "unconfigured",
         duplicateWindow: "unconfigured",
+        reviewEvidence: "unconfigured",
         delegation: "configured",
         phone: "configured",
         meter: "unconfigured",
@@ -212,6 +219,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
   ])(
     "%s cannot read named policies on success or database failure",
     async (state) => {
+      await activePolicy();
       const a = await actor(state);
       if (state === "must-change")
         await pool.query(
@@ -251,6 +259,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
     },
   );
   it("attendant, recovery, malformed, duplicate and unknown cookies never select named policies", async () => {
+    await activePolicy();
     const a = await actor();
     const attendantToken = randomBytes(32).toString("hex");
     await pool.query(
@@ -265,9 +274,11 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       adminCookie(randomBytes(32).toString("hex")),
       `${adminCookie(a.token)}; ${adminCookie(a.token)}`,
     ])
-      expectPublic(await call(cookie));
+      for (const failure of [false, true])
+        expectPublic(await call(cookie, failure));
   });
   it("permission revoked while the probe is pending is checked before response", async () => {
+    await activePolicy();
     const a = await actor();
     let entered!: () => void, release!: () => void;
     const started = new Promise<void>((resolve) => {
@@ -340,5 +351,269 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
     expect((await call(adminCookie(a.token))).policies.duplicateWindow).toBe(
       "unconfigured",
     );
+  });
+  async function activePolicy() {
+    vi.stubEnv("WHR_ENV", "test");
+    const station = newId();
+    await pool.query(
+      "INSERT INTO station(id,code,name,timezone,version) VALUES($1,$2,'Fictional health station','Africa/Lagos',1)",
+      [station, `HEALTH-${station}`],
+    );
+    const policy = await activate(pool, station);
+    vi.stubEnv("WHR_REVIEW_EVIDENCE_POLICY", JSON.stringify(policy));
+    return policy;
+  }
+  it("RE-20 approved active matching runtime configuration reports only twelve statuses without enabling meter or revealing policy identity", async () => {
+    const policy = await activePolicy(),
+      a = await actor();
+    for (const failure of [false, true]) {
+      const body = await call(adminCookie(a.token), failure);
+      expect(Object.keys(body.policies).sort()).toEqual([
+        "auth",
+        "cardPrint",
+        "delegation",
+        "delivery",
+        "duplicateWindow",
+        "meter",
+        "phone",
+        "phoneVerification",
+        "reconciliation",
+        "recovery",
+        "reviewEvidence",
+        "timing",
+      ]);
+      expect(body.policies.reviewEvidence).toBe("configured");
+      expect(body.policies.meter).toBe("unconfigured");
+      expect(body.fullyConfigured).toBe(
+        Object.values(body.policies).every((s) => s === "configured"),
+      );
+      for (const value of [
+        policy.release,
+        policy.digest,
+        policy.scope.stationId,
+        policy.activation.approvalReference!,
+        "approvalReference",
+        "activatedAt",
+        "authorization_reference",
+      ])
+        expect(JSON.stringify(body)).not.toContain(value);
+      expectPublic(await call(undefined, failure));
+    }
+  });
+  it.each([
+    "missing",
+    "malformed",
+    "extra",
+    "nested-extra",
+    "string-revision",
+    "unknown-release",
+    "digest",
+    "environment",
+    "station",
+    "unapproved",
+    "missing-approval-record",
+    "approval-digest-mismatch",
+    "future",
+    "inactive",
+    "superseded",
+  ])(
+    "RE-20 %s runtime policy fails closed without affecting other statuses",
+    async (state) => {
+      const policy = await activePolicy(),
+        a = await actor();
+      const changed = structuredClone(policy) as Record<string, unknown>;
+      if (state === "extra") changed.secret = "private-canary";
+      if (state === "nested-extra")
+        changed.scope = { ...policy.scope, secret: "private-canary" };
+      if (state === "string-revision") changed.revision = "1";
+      if (state === "unknown-release") changed.release = "review-evidence-v99";
+      if (state === "digest") changed.digest = "a".repeat(64);
+      if (state === "environment")
+        changed.scope = { ...policy.scope, environment: "production" };
+      if (state === "station")
+        changed.scope = { ...policy.scope, stationId: newId() };
+      if (state === "unapproved")
+        changed.activation = {
+          ...policy.activation,
+          approvalReference: newId(),
+        };
+      if (
+        state === "missing-approval-record" ||
+        state === "approval-digest-mismatch"
+      ) {
+        const approval = newId();
+        changed.revision = 2;
+        changed.activation = {
+          ...policy.activation,
+          approvalReference: approval,
+        };
+        if (state === "approval-digest-mismatch") {
+          await pool.query(
+            "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,$2,$3,2,$4,'test',$5,'Fictional approval')",
+            [
+              approval,
+              policy.release,
+              "b".repeat(64),
+              policy.scope.stationId,
+              policy.activation.activatedAt,
+            ],
+          );
+        }
+        await pool.query(
+          "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,'test',2,$3,'Fictional approval')",
+          [newId(), policy.scope.stationId, changed],
+        );
+      }
+      if (state === "future") {
+        const approval = newId();
+        changed.revision = 2;
+        changed.activation = {
+          ...policy.activation,
+          approvalReference: approval,
+          activatedAt: "2999-01-01T00:00:00Z",
+        };
+        await pool.query(
+          "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,$2,$3,2,$4,'test','2999-01-01','Fictional approval')",
+          [approval, policy.release, policy.digest, policy.scope.stationId],
+        );
+        await pool.query(
+          "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,'test',2,$3,'Fictional approval')",
+          [newId(), policy.scope.stationId, changed],
+        );
+      }
+      if (state === "inactive")
+        Object.assign(
+          changed,
+          await activate(pool, policy.scope.stationId, 2, false),
+        );
+      if (state === "superseded")
+        await activate(pool, policy.scope.stationId, 2, false);
+      vi.stubEnv(
+        "WHR_REVIEW_EVIDENCE_POLICY",
+        state === "missing"
+          ? undefined
+          : state === "malformed"
+            ? "private-canary"
+            : JSON.stringify(changed),
+      );
+      const body = await call(adminCookie(a.token));
+      expect(body.policies).toMatchObject({
+        reviewEvidence: "unconfigured",
+        auth: "configured",
+        cardPrint: "configured",
+      });
+    },
+  );
+  it("RE-20 partial evaluator installation denies an otherwise approved runtime policy", async () => {
+    await activePolicy();
+    const a = await actor();
+    vi.spyOn(evaluator, "reviewEvidenceV1Installed").mockReturnValue(false);
+    expect((await call(adminCookie(a.token))).policies.reviewEvidence).toBe(
+      "unconfigured",
+    );
+  });
+  it("RE-20 health reads configuration and authority only without purchase, photo, provider probes or writes", async () => {
+    await activePolicy();
+    const a = await actor();
+    const fetch = vi.spyOn(globalThis, "fetch");
+    const queries = vi.spyOn(pg.Client.prototype, "query");
+    expect((await call(adminCookie(a.token))).policies.reviewEvidence).toBe(
+      "configured",
+    );
+    expectPublic(await call());
+    expect(fetch).not.toHaveBeenCalled();
+    const sql = queries.mock.calls
+      .map(([query]) =>
+        typeof query === "string" ? query : (query as { text: string }).text,
+      )
+      .join("\n");
+    expect(sql).toContain("review_evidence_configuration");
+    expect(sql).not.toMatch(
+      /(?:^\s*(?:INSERT|UPDATE|DELETE|MERGE|TRUNCATE)\b|\b(?:purchase|photo_asset|review_evaluation|sale_decision|customer)\b)/im,
+    );
+  });
+  it("RE-20 permission revoked during approval lookup is checked before disclosure", async () => {
+    await activePolicy();
+    const a = await actor();
+    const query = pool.query.bind(pool);
+    let entered!: () => void, release!: () => void;
+    const started = new Promise<void>((r) => {
+      entered = r;
+    });
+    const blocked = new Promise<void>((r) => {
+      release = r;
+    });
+    vi.spyOn(pool, "query").mockImplementation((async (
+      ...args: Parameters<typeof pool.query>
+    ) => {
+      const result = await query(...args);
+      if (
+        typeof args[0] === "string" &&
+        args[0].includes("SELECT c.id FROM review_evidence_configuration")
+      ) {
+        entered();
+        await blocked;
+      }
+      return result;
+    }) as typeof pool.query);
+    const response = call(adminCookie(a.token));
+    await started;
+    await transaction(pool, async (db) => {
+      await securityLock(db);
+      await db.query("DELETE FROM role_permission WHERE role_id=$1", [a.role]);
+    });
+    release();
+    expectPublic(await response);
+  });
+  it("RE-20 approval storage failure returns redacted 503 while live authorization still governs projection", async () => {
+    await activePolicy();
+    const a = await actor();
+    await pool.query(
+      "ALTER TABLE review_evidence_configuration RENAME TO unavailable_health_configuration",
+    );
+    try {
+      // Keep the name occupied in this schema: a missing relation would fall
+      // through search_path to a separately migrated public database table.
+      await pool.query(
+        "CREATE VIEW review_evidence_configuration AS SELECT NULL::uuid AS id",
+      );
+      await expect(
+        pool.query("SELECT station_id FROM review_evidence_configuration"),
+      ).rejects.toMatchObject({ code: "42703" });
+      const body = await call(adminCookie(a.token), true, async () => {
+        await pool.query("SELECT 1");
+      });
+      expect(body.policies.reviewEvidence).toBe("unconfigured");
+      expectPublic(
+        await call(undefined, true, async () => {
+          await pool.query("SELECT 1");
+        }),
+      );
+    } finally {
+      await pool.query("DROP VIEW IF EXISTS review_evidence_configuration");
+      await pool.query(
+        "ALTER TABLE unavailable_health_configuration RENAME TO review_evidence_configuration",
+      );
+    }
+  });
+  it("RE-20 unavailable authorization storage falls back to public fields without leaking errors", async () => {
+    await activePolicy();
+    const a = await actor();
+    await pool.query(
+      "ALTER TABLE auth_session RENAME TO unavailable_health_session",
+    );
+    try {
+      await pool.query("CREATE VIEW auth_session AS SELECT NULL::uuid AS id");
+      await expect(
+        pool.query("SELECT user_id FROM auth_session"),
+      ).rejects.toMatchObject({ code: "42703" });
+      for (const failure of [false, true])
+        expectPublic(await call(adminCookie(a.token), failure));
+    } finally {
+      await pool.query("DROP VIEW IF EXISTS auth_session");
+      await pool.query(
+        "ALTER TABLE unavailable_health_session RENAME TO auth_session",
+      );
+    }
   });
 });

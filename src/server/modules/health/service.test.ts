@@ -98,7 +98,20 @@ describe("WHR-100 policy configuration", () => {
 
   it("evaluates existing gates with staging proposals and keeps unavailable M3/M4 evaluators unconfigured", () => {
     const { policies, fullyConfigured } = policyConfiguration(configured);
-    expect(Object.keys(policies)).toEqual(policyNames);
+    expect(Object.keys(policies)).toEqual([
+      "auth",
+      "delivery",
+      "delegation",
+      "phone",
+      "meter",
+      "phoneVerification",
+      "recovery",
+      "reconciliation",
+      "timing",
+      "cardPrint",
+      "duplicateWindow",
+      "reviewEvidence",
+    ]);
     for (const name of policyNames)
       expect(policies[name]).toBe(
         implemented.some((item) => item === name)
@@ -107,7 +120,7 @@ describe("WHR-100 policy configuration", () => {
       );
     expect(fullyConfigured).toBe(false);
   });
-  it("can report all ten configured only when every evaluator positively validates", () => {
+  it("can report RE-20 all twelve configured only when every evaluator positively validates", () => {
     expect(policyConfiguration(configured, allEnabled)).toEqual({
       policies: Object.fromEntries(
         policyNames.map((name) => [name, "configured"]),
