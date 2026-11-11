@@ -46,11 +46,21 @@ async function image(page: Page, id: string) {
       `${id} has 48px tap targets`,
     ).toEqual([]);
   }
+  const viewport = page.viewportSize();
+  if (id.startsWith("A") && viewport) {
+    // The reference boards show the full scroll surface, with fixed actions at its foot.
+    // Measure the real phone viewport first, then capture the same width on a tall surface.
+    const height = await page.evaluate(
+      () => document.documentElement.scrollHeight,
+    );
+    await page.setViewportSize({ width: viewport.width, height });
+  }
   await page.screenshot({
     path: `${destination}${id}.built.png`,
     fullPage: true,
     animations: "disabled",
   });
+  if (id.startsWith("A") && viewport) await page.setViewportSize(viewport);
 }
 /** Fictional board-named identity/card fixtures; no change to a seeded customer's identity. */
 async function boardCard(db: pg.Client, name: string, category: string) {
@@ -126,6 +136,20 @@ test("WO-app-7 independent phone fidelity A09 A10 A11 at390/360", async ({
       await f.phone.goto(`/attendant/history/${main.detail.id}/correct`);
       await ready(f.phone, "Correct sale");
       await expect(f.phone.getByLabel("Reason", { exact: true })).toBeVisible();
+      await expect(
+        f.phone.getByAltText("Retained meter photo", { exact: true }),
+      ).toBeVisible();
+      await expect
+        .poll(() =>
+          f.phone
+            .getByAltText("Retained meter photo", { exact: true })
+            .evaluate(
+              (el) =>
+                (el as HTMLImageElement).complete &&
+                (el as HTMLImageElement).naturalWidth > 0,
+            ),
+        )
+        .toBe(true);
       await image(f.phone, `A11-${width}`);
     }
   } finally {

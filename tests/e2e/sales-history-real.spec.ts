@@ -655,6 +655,7 @@ test("I-06 pending correction and server history stay with originating account a
       "UPDATE auth_user SET must_change_password=false WHERE id=$1",
       [second.accountId],
     );
+    await waitForWorker(f.phone);
     await correctionEditor(f.phone, sale.detail.id);
     await f.phone.getByLabel("Amount (₦)", { exact: true }).fill("25000.00");
     await f.phone
@@ -671,6 +672,11 @@ test("I-06 pending correction and server history stay with originating account a
       .poll(async () => (await correctionRows(f.phone)).length)
       .toBe(1);
     await f.phone.getByRole("link", { name: "Account", exact: true }).click();
+    await expect(
+      f.phone
+        .getByRole("heading", { name: "Your account", exact: true })
+        .or(f.phone.getByRole("heading", { name: "Account", exact: true })),
+    ).toBeVisible();
     await f.phone
       .getByRole("button", { name: "Sign out / hand over device", exact: true })
       .click();
