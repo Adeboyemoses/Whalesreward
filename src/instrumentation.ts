@@ -15,6 +15,9 @@ export async function register() {
       const { startAutomaticCorrections } =
         await import("./server/modules/corrections/runtime");
       startAutomaticCorrections();
+      const { startAutomaticDuplicates } =
+        await import("./server/modules/duplicates/runtime");
+      startAutomaticDuplicates();
     } catch (error) {
       // Next catches instrumentation exceptions and keeps listening: terminate explicitly.
       logger.error(
