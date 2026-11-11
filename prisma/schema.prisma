@@ -1047,6 +1047,8 @@ model CorrectionRequest {
  @@map("correction_request")
 }
 model SaleDecision {
+ capture_evaluation Json? @db.JsonB
+ resolved_capture_block_ids String[] @default([]) @db.Uuid
  hold_id String? @db.Uuid
  flag_id String? @db.Uuid
  evidence_evaluation Json? @db.JsonB
@@ -1103,4 +1105,37 @@ model DuplicateReportingState {
  generation BigInt @default(0)
  station Station @relation(fields: [station_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
  @@map("duplicate_reporting_state")
+}
+
+/// Immutable operational approval, provisioned only after explicit deployment authorization.
+model ReviewEvidenceApproval {
+ id String @id @db.Uuid
+ release String
+ digest String
+ revision BigInt
+ station_id String @db.Uuid
+ environment String
+ activated_at DateTime @db.Timestamptz(6)
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@unique([station_id,environment,revision])
+ @@map("review_evidence_approval")
+}
+model ReviewEvidenceConfiguration {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ environment String
+ revision BigInt
+ configuration Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@unique([station_id,environment,revision])
+ @@map("review_evidence_configuration")
+}
+model ReviewEvaluation {
+ decision_id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ provenance Json @db.JsonB
+ created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@map("review_evaluation")
 }

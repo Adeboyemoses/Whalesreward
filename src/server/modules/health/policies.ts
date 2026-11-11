@@ -16,6 +16,7 @@ export const policyNames = [
   "timing",
   "cardPrint",
   "duplicateWindow",
+  "reviewEvidence",
 ] as const;
 export type PolicyName = (typeof policyNames)[number];
 export type PolicyStatus = "configured" | "unconfigured";

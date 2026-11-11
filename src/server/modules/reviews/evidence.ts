@@ -74,20 +74,7 @@ export async function inspectReviewEvidence(
   } catch {
     throw new AuthError("evidence_unavailable", 422);
   }
-  // Only immutable records already bound to this purchase are admissible here.
-  for (const id of evidence.referenceIds) {
-    const found = await db.query(
-      `SELECT id FROM audit_event WHERE id=$1 AND target_id=$2 AND target_type='purchase'
-      UNION ALL SELECT id FROM sale_decision WHERE id=$1 AND purchase_id=$2
-      UNION ALL SELECT c.id FROM capture_context c JOIN purchase p ON p.capture_context_id=c.id WHERE c.id=$1 AND p.id=$2
-      UNION ALL SELECT a.id FROM assignment a JOIN purchase p ON p.assignment_id=a.id WHERE a.id=$1 AND p.id=$2
-      UNION ALL SELECT v.id FROM product_price_version v JOIN purchase p ON p.price_version_id=v.id WHERE v.id=$1 AND p.id=$2
-      UNION ALL SELECT l.id FROM card_customer_link l JOIN purchase p ON p.card_id=l.card_id AND p.customer_id=l.customer_id WHERE l.id=$1 AND p.id=$2
-      UNION ALL SELECT e.id FROM audit_event e JOIN purchase p ON p.card_id=e.target_id WHERE e.id=$1 AND p.id=$2 AND e.target_type='card' `,
-      [id, purchaseId],
-    );
-    if (!found.rowCount) throw new AuthError("evidence_insufficient", 422);
-  }
+  return { assetId: evidence.assetId, digest: asset.validated_digest };
 }
 export async function evaluateReviewEvidence(
   db: pg.PoolClient,

@@ -1,4 +1,9 @@
 import {
+  reviewEvidenceConfiguration,
+  reviewEvidenceApprovalValid,
+} from "../reviews/config";
+import { reviewEvidenceV1Installed } from "../reviews/evidence-evaluator";
+import {
   healthEnvironmentValid,
   policyConfiguration,
   type Configuration,
@@ -38,11 +43,28 @@ async function probeDatabase(): Promise<void> {
 export async function getHealth(
   probe: () => Promise<void> = probeDatabase,
   authorize: (env: Configuration) => Promise<boolean> = async () => false,
+  configurationPool?: pg.Pool,
 ) {
   const env = Object.freeze({ ...process.env });
-  const { policies, fullyConfigured } = policyConfiguration(env);
-  const deployedVersion = env.APP_VERSION || version;
+  const configuration = policyConfiguration(env);
   let ok = true;
+  try {
+    const policy = reviewEvidenceConfiguration(env);
+    if (healthEnvironmentValid(env) && policy && reviewEvidenceV1Installed()) {
+      const db = configurationPool ?? database();
+      configuration.policies.reviewEvidence =
+        (await reviewEvidenceApprovalValid(db, policy))
+          ? "configured"
+          : "unconfigured";
+    }
+  } catch {
+    ok = false; // Approval storage is part of database readiness.
+  }
+  const { policies } = configuration;
+  const fullyConfigured = Object.values(policies).every(
+    (status) => status === "configured",
+  );
+  const deployedVersion = env.APP_VERSION || version;
   try {
     await probe();
   } catch {
@@ -68,17 +90,21 @@ export async function healthResponse(
   request: Request,
   dependencies: { probe?: () => Promise<void>; pool?: pg.Pool } = {},
 ) {
-  const health = await getHealth(dependencies.probe, async (env) => {
-    const token = cookieToken(request);
-    if (!token) return false;
-    requirePolicy(adminSessionConfig(env));
-    return transaction(dependencies.pool ?? database(), async (db) => {
-      await securityLock(db);
-      const actor = await requireAdminSession(db, token);
-      requirePermission(actor, "settings");
-      return true;
-    });
-  });
+  const health = await getHealth(
+    dependencies.probe,
+    async (env) => {
+      const token = cookieToken(request);
+      if (!token) return false;
+      requirePolicy(adminSessionConfig(env));
+      return transaction(dependencies.pool ?? database(), async (db) => {
+        await securityLock(db);
+        const actor = await requireAdminSession(db, token);
+        requirePermission(actor, "settings");
+        return true;
+      });
+    },
+    dependencies.pool,
+  );
   return Response.json(health, {
     status: health.ok ? 200 : 503,
     headers: { "Cache-Control": "no-store", Vary: "Cookie" },
