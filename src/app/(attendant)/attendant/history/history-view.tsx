@@ -782,7 +782,10 @@ export function SaleView({
                 </p>
               </div>
               {preview && (
-                <div className="wr-card wr-quiet">
+                <div
+                  className="wr-card wr-quiet"
+                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+                >
                   <span className="wr-label">Calculated</span>
                   <strong className="wr-amount-md">
                     {values.basis === "amount"
