@@ -269,7 +269,7 @@ body {
 
 /* Attendant capture layouts reuse board spacing, type and colour tokens. */
 .wr-capture-shell .wr-nav {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .wr-capture-shell.wr-without-nav .wr-actionbar {
   bottom: 0;
@@ -703,3 +703,13 @@ body {
 .wr-sales-lightbox::backdrop {
   background: var(--surface-inverse);
 }
+
+/* Sales history reuses the phone tokens and keeps private meter images in view memory. */
+.wr-attendant-shell .wr-history-photo { overflow: hidden; height: auto; min-height: 0; }
+.wr-attendant-shell .wr-history-photo > img { width: 100%; max-height: 28rem; object-fit: contain; }
+.wr-history-photo-dialog { max-width: calc(100vw - var(--space-8)); max-height: 90vh; border: 1px solid var(--line-100); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--surface-000); }
+.wr-history-photo-dialog img { display: block; width: 100%; max-height: 75vh; object-fit: contain; }
+.wr-history-right { text-align: right; }
+.wr-attendant-shell .wr-header-top { flex-wrap: wrap; }
+.wr-attendant-shell .wr-kv-row dd { overflow-wrap: anywhere; }
+.wr-attendant-shell textarea.wr-input { min-height: var(--control-h); height: auto; padding: var(--space-3); }

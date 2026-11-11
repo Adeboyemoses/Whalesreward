@@ -121,3 +121,37 @@ it("serves only the generic registration shell offline and never intercepts phon
     "/api/attendant/customers/lookup",
   );
 });
+
+it("uses only the generic history shell offline and never intercepts history API or photos", async () => {
+  vi.stubGlobal("self", {
+    __WB_MANIFEST: [],
+    addEventListener: vi.fn(),
+    location: { origin: "https://fixture.example" },
+  });
+  vi.stubGlobal("fetch", async () => {
+    throw new Error("offline");
+  });
+  const shell = new Response("generic empty history shell");
+  mocks.precache.mockImplementation(async (path: string) =>
+    path === "/attendant/history" ? shell : undefined,
+  );
+  await import("./worker.js");
+  const [match, handler] = mocks.route.mock.calls[0]!;
+  const url = new URL(
+    "https://fixture.example/attendant/history/sale-id/correct",
+  );
+  const result = await handler({ request: new Request(url), url });
+  expect(result).toBe(shell);
+  for (const path of [
+    "/api/attendant/sales",
+    "/api/attendant/sales/id/photo",
+    "/api/admin/sales/id/photo-access",
+  ]) {
+    expect(
+      match({
+        request: { mode: "cors" },
+        url: new URL(path, "https://fixture.example"),
+      }),
+    ).toBe(false);
+  }
+});

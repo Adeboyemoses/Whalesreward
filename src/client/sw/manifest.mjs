@@ -39,6 +39,7 @@ export async function collectPrecacheManifest(root) {
     "/attendant/sign-in",
     "/attendant/sale",
     "/attendant/register",
+    "/attendant/history",
     "/attendant/account",
     "/attendant/account/hand-over",
     "/attendant/access-expired",

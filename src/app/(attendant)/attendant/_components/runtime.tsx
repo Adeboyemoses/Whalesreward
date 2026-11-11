@@ -347,6 +347,7 @@ export function Frame({
   context,
   children,
   action,
+  headerAction,
   active = "Sale",
   noNav = false,
   signIn = false,
@@ -357,6 +358,7 @@ export function Frame({
   context?: ReactNode;
   children: ReactNode;
   action?: ReactNode;
+  headerAction?: ReactNode;
   active?: NavLabel;
   noNav?: boolean;
   signIn?: boolean;
@@ -374,6 +376,7 @@ export function Frame({
         context={context}
         connection={online ? "online" : "offline"}
         secondary={!signIn && title !== "New sale"}
+        action={headerAction}
       />
       <main className="wr-screen">
         {!signIn &&
@@ -397,6 +400,7 @@ export function Frame({
           items={[
             { label: "Sale", href: "/attendant/sale" },
             { label: "Register", href: "/attendant/register" },
+            { label: "History", href: "/attendant/history" },
             { label: "Uploads", href: "/attendant/uploads" },
             { label: "Account", href: "/attendant/account" },
           ]}
