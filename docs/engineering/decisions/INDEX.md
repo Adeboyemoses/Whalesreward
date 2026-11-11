@@ -32,6 +32,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | P-23 | Supersedes only P-20's unconditional S lower bound: verified server-HMAC lookup/registration evidence gives L=max(S,T), otherwise L=S; all capture checks use [L,min(R,original expiry)], with card link still in force at R. Preserves P-20 cap/review permissions and Q-528 gate. Cached evidence keeps its original time; invalid/mismatched evidence falls back without rejection. Prevents ordinary register-then-sell holds under P-02's app-integrity boundary | Earl, 9 Nov 2026; [WHR-91](https://linear.app/phaneum/issue/WHR-91), [M1](../contracts/m1.md#signed-lookup-lower-bound--p-23-wo-spec-3d-whr-91). Rook to mirror in product docs |
 
+| P-24 | Flag distinct non-cancelled station sales for the same customer, product and exact entered value in the same basis within a configured 10 minutes by app-reported capture time, OR byte-identical server-validated photo digests regardless of customer/time. Flags never hold or change credit; phone time grants no eligibility. Missing window disables only time-based matching. Refines F07; client Q-555 pending | Earl, 11 Nov 2026; [WHR-102](https://linear.app/phaneum/issue/WHR-102), [M3](../contracts/m3.md#duplicate-and-independent-hold-decisions--s02s07). Rook to mirror in product docs |
+
 ## Technical (this repo)
 
 | ID | Decision | Since |
