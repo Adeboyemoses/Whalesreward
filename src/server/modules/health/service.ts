@@ -1,4 +1,8 @@
-import { policyConfiguration, type Configuration } from "./policies";
+import {
+  healthEnvironmentValid,
+  policyConfiguration,
+  type Configuration,
+} from "./policies";
 import { database } from "../../lib/db";
 import {
   requireAdminSession,
@@ -47,7 +51,7 @@ export async function getHealth(
   // Probe first: permission revoked during the probe must not expose diagnostics.
   let privileged = false;
   try {
-    privileged = await authorize(env);
+    privileged = healthEnvironmentValid(env) && (await authorize(env));
   } catch {
     /* Public projection on any auth failure. */
   }

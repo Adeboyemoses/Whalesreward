@@ -43,6 +43,59 @@ afterEach(() => {
 });
 
 describe("WHR-100 policy configuration", () => {
+  it.each([
+    { WHR_ENV: "prod", NODE_ENV: "production" },
+    { WHR_ENV: "", NODE_ENV: "production" },
+    { WHR_ENV: " staging", NODE_ENV: "production" },
+    { WHR_ENV: "STAGING", NODE_ENV: "production" },
+    { WHR_ENV: "unsupported", NODE_ENV: "test" },
+    { WHR_ENV: "staging", NODE_ENV: "prod" },
+    { WHR_ENV: "local", NODE_ENV: "" },
+    { WHR_ENV: undefined, NODE_ENV: "development " },
+  ])(
+    "WHR-100 invalid environment %j cannot configure any policy or invoke evaluators",
+    (environment) => {
+      const env = { ...configured, EMAIL_PROVIDER: "mailpit", ...environment };
+      const result = policyConfiguration(env);
+      expect(result).toEqual({
+        policies: Object.fromEntries(
+          policyNames.map((name) => [name, "unconfigured"]),
+        ),
+        fullyConfigured: false,
+      });
+      const check = vi.fn(() => true);
+      const checks = Object.fromEntries(
+        policyNames.map((name) => [name, check]),
+      ) as PolicyEvaluators;
+      expect(policyConfiguration(env, checks)).toEqual(result);
+      expect(check).not.toHaveBeenCalled();
+    },
+  );
+  it.each([
+    { WHR_ENV: "local", NODE_ENV: "production" },
+    { WHR_ENV: "test", NODE_ENV: "test" },
+    { WHR_ENV: undefined, NODE_ENV: "development" },
+    { WHR_ENV: undefined, NODE_ENV: "test" },
+    { WHR_ENV: undefined, NODE_ENV: undefined },
+  ])(
+    "WHR-100 permitted development environment %j retains explicit local proposals",
+    (environment) => {
+      expect(
+        policyConfiguration({
+          ...configured,
+          EMAIL_PROVIDER: "mailpit",
+          ...environment,
+        }).policies,
+      ).toMatchObject({
+        auth: "configured",
+        delivery: "configured",
+        delegation: "configured",
+        phone: "configured",
+        cardPrint: "configured",
+      });
+    },
+  );
+
   it("evaluates existing gates with staging proposals and keeps unavailable M3/M4 evaluators unconfigured", () => {
     const { policies, fullyConfigured } = policyConfiguration(configured);
     expect(Object.keys(policies)).toEqual(policyNames);

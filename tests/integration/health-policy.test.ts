@@ -303,4 +303,24 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
     vi.stubEnv("WHR_ENV", "production");
     expectPublic(await call(adminCookie(a.token)));
   });
+  it.each([
+    ["WHR_ENV", "prod"],
+    ["WHR_ENV", ""],
+    ["WHR_ENV", "staging "],
+    ["WHR_ENV", "STAGING"],
+    ["NODE_ENV", "prod"],
+    ["NODE_ENV", ""],
+  ])(
+    "WHR-100 malformed %s=%j denies named health to a valid privileged session",
+    async (key, value) => {
+      const a = await actor();
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv(key, value);
+      for (const failure of [false, true]) {
+        const body = await call(adminCookie(a.token), failure);
+        expect(body.fullyConfigured).toBe(false);
+        expectPublic(body);
+      }
+    },
+  );
 });

@@ -22,6 +22,15 @@ export type Configuration = Readonly<Record<string, string | undefined>>;
 export type PolicyEvaluators = Partial<
   Record<PolicyName, (env: Configuration) => boolean>
 >;
+/** Health must not interpret a deployment typo as permission to use local defaults. */
+export function healthEnvironmentValid(env: Configuration): boolean {
+  return (
+    (env.WHR_ENV === undefined ||
+      ["local", "test", "staging", "production"].includes(env.WHR_ENV)) &&
+    (env.NODE_ENV === undefined ||
+      ["development", "test", "production"].includes(env.NODE_ENV))
+  );
+}
 const evaluators: PolicyEvaluators = {
   auth: (env) => {
     requirePolicy(adminSessionConfig(env));
@@ -56,11 +65,14 @@ export function policyConfiguration(
   env: Configuration,
   checks: PolicyEvaluators = evaluators,
 ) {
+  const validEnvironment = healthEnvironmentValid(env);
   const policies = {} as HealthPolicies;
   for (const name of policyNames) {
     try {
       policies[name] =
-        checks[name]?.(env) === true ? "configured" : "unconfigured";
+        validEnvironment && checks[name]?.(env) === true
+          ? "configured"
+          : "unconfigured";
     } catch {
       policies[name] = "unconfigured";
     }
