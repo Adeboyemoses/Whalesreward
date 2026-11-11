@@ -161,7 +161,7 @@ describe("M2 atomic customers and card inventory", () => {
         context = kind === "attendant" ? newId() : null;
       if (context)
         await pool.query(
-          "INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest) VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '24 hours','Grace Okon','grace.okon','fictional-digest')",
+          "INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest) VALUES($1,$2,$3,statement_timestamp(),statement_timestamp()+interval '24 hours','Grace Okon','grace.okon','fictional-digest')",
           [context, id(6), id(18)],
         );
       await pool.query(
@@ -507,7 +507,7 @@ describe("M2 atomic customers and card inventory", () => {
             [e.id],
           )
         ).rows[0],
-      ).toMatchObject({ status: "failed", lease_nonce: null });
+      ).toMatchObject({ status: "pending", lease_nonce: null });
       await pool.query(
         "UPDATE card_export SET next_attempt_at=clock_timestamp() WHERE id=$1",
         [e.id],
@@ -742,7 +742,7 @@ describe("M2 atomic customers and card inventory", () => {
     files.set(object, new Uint8Array([1]));
     await expect(
       downloadCardExport(pool, adminToken, b.id, e.id, storage),
-    ).rejects.toMatchObject({ code: "export_failed" });
+    ).rejects.toMatchObject({ code: "export_failed", status: 409 });
   });
   it.each([undefined, "{bad-json", JSON.stringify({ pageWidthMm: 0 })])(
     "WHR-99 PDF configuration error is JSON 409 without mutation: %s",
@@ -865,7 +865,7 @@ describe("M2 atomic customers and card inventory", () => {
         b.id,
         e.id,
       ),
-    ).toMatchObject({ state: "failed", failure: "preparation_failed" });
+    ).toMatchObject({ state: "pending", failure: null });
     await pool.query(
       "UPDATE card_export SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=$1",
       [e.id],
@@ -1149,7 +1149,7 @@ describe("M2 atomic customers and card inventory", () => {
     });
     await expect(
       downloadCardExport(pool, adminToken, b.id, e.id, storage),
-    ).rejects.toMatchObject({ code: "export_failed" });
+    ).rejects.toMatchObject({ code: "export_failed", status: 409 });
   });
   it("I-52 preserves unexpired final claims and their active quota until their leases end", async () => {
     const b = await batch();
@@ -1171,12 +1171,7 @@ describe("M2 atomic customers and card inventory", () => {
       "UPDATE card_export SET attempts=3,fencing_version=3,lease_nonce='fictional-live-final-claim',lease_until=clock_timestamp()+interval '1 hour' WHERE id=ANY($1::uuid[])",
       [ids],
     );
-    // A retried final attempt retains failed state while rendering; it is
-    // still an active preparation until its lease expires.
-    await pool.query(
-      "UPDATE card_export SET status='failed',failure_code='preparation_failed' WHERE id=$1",
-      [second.id],
-    );
+    // Bounded retry attempts remain pending while their lease is active.
     const before = (
       await pool.query(
         "SELECT * FROM card_export WHERE id=ANY($1::uuid[]) ORDER BY id",
@@ -1219,7 +1214,7 @@ describe("M2 atomic customers and card inventory", () => {
     marginMm: 10,
     gapMm: 2,
   };
-  const blockedPdfCases = ["pending", "failed"].flatMap((state) =>
+  const blockedPdfCases = ["pending"].flatMap((state) =>
     [0, 1, 2].flatMap((attempts) =>
       ["missing", "malformed"].flatMap((configuration) =>
         ["absent", "expired"].map((lease) => ({
@@ -1387,7 +1382,7 @@ describe("M2 atomic customers and card inventory", () => {
       [ids],
     );
     await pool.query(
-      "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=2,fencing_version=2 WHERE id=$1",
+      "UPDATE card_export SET attempts=2,fencing_version=2 WHERE id=$1",
       [second.id],
     );
     const before = (
@@ -1588,5 +1583,226 @@ describe("M2 atomic customers and card inventory", () => {
     expect((await call("customers", "register", input)).response.status).toBe(
       200,
     );
+  });
+  it.each([0, 1, 2])(
+    "WHR-100 failed exports are terminal at attempts=%s and require a new preparation without inventory changes",
+    async (attempts) => {
+      const b = await batch();
+      const input = {
+        operationId: newId(),
+        expectedVersion: 1,
+        format: "xlsx",
+      };
+      const first = await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        input,
+        b.id,
+      );
+      const e = first.data as { id: string };
+      await pool.query(
+        "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=$2 WHERE id=$1",
+        [e.id, attempts],
+      );
+      const before = (
+        await pool.query("SELECT * FROM card_export WHERE id=$1", [e.id])
+      ).rows;
+      const inventory = (
+        await pool.query("SELECT * FROM card WHERE batch_id=$1 ORDER BY id", [
+          b.id,
+        ])
+      ).rows;
+      const render = vi.fn();
+      expect(
+        await prepareCardExport(pool, { ...options, render }, e.id),
+      ).toEqual({ processed: false });
+      expect(render).not.toHaveBeenCalled();
+      expect(
+        (
+          await cardsWrite(
+            pool,
+            adminConfig(),
+            adminToken,
+            "export",
+            input,
+            b.id,
+          )
+        ).data,
+      ).toEqual(first.data);
+      for (let attempt = 0; attempt < 2; attempt++)
+        await expect(
+          downloadCardExport(pool, adminToken, b.id, e.id, storage),
+        ).rejects.toMatchObject({ code: "export_failed", status: 409 });
+      expect(
+        (await pool.query("SELECT * FROM card_export WHERE id=$1", [e.id]))
+          .rows,
+      ).toEqual(before);
+      const replacement = (
+        await cardsWrite(
+          pool,
+          adminConfig(),
+          adminToken,
+          "export",
+          { ...input, operationId: newId() },
+          b.id,
+        )
+      ).data as { id: string };
+      expect(replacement.id).not.toBe(e.id);
+      expect(await prepareCardExport(pool, options, replacement.id)).toEqual({
+        processed: true,
+        delivered: true,
+      });
+      expect(
+        (
+          await pool.query("SELECT * FROM card WHERE batch_id=$1 ORDER BY id", [
+            b.id,
+          ])
+        ).rows,
+      ).toEqual(inventory);
+    },
+  );
+  it.each(["register", "lookup"])(
+    "WHR-100 phone policy %s returns JSON 409 without customer or receipt mutation",
+    async (action) => {
+      const b = await active();
+      const card = (await codes(b.id)).items[0]!;
+      const input =
+        action === "register"
+          ? registration(card.code)
+          : { phone: "08000001000" };
+      const before = (
+        await pool.query(
+          "SELECT (SELECT count(*) FROM customer) AS customers,(SELECT count(*) FROM mutation_receipt) AS receipts",
+        )
+      ).rows[0];
+      vi.stubEnv("WHR_PHONE_POLICY", "unsupported");
+      try {
+        const result = await call("customers", action, input);
+        expect(result.body.error.code).toBe("phone_policy_unconfigured");
+        expect(result.response.status).toBe(409);
+        expect(result.body.error).toMatchObject({
+          code: "phone_policy_unconfigured",
+          retryable: false,
+        });
+        expect(result.response.headers.get("cache-control")).toBe("no-store");
+        expect(
+          (
+            await pool.query(
+              "SELECT (SELECT count(*) FROM customer) AS customers,(SELECT count(*) FROM mutation_receipt) AS receipts",
+            )
+          ).rows[0],
+        ).toEqual(before);
+        expect((await codes(b.id)).items[0]).toEqual(card);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+  it("WHR-100 terminal export file HTTP envelope is 409 and never touches storage", async () => {
+    const b = await batch();
+    const e = (
+      await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+        b.id,
+      )
+    ).data as { id: string };
+    await pool.query(
+      "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=1 WHERE id=$1",
+      [e.id],
+    );
+    const before = (
+      await pool.query("SELECT * FROM card_export WHERE id=$1", [e.id])
+    ).rows;
+    for (const [key, value] of Object.entries({
+      STORAGE_ENDPOINT: "http://127.0.0.1:9000",
+      STORAGE_REGION: "us-east-1",
+      STORAGE_BUCKET: "whr-e2e-cards",
+      STORAGE_ACCESS_KEY_ID: "whr-local",
+      STORAGE_SECRET_ACCESS_KEY: "local-development-only",
+    }))
+      vi.stubEnv(key, value);
+    try {
+      const response = await handleCardsCustomers(
+        new Request(
+          `${origin}/api/admin/card-batches/${b.id}/exports/${e.id}/file`,
+          {
+            headers: {
+              cookie: `__Host-whr-admin-session=${adminToken}`,
+              "x-test-ip": "10.47.0.44",
+            },
+          },
+        ),
+        "cards",
+        "file",
+        b.id,
+        e.id,
+      );
+      const json = await response.json();
+      expect(json.error.code).toBe("export_failed");
+      expect(response.status).toBe(409);
+      expect(json.error).toMatchObject({
+        code: "export_failed",
+        retryable: false,
+      });
+      expect(response.headers.get("content-type")).toContain(
+        "application/json",
+      );
+      expect(
+        (await pool.query("SELECT * FROM card_export WHERE id=$1", [e.id]))
+          .rows,
+      ).toEqual(before);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+  it("WHR-100 bounded internal retries stay pending until the final failed attempt", async () => {
+    const b = await batch();
+    const e = (
+      await cardsWrite(
+        pool,
+        adminConfig(),
+        adminToken,
+        "export",
+        { operationId: newId(), expectedVersion: 1, format: "xlsx" },
+        b.id,
+      )
+    ).data as { id: string };
+    const render = vi.fn(async () => {
+      throw new Error("fictional-render-failure");
+    });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await pool.query(
+        "UPDATE card_export SET next_attempt_at=clock_timestamp() WHERE id=$1",
+        [e.id],
+      );
+      expect(
+        await prepareCardExport(pool, { ...options, render }, e.id),
+      ).toEqual({ processed: true, delivered: false });
+      const row = (
+        await pool.query(
+          "SELECT status,attempts,failure_code,lease_nonce,lease_until,next_attempt_at FROM card_export WHERE id=$1",
+          [e.id],
+        )
+      ).rows[0];
+      expect(row).toMatchObject({
+        status: attempt === 3 ? "failed" : "pending",
+        attempts: attempt,
+        failure_code: attempt === 3 ? "preparation_failed" : null,
+        lease_nonce: null,
+        lease_until: null,
+      });
+      if (attempt === 3) expect(row.next_attempt_at).toBeNull();
+      else expect(row.next_attempt_at).toBeInstanceOf(Date);
+    }
+    expect(await prepareCardExport(pool, { ...options, render }, e.id)).toEqual(
+      { processed: false },
+    );
+    expect(render).toHaveBeenCalledTimes(3);
   });
 });

@@ -1097,7 +1097,7 @@ describe("independent M2 customer and card adversarial checks", () => {
       );
       await expect(
         downloadCardExport(f.pool, actor.token, b.id, e.id, files.storage),
-      ).rejects.toMatchObject({ code: "export_failed", status: 503 });
+      ).rejects.toMatchObject({ code: "export_failed", status: 409 });
       expect(download.bytes.byteLength).toBeGreaterThan(0);
     } finally {
       release();

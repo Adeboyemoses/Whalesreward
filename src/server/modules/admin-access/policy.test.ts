@@ -64,3 +64,20 @@ it("M01/M02 emails use inline tables, matching text, configured lifetime and exp
   expect(reset.text).toContain("every other session");
   expect(reset.html).toContain("30 minutes");
 });
+
+it.each([false, true])(
+  "WHR-100 unconfigured auth/delegation is actionable 409: %s",
+  (delegation) => {
+    try {
+      requirePolicy({ secret: "", origin: "", production: true }, delegation);
+      expect.fail("must remain fail closed");
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: delegation
+          ? "delegation_policy_unconfigured"
+          : "auth_policy_unconfigured",
+        status: 409,
+      });
+    }
+  },
+);

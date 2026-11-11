@@ -3,16 +3,28 @@ import { AuthError } from "../modules/auth/errors";
 export interface PhoneNormalizer {
   normalize(input: string): string;
 }
-export function createPhoneNormalizer(options: {
-  production: boolean;
-  policy?: string;
-}): PhoneNormalizer {
+type PhonePolicy = { production: boolean; policy?: string };
+export function requirePhonePolicy(options: PhonePolicy) {
+  if (
+    (options.production && options.policy !== "ng-mobile-v1") ||
+    (options.policy && options.policy !== "ng-mobile-v1")
+  )
+    throw new AuthError("phone_policy_unconfigured", 409);
+}
+export function phonePolicy(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): PhonePolicy {
+  return {
+    production:
+      env.WHR_ENV === "production" ||
+      (!env.WHR_ENV && env.NODE_ENV === "production"),
+    policy: env.WHR_PHONE_POLICY,
+  };
+}
+export function createPhoneNormalizer(options: PhonePolicy): PhoneNormalizer {
   return {
     normalize(input) {
-      if (options.production && options.policy !== "ng-mobile-v1")
-        throw new AuthError("phone_policy_unconfigured", 503);
-      if (options.policy && options.policy !== "ng-mobile-v1")
-        throw new AuthError("phone_policy_unconfigured", 503);
+      requirePhonePolicy(options);
       if (input.length > 32 || !input || /[^+0-9 ()-]/.test(input))
         throw new AuthError("phone_invalid", 422);
       const value = input.replace(/[ ()-]/g, "");
@@ -23,10 +35,5 @@ export function createPhoneNormalizer(options: {
   };
 }
 export function phoneNormalizer() {
-  return createPhoneNormalizer({
-    production:
-      process.env.WHR_ENV === "production" ||
-      (!process.env.WHR_ENV && process.env.NODE_ENV === "production"),
-    policy: process.env.WHR_PHONE_POLICY,
-  });
+  return createPhoneNormalizer(phonePolicy());
 }

@@ -59,8 +59,10 @@ export type AdminConfig = {
   receiptKeys?: Record<string, string>;
   receiptKeyVersion?: string;
 };
-export function adminConfig(): AdminConfig {
-  const raw = process.env.WHR_ADMIN_RECEIPT_KEYS;
+export function adminSessionConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): AdminConfig {
+  const raw = env.WHR_ADMIN_RECEIPT_KEYS;
   let receiptKeys: Record<string, string> | undefined;
   if (raw) {
     let parsed: unknown;
@@ -83,28 +85,38 @@ export function adminConfig(): AdminConfig {
       throw new Error("Receipt key configuration unavailable");
     receiptKeys = parsed as Record<string, string>;
   }
-  const receiptKeyVersion = process.env.WHR_ADMIN_RECEIPT_KEY_VERSION ?? "v1";
+  const receiptKeyVersion = env.WHR_ADMIN_RECEIPT_KEY_VERSION ?? "v1";
   if (receiptKeys && !receiptKeys[receiptKeyVersion])
     throw new Error("Current receipt key unavailable");
-  const email = emailConfig();
   return {
-    ...authConfig(),
+    ...authConfig(env),
     receiptKeys,
     receiptKeyVersion,
     production:
-      process.env.WHR_ENV === "production" ||
-      (!process.env.WHR_ENV && process.env.NODE_ENV === "production"),
-    delivery: email.adapter,
-    email,
-    mailpitUrl: process.env.MAILPIT_URL ?? "http://127.0.0.1:8025",
+      env.WHR_ENV === "production" ||
+      (!env.WHR_ENV && env.NODE_ENV === "production"),
   };
 }
-export function requirePolicy(config: AdminConfig, delegation = false) {
+export function adminConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): AdminConfig {
+  const email = emailConfig(env);
+  return {
+    ...adminSessionConfig(env),
+    delivery: email.adapter,
+    email,
+    mailpitUrl: env.MAILPIT_URL ?? "http://127.0.0.1:8025",
+  };
+}
+export function requirePolicy(
+  config: Pick<AdminConfig, "production"> & Partial<AdminConfig>,
+  delegation = false,
+) {
   if (config.production)
     throw new AuthError(
       delegation
         ? "delegation_policy_unconfigured"
         : "auth_policy_unconfigured",
-      503,
+      409,
     );
 }

@@ -1,4 +1,13 @@
-import { cardPrintLayout } from "../cards/config";
+import { policyConfiguration, type Configuration } from "./policies";
+import { database } from "../../lib/db";
+import {
+  requireAdminSession,
+  requirePermission,
+  securityLock,
+} from "../../lib/authz";
+import { transaction } from "../../lib/transaction";
+import { adminSessionConfig, requirePolicy } from "../admin-access/config";
+import { cookieToken } from "../admin-access/http";
 import pg from "pg";
 import { version } from "../../../../package.json";
 
@@ -22,18 +31,52 @@ async function probeDatabase(): Promise<void> {
   await pool.query("SELECT 1");
 }
 
-export async function getHealth(probe: () => Promise<void> = probeDatabase) {
-  const cardPrint = cardPrintLayout() ? "configured" : "unconfigured";
-  const deployedVersion = process.env.APP_VERSION || version;
+export async function getHealth(
+  probe: () => Promise<void> = probeDatabase,
+  authorize: (env: Configuration) => Promise<boolean> = async () => false,
+) {
+  const env = Object.freeze({ ...process.env });
+  const { policies, fullyConfigured } = policyConfiguration(env);
+  const deployedVersion = env.APP_VERSION || version;
+  let ok = true;
   try {
     await probe();
-    return { ok: true, version: deployedVersion, db: "ok", cardPrint };
   } catch {
-    return {
-      ok: false,
-      version: deployedVersion,
-      db: "unavailable",
-      cardPrint,
-    };
+    ok = false;
   }
+  // Probe first: permission revoked during the probe must not expose diagnostics.
+  let privileged = false;
+  try {
+    privileged = await authorize(env);
+  } catch {
+    /* Public projection on any auth failure. */
+  }
+  return {
+    ok,
+    version: deployedVersion,
+    db: ok ? "ok" : "unavailable",
+    fullyConfigured,
+    ...(privileged ? { policies } : {}),
+  };
+}
+
+export async function healthResponse(
+  request: Request,
+  dependencies: { probe?: () => Promise<void>; pool?: pg.Pool } = {},
+) {
+  const health = await getHealth(dependencies.probe, async (env) => {
+    const token = cookieToken(request);
+    if (!token) return false;
+    requirePolicy(adminSessionConfig(env));
+    return transaction(dependencies.pool ?? database(), async (db) => {
+      await securityLock(db);
+      const actor = await requireAdminSession(db, token);
+      requirePermission(actor, "settings");
+      return true;
+    });
+  });
+  return Response.json(health, {
+    status: health.ok ? 200 : 503,
+    headers: { "Cache-Control": "no-store", Vary: "Cookie" },
+  });
 }

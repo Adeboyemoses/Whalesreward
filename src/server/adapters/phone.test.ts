@@ -20,7 +20,10 @@ describe("D08 phone normalization", () => {
     expect(() =>
       createPhoneNormalizer({ production: true }).normalize("08000000000"),
     ).toThrowError(
-      expect.objectContaining({ code: "phone_policy_unconfigured" }),
+      expect.objectContaining({
+        code: "phone_policy_unconfigured",
+        status: 409,
+      }),
     );
     expect(
       createPhoneNormalizer({
