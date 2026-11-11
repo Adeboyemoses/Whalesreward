@@ -19,6 +19,26 @@ import {
 } from "../types";
 import { CaptureDatabase, type Installation } from "./db";
 import { SaleSynchronizer } from "./sync";
+import { CorrectionSynchronizer } from "./corrections";
+import { HttpAttendantSalesApi, type AttendantSalesApi } from "../sales-api";
+import {
+  attendantSaleDetailSchema,
+  correctionSubmissionSchema,
+} from "../../shared/contracts/sales";
+import {
+  localValues,
+  numericCorrection,
+  valuesDigest,
+} from "./correction-values";
+import {
+  pendingCorrection,
+  type CorrectionOutboxRow,
+  type SaveCorrectionInput,
+} from "./correction-types";
+export type {
+  CorrectionOutboxRow,
+  SaveCorrectionInput,
+} from "./correction-types";
 import { connection } from "./connection";
 import {
   advanceWindow,
@@ -66,6 +86,7 @@ export class AttendantClient {
   private salesListeners = new Set<() => void>();
   private foregroundCleanup: (() => void) | null = null;
   private synchronizer: SaleSynchronizer;
+  private correctionSynchronizer: CorrectionSynchronizer;
 
   constructor(
     private api: AttendantApi = new HttpAttendantApi(),
@@ -78,6 +99,7 @@ export class AttendantClient {
     private online: () => boolean = () =>
       typeof navigator === "undefined" || navigator.onLine,
     private reachable: () => boolean = online,
+    private salesApi: AttendantSalesApi = new HttpAttendantSalesApi(),
   ) {
     this.synchronizer = new SaleSynchronizer({
       api,
@@ -107,6 +129,15 @@ export class AttendantClient {
         }
         return state.session;
       },
+      lock: (session, code) =>
+        this.lockContext(session, code !== "online_sign_in_required"),
+      changed: () => this.salesChanged(),
+    });
+    this.correctionSynchronizer = new CorrectionSynchronizer({
+      api: this.salesApi,
+      db,
+      now: () => this.clock().wall,
+      authorize: () => this.authorizeCorrectionSync(),
       lock: (session, code) =>
         this.lockContext(session, code !== "online_sign_in_required"),
       changed: () => this.salesChanged(),
@@ -152,8 +183,27 @@ export class AttendantClient {
     for (const listener of this.salesListeners) listener();
     this.signal();
   }
-  retryUploads() {
-    return this.synchronizer.run();
+  async retryUploads() {
+    await this.synchronizer.run();
+    await this.correctionSynchronizer.run();
+  }
+  private async authorizeCorrectionSync(): Promise<Session> {
+    if (!this.reachable())
+      throw new ClientError("offline", "Uploads pause while offline.");
+    const session = await this.active();
+    const window = await this.db.windows.get(session.account.id);
+    if (
+      !window ||
+      Date.parse(window.lastOnlineSignInAt) + window.elapsedAtCheckpointMs >=
+        Date.parse(session.sessionExpiresAt)
+    ) {
+      await this.lockContext(session);
+      throw new ClientError(
+        "access_expired",
+        "Sign in online again to upload.",
+      );
+    }
+    return session;
   }
   refreshSale(operationId: string) {
     return this.synchronizer.run(operationId, true);
@@ -170,7 +220,10 @@ export class AttendantClient {
         /* Durable row survives storage/service interruption. */
       });
     };
-    const pause = () => this.synchronizer.stop();
+    const pause = () => {
+      this.synchronizer.stop();
+      this.correctionSynchronizer.stop();
+    };
     const interval = setInterval(run, 1000);
     if (typeof window !== "undefined") {
       window.addEventListener("online", run);
@@ -333,6 +386,7 @@ export class AttendantClient {
   async signIn(username: string, password: string): Promise<ClientState> {
     this.requireOnline();
     this.synchronizer.stop();
+    this.correctionSynchronizer.stop();
     const epoch = ++this.authEpoch;
     const attempt = uuidv7();
     // Claim the attempt in the first transaction, before any revocation/network wait.
@@ -640,6 +694,7 @@ export class AttendantClient {
   }
   async signOut(): Promise<ClientState> {
     this.synchronizer.stop();
+    this.correctionSynchronizer.stop();
     ++this.authEpoch;
     this.restricted = null;
     this.accessNotice = null;
@@ -804,6 +859,7 @@ export class AttendantClient {
           this.accessNotice =
             "Your session ended. Sign in online again. Pending sales and photos stay on this phone.";
           this.synchronizer.stop();
+          this.correctionSynchronizer.stop();
         }
       }
     });
@@ -1142,6 +1198,198 @@ export class AttendantClient {
       );
     }
   }
+  /** Save a separate immutable operation. No server receipt or credit is implied. */
+  async saveCorrection(
+    input: SaveCorrectionInput,
+  ): Promise<CorrectionOutboxRow> {
+    const session = await this.active();
+    const epoch = this.authEpoch;
+    let baseValues,
+      purchaseId: string | null = null,
+      basedOnRevisionId: string | null = null;
+    let evidenceAssetId: string | null = null,
+      photoDigest: string,
+      originalOperationId: string;
+    let submission: CorrectionOutboxRow["submission"] = null;
+    let expectedVersion: number | null = null;
+    const operationId = uuidv7();
+    const reason = correctionSubmissionSchema.shape.reason.safeParse(
+      input.reason,
+    );
+    if (!reason.success)
+      throw new ClientError(
+        "invalid_request",
+        "Enter a reason with 1 to 1000 characters.",
+      );
+    if (input.source.kind === "server") {
+      const detail = attendantSaleDetailSchema.parse(input.source.detail);
+      if (
+        detail.seller.accountId !== session.account.id ||
+        detail.station.id !== session.station.id
+      )
+        throw new ClientError(
+          "permission_denied",
+          "This sale belongs to another account.",
+        );
+      if (
+        detail.state === "cancelled" ||
+        !detail.currentRevisionId ||
+        detail.displayedValues.calculation !== "captured_rate"
+      )
+        throw new ClientError(
+          "sale_not_correctable",
+          "This sale cannot be corrected here.",
+        );
+      if (detail.correctionPending)
+        throw new ClientError(
+          "correction_pending",
+          "A correction is already pending for this sale.",
+        );
+      if (
+        detail.evidence.state !== "validated" ||
+        !detail.evidence.assetId ||
+        !detail.evidence.sha256
+      )
+        throw new ClientError(
+          "evidence_unavailable",
+          "This correction needs the retained validated meter photo.",
+        );
+      expectedVersion = detail.version;
+      baseValues = detail.displayedValues;
+      purchaseId = detail.id;
+      basedOnRevisionId = detail.currentRevisionId;
+      evidenceAssetId = detail.evidence.assetId;
+      photoDigest = detail.evidence.sha256;
+      originalOperationId = detail.operationId;
+    } else {
+      const original = await this.ownSale(input.source.operationId);
+      if (!original)
+        throw new ClientError("not_found", "This saved sale is unavailable.");
+      if (original.state === "cancelled")
+        throw new ClientError(
+          "sale_not_correctable",
+          "This sale cannot be corrected here.",
+        );
+      baseValues = localValues(original);
+      photoDigest = original.photoDigest;
+      originalOperationId = original.operationId;
+      purchaseId = original.purchaseId;
+    }
+    let calculated;
+    try {
+      calculated = numericCorrection(baseValues, input.value);
+    } catch {
+      throw new ClientError(
+        "calculation_invalid",
+        "Enter a positive value within the sale's recorded precision.",
+      );
+    }
+    const baseValuesDigest = await valuesDigest(baseValues);
+    if ((await valuesDigest(calculated.values)) === baseValuesDigest)
+      throw new ClientError(
+        "no_change",
+        "Change the recorded value before saving a correction.",
+      );
+    if (input.source.kind === "server")
+      submission = correctionSubmissionSchema.parse({
+        operationId,
+        expectedVersion,
+        basedOnRevisionId,
+        edit: calculated.edit,
+        evidenceAssetId,
+        reason: reason.data,
+      });
+    const row: CorrectionOutboxRow = {
+      schemaVersion: 1,
+      originatingAccountId: session.account.id,
+      operationId,
+      originalOperationId,
+      purchaseId,
+      basedOnRevisionId,
+      baseValues,
+      baseValuesDigest,
+      edit: calculated.edit,
+      reason: reason.data,
+      evidenceAssetId,
+      photoDigest,
+      submission,
+      serverCorrection: null,
+      state: submission ? "saved" : "waiting_original",
+      localSavedAt: new Date(this.clock().wall).toISOString(),
+      attempts: 0,
+      nextAttemptAt: null,
+      lastErrorCode: null,
+      syncLease: null,
+    };
+    await this.active();
+    try {
+      const saved = await this.db.transaction(
+        "rw",
+        this.db.meta,
+        this.db.windows,
+        this.db.corrections,
+        async () => {
+          const meta = await this.db.meta.get("installation");
+          const window = await this.db.windows.get(session.account.id);
+          if (
+            epoch !== this.authEpoch ||
+            meta?.activeAccountId !== session.account.id ||
+            meta.logoutPending ||
+            meta.signInAttempt ||
+            !window ||
+            window.locked ||
+            window.logoutPending ||
+            window.captureContextId !== session.captureContextId
+          )
+            throw new ClientError(
+              "account_changed",
+              "Account changed. Sign in again before saving.",
+            );
+          const existing = await this.db.corrections
+            .where("[originatingAccountId+originalOperationId]")
+            .equals([session.account.id, originalOperationId])
+            .toArray();
+          if (existing.some(pendingCorrection))
+            throw new ClientError(
+              "correction_pending",
+              "A correction is already waiting for this sale.",
+            );
+          await this.db.corrections.add(row);
+          return row;
+        },
+      );
+      this.salesChanged();
+      return saved;
+    } catch (error) {
+      if (error instanceof ClientError) throw error;
+      throw new ClientError(
+        "storage_failed",
+        "Correction was not saved. Storage may be full. Keep this screen open and try again.",
+      );
+    }
+  }
+  async ownCorrections(): Promise<CorrectionOutboxRow[]> {
+    const state = await this.checkAccess();
+    if (!state.session) return [];
+    return this.db.transaction(
+      "r",
+      this.db.meta,
+      this.db.corrections,
+      async () => {
+        const meta = await this.db.meta.get("installation");
+        if (
+          meta?.activeAccountId !== state.session!.account.id ||
+          meta.logoutPending ||
+          meta.signInAttempt
+        )
+          return [];
+        return this.db.corrections
+          .where("[originatingAccountId+operationId]")
+          .between([meta.activeAccountId, ""], [meta.activeAccountId, "\uffff"])
+          .toArray();
+      },
+    );
+  }
   async ownSales(): Promise<OutboxRow[]> {
     const state = await this.checkAccess();
     if (!state.session) return [];
@@ -1186,6 +1434,7 @@ export class AttendantClient {
   close() {
     this.foregroundCleanup?.();
     this.synchronizer.stop();
+    this.correctionSynchronizer.stop();
     this.channel?.close();
     this.db.close();
   }
