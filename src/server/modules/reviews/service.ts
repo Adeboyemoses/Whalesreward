@@ -663,8 +663,8 @@ export function createReviewsService({
           if (conclusion.beforeReplacement !== true)
             throw new AuthError("evidence_insufficient", 422);
           const link = await db.query(
-            "SELECT l.id FROM card_customer_link l JOIN card c ON c.id=l.card_id WHERE c.id=$1 AND l.customer_id=$2 AND c.state='retired' AND c.replaced_by_card_id IS NOT NULL AND l.ended_at IS NOT NULL AND l.ended_at<= $3 FOR SHARE OF c,l",
-            [p.card_id, p.customer_id, p.server_received_at],
+            "SELECT l.id FROM card_customer_link l JOIN card c ON c.id=l.card_id WHERE c.id=$1 AND l.customer_id=$2 AND c.state='retired' AND c.replaced_by_card_id IS NOT NULL AND l.ended_at IS NOT NULL AND l.ended_at<=(SELECT server_received_at FROM purchase WHERE id=$3) FOR SHARE OF c,l",
+            [p.card_id, p.customer_id, p.id],
           );
           if (!link.rowCount)
             throw new AuthError("policy_review_required", 422);

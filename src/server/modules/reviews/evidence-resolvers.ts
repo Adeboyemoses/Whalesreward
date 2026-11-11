@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type pg from "pg";
+import { authId } from "../../../shared/contracts/auth";
 import { AuthError } from "../auth/errors";
 import type {
   Fact,
@@ -286,6 +287,20 @@ export async function resolveReferenceClosure(
       return insufficient();
     if (done.has(id)) return;
     const originals = facts.sources.filter((s) => s.id === id);
+    // Frozen lookup is an exact, typed original in the server's source closure,
+    // not a database UUID. Only internal dependencies may reference it.
+    if (
+      depth > 0 &&
+      id === `${facts.original.id}:lookup` &&
+      originals.length === 1 &&
+      originals[0]!.category === "frozen_lookup_verification"
+    ) {
+      done.add(id);
+      return;
+    }
+    // Corrupt/unknown internal dependencies are insufficient evidence, never
+    // UUID casts that become transient database errors in the HTTP adapter.
+    if (!authId.safeParse(id).success) return insufficient();
     const derived = (
       await rows(
         db,
