@@ -359,8 +359,13 @@ export class CorrectionSynchronizer {
       )
         return;
       try {
+        // A stable invalid_request refusal precedes correction receipt creation.
+        // An unreadable HTTP 400 maps to temporarily_unavailable and remains uncertain.
         const permanent =
-          (e.status === 409 || e.status === 422) && !e.retryable;
+          (e.status === 409 ||
+            e.status === 422 ||
+            (e.status === 400 && e.code === "invalid_request")) &&
+          !e.retryable;
         const attempts = row.attempts + 1;
         await patch({
           state: permanent ? "needs_attention" : row.state,

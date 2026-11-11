@@ -384,6 +384,78 @@ describe("separate durable numeric corrections", () => {
     expect(sales.sent[1]).toEqual(saved.submission);
     expect((await client.ownCorrections())[0]!.state).toBe("awaiting_review");
   });
+  it("stops retrying a definitive invalid reason and allows a newly reviewed operation without changing the failed one", async () => {
+    const failed = await client.saveCorrection({
+      source: { kind: "server", detail },
+      value: "21000",
+      reason: "password: fictional",
+    });
+    sales.reject = new ClientError(
+      "invalid_request",
+      "Check the correction reason.",
+      400,
+      null,
+      false,
+    );
+    await client.retryUploads();
+    const stored = (await client.ownCorrections())[0]!;
+    expect(stored.state).toBe("needs_attention");
+    expect(stored.lastErrorCode).toBe("invalid_request");
+    expect(stored.nextAttemptAt).toBeNull();
+    expect(stored.submission).toEqual(failed.submission);
+    expect(stored.operationId).toBe(failed.operationId);
+    now += 70000;
+    await client.retryUploads();
+    expect(sales.sent).toHaveLength(1);
+    sales.reject = null;
+    const corrected = await client.saveCorrection({
+      source: { kind: "server", detail },
+      value: "21000",
+      reason: "Meter amount entered incorrectly",
+    });
+    expect(corrected.operationId).not.toBe(failed.operationId);
+    await client.retryUploads();
+    expect(sales.sent).toHaveLength(2);
+    expect(sales.sent[1]).toEqual(corrected.submission);
+    expect(
+      (await client.ownCorrections()).find(
+        (row) => row.operationId === failed.operationId,
+      )?.submission,
+    ).toEqual(failed.submission);
+    expect(
+      (await client.ownCorrections()).find(
+        (row) => row.operationId === corrected.operationId,
+      )?.state,
+    ).toBe("awaiting_review");
+  });
+  it.each([
+    ["temporarily_unavailable", 400],
+    ["invalid_response", 200],
+  ])(
+    "preserves retry identity for uncertain %s status %i failures",
+    async (code, status) => {
+      const saved = await client.saveCorrection({
+        source: { kind: "server", detail },
+        value: "21000",
+        reason: "Meter amount",
+      });
+      sales.reject = new ClientError(
+        code,
+        "Could not verify response.",
+        status,
+      );
+      await client.retryUploads();
+      const waiting = (await client.ownCorrections())[0]!;
+      expect(waiting.state).not.toBe("needs_attention");
+      expect(waiting.nextAttemptAt).not.toBeNull();
+      expect(waiting.submission).toEqual(saved.submission);
+      sales.reject = null;
+      now += 70000;
+      await client.retryUploads();
+      expect(sales.sent).toHaveLength(2);
+      expect(sales.sent[1]).toEqual(saved.submission);
+    },
+  );
   it("never changes frozen guards on a definitive stale base rejection", async () => {
     const saved = await client.saveCorrection({
       source: { kind: "server", detail },

@@ -83,6 +83,35 @@ describe("attendant sales transport", () => {
       expect((e as Error).message).not.toContain("private server narrative");
     }
   });
+  it("distinguishes a stable invalid_request reason refusal from an unreadable HTTP 400", async () => {
+    const refusal = new HttpAttendantSalesApi(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "invalid_request",
+              message: "private reason",
+              retryable: false,
+            },
+          }),
+          { status: 400 },
+        ),
+      () => () => {},
+    );
+    await expect(refusal.correction(v7(), v7())).rejects.toMatchObject({
+      code: "invalid_request",
+      status: 400,
+      retryable: false,
+    });
+    const unreadable = new HttpAttendantSalesApi(
+      async () => new Response("unreadable", { status: 400 }),
+      () => () => {},
+    );
+    await expect(unreadable.correction(v7(), v7())).rejects.toMatchObject({
+      code: "temporarily_unavailable",
+      status: 400,
+    });
+  });
   it("treats unreadable failure and malformed success as uncertain without inventing domain absence", async () => {
     const api = new HttpAttendantSalesApi(
       async () => new Response("unavailable", { status: 503 }),
