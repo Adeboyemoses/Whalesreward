@@ -720,3 +720,14 @@ body {
 .wr-review-reference input { width: var(--space-5); height: var(--space-5); }
 
 .wr-review-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* Review actions can include two full sale references. Keep each action in
+   the sheet at phone widths instead of expanding the document viewport. */
+.wr-sales .wr-sheet { min-width: 0; }
+.wr-sales .wr-row { flex-wrap: wrap; }
+.wr-sales .wr-row > .wr-btn {
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  min-height: var(--control-h);
+}
