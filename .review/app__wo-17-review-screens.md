@@ -14,7 +14,7 @@ plan:
   approach: Reuse strict contracts and current session guards; latest-read versions and frozen same-operation retries; API-only evidence references; no meter correction or price cancellation.
   tests: Unit request/retry boundaries; real-stack Playwright decisions, permissions, stale versions, remaining holds and lost responses; independent 1440px and A14 390/360px fidelity.
   risks: Decisions can cancel sales or release credit; stale guards, uncertain sends, permission changes and insufficient evidence must fail closed without changing operation identity.
-invariants: [I-07, I-09, I-22, I-26, I-31, I-33, I-34, I-39]
+invariants: [I-07, I-09, I-22, I-26, I-31, I-33, I-34, I-35, I-39, I-40]
 p1: []
 tickets: []
 ---
