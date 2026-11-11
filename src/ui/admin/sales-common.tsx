@@ -159,7 +159,9 @@ export function AdminSalePhoto({ sale }: { sale: AdminSaleDetail }) {
           : null;
   return (
     <Sheet title="Meter evidence">
-      <div className="wr-photo wr-sales-photo">
+      <div
+        className={`wr-photo wr-sales-photo${photo && !error ? " wr-taken" : ""}`}
+      >
         {photo && !error ? (
           <>
             <img

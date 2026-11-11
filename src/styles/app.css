@@ -616,10 +616,18 @@ body {
   margin: 0;
 }
 .wr-sales-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: end;
 }
-.wr-sales-toolbar > .wr-field:first-child {
-  flex: 2;
+.wr-sales-toolbar > .wr-field {
+  min-width: 0;
+}
+.wr-sales-photo .wr-photo-bar {
+  width: 100%;
+  box-sizing: border-box;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 .wr-sales-pair {
   display: grid;
@@ -677,7 +685,7 @@ body {
     grid-template-columns: 1fr;
   }
   .wr-sales-toolbar {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
   }
 }
 .wr-sales-lightbox {

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { Clock } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import type { AdminSession } from "@/client/admin-session";
@@ -353,25 +354,32 @@ function SaleDetail({
         back={{ href: "/admin/sales" + suffix, label: "Back to sales" }}
       />
       <ReadState {...result} />
-      <Notice tone={sale.credited ? "success" : "info"}>
-        {sale.correctionPending ? (
-          <>
+      {sale.correctionPending ? (
+        <div className="wr-notice">
+          <Clock aria-hidden="true" strokeWidth={1.75} />
+          <div>
             <b>Late correction awaiting review.</b> The recorded{" "}
             {saleMoney(sale.displayedValues.amountKobo)} remains effective until
             an authorized decision.
-          </>
-        ) : sale.credited ? (
-          <>
-            <b>Completed.</b> Purchase details and photo have been received; no
-            routine approval is needed.
-          </>
-        ) : (
-          <>
-            <b>{sale.state === "cancelled" ? "Cancelled." : "Not credited."}</b>{" "}
-            Recorded details and history are retained.
-          </>
-        )}
-      </Notice>
+          </div>
+        </div>
+      ) : (
+        <Notice tone={sale.credited ? "success" : "info"}>
+          {sale.credited ? (
+            <>
+              <b>Completed.</b> Purchase details and photo have been received;
+              no routine approval is needed.
+            </>
+          ) : (
+            <>
+              <b>
+                {sale.state === "cancelled" ? "Cancelled." : "Not credited."}
+              </b>{" "}
+              Recorded details and history are retained.
+            </>
+          )}
+        </Notice>
+      )}
       <div className="wr-two-col">
         <Sheet title="Purchase details" badge={<SaleStatus sale={sale} />}>
           <KeyValueList
