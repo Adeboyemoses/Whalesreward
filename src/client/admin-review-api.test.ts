@@ -118,6 +118,40 @@ describe("guarded admin review decisions", () => {
       api.prepareDuplicate(a, b, id(8), null, "Repeat purchase").body.decision,
     ).toEqual({ outcome: "keep_both" });
   });
+  it("refuses every new duplicate outcome when either latest-read member is cancelled", () => {
+    for (const cancelled of ["first", "second"] as const) {
+      const a = sale(),
+        b = { ...sale(), id: id(9), saleCode: "S009" };
+      (cancelled === "first" ? a : b).state = "cancelled";
+      const api = new AdminReviewApi();
+      for (const target of [null, a.id, b.id]) {
+        expect(() =>
+          api.prepareDuplicate(a, b, id(8), target, "Reason"),
+        ).toThrowError(
+          expect.objectContaining({ code: "sale_not_cancellable" }),
+        );
+      }
+    }
+  });
+  it("preserves a frozen duplicate retry after a member becomes cancelled", async () => {
+    const transport = vi.fn(async () => {
+      throw new AdminError("network");
+    });
+    const api = new AdminReviewApi(transport as typeof adminRequest);
+    const a = sale(),
+      b = { ...sale(), id: id(9), saleCode: "S009" };
+    const frozen = api.prepareDuplicate(
+      a,
+      b,
+      id(8),
+      b.id,
+      "Duplicate purchase",
+    );
+    await expect(api.submit(frozen)).rejects.toMatchObject({ code: "network" });
+    b.state = "cancelled";
+    await expect(api.submit(frozen)).rejects.toMatchObject({ code: "network" });
+    expect(transport.mock.calls[0]).toEqual(transport.mock.calls[1]);
+  });
   it("capture covers all open capture blocks with aggregate guard and no invented hold", () => {
     const api = new AdminReviewApi(),
       a = sale();

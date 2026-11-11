@@ -178,6 +178,10 @@ export class AdminReviewApi extends AdminSalesApi {
     cancelId: string | null,
     reason: string,
   ): FrozenReview {
+    // New decisions are unavailable for a historical pair with a cancelled member.
+    // submit() deliberately does not recheck this: successful same-key replay wins.
+    if (a.state === "cancelled" || b.state === "cancelled")
+      throw new AdminError("sale_not_cancellable", 409);
     const flag = a.duplicateFlags.find(
       (f) => f.id === flagId && f.state === "open",
     );

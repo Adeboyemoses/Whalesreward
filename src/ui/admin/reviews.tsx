@@ -873,6 +873,18 @@ function DecisionForm({
         {permissions[effectiveKind]} access are both required.
       </Notice>
     );
+  if (
+    !frozen &&
+    kind === "duplicate" &&
+    (sale.state === "cancelled" || pair?.state === "cancelled")
+  )
+    return (
+      <Notice>
+        Sale {sale.state === "cancelled" ? sale.saleCode : pair!.saleCode} is
+        already cancelled. This duplicate flag is historical; no new decision
+        can be made for this pair. Both records remain available.
+      </Notice>
+    );
   return (
     <Sheet
       title={
