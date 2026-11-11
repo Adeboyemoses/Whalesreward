@@ -15,7 +15,6 @@ import {
   type Session,
   type OutboxRow,
 } from "@/client/offline/client";
-import { needsUpload } from "@/client/offline/sync-status";
 import { registerAttendantWorker } from "@/client/sw/register";
 import { connection, probeConnection } from "@/client/offline/connection";
 import { AppHeader, BottomNav, Notice, Button } from "@/ui";
@@ -491,9 +490,59 @@ export function useOwnSales() {
     return { rows: null, error: null };
   return { rows: result.rows, error: result.error };
 }
+export function useOwnPendingWork() {
+  const { client, state } = useAttendant();
+  const accountId = state?.session?.account.id;
+  const contextId = state?.session?.captureContextId;
+  const access = state?.access;
+  const [result, setResult] = useState<{
+    accountId?: string;
+    contextId?: string;
+    pending: { sales: number; corrections: number } | null;
+    error: string | null;
+  }>({ pending: null, error: null });
+  useEffect(() => {
+    let live = true,
+      request = 0;
+    if (!client || !accountId || !contextId || access === "signed_out") return;
+    const current = () =>
+      live &&
+      client.getState().session?.account.id === accountId &&
+      client.getState().session?.captureContextId === contextId;
+    const read = () => {
+      const n = ++request;
+      void client.ownPendingUploads().then(
+        (pending) => {
+          if (current() && n === request)
+            setResult({ accountId, contextId, pending, error: null });
+        },
+        (error) => {
+          if (current() && n === request)
+            setResult({
+              accountId,
+              contextId,
+              pending: null,
+              error: message(error),
+            });
+        },
+      );
+    };
+    const stop = client.subscribeSales(read);
+    read();
+    return () => {
+      live = false;
+      stop();
+    };
+  }, [client, accountId, contextId, access]);
+  return result.accountId === accountId &&
+    result.contextId === contextId &&
+    access !== "signed_out"
+    ? { pending: result.pending, error: result.error }
+    : { pending: null, error: null };
+}
 export function useOwnCount() {
-  const { rows } = useOwnSales();
-  return rows ? rows.filter(needsUpload).length : null;
+  const { pending } = useOwnPendingWork();
+  return pending ? pending.sales + pending.corrections : null;
 }
 export function WindowNotice() {
   return (

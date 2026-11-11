@@ -2,21 +2,22 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CloudUpload, UserRound } from "lucide-react";
-import { needsUpload } from "@/client/offline/sync-status";
 import { Button, Notice } from "@/ui";
 import {
   AccessGate,
   Frame,
   go,
   useAttendant,
-  useOwnCount,
+  useOwnPendingWork,
   message,
   pumpName,
   productName,
 } from "../../_components/runtime";
 function Handover() {
   const { client, state, online } = useAttendant();
-  const count = useOwnCount();
+  const { pending, error: pendingError } = useOwnPendingWork();
+  const count = pending ? pending.sales + pending.corrections : null;
+  const hasCorrections = !!pending?.corrections;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -54,11 +55,15 @@ function Handover() {
     setBusy(true);
     setError(null);
     try {
-      const pending = (await client.ownSales()).filter(needsUpload).length;
+      const latest = await client.ownPendingUploads();
       if (!current()) return;
-      if (pending !== count) {
+      if (
+        !pending ||
+        latest.sales !== pending.sales ||
+        latest.corrections !== pending.corrections
+      ) {
         setError(
-          "The pending count changed. Check the sales still on this phone, then confirm sign-out again.",
+          "The pending count changed. Check the saved work still on this phone, then confirm sign-out again.",
         );
         return;
       }
@@ -91,11 +96,13 @@ function Handover() {
     try {
       await client.retryUploads();
       if (!current()) return;
-      const pending = (await client.ownSales()).filter(needsUpload).length;
+      const latest = await client.ownPendingUploads();
       if (!current()) return;
-      if (pending) {
+      if (latest.sales || latest.corrections) {
         setError(
-          "Some sales are still pending. Uploads will retry while you stay signed in, respecting any retry delay. You can also sign out and leave them on this phone.",
+          latest.corrections
+            ? "Some sales or corrections are still pending. Uploads will retry while you stay signed in, respecting any retry delay. You can also sign out and leave them on this phone. Prior accepted sale values remain effective."
+            : "Some sales are still pending. Uploads will retry while you stay signed in, respecting any retry delay. You can also sign out and leave them on this phone.",
         );
         return;
       }
@@ -129,8 +136,12 @@ function Handover() {
               </Button>
               <p className="wr-help">
                 {online
-                  ? "Sign-out follows confirmed upload. Sales held for review are not credited."
-                  : "Connect to the internet to upload. Sales stay on this phone."}
+                  ? hasCorrections
+                    ? "Sign-out follows confirmed upload of every sale and correction. A correction awaiting review does not change accepted values."
+                    : "Sign-out follows confirmed upload. Sales held for review are not credited."
+                  : hasCorrections
+                    ? "Connect to the internet to upload. Sales and corrections stay on this phone."
+                    : "Connect to the internet to upload. Sales stay on this phone."}
               </p>
             </>
           )}
@@ -145,7 +156,9 @@ function Handover() {
               ? "Signing out…"
               : count === 0
                 ? "Sign out"
-                : "Sign out with pending sales"}
+                : hasCorrections
+                  ? "Sign out with pending changes"
+                  : "Sign out with pending sales"}
           </Button>
           <Button variant="ghost" disabled={busy} onClick={staySignedIn}>
             Stay signed in
@@ -169,17 +182,26 @@ function Handover() {
         <h2 className="wr-person-title">
           {count === null
             ? "Checking pending sales…"
-            : `${count} ${count === 1 ? "sale" : "sales"} still pending`}
+            : hasCorrections
+              ? `${pending!.sales} ${pending!.sales === 1 ? "sale" : "sales"} · ${pending!.corrections} ${pending!.corrections === 1 ? "correction" : "corrections"} still pending`
+              : `${count} ${count === 1 ? "sale" : "sales"} still pending`}
         </h2>
         <p>
-          These sales and photos remain on this phone. They have not been added
-          to loyalty yet.
+          {hasCorrections
+            ? "Saved corrections remain on this phone until the server receives them. Their prior accepted sale values remain effective until a server decision. Any original sales still waiting to upload have not been added to loyalty yet."
+            : "These sales and photos remain on this phone. They have not been added to loyalty yet."}
         </p>
       </div>
       <Notice>
         If you sign out now, uploads pause. Sign in to this same account again
-        to resume. The next account cannot see these sales.
+        to resume. The next account cannot see these{" "}
+        {hasCorrections ? "sales or corrections" : "sales"}.
       </Notice>
+      {pendingError && (
+        <Notice tone="danger" role="alert">
+          {pendingError}
+        </Notice>
+      )}
       {error && (
         <Notice tone="danger" role="alert">
           {error}
