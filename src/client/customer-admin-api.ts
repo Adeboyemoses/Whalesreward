@@ -140,8 +140,7 @@ const messages: Record<string, string> = {
   no_printable_cards: "There are no unassigned cards to print in this batch.",
   export_not_ready: "This export is still being prepared.",
   export_expired: "This file has expired. Prepare a new export.",
-  export_failed:
-    "File preparation failed. Retry the same preparation or prepare a new export.",
+  export_failed: "File preparation failed. Prepare a new export.",
   version_conflict:
     "This batch changed. Reload the batch and review a new change.",
   invalid_transition:
