@@ -3,6 +3,11 @@ export const adminOperationId = () => v7();
 const messages: Record<string, string> = {
   unavailable:
     "The service is unavailable. Retry the same request; do not assume it failed.",
+  auth_policy_unconfigured:
+    "Sign-in isn't set up on this server yet. Contact your system administrator.",
+  delegation_policy_unconfigured:
+    "Access settings aren't set up on this server, so roles can't be changed. Contact your system administrator.",
+  export_failed: "File preparation failed. Prepare a new export.",
   last_owner: "At least one active Owner must remain.",
   delegation_denied:
     "You cannot grant or change access beyond your own authority.",

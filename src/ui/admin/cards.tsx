@@ -1,9 +1,15 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { z } from "zod";
-import type { AdminSession } from "@/client/admin-session";
+import type { AdminSession, AdminSessionStore } from "@/client/admin-session";
 import { AdminError } from "@/client/admin-api";
 import {
   batchSchema,
@@ -1042,7 +1048,6 @@ function ExportHistory({ batch: b }: { batch: Batch }) {
     `card-batches/${b.id}/exports`,
     cardExportSchema,
   );
-  const [, setPreview] = useMemory<string | null>("preview:" + b.id, null);
   return (
     <Sheet title="Export history">
       <p className="wr-help">
@@ -1079,14 +1084,6 @@ function ExportHistory({ batch: b }: { batch: Batch }) {
             action:
               e.state === "ready" ? (
                 <div className="wr-row">
-                  {e.format === "pdf" && (
-                    <Link
-                      href={`/admin/cards/${b.id}/print-preview`}
-                      onClick={() => setPreview(e.id)}
-                    >
-                      Preview print sheet
-                    </Link>
-                  )}
                   <FileAction batch={b} item={e} />
                 </div>
               ) : (
@@ -1120,7 +1117,6 @@ function ExportStatus({
     }, 2000);
     return () => clearTimeout(timer);
   }, [e, result]);
-  const [, setPreview] = useMemory<string | null>("preview:" + b.id, null);
   return (
     <>
       <Loading {...result} label="Checking preparation…" />
@@ -1134,44 +1130,67 @@ function ExportStatus({
       {e.state === "ready" ? (
         <div className="wr-row">
           <FileAction batch={b} item={e} />
-          {e.format === "pdf" && (
-            <Link
-              className="wr-btn wr-btn-secondary"
-              href={`/admin/cards/${b.id}/print-preview`}
-              onClick={() => setPreview(e.id)}
-            >
-              Preview print sheet
-            </Link>
-          )}
         </div>
       ) : (
         <>
-          <Notice tone={e.state === "pending" ? "info" : "warning"}>
+          <Notice
+            tone={e.state === "pending" ? "info" : "warning"}
+            role={e.state === "failed" ? "alert" : "status"}
+          >
             {e.state === "pending"
               ? "File preparation is pending. No download or physical printing is confirmed."
               : e.state === "expired"
                 ? "This file has expired. Prepare a new export."
-                : "File preparation failed. Inventory and batch status are unchanged."}
+                : "File preparation failed. Prepare a new export."}
           </Notice>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              polls.current = 0;
-              result.reload();
-            }}
-          >
-            Check export status
-          </Button>
+          {e.state === "failed" ? (
+            <NewExportLink batch={b} />
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                polls.current = 0;
+                result.reload();
+              }}
+            >
+              Check export status
+            </Button>
+          )}
         </>
       )}
     </>
   );
 }
-function useProtectedFile() {
+// Notifications are scoped to the provider; terminal IDs live in its cleared-on-
+// authority-change memory map, never in browser storage.
+const fileListeners = new WeakMap<AdminSessionStore, Set<() => void>>();
+function useProtectedFile(exportId: string) {
   const { store } = useAdminSession(),
     capture = useViewGuard();
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const failureKey = "failed-export:" + exportId;
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      let listeners = fileListeners.get(store);
+      if (!listeners) {
+        listeners = new Set();
+        fileListeners.set(store, listeners);
+      }
+      listeners.add(listener);
+      const unsubscribe = store.subscribe(listener);
+      return () => {
+        listeners.delete(listener);
+        unsubscribe();
+      };
+    },
+    [store],
+  );
+  const failed = useSyncExternalStore(
+    subscribe,
+    () => store.lists.get(failureKey) === true,
+    () => false,
+  );
   const urls = useRef(new Set<string>());
   const lock = useRef(false);
   useEffect(
@@ -1182,11 +1201,12 @@ function useProtectedFile() {
     [],
   );
   async function load(b: Batch, e: CardExport, onReady: (url: string) => void) {
-    if (lock.current) return;
+    if (lock.current || store.lists.get(failureKey) === true) return;
     const authorityCurrent = capture();
     const route = window.location.pathname + window.location.search;
     const current = () =>
       authorityCurrent() &&
+      store.lists.get(failureKey) !== true &&
       window.location.pathname + window.location.search === route;
     lock.current = true;
     setBusy(true);
@@ -1211,32 +1231,70 @@ function useProtectedFile() {
         store.clear(
           "Your session ended or permissions changed. Sign in again.",
         );
-      else setError(customerMessage(error));
+      else {
+        if (error instanceof AdminError && error.code === "export_failed") {
+          store.lists.set(failureKey, true);
+          fileListeners.get(store)?.forEach((listener) => listener());
+        }
+        setError(customerMessage(error));
+      }
     } finally {
       lock.current = false;
       if (current()) setBusy(false);
     }
   }
-  return { load, error, busy };
+  return { load, error, busy, failed };
+}
+function NewExportLink({ batch: b }: { batch: Batch }) {
+  return (
+    <Link className="wr-btn wr-btn-secondary" href={`/admin/cards/${b.id}`}>
+      Prepare a new export
+    </Link>
+  );
 }
 function FileAction({ batch: b, item: e }: { batch: Batch; item: CardExport }) {
-  const file = useProtectedFile();
+  const file = useProtectedFile(e.id);
+  return <FileControls batch={b} item={e} file={file} />;
+}
+function FileControls({
+  batch: b,
+  item: e,
+  file,
+}: {
+  batch: Batch;
+  item: CardExport;
+  file: ReturnType<typeof useProtectedFile>;
+}) {
+  const [, setPreview] = useMemory<string | null>("preview:" + b.id, null);
   return (
     <>
-      <Button
-        variant="secondary"
-        loading={file.busy}
-        onClick={() =>
-          void file.load(b, e, (url) => {
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${b.batchCode}-${e.id}.${e.format}`;
-            a.click();
-          })
-        }
-      >
-        Download {e.format.toUpperCase()}
-      </Button>
+      {!file.failed && e.format === "pdf" && (
+        <Link
+          className="wr-btn wr-btn-secondary"
+          href={`/admin/cards/${b.id}/print-preview`}
+          onClick={() => setPreview(e.id)}
+        >
+          Preview print sheet
+        </Link>
+      )}
+      {file.failed ? (
+        <NewExportLink batch={b} />
+      ) : (
+        <Button
+          variant="secondary"
+          loading={file.busy}
+          onClick={() =>
+            void file.load(b, e, (url) => {
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${b.batchCode}-${e.id}.${e.format}`;
+              a.click();
+            })
+          }
+        >
+          Download {e.format.toUpperCase()}
+        </Button>
+      )}
       {file.error && (
         <Notice tone="danger" role="alert">
           {file.error}
@@ -1286,7 +1344,7 @@ function PreparedPreview({ batch: b, id }: { batch: Batch; id: string }) {
     `card-batches/${b.id}/exports/${id}`,
     cardExportSchema,
   );
-  const file = useProtectedFile();
+  const file = useProtectedFile(id);
   const [url, setUrl] = useState("");
   const e = result.data;
   return (
@@ -1308,6 +1366,8 @@ function PreparedPreview({ batch: b, id }: { batch: Batch; id: string }) {
               This export is an Excel register. Select a prepared PDF to
               preview.
             </Notice>
+          ) : file.failed ? (
+            <NewExportLink batch={b} />
           ) : e.state !== "ready" ? (
             <ExportStatus batch={b} initial={e} />
           ) : (
@@ -1319,7 +1379,7 @@ function PreparedPreview({ batch: b, id }: { batch: Batch; id: string }) {
               >
                 Load protected PDF preview
               </Button>
-              <FileAction batch={b} item={e} />
+              <FileControls batch={b} item={e} file={file} />
               {url && (
                 <iframe
                   className="wr-cc-pdf"

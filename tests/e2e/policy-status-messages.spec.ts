@@ -34,7 +34,7 @@ async function safeMessage(page: Page, message: string) {
   );
 }
 
-test("I-07 WHR-100 admin sign-in displays the preserved auth policy 409 message", async ({
+test("I-07 WHR-100 admin sign-in displays the approved auth policy 409 message", async ({
   page,
 }) => {
   await refuse(page, "**/api/admin/sign-in", "auth_policy_unconfigured");
@@ -46,7 +46,7 @@ test("I-07 WHR-100 admin sign-in displays the preserved auth policy 409 message"
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await safeMessage(
     page,
-    "This request could not be completed. Reload and try again.",
+    "Sign-in isn't set up on this server yet. Contact your system administrator.",
   );
   await expect(page).toHaveURL(/\/admin\/sign-in$/);
 });
@@ -64,11 +64,34 @@ test("I-07 WHR-100 admin delegation 409 does not offer a role or imply user crea
     await page.goto("/admin/users/new");
     await safeMessage(
       page,
-      "This request could not be completed. Reload and try again.",
+      "Access settings aren't set up on this server, so roles can't be changed. Contact your system administrator.",
     );
     await expect(
       page.getByLabel("Role", { exact: true }).locator("option"),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Confirm change", exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-07 WHR-101 existing user displays the approved delegation policy message", async ({
+  page,
+}) => {
+  const f = await stationFixture(page);
+  try {
+    await refuse(
+      page,
+      "**/api/admin/assignable-roles?*",
+      "delegation_policy_unconfigured",
+    );
+    await page.goto(`/admin/users/${f.adminId}`);
+    await safeMessage(
+      page,
+      "Access settings aren't set up on this server, so roles can't be changed. Contact your system administrator.",
+    );
     await expect(
       page.getByRole("button", { name: "Confirm change", exact: true }),
     ).toHaveCount(0);
@@ -147,74 +170,206 @@ test("I-15 WHR-100 phone policy 409 gives station-manager guidance without linki
   }
 });
 
-test("I-20 WHR-100 export_failed 409 explains file failure without downloading or changing stock", async ({
-  page,
-}) => {
-  const f = await stationFixture(page);
-  const downloads: string[] = [];
-  page.on("download", (download) =>
-    downloads.push(download.suggestedFilename()),
-  );
-  try {
-    const batch = await api<{ id: string; version: number }>(
-      page.request,
-      "card-batches",
-      { operationId: v7(), name: "Fictional policy message stock", count: 1 },
-      201,
+for (const failurePath of [
+  "download",
+  "metadata",
+  "preview",
+  "preview-download",
+] as const)
+  test(`I-20 WHR-101 ${failurePath} failure offers a new export without downloading or changing stock`, async ({
+    page,
+  }) => {
+    const f = await stationFixture(page);
+    const downloads: string[] = [];
+    page.on("download", (download) =>
+      downloads.push(download.suggestedFilename()),
     );
-    const artifact = {
-      id: v7(),
-      batchId: batch.id,
-      format: "pdf",
-      state: "ready",
-      preparedAt: new Date().toISOString(),
-      snapshotAt: new Date().toISOString(),
-      batchStatus: "generated",
-      batchVersion: 1,
-      cardCount: "1",
-      expiresAt: new Date(Date.now() + 3600000).toISOString(),
-      failure: null,
-    };
-    await page.route(
-      `**/api/admin/card-batches/${batch.id}/exports?*`,
-      (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            data: { items: [artifact], nextCursor: null },
+    try {
+      const batch = await api<{ id: string; version: number }>(
+        page.request,
+        "card-batches",
+        { operationId: v7(), name: "Fictional policy message stock", count: 1 },
+        201,
+      );
+      const artifact = {
+        id: v7(),
+        batchId: batch.id,
+        format: "pdf",
+        state: failurePath === "metadata" ? "failed" : "ready",
+        preparedAt: new Date().toISOString(),
+        snapshotAt: new Date().toISOString(),
+        batchStatus: "generated",
+        batchVersion: 1,
+        cardCount: "1",
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        failure: null,
+      };
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports?*`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: { items: [artifact], nextCursor: null },
+            }),
           }),
+      );
+      await refuse(
+        page,
+        `**/api/admin/card-batches/${batch.id}/exports/${artifact.id}/file`,
+        "export_failed",
+      );
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports/${artifact.id}`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: artifact }),
+          }),
+      );
+      await page.goto(`/admin/cards/${batch.id}`);
+      if (failurePath === "preview" || failurePath === "preview-download") {
+        await page
+          .getByRole("row")
+          .filter({ hasText: "Ready" })
+          .getByRole("link", { name: "Preview print sheet", exact: true })
+          .click();
+        await page
+          .getByRole("button", {
+            name:
+              failurePath === "preview"
+                ? "Load protected PDF preview"
+                : "Download PDF",
+            exact: true,
+          })
+          .click();
+      } else if (failurePath === "download") {
+        await page
+          .getByRole("button", { name: "Download PDF", exact: true })
+          .click();
+      }
+      const exportRow = failurePath.startsWith("preview")
+        ? page.locator("main")
+        : page.getByRole("row").filter({ hasText: "PDF" }).last();
+      const fileError = exportRow
+        .getByRole("alert")
+        .filter({ hasText: "File preparation failed." });
+      await expect(fileError).toHaveText(
+        "File preparation failed. Prepare a new export.",
+      );
+      await expect(
+        exportRow.getByRole("button", { name: "Download PDF", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        exportRow.getByRole("button", {
+          name: "Load protected PDF preview",
+          exact: true,
         }),
-    );
-    await refuse(
-      page,
-      `**/api/admin/card-batches/${batch.id}/exports/${artifact.id}/file`,
-      "export_failed",
-    );
-    await page.goto(`/admin/cards/${batch.id}`);
-    await page
-      .getByRole("button", { name: "Download PDF", exact: true })
-      .click();
-    const exportRow = page.getByRole("row").filter({
-      has: page.getByRole("button", { name: "Download PDF", exact: true }),
-    });
-    const fileError = exportRow.getByRole("alert");
-    await expect(fileError).toContainText("File preparation failed.");
-    await expect(fileError).toContainText("prepare a new export");
-    await expect(page.locator("body")).not.toContainText(canary);
-    expect(downloads).toEqual([]);
-    expect(
-      (
-        await f.db.query("SELECT status,version FROM card_batch WHERE id=$1", [
-          batch.id,
-        ])
-      ).rows,
-    ).toEqual([{ status: "generated", version: 1 }]);
-    expect(
-      (await f.db.query("SELECT state FROM card WHERE batch_id=$1", [batch.id]))
-        .rows,
-    ).toEqual([{ state: "unassigned" }]);
-  } finally {
-    await f.db.end();
-  }
-});
+      ).toHaveCount(0);
+      await exportRow
+        .getByRole("link", { name: "Prepare a new export", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Review export preparation", exact: true })
+        .click();
+      const prepared = { ...artifact, id: v7(), state: "ready" };
+      const operations: string[] = [];
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports`,
+        (route) => {
+          const operation = route.request().postDataJSON()
+            .operationId as string;
+          operations.push(operation);
+          return route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({ data: prepared }),
+          });
+        },
+      );
+      await page
+        .getByRole("button", {
+          name: "Confirm export preparation",
+          exact: true,
+        })
+        .click();
+      await expect.poll(() => operations.length).toBe(1);
+      await page
+        .getByRole("button", { name: "Review a new export", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Review export preparation", exact: true })
+        .click();
+      await page
+        .getByRole("button", {
+          name: "Confirm export preparation",
+          exact: true,
+        })
+        .click();
+      await expect.poll(() => operations.length).toBe(2);
+      expect(operations[1]).not.toBe(operations[0]);
+      // The receipt and refreshed history can expose the same artifact together.
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports?*`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: { items: [prepared], nextCursor: null },
+            }),
+          }),
+      );
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports/${prepared.id}`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: prepared }),
+          }),
+      );
+      await refuse(
+        page,
+        `**/api/admin/card-batches/${batch.id}/exports/${prepared.id}/file`,
+        "export_failed",
+      );
+      await page
+        .getByRole("button", { name: "Refresh export history", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Download PDF", exact: true }),
+      ).toHaveCount(2);
+      await page
+        .getByRole("button", { name: "Download PDF", exact: true })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Download PDF", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Prepare a new export", exact: true }),
+      ).toHaveCount(2);
+      await expect(page.locator("body")).not.toContainText(canary);
+      expect(downloads).toEqual([]);
+      expect(
+        (
+          await f.db.query(
+            "SELECT status,version FROM card_batch WHERE id=$1",
+            [batch.id],
+          )
+        ).rows,
+      ).toEqual([{ status: "generated", version: 1 }]);
+      expect(
+        (
+          await f.db.query("SELECT state FROM card WHERE batch_id=$1", [
+            batch.id,
+          ])
+        ).rows,
+      ).toEqual([{ state: "unassigned" }]);
+    } finally {
+      await f.db.end();
+    }
+  });

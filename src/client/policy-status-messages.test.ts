@@ -26,12 +26,12 @@ describe("WHR-100 actionable policy responses", () => {
     [
       "auth_policy_unconfigured",
       "sign-in",
-      "This request could not be completed. Reload and try again.",
+      "Sign-in isn't set up on this server yet. Contact your system administrator.",
     ],
     [
       "delegation_policy_unconfigured",
       "assignable-roles",
-      "This request could not be completed. Reload and try again.",
+      "Access settings aren't set up on this server, so roles can't be changed. Contact your system administrator.",
     ],
     [
       "delivery_unconfigured",
@@ -39,7 +39,7 @@ describe("WHR-100 actionable policy responses", () => {
       "Email delivery is unavailable. The address remains unverified.",
     ],
   ])(
-    "I-07 I-12 admin 409 %s preserves the code and existing safe copy",
+    "I-07 I-12 admin 409 %s preserves the code and approved safe copy",
     async (code, path, message) => {
       vi.stubGlobal(
         "fetch",
@@ -95,7 +95,7 @@ describe("WHR-100 actionable policy responses", () => {
     expect(error).toMatchObject({ code: "export_failed", status: 409 });
     expect(customerChangeIsUncertain(error)).toBe(false);
     expect(customerMessage(error)).toBe(
-      "File preparation failed. Retry the same preparation or prepare a new export.",
+      "File preparation failed. Prepare a new export.",
     );
     expect(customerMessage(error)).not.toContain(privateDetail);
     expect(transport).toHaveBeenCalledTimes(1);
