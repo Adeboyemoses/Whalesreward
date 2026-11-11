@@ -195,10 +195,12 @@ test("I-20 WHR-100 export_failed 409 explains file failure without downloading o
     await page
       .getByRole("button", { name: "Download PDF", exact: true })
       .click();
-    await expect(page.getByRole("alert")).toContainText(
-      "File preparation failed.",
-    );
-    await expect(page.getByRole("alert")).toContainText("prepare a new export");
+    const exportRow = page.getByRole("row").filter({
+      has: page.getByRole("button", { name: "Download PDF", exact: true }),
+    });
+    const fileError = exportRow.getByRole("alert");
+    await expect(fileError).toContainText("File preparation failed.");
+    await expect(fileError).toContainText("prepare a new export");
     await expect(page.locator("body")).not.toContainText(canary);
     expect(downloads).toEqual([]);
     expect(
