@@ -112,7 +112,7 @@ test("I-22 I-35 duplicate keep-both uses latest pair guards and same-operation l
   }
 });
 
-test("I-35 duplicate cancellation names one member and preserves the comparison sale", async ({
+test("I-22 I-35 cancelled duplicate members reject new decisions but retain same-operation replay", async ({
   page,
   browser,
 }) => {
@@ -131,16 +131,39 @@ test("I-35 duplicate cancellation names one member and preserves the comparison 
       name: "Cancel sale " + b.detail.saleCode,
       exact: true,
     });
-    await target.click();
-    const request = page.waitForResponse(
-      (r) =>
-        r.request().method() === "POST" &&
-        r.url().includes("/duplicate-flags/"),
+    const bodies: unknown[] = [];
+    await page.route(
+      "**/api/admin/duplicate-flags/*/decision",
+      async (route) => {
+        bodies.push(route.request().postDataJSON());
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        if (bodies.length === 1) await route.abort("failed");
+        else await route.fulfill({ response });
+      },
     );
+    await target.click();
     await page
       .getByRole("button", { name: "Confirm decision", exact: true })
       .click();
-    expect((await request).status()).toBe(200);
+    await expect(
+      page.getByRole("button", { name: "Retry same decision", exact: true }),
+    ).toBeVisible();
+    // Leave and revisit through client navigation: the operation stays frozen even
+    // though the latest server read now contains the cancellation and closed flag.
+    await page
+      .getByRole("link", { name: "Back to reviews", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/sales\/reviews/);
+    await page.goBack();
+    await expect(
+      page.getByRole("button", { name: "Retry same decision", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Retry same decision", exact: true })
+      .click();
+    await expect.poll(() => bodies.length).toBe(2);
+    expect(bodies[1]).toEqual(bodies[0]);
     await expect(
       page.getByText(
         `Sale ${b.detail.saleCode} was cancelled and has no loyalty credit. The other sale is unchanged.`,
@@ -149,6 +172,49 @@ test("I-35 duplicate cancellation names one member and preserves the comparison 
     ).toBeVisible();
     expect((await adminDetail(page, b.detail.id)).state).toBe("cancelled");
     expect((await adminDetail(page, a.detail.id)).credited).toBe(true);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM sale_decision WHERE operation_id=$1",
+          [(bodies[0] as { operationId: string }).operationId],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    // A retained open historical pair may reference a now-cancelled member.
+    const c = await acceptedSale(f.phone, "amount", "1500000", f.cardCode);
+    await f.db.query(
+      "INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) VALUES($1,$2,$3,'Fictional historical pair with cancelled member','open',1)",
+      [v7(), ...[b.detail.id, c.detail.id].sort()],
+    );
+    for (const id of [b.detail.id, c.detail.id]) {
+      await page.goto(`/admin/sales/${id}/duplicate`);
+      await expect(
+        page
+          .getByText("Fictional historical pair with cancelled member", {
+            exact: true,
+          })
+          .first(),
+      ).toBeVisible();
+      await expect(
+        page.getByText(/already cancelled.*no new decision can be made/i),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", {
+          name: "Clear the flag · keep both",
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: /^Cancel sale / }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Confirm decision", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Retry same decision", exact: true }),
+      ).toHaveCount(0);
+    }
+    expect(bodies).toHaveLength(2);
   } finally {
     await f.close();
   }
