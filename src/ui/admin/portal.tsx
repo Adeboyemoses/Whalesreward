@@ -5,11 +5,16 @@ import { useAdminSession } from "./session";
 import { StationPortal, stationSections } from "./station";
 import { CustomerPortal } from "./customers";
 import { CardsPortal } from "./cards";
+import { SalesPortal } from "./sales";
 const customerSections = [
   { grant: "customers", label: "Customers", href: "/admin/customers" },
   { grant: "cards", label: "Loyalty cards", href: "/admin/cards" },
 ] as const;
-const portalSections = [...stationSections, ...customerSections];
+const portalSections = [
+  { grant: "sales", label: "Sales", href: "/admin/sales" } as const,
+  ...stationSections,
+  ...customerSections,
+];
 import type { AdminSession as Session } from "@/client/admin-session";
 import { adminTime, adminAction } from "@/client/admin-display";
 import {
@@ -160,9 +165,11 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
         station={session.station?.name ?? ""}
         active={
           customerRoute
-            ? path[0] === "cards"
-              ? "Loyalty cards"
-              : "Customers"
+            ? path[0] === "sales"
+              ? "Sales"
+              : path[0] === "cards"
+                ? "Loyalty cards"
+                : "Customers"
             : stationRoute
               ? (stationSections.find(
                   (item) => item.href === "/admin/" + path[0],
@@ -215,7 +222,9 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           </p>
         )}
         {customerRoute ? (
-          path[0] === "cards" ? (
+          path[0] === "sales" ? (
+            <SalesPortal key={epoch} path={path} session={session} />
+          ) : path[0] === "cards" ? (
             <CardsPortal key={epoch} path={path} session={session} />
           ) : (
             <CustomerPortal key={epoch} path={path} session={session} />
