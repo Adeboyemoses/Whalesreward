@@ -39,6 +39,7 @@ export async function reviewFixture(page: Page, browser: Browser) {
   await f.db.query("COMMIT");
   const customerId = v7(),
     cardId = v7(),
+    batchId = v7(),
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const code = Array.from(
     randomBytes(7),
@@ -52,9 +53,22 @@ export async function reviewFixture(page: Page, browser: Browser) {
       `+23480${String(BigInt("0x" + randomBytes(6).toString("hex")) % 100000000n).padStart(8, "0")}`,
     ],
   );
+  // Review inventory must not alter the shared seed batch used by card screens.
+  await f.db.query(
+    "INSERT INTO card_batch(id,batch_code,status,version,created_by) VALUES($1,$2,'generated',1,$3)",
+    [batchId, `QA-${batchId}`, f.adminId],
+  );
+  await f.db.query(
+    "UPDATE card_batch SET status='printed',version=2 WHERE id=$1",
+    [batchId],
+  );
+  await f.db.query(
+    "UPDATE card_batch SET status='active',version=3 WHERE id=$1",
+    [batchId],
+  );
   await f.db.query(
     "INSERT INTO card(id,batch_id,code,qr_payload,state,version) VALUES($1,$2,$3,$3,'unassigned',1)",
-    [cardId, seedId(28), code],
+    [cardId, batchId, code],
   );
   await f.db.query(
     "INSERT INTO card_customer_link(id,card_id,customer_id,linked_at,actor_user_id,reason) VALUES($1,$2,$3,'2026-11-01T00:00:00Z',$4,'Fictional review fixture')",
@@ -63,7 +77,7 @@ export async function reviewFixture(page: Page, browser: Browser) {
   await f.db.query("UPDATE card SET state='linked',version=2 WHERE id=$1", [
     cardId,
   ]);
-  return { ...f, cardId, cardCode: code, customerId };
+  return { ...f, batchId, cardId, cardCode: code, customerId };
 }
 
 /** Historical fixtures only; decisions still traverse real HTTP, storage and transaction guards. */
@@ -204,7 +218,7 @@ export async function heldSale(
           : "2026-11-10T12:30:00Z";
     await f.db.query(
       "INSERT INTO card(id,batch_id,code,qr_payload,state,version) VALUES($1,$2,$3,$3,'unassigned',1)",
-      [next, seedId(28), code],
+      [next, f.batchId, code],
     );
     await f.db.query(
       "UPDATE card_customer_link SET ended_at=$2 WHERE card_id=$1 AND ended_at IS NULL",
