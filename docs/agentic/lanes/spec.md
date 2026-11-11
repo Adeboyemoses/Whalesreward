@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3g (WHR-102) duplicate detection rule P-24: READY since 2026-11-11
+WO-spec-3h (WHR-103) evidence admissibility PROPOSAL: READY since 2026-11-11
 
 ## In flight
-- [Spec PR #105](https://github.com/Adeboyemoses/Whalesreward/pull/105) merged into staging at fa1d70d with all five checks green. M3 defines advisory entered-value/time or validated-photo matching; no flag holds or changes credit.
-- Code/security/integrity PASS at 908b3e2, round 1, no findings. EM typecheck/lint, 579 unit tests, build, paragraph limit (maximum 119 words) and evidence PASS.
-- Settlement/accepted-revision intents, unique unordered pairs, cancellation guards and 100-pair batches with durable continuation are specified. Missing window disables only time-based matching; protected health gains duplicateWindow as its eleventh status.
-- This separate records PR completes the READY handoff on its reviewed green staging merge. WHR-102 stays In Review; acceptance is not inferred.
+- [Proposal PR #109](https://github.com/Adeboyemoses/Whalesreward/pull/109) merged into staging at 394b654 with all five checks green. Code/security/integrity PASS at 3257367, round 1, no findings; the proposal stayed unchanged through base integration.
+- EM typecheck/lint, 663 unit tests, build, paragraph maximum 86 words, links and evidence PASS. Two inherited image lint warnings; no runtime or board-parity claim.
+- This separate records PR completes READY on its reviewed green staging merge. WHR-103 stays In Review; acceptance is not inferred.
+- `docs/engineering/proposals/evidence-policy.md` remains non-normative. m3.md and runtime policy are unchanged; no evaluator, health field or configuration is activated.
 
 ## Next
-- Stop at READY. WHR-16 implements detection in its own approved session; no code is part of this work order.
-- Rook should mirror P-24 into product docs; client confirmation Q-555 remains pending.
+- Stop at READY. Earl/client questions: [EP-1 WHR-109](https://linear.app/phaneum/issue/WHR-109), [EP-2 WHR-105](https://linear.app/phaneum/issue/WHR-105), [EP-3 WHR-106](https://linear.app/phaneum/issue/WHR-106), [EP-4 WHR-107](https://linear.app/phaneum/issue/WHR-107), [EP-5 WHR-108](https://linear.app/phaneum/issue/WHR-108). Each recommends A with no runtime activation by default.
+- After explicit approval, Rook commissions a normative amendment and separate core evaluator work order. Q-528 and WHR-50 remain separate gates.
 
 ## Earl's gos
-- 2026-11-11: “Work order WHR-102 (WO-spec-3g) is approved and in Todo.” “Spec only.” “Code, security and integrity verdicts.” “Stop when merged and report READY.”
+- 2026-11-11: “Work order WHR-103 (WO-spec-3h) is approved and in Todo.” “Write a PROPOSAL (not yet normative)”. “Don't change m3.md.” “Code, security and integrity verdicts. Stop when merged and report READY with the questions.”
 
 ## Risks
-- Specification coverage only: no runtime detection, policy activation, migration or board parity claimed. App-reported time remains advisory and grants no credit/eligibility authority.
+- Genuinely ambiguous cases may remain held. Proposed v1 does not enable price cancellation or WHR-50 meter correction and creates no external admission channel.
 - No cloud changes or main promotion. Full runtime model ID unavailable. Metrics include the separate records review.
 
 dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
