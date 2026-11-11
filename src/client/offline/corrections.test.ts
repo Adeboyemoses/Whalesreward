@@ -206,7 +206,11 @@ async function acceptedLocal(row: OutboxRow) {
       photoValidated: true,
       credited: true,
       currentRevisionId: detail.currentRevisionId,
-      customer: null,
+      customer: {
+        id: detail.customer!.id,
+        name: detail.customer!.name,
+        category: detail.customer!.category,
+      },
       holds: [],
       cancellationReason: null,
       pendingReason: null,
@@ -456,6 +460,144 @@ describe("separate durable numeric corrections", () => {
       expect(sales.sent[1]).toEqual(saved.submission);
     },
   );
+  it("counts a correction-only pending upload beside a credited original and keeps uncertain sends pending", async () => {
+    const original = await saveLocal();
+    await acceptedLocal(original);
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 0,
+    });
+    await client.saveCorrection({
+      source: { kind: "server", detail },
+      value: "21000",
+      reason: "Meter amount",
+    });
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 1,
+    });
+    sales.reject = new ClientError("network_unavailable", "Uncertain delivery");
+    await client.retryUploads();
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 1,
+    });
+    sales.reject = null;
+    now += 70000;
+    await client.retryUploads();
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 0,
+    });
+  });
+  it("counts a separate correction waiting for an unaccepted original without counting either as server received", async () => {
+    const original = await saveLocal();
+    await client.saveCorrection({
+      source: { kind: "local", operationId: original.operationId },
+      value: "21000",
+      reason: "Meter amount",
+    });
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 1,
+      corrections: 1,
+    });
+  });
+  it.each([
+    "pending_validation",
+    "awaiting_review",
+    "accepted",
+    "rejected",
+  ] as const)(
+    "a verified %s server receipt settles correction upload without claiming credit",
+    async (state) => {
+      const saved = await client.saveCorrection({
+        source: { kind: "server", detail },
+        value: "21000",
+        reason: "Meter amount",
+      });
+      await client.retryUploads();
+      const receipt = sales.receipts.get(saved.operationId)!;
+      await db.corrections.update(
+        [auth.current.account.id, saved.operationId],
+        { state, serverCorrection: { ...receipt, state } },
+      );
+      expect(await client.ownPendingUploads()).toEqual({
+        sales: 0,
+        corrections: 0,
+      });
+      await db.corrections.update(
+        [auth.current.account.id, saved.operationId],
+        { serverCorrection: { ...receipt, state, operationId: v7() } },
+      );
+      expect(await client.ownPendingUploads()).toEqual({
+        sales: 0,
+        corrections: 1,
+      });
+    },
+  );
+  it("excludes definitive local refusals from uploads while retaining their attention row", async () => {
+    const saved = await client.saveCorrection({
+      source: { kind: "server", detail },
+      value: "21000",
+      reason: "password: fictional",
+    });
+    sales.reject = new ClientError("invalid_request", "Invalid reason", 400);
+    await client.retryUploads();
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 0,
+    });
+    expect((await client.ownCorrections())[0]).toMatchObject({
+      operationId: saved.operationId,
+      state: "needs_attention",
+      lastErrorCode: "invalid_request",
+    });
+  });
+  it("never counts foreign partitions and includes this account's queue after a fresh capture context", async () => {
+    await client.saveCorrection({
+      source: { kind: "server", detail },
+      value: "21000",
+      reason: "Meter amount",
+    });
+    const previous = auth.current;
+    await client.signOut();
+    auth.current = sessionFixture(now);
+    await client.signIn("favour.james", "fictional");
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 0,
+    });
+    await client.signOut();
+    auth.current = { ...previous, captureContextId: v7() };
+    await client.signIn("grace.okon", "fictional");
+    expect(await client.ownPendingUploads()).toEqual({
+      sales: 0,
+      corrections: 1,
+    });
+  });
+  it("fences the pending-count snapshot when an account/context switches during its read", async () => {
+    await client.saveCorrection({
+      source: { kind: "server", detail },
+      value: "21000",
+      reason: "Meter amount",
+    });
+    let began!: () => void, release!: () => void;
+    const started = new Promise<void>((r) => (began = r)),
+      held = new Promise<void>((r) => (release = r));
+    const originalCheck = client.checkAccess.bind(client);
+    client.checkAccess = async () => {
+      const snapshot = await originalCheck();
+      began();
+      await held;
+      return snapshot;
+    };
+    const reading = client.ownPendingUploads();
+    await started;
+    await db.meta.update("installation", { activeAccountId: v7() });
+    release();
+    expect(await reading).toEqual({ sales: 0, corrections: 0 });
+    client.checkAccess = originalCheck;
+  });
   it("never changes frozen guards on a definitive stale base rejection", async () => {
     const saved = await client.saveCorrection({
       source: { kind: "server", detail },

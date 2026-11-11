@@ -1,3 +1,4 @@
+import { attendantCorrectionSchema } from "../../shared/contracts/sales";
 import type { AttendantSaleDetail } from "../sales-api";
 import type {
   AttendantCorrection,
@@ -46,3 +47,19 @@ export type CorrectionOutboxRow = {
 };
 export const pendingCorrection = (row: CorrectionOutboxRow) =>
   !["accepted", "rejected", "needs_attention"].includes(row.state);
+
+/** Receipt settles transport only; review/credit remain the server's decision. */
+export function correctionNeedsUpload(row: CorrectionOutboxRow): boolean {
+  // Definitive refusals need a newly reviewed operation, never upload-first retries.
+  if (row.state === "needs_attention") return false;
+  const receipt = attendantCorrectionSchema.safeParse(row.serverCorrection);
+  return !(
+    receipt.success &&
+    row.submission &&
+    receipt.data.operationId === row.operationId &&
+    receipt.data.operationId === row.submission.operationId &&
+    receipt.data.purchaseId === row.purchaseId &&
+    receipt.data.basedOnRevisionId === row.submission.basedOnRevisionId &&
+    receipt.data.reason === row.submission.reason
+  );
+}

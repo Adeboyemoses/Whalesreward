@@ -19,6 +19,7 @@ import {
 } from "../types";
 import { CaptureDatabase, type Installation } from "./db";
 import { SaleSynchronizer } from "./sync";
+import { needsUpload } from "./sync-status";
 import { CorrectionSynchronizer } from "./corrections";
 import { HttpAttendantSalesApi, type AttendantSalesApi } from "../sales-api";
 import {
@@ -32,6 +33,7 @@ import {
 } from "./correction-values";
 import {
   pendingCorrection,
+  correctionNeedsUpload,
   type CorrectionOutboxRow,
   type SaveCorrectionInput,
 } from "./correction-types";
@@ -1389,6 +1391,49 @@ export class AttendantClient {
           .toArray();
       },
     );
+  }
+  /** One account/context snapshot for upload-first and handover decisions. */
+  async ownPendingUploads(): Promise<{ sales: number; corrections: number }> {
+    const epoch = this.authEpoch;
+    const state = await this.checkAccess();
+    const session = state.session;
+    const empty = { sales: 0, corrections: 0 };
+    if (!session || epoch !== this.authEpoch) return empty;
+    const snapshot = await this.db.transaction(
+      "r",
+      this.db.meta,
+      this.db.windows,
+      this.db.outbox,
+      this.db.corrections,
+      async () => {
+        const meta = await this.db.meta.get("installation");
+        const window = await this.db.windows.get(session.account.id);
+        if (
+          epoch !== this.authEpoch ||
+          meta?.activeAccountId !== session.account.id ||
+          meta.logoutPending ||
+          meta.signInAttempt ||
+          !window ||
+          window.logoutPending ||
+          window.captureContextId !== session.captureContextId
+        )
+          return empty;
+        // Earlier captures keep their original context; partition by originating account.
+        const sales = await this.db.outbox
+          .where("[originatingAccountId+operationId]")
+          .between([session.account.id, ""], [session.account.id, "\uffff"])
+          .toArray();
+        const corrections = await this.db.corrections
+          .where("[originatingAccountId+operationId]")
+          .between([session.account.id, ""], [session.account.id, "\uffff"])
+          .toArray();
+        return {
+          sales: sales.filter(needsUpload).length,
+          corrections: corrections.filter(correctionNeedsUpload).length,
+        };
+      },
+    );
+    return epoch === this.authEpoch ? snapshot : empty;
   }
   async ownSales(): Promise<OutboxRow[]> {
     const state = await this.checkAccess();
