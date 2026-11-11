@@ -732,7 +732,8 @@ function DecisionForm({
   const [busy, setBusy] = useState(false),
     [uncertain, setUncertain] = useState(() => store.lists.has(memoryKey)),
     [blocked, setBlocked] = useState(false),
-    [receipt, setReceipt] = useState<Decision | null>(null);
+    [receipt, setReceipt] = useState<Decision | null>(null),
+    [recordedLabel, setRecordedLabel] = useState("");
   const flight = useRef(false);
   const effectiveKind = frozen?.kind ?? kind;
   const allowed =
@@ -770,6 +771,7 @@ function DecisionForm({
       if (!current()) return;
       store.lists.delete(memoryKey);
       setReceipt(result);
+      setRecordedLabel(frozen.label);
       setFrozen(null);
       setUncertain(false);
       for (const key of store.lists.keys())
@@ -790,15 +792,20 @@ function DecisionForm({
     return (
       <Sheet title="Decision recorded">
         <Notice tone={receipt.creditedAfter ? "success" : "info"}>
-          {receipt.creditedAfter
-            ? "Recorded spend included."
-            : receipt.outcome === "cancel"
-              ? "Cancelled. This sale has no loyalty credit."
-              : "Not credited; remaining checks still apply."}{" "}
+          {receipt.kind === "duplicate"
+            ? receipt.outcome === "cancel"
+              ? `${recordedLabel.replace(/^Cancel sale /, "Sale ")} was cancelled and has no loyalty credit. The other sale is unchanged.`
+              : "The flag is cleared and both sales are kept. Neither sale’s loyalty credit was changed."
+            : receipt.creditedAfter
+              ? "Recorded spend included."
+              : receipt.outcome === "cancel"
+                ? "Cancelled. This sale has no loyalty credit."
+                : "Not credited; remaining checks still apply."}{" "}
           The decision is recorded and the original is retained.
         </Notice>
         <KeyValueList
           items={[
+            { label: "Decision", value: recordedLabel },
             { label: "Outcome", value: adminAction(receipt.outcome) },
             { label: "Recorded values", value: valuePair(receipt.after) },
             { label: "Decision reason", value: receipt.reason },
