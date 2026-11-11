@@ -66,9 +66,14 @@ async function confirmReview(
 ) {
   await page.getByLabel("Decision reason", { exact: true }).fill(reason);
   await page.getByRole("button", { name: action, exact: true }).click();
+  const decision = page.waitForResponse((response) =>
+    response.request().method() === "POST" &&
+    /\/corrections\/[^/]+\/decision$/.test(new URL(response.url()).pathname),
+  );
   await page
     .getByRole("button", { name: "Confirm decision", exact: true })
     .click();
+  expect((await decision).status()).toBe(200);
 }
 
 test("I-29 P-22 amount correction preserves kobo, recorded basis, reason and retained photo on real endpoints", async ({
