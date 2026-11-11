@@ -1,9 +1,15 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { z } from "zod";
-import type { AdminSession } from "@/client/admin-session";
+import type { AdminSession, AdminSessionStore } from "@/client/admin-session";
 import { AdminError } from "@/client/admin-api";
 import {
   batchSchema,
@@ -1155,12 +1161,36 @@ function ExportStatus({
     </>
   );
 }
-function useProtectedFile() {
+// Notifications are scoped to the provider; terminal IDs live in its cleared-on-
+// authority-change memory map, never in browser storage.
+const fileListeners = new WeakMap<AdminSessionStore, Set<() => void>>();
+function useProtectedFile(exportId: string) {
   const { store } = useAdminSession(),
     capture = useViewGuard();
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const failureKey = "failed-export:" + exportId;
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      let listeners = fileListeners.get(store);
+      if (!listeners) {
+        listeners = new Set();
+        fileListeners.set(store, listeners);
+      }
+      listeners.add(listener);
+      const unsubscribe = store.subscribe(listener);
+      return () => {
+        listeners.delete(listener);
+        unsubscribe();
+      };
+    },
+    [store],
+  );
+  const failed = useSyncExternalStore(
+    subscribe,
+    () => store.lists.get(failureKey) === true,
+    () => false,
+  );
   const urls = useRef(new Set<string>());
   const lock = useRef(false);
   useEffect(
@@ -1171,11 +1201,12 @@ function useProtectedFile() {
     [],
   );
   async function load(b: Batch, e: CardExport, onReady: (url: string) => void) {
-    if (lock.current) return;
+    if (lock.current || store.lists.get(failureKey) === true) return;
     const authorityCurrent = capture();
     const route = window.location.pathname + window.location.search;
     const current = () =>
       authorityCurrent() &&
+      store.lists.get(failureKey) !== true &&
       window.location.pathname + window.location.search === route;
     lock.current = true;
     setBusy(true);
@@ -1201,8 +1232,10 @@ function useProtectedFile() {
           "Your session ended or permissions changed. Sign in again.",
         );
       else {
-        if (error instanceof AdminError && error.code === "export_failed")
-          setFailed(true);
+        if (error instanceof AdminError && error.code === "export_failed") {
+          store.lists.set(failureKey, true);
+          fileListeners.get(store)?.forEach((listener) => listener());
+        }
         setError(customerMessage(error));
       }
     } finally {
@@ -1220,7 +1253,7 @@ function NewExportLink({ batch: b }: { batch: Batch }) {
   );
 }
 function FileAction({ batch: b, item: e }: { batch: Batch; item: CardExport }) {
-  const file = useProtectedFile();
+  const file = useProtectedFile(e.id);
   return <FileControls batch={b} item={e} file={file} />;
 }
 function FileControls({
@@ -1311,7 +1344,7 @@ function PreparedPreview({ batch: b, id }: { batch: Batch; id: string }) {
     `card-batches/${b.id}/exports/${id}`,
     cardExportSchema,
   );
-  const file = useProtectedFile();
+  const file = useProtectedFile(id);
   const [url, setUrl] = useState("");
   const e = result.data;
   return (

@@ -310,6 +310,48 @@ for (const failurePath of [
         .click();
       await expect.poll(() => operations.length).toBe(2);
       expect(operations[1]).not.toBe(operations[0]);
+      // The receipt and refreshed history can expose the same artifact together.
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports?*`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              data: { items: [prepared], nextCursor: null },
+            }),
+          }),
+      );
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports/${prepared.id}`,
+        (route) =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ data: prepared }),
+          }),
+      );
+      await refuse(
+        page,
+        `**/api/admin/card-batches/${batch.id}/exports/${prepared.id}/file`,
+        "export_failed",
+      );
+      await page
+        .getByRole("button", { name: "Refresh export history", exact: true })
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Download PDF", exact: true }),
+      ).toHaveCount(2);
+      await page
+        .getByRole("button", { name: "Download PDF", exact: true })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("button", { name: "Download PDF", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Prepare a new export", exact: true }),
+      ).toHaveCount(2);
       await expect(page.locator("body")).not.toContainText(canary);
       expect(downloads).toEqual([]);
       expect(
