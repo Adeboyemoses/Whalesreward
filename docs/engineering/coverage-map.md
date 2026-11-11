@@ -670,3 +670,17 @@ The M2 rule requires non-5xx status for every domain error the UI must explain. 
 WO-core-7d implements current M2/export mappings and health; M3/M4 mappings ship with their own work orders. The health contract requires absent evaluators to report unconfigured; no deployment may infer approval from this specification. WHR-100 stays open for its separate core part. Stop at READY, with no acceptance or live staging configuration claim.
 
 Inventory correction: the earlier four-occurrence verification counted table rows only. M1 finalize also names `storage_unavailable` in prose, making five retained 503 endpoint occurrences. Its status was unchanged throughout; no endpoint mapping was missed.
+
+
+## WO-spec-3g / WHR-102 duplicate rule P-24 READY — 11 Nov 2026
+
+[Spec PR #105](https://github.com/Adeboyemoses/Whalesreward/pull/105) merged at fa1d70d with all five checks green. Independent code/security/integrity PASS at 908b3e2, round 1, no findings. EM typecheck/lint, 579 existing unit tests, build, paragraph limit (maximum 119 words) and evidence PASS. The separate READY records merge completes this handoff. No runtime feature coverage or board parity advances.
+
+| Invariants | Specification verification / future WHR-16 tests | Status |
+|---|---|---|
+| I-25, I-28, I-29, I-45a | Server-validated byte digests; exact same-basis entered values; inclusive configured window and immutable advisory app time, never eligibility proof | Spec on staging; runtime tests pending |
+| I-35, I-40, I-41 | Flags never hold/change credit; settlement and accepted-revision triggers; unique pairs, terminal decisions, cancellation races and atomic flag audit | Spec on staging; runtime tests pending |
+| I-52 | At most 100 pair evaluations per leased batch; durable cursor/intents and restartable continuation without dropped pairs | Spec on staging; runtime tests pending |
+| Health contract | Missing/invalid/inactive window disables only rule (a); rule (b) continues; duplicateWindow joins protected allowlist, aggregate-only public view | Spec on staging; runtime tests pending |
+
+M3 lists required boundary, concurrency, replay, multi-sale, continuation and health cases for implementation. P-24 is logged in INDEX; Rook's mirror request is on WHR-102. Client Q-555 remains pending. WHR-102 stays In Review at READY, and this session starts no implementation work.

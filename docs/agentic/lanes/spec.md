@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3f (WHR-100 spec part) policy error status and health: READY since 2026-11-11
+WO-spec-3g (WHR-102) duplicate detection rule P-24: READY since 2026-11-11
 
 ## In flight
-- [Spec PR #101](https://github.com/Adeboyemoses/Whalesreward/pull/101) merged into staging at 25ecdc9 with all five checks green. M1–M4 remap nine unconfigured codes and export_failed to 409; three transient codes stay 503.
-- Code/security/integrity PASS at 81be239, round 2. The sole P1 clarified pending worker retries versus terminal failed exports. EM typecheck/lint, 536 unit tests, build, inventory, paragraph limit and evidence PASS.
-- Health specifies ten named statuses including cardPrint, restricted to a full live admin session with settings permission. Public callers see only fullyConfigured plus existing probe fields. Missing evaluators remain unconfigured. This separate records PR completes the READY handoff on its reviewed green merge.
+- [Spec PR #105](https://github.com/Adeboyemoses/Whalesreward/pull/105) merged into staging at fa1d70d with all five checks green. M3 defines advisory entered-value/time or validated-photo matching; no flag holds or changes credit.
+- Code/security/integrity PASS at 908b3e2, round 1, no findings. EM typecheck/lint, 579 unit tests, build, paragraph limit (maximum 119 words) and evidence PASS.
+- Settlement/accepted-revision intents, unique unordered pairs, cancellation guards and 100-pair batches with durable continuation are specified. Missing window disables only time-based matching; protected health gains duplicateWindow as its eleventh status.
+- This separate records PR completes the READY handoff on its reviewed green staging merge. WHR-102 stays In Review; acceptance is not inferred.
 
 ## Next
-- WO-core-7d is the separate implementation part of WHR-100. M3/M4 mappings remain for their own feature work orders. Stop at READY; no next work order starts here.
-- WHR-100 stays open for the core part; acceptance is not inferred.
+- Stop at READY. WHR-16 implements detection in its own approved session; no code is part of this work order.
+- Rook should mirror P-24 into product docs; client confirmation Q-555 remains pending.
 
 ## Earl's gos
-- 2026-11-11: “Work order WHR-100 (WO-spec-3f part) is approved and in Todo.” “Spec only.” “Code, security and integrity verdicts.” “Stop when merged and report READY.”
+- 2026-11-11: “Work order WHR-102 (WO-spec-3g) is approved and in Todo.” “Spec only.” “Code, security and integrity verdicts.” “Stop when merged and report READY.”
 
 ## Risks
-- No runtime behavior, policy activation or live staging configuration is claimed by this spec. Unimplemented gates must not be marked configured to satisfy a smoke check.
-- No cloud changes or main promotion. Client card-stock specification Q-553 remains pending.
-- Full runtime model ID unavailable. Metrics include the separate records review.
+- Specification coverage only: no runtime detection, policy activation, migration or board parity claimed. App-reported time remains advisory and grants no credit/eligibility authority.
+- No cloud changes or main promotion. Full runtime model ID unavailable. Metrics include the separate records review.
 
-dispatches=8 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
