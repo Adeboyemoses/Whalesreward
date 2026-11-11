@@ -9,3 +9,5 @@ WO-core-7d / WHR-100. Run after the reviewed change is deployed; no cloud or pol
 5. A terminal failed card export returns JSON 409 export_failed. Prepare a new export; fetching or replaying the old export never restarts it or changes card inventory. Transient unavailable errors retain their retry path.
 
 Automated evidence and exact test results are recorded in `.review/core__wo-7d-policy-status.md`.
+
+Existing copy gaps are tracked in [WHR-101](https://linear.app/phaneum/issue/WHR-101/align-existing-policy-and-failed-export-messages-with-actionable): auth/delegation currently use the generic fallback, and export failure copy still offers same-preparation retry. This work preserves that copy; a terminal failed export cannot actually restart. Message tests prove preservation, not that these fallbacks give complete guidance.
