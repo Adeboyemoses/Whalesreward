@@ -2,9 +2,23 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-spec-3i review-evidence-v1 specification READY (WHR-110)
+
+[Spec PR #111](https://github.com/Adeboyemoses/Whalesreward/pull/111) merged at 418e471 with all five checks green. P-25 makes the [M3 policy](contracts/m3.md#duplicate-and-independent-hold-decisions--s02s07) normative and adds protected reviewEvidence health. Independent code/security/integrity PASS at 62c5535, round 1. EM typecheck/lint, 663 unit tests, build, links, paragraph limit and evidence PASS. READY takes effect on this separate records PR's reviewed green merge; no implementation or board status advances.
+
+| Invariants / boards | Specification verification assigned to T1 / WHR-111 | Status |
+|---|---|---|
+| I-05a/I-07/I-25/I-26/I-48 | RE-01–RE-04, RE-08, RE-12–RE-13: closed sources, retained evidence, original context and live authority | normative specification only; runtime tests pending |
+| I-28/I-31/I-33/I-34/I-35/I-45a | RE-04–RE-12, RE-16: exact interval boundaries, per-kind combinations, independent holds and receipt/date semantics | normative specification only; runtime tests pending |
+| I-22/I-26/I-41/I-46 | RE-14–RE-19, RE-21: guards, immutable replay/provenance, atomic contribution, policy races and snapshot preservation | normative specification only; runtime tests pending |
+| I-07/I-48 | RE-20–RE-21: protected health, redaction, unchanged errors and no side effects | normative specification only; runtime tests pending |
+| S03/S04/S06/S07/S09 | Existing review surfaces remain reference context; no new two-person or meter path | no UI or parity claim |
+
+The exact assertions are [RE-01–RE-21](contracts/m3.md#t1-implementation-verification--required-before-activation). WHR-113 tracks an intermittent local worker-start failure; unchanged full reruns passed. Client Q-556/Q-528 remain pending, Q-557 undecided, and WHR-50 separate. Rook must mirror P-25 in product docs.
+
 ## WO-spec-3h evidence admissibility PROPOSAL (WHR-103)
 
-The [proposal](proposals/evidence-policy.md) merged in [PR #109](https://github.com/Adeboyemoses/Whalesreward/pull/109) at 394b654 with all five checks green. It defines reference types, proof limits, minimum combinations, exclusions, versioning and protected health reporting for price/card/date/capture. It is not normative or approved for activation: m3.md and runtime policy remain unchanged. READY takes effect on this separate records PR's reviewed green merge. Questions EP-1–EP-5 are WHR-109 and WHR-105–108; Q-528 and WHR-50 remain separate.
+The [proposal](proposals/evidence-policy.md) merged in [PR #109](https://github.com/Adeboyemoses/Whalesreward/pull/109) at 394b654 with all five checks green. It defines reference types, proof limits, minimum combinations, exclusions, versioning and protected health reporting for price/card/date/capture. Historical status: it was non-normative at merge. Earl subsequently approved EP-1–EP-5 Option A; WO-spec-3i/P-25 and M3 now supersede the proposal. Runtime activation remains separate. READY takes effect on this separate records PR's reviewed green merge. Decided EP-1–EP-5 are WHR-109 and WHR-105–108; Q-556/Q-528 and WHR-50 remain separate.
 
 Code/security/integrity PASS at 3257367, round 1, no findings; proposal bytes remained unchanged through base integration. EM typecheck/lint, 663 unit tests, build, paragraph maximum 86 words, local links and evidence checks PASS. These verify the repository and document, not a new evaluator implementation.
 
