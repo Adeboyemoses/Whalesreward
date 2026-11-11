@@ -2,6 +2,10 @@ import { randomBytes } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { correctionStorage } from "../../src/server/modules/corrections/http";
+import { createCorrectionsService } from "../../src/server/modules/corrections/service";
+import { readSales } from "../../src/server/modules/sales/service";
+import { adminConfig } from "../../src/server/modules/admin-access/config";
 import { database } from "../../src/server/lib/db";
 import { handleReviews } from "../../src/server/modules/reviews/http";
 import { COOKIE } from "../../src/server/modules/admin-access/http";
@@ -71,6 +75,23 @@ describe("M3 PostgreSQL adversarial review history", () => {
           };
         },
       },
+    });
+  }
+  async function auditAction(
+    decision: { auditEventId: string; purchaseId: string },
+    action: string,
+  ) {
+    expect(
+      (
+        await pool.query(
+          "SELECT action,target_type,target_id FROM audit_event WHERE id=$1",
+          [decision.auditEventId],
+        )
+      ).rows[0],
+    ).toEqual({
+      action,
+      target_type: "purchase",
+      target_id: decision.purchaseId,
     });
   }
   async function held() {
@@ -234,6 +255,10 @@ describe("M3 PostgreSQL adversarial review history", () => {
           calculation: "meter_evidence",
         });
         expect(result.creditedAfter).toBe(index === 1);
+        await auditAction(
+          result,
+          kind === "date" ? "sale_date_verified" : "card_eligibility_confirmed",
+        );
       }
       expect(await bounds(sale.purchaseId)).toEqual(originalBounds);
       expect(
@@ -263,6 +288,10 @@ describe("M3 PostgreSQL adversarial review history", () => {
       const body = { ...(await h.guard(sale.purchaseId)), outcome, evidence };
       const originalBounds = await bounds(sale.purchaseId);
       const first = await svc.decideCapture(token, sale.purchaseId, body);
+      await auditAction(
+        first,
+        outcome === "confirm" ? "capture_confirmed" : "capture_cancelled",
+      );
       const durable = (
         await pool.query(
           "SELECT row_to_json(p)::text value FROM purchase p WHERE id=$1",
@@ -334,6 +363,7 @@ describe("M3 PostgreSQL adversarial review history", () => {
       decision: { outcome: "accept_captured" },
     });
     expect(accepted.creditedAfter).toBe(true);
+    await auditAction(accepted, "price_accepted");
     expect(
       (
         await pool.query(
@@ -557,4 +587,272 @@ describe("M3 PostgreSQL adversarial review history", () => {
       failure.mockRestore();
     }
   });
+  it.each(["price", "card"] as const)(
+    "I-41 %s cancellation persists the closed audit vocabulary",
+    async (kind) => {
+      const { sale, hold, evidence, token } = await held();
+      let holdId = hold.id;
+      if (kind === "card") {
+        holdId = newId();
+        await pool.query(
+          "INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) VALUES($1,$2,'card','open',$3,'replaced_card',1)",
+          [holdId, sale.purchaseId, hold.opened_revision_id],
+        );
+      }
+      const common = {
+        ...(await h.guard(sale.purchaseId)),
+        expectedHoldVersion: 1,
+        evidence,
+      };
+      const result =
+        kind === "price"
+          ? await service().decidePrice(token, sale.purchaseId, holdId, {
+              ...common,
+              decision: { outcome: "cancel" },
+            })
+          : await service().decideCard(token, sale.purchaseId, holdId, {
+              ...common,
+              outcome: "cancel",
+            });
+      await auditAction(
+        result,
+        kind === "price" ? "price_cancelled" : "card_eligibility_cancelled",
+      );
+    },
+  );
+
+  it.each(["keep_both", "cancel"] as const)(
+    "I-40 duplicate %s preserves correction receipts and projects the resolved member",
+    async (outcome) => {
+      const { sale, f, hold, evidence, token } = await held();
+      const svc = service();
+      await svc.decidePrice(token, sale.purchaseId, hold.id, {
+        ...(await h.guard(sale.purchaseId)),
+        expectedHoldVersion: 1,
+        evidence,
+        decision: { outcome: "accept_captured" },
+      });
+      const other = await h.settle(f, await h.image());
+      const flag = newId();
+      const ids = [sale.purchaseId, other.purchaseId].sort();
+      await pool.query(
+        "INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) VALUES($1,$2,$3,'suspected_duplicate','open',1)",
+        [flag, ...ids],
+      );
+      const corrections = createCorrectionsService({
+        pool,
+        storage: h.storage,
+      });
+      const current = await h.guard(sale.purchaseId);
+      const input = {
+        operationId: newId(),
+        expectedVersion: current.expectedVersion,
+        basedOnRevisionId: current.expectedRevisionId!,
+        edit: { basis: "amount", enteredAmountKobo: "3000000" },
+        evidenceAssetId: sale.assetId,
+        reason: "Correct fictional entry",
+      };
+      const cutoff = new Date(Date.now() + 2 * 86400000);
+      // Test-only trusted receipt injection, before the production receipt-binding trigger.
+      const trigger = `test_receipt_${randomBytes(6).toString("hex")}`;
+      await pool.query(
+        `CREATE FUNCTION ${trigger}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.purchase_id::text=TG_ARGV[0] THEN NEW.first_received_at=TG_ARGV[1]::timestamptz; END IF; RETURN NEW; END $$`,
+      );
+      let receipt;
+      try {
+        await pool.query(
+          `CREATE TRIGGER ${trigger} BEFORE INSERT ON correction_request FOR EACH ROW EXECUTE FUNCTION ${trigger}('${sale.purchaseId}','${new Date(cutoff.getTime() + 1000).toISOString()}')`,
+        );
+        receipt = await corrections.submit(f.token, sale.purchaseId, input);
+      } finally {
+        await pool.query(
+          `DROP TRIGGER IF EXISTS ${trigger} ON correction_request`,
+        );
+        await pool.query(`DROP FUNCTION ${trigger}()`);
+      }
+      expect(await corrections.processNext()).toBe(true);
+      const correctionId = receipt.data.id;
+      const before = (
+        await pool.query("SELECT * FROM correction_request WHERE id=$1", [
+          correctionId,
+        ])
+      ).rows[0];
+      expect(before.state).toBe("awaiting_review");
+      const purchases = await Promise.all(
+        ids.map(async (id) => {
+          const guard = await h.guard(id);
+          return {
+            id,
+            expectedVersion: guard.expectedVersion,
+            expectedRevisionId: guard.expectedRevisionId,
+          };
+        }),
+      );
+      const body = {
+        operationId: newId(),
+        expectedFlagVersion: 1,
+        purchases,
+        decision:
+          outcome === "cancel"
+            ? { outcome, cancelPurchaseId: sale.purchaseId }
+            : { outcome },
+        reason: "Reviewed fictional duplicate",
+      };
+      const result = await svc.decideDuplicate(token, flag, body);
+      await auditAction(
+        result.decision,
+        outcome === "cancel" ? "duplicate_cancelled" : "duplicate_cleared",
+      );
+      expect(await svc.decideDuplicate(token, flag, body)).toEqual(result);
+      const after = (
+        await pool.query("SELECT * FROM correction_request WHERE id=$1", [
+          correctionId,
+        ])
+      ).rows[0];
+      for (const key of [
+        "receipt",
+        "first_received_at",
+        "submitted_by_user_id",
+        "originating_attendant_id",
+        "authorship",
+        "authority_session_id",
+        "frozen_request_digest",
+      ])
+        expect(after[key]).toEqual(before[key]);
+      if (outcome === "cancel") {
+        expect(after).toMatchObject({
+          state: "rejected",
+          validation_error: "sale_cancelled",
+          decision_id: result.decision.id,
+          decided_by_user_id: fixtureId(2),
+          decision_reason: body.reason,
+        });
+        expect(after.decided_at).toBeInstanceOf(Date);
+        expect(
+          (
+            await pool.query(
+              "SELECT state FROM purchase_revision WHERE id=$1",
+              [before.proposed_revision_id],
+            )
+          ).rows[0].state,
+        ).toBe("rejected");
+        expect(
+          (
+            await pool.query("SELECT status FROM purchase WHERE id=$1", [
+              sale.purchaseId,
+            ])
+          ).rows[0].status,
+        ).toBe("cancelled");
+      } else expect(after).toEqual(before);
+      expect(
+        (await corrections.submit(f.token, sale.purchaseId, input)).data,
+      ).toEqual(receipt.data);
+      const detail = await readSales(
+        pool,
+        adminConfig(),
+        token,
+        "admin",
+        "detail",
+        {},
+        sale.purchaseId,
+      );
+      const history = await readSales(
+        pool,
+        adminConfig(),
+        token,
+        "admin",
+        "history",
+        { kind: "duplicateFlags" },
+        sale.purchaseId,
+      );
+      const expected = {
+        id: flag,
+        state: outcome === "cancel" ? "cancelled" : "cleared",
+        cancelledPurchaseId: outcome === "cancel" ? sale.purchaseId : null,
+      };
+      expect(detail).toMatchObject({ duplicateFlags: [expected] });
+      expect(history).toMatchObject({ items: [expected] });
+    },
+  );
+
+  it.each(["network", "server", "missing", "corrupt"] as const)(
+    "I-25 HTTP evidence %s failure retains review state with the appropriate retry contract",
+    async (failureKind) => {
+      const { sale, hold, evidence, token } = await held();
+      const { StorageNotFoundError } =
+        await import("../../src/server/adapters/storage");
+      const read = vi
+        .spyOn(correctionStorage, "read")
+        .mockImplementation(async () => {
+          if (failureKind === "corrupt") return Buffer.from("not an image");
+          if (failureKind === "missing")
+            throw new StorageNotFoundError("missing fixture");
+          throw Object.assign(
+            new Error("private storage diagnostics"),
+            failureKind === "network"
+              ? { code: "ECONNRESET" }
+              : { $metadata: { httpStatusCode: 503 } },
+          );
+        });
+      const before = (
+        await pool.query(
+          "SELECT row_to_json(p)::text value FROM purchase p WHERE id=$1",
+          [sale.purchaseId],
+        )
+      ).rows;
+      try {
+        const response = await handleReviews(
+          new Request("http://localhost:3000/api/admin/sales/review", {
+            method: "POST",
+            headers: {
+              origin: "http://localhost:3000",
+              "content-type": "application/json",
+              cookie: `${COOKIE}=${token}`,
+            },
+            body: JSON.stringify({
+              ...(await h.guard(sale.purchaseId)),
+              expectedHoldVersion: 1,
+              evidence,
+              decision: { outcome: "accept_captured" },
+            }),
+          }),
+          "price",
+          sale.purchaseId,
+          hold.id,
+        );
+        const retryable = failureKind === "network" || failureKind === "server";
+        expect(response.status).toBe(retryable ? 503 : 422);
+        const output = await response.json();
+        expect(output).toMatchObject({
+          error: {
+            code: retryable
+              ? "temporarily_unavailable"
+              : "evidence_unavailable",
+            retryable,
+          },
+        });
+        expect(JSON.stringify(output)).not.toContain(
+          "private storage diagnostics",
+        );
+        expect(
+          (
+            await pool.query(
+              "SELECT row_to_json(p)::text value FROM purchase p WHERE id=$1",
+              [sale.purchaseId],
+            )
+          ).rows,
+        ).toEqual(before);
+        expect(
+          (
+            await pool.query(
+              "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+              [sale.purchaseId],
+            )
+          ).rows[0].n,
+        ).toBe(0);
+      } finally {
+        read.mockRestore();
+      }
+    },
+  );
 });
