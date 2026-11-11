@@ -94,8 +94,9 @@ describe("WHR-100 actionable policy responses", () => {
     );
     expect(error).toMatchObject({ code: "export_failed", status: 409 });
     expect(customerChangeIsUncertain(error)).toBe(false);
-    expect(customerMessage(error)).toContain("File preparation failed.");
-    expect(customerMessage(error)).toContain("prepare a new export");
+    expect(customerMessage(error)).toBe(
+      "File preparation failed. Retry the same preparation or prepare a new export.",
+    );
     expect(customerMessage(error)).not.toContain(privateDetail);
     expect(transport).toHaveBeenCalledTimes(1);
   });
