@@ -44,6 +44,18 @@ async function correctionEditor(phone: Page, id: string) {
   await expect(
     phone.getByRole("heading", { name: "Correct sale", exact: true }),
   ).toBeVisible();
+  await expect(phone.getByAltText("Retained meter photo")).toBeVisible();
+  await expect
+    .poll(() =>
+      phone
+        .getByAltText("Retained meter photo")
+        .evaluate(
+          (el) =>
+            (el as HTMLImageElement).complete &&
+            (el as HTMLImageElement).naturalWidth > 0,
+        ),
+    )
+    .toBe(true);
 }
 async function confirmReview(
   page: Page,
@@ -646,6 +658,9 @@ test("I-06 pending correction and server history stay with originating account a
     await f.phone
       .getByLabel("Reason", { exact: true })
       .fill("Fictional pending account correction");
+    await expect(
+      f.phone.getByRole("button", { name: "Save correction", exact: true }),
+    ).toBeEnabled();
     await f.context.setOffline(true);
     await f.phone
       .getByRole("button", { name: "Save correction", exact: true })

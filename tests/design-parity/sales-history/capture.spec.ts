@@ -26,6 +26,26 @@ async function image(page: Page, id: string) {
   expect(metrics.scroll, `${id} fits viewport`).toBeLessThanOrEqual(
     metrics.width,
   );
+  if (id.startsWith("A")) {
+    const controls = await page
+      .locator("button,a,input,textarea,select")
+      .evaluateAll((elements) =>
+        elements
+          .map((el) => ({
+            name:
+              el.getAttribute("aria-label") ??
+              el.textContent?.trim() ??
+              el.tagName,
+            height: el.getBoundingClientRect().height,
+            width: el.getBoundingClientRect().width,
+          }))
+          .filter((r) => r.width > 0 && r.height > 0),
+      );
+    expect(
+      controls.filter((control) => control.height < 48),
+      `${id} has 48px tap targets`,
+    ).toEqual([]);
+  }
   await page.screenshot({
     path: `${destination}${id}.built.png`,
     fullPage: true,
