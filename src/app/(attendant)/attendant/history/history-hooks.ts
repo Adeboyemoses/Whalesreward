@@ -13,28 +13,38 @@ export const salesApi = new HttpAttendantSalesApi();
 let viewed: { identity: string; detail: AttendantSaleDetail } | null = null;
 export function useCorrections() {
   const { client, state } = useAttendant();
-  const identity = `${state?.session?.account.id}:${state?.session?.captureContextId}`;
+  const accountId = state?.session?.account.id;
+  const contextId = state?.session?.captureContextId;
+  const access = state?.access;
+  const identity = `${accountId}:${contextId}`;
   const [result, setResult] = useState<{
     identity: string;
     rows: CorrectionOutboxRow[];
-  }>({ identity: "", rows: [] });
+    error: string | null;
+  }>({ identity: "", rows: [], error: null });
   useEffect(() => {
     let live = true,
       serial = 0;
-    if (!client || !state?.session) return;
+    if (!client || !accountId || !contextId || access === "signed_out") return;
+    const current = () =>
+      live &&
+      client.getState().session?.account.id === accountId &&
+      client.getState().session?.captureContextId === contextId;
     const read = () => {
       const n = ++serial;
       void client.ownCorrections().then(
         (rows) => {
-          if (
-            live &&
-            n === serial &&
-            `${client.getState().session?.account.id}:${client.getState().session?.captureContextId}` ===
-              identity
-          )
-            setResult({ identity, rows });
+          if (current() && n === serial)
+            setResult({ identity, rows, error: null });
         },
-        () => {},
+        (error) => {
+          if (current() && n === serial)
+            setResult((previous) => ({
+              identity,
+              rows: previous.identity === identity ? previous.rows : [],
+              error: message(error),
+            }));
+        },
       );
     };
     const stop = client.subscribeSales(read);
@@ -43,13 +53,15 @@ export function useCorrections() {
       live = false;
       stop();
     };
-  }, [client, identity, state?.session]);
-  return result.identity === identity ? result.rows : [];
+  }, [client, accountId, contextId, identity, access]);
+  return result.identity === identity && access !== "signed_out"
+    ? { rows: result.rows, error: result.error }
+    : { rows: [], error: null };
 }
 export function useSale(saleId: string, refresh: number) {
   const { client, state, online } = useAttendant();
   const { rows, error: localError } = useOwnSales();
-  const corrections = useCorrections();
+  const { rows: corrections, error: correctionLoadError } = useCorrections();
   const account = state?.session?.account.id;
   const identity = `${account}:${state?.session?.captureContextId}`;
   const local = rows?.find(
@@ -184,7 +196,9 @@ export function useSale(saleId: string, refresh: number) {
         c.originalOperationId ===
           (local?.operationId ?? result.detail?.operationId),
     ),
-    error: visible ? result.error : localError,
+    error: visible
+      ? (result.error ?? localError ?? correctionLoadError)
+      : (localError ?? correctionLoadError),
     loading: !visible || result.loading,
     identity,
   };

@@ -65,7 +65,7 @@ function Back() {
 export function HistoryList() {
   const { client, state, online } = useAttendant();
   const { rows, error: localError } = useOwnSales();
-  const corrections = useCorrections();
+  const { rows: corrections, error: correctionLoadError } = useCorrections();
   const account = state!.session!.account.id,
     context = state!.session!.captureContextId;
   const [result, setResult] = useState<{
@@ -181,9 +181,9 @@ export function HistoryList() {
       {(result.loading || rows === null) && (
         <Notice role="status">Loading sales history…</Notice>
       )}
-      {(result.error || localError) && (
+      {(result.error || localError || correctionLoadError) && (
         <Notice tone="warning" role="status">
-          {result.error || localError}
+          {result.error || localError || correctionLoadError}
         </Notice>
       )}
       {!result.loading &&
