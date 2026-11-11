@@ -4,7 +4,11 @@ import {
   reviewEvidenceSchema,
   saleDateSchema,
 } from "../../../shared/contracts/sales";
-import type { EvidenceStorage } from "../../adapters/storage";
+import {
+  type EvidenceStorage,
+  StorageNotFoundError,
+  StorageSizeError,
+} from "../../adapters/storage";
 import { SYNC_LIMITS } from "../../../shared/contracts/sync";
 import { validatePhoto } from "../sync/photo";
 import { AuthError } from "../auth/errors";
@@ -50,8 +54,18 @@ export async function inspectReviewEvidence(
     )
   ).rows[0];
   if (!asset) throw new AuthError("evidence_unavailable", 422);
+  let bytes: Buffer;
   try {
-    const bytes = await storage.read(asset.final_key, SYNC_LIMITS.maxBytes);
+    bytes = await storage.read(asset.final_key, SYNC_LIMITS.maxBytes);
+  } catch (error) {
+    if (
+      error instanceof StorageNotFoundError ||
+      error instanceof StorageSizeError
+    )
+      throw new AuthError("evidence_unavailable", 422);
+    throw new AuthError("temporarily_unavailable", 503);
+  }
+  try {
     await validatePhoto(
       bytes,
       asset.validated_digest,

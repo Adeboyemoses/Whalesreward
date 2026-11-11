@@ -13,6 +13,7 @@ import { stationDate } from "../../lib/time";
 import { AuthError } from "../auth/errors";
 import { transaction } from "../sync/repo";
 import { payloadDigest } from "../sync/canonical";
+import { reviewAuditAction } from "./audit-actions";
 import { safeReason, snapshotText } from "../corrections/service";
 import { enqueueDuplicateDetection } from "../duplicates/service";
 import * as sql from "../sales/projections";
@@ -151,6 +152,12 @@ async function cancel(
   await db.query(
     "UPDATE purchase_revision SET state='rejected',version=version+1,decision_actor_id=$2,decision_reason=$3,decided_at=clock_timestamp() WHERE purchase_id=$1 AND state='proposed'",
     [p.id, actor, reason],
+  );
+  // Terminally close proposal work before the purchase trigger runs; the original
+  // submission receipt remains immutable, while current review state records cancellation.
+  await db.query(
+    "UPDATE correction_request SET state='rejected',version=version+1,validation_error='sale_cancelled',decision_reason=$3,decision_id=$4,decided_by_user_id=$2,decided_at=clock_timestamp(),lease_token=NULL,lease_until=NULL WHERE purchase_id=$1 AND state IN ('pending_validation','awaiting_review')",
+    [p.id, actor, reason, did],
   );
   const result = await db.query(
     "UPDATE purchase SET status='cancelled',cancellation_reason=$3,resolution_candidate_revision_id=NULL,version=version+1 WHERE id=$1 AND version=$2 AND status=$4",
@@ -327,7 +334,7 @@ async function record(
     [
       auditId,
       a.user_id,
-      `${kind}_${outcome}`,
+      reviewAuditAction(kind, outcome),
       body.operationId,
       JSON.stringify(
         auditValue(before, p.current_revision_id, p.status === "credited"),
