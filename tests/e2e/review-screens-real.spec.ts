@@ -66,8 +66,8 @@ test("I-22 I-35 duplicate keep-both uses latest pair guards and same-operation l
     const retry = page.getByRole("button", { name: /Retry.*decision/i });
     await expect(retry).toBeVisible();
     await expect(
-      page.getByLabel("Decision reason", { exact: true }),
-    ).toBeDisabled();
+      page.locator("textarea:enabled,input:not([type=hidden]):enabled"),
+    ).toHaveCount(0);
     await retry.click();
     await expect.poll(() => bodies.length).toBe(2);
     expect(bodies[1]).toEqual(bodies[0]);
@@ -128,7 +128,8 @@ test("I-35 duplicate cancellation names one member and preserves the comparison 
     await openReview(page, a.detail.id, "duplicate");
     await explain(page);
     const target = page.getByRole("button", {
-      name: new RegExp("Cancel.*" + a.detail.saleCode),
+      name: "Cancel sale " + b.detail.saleCode,
+      exact: true,
     });
     await target.click();
     const request = page.waitForResponse(
@@ -140,8 +141,14 @@ test("I-35 duplicate cancellation names one member and preserves the comparison 
       .getByRole("button", { name: "Confirm decision", exact: true })
       .click();
     expect((await request).status()).toBe(200);
-    expect((await adminDetail(page, a.detail.id)).state).toBe("cancelled");
-    expect((await adminDetail(page, b.detail.id)).credited).toBe(true);
+    await expect(
+      page.getByText(
+        `Sale ${b.detail.saleCode} was cancelled and has no loyalty credit. The other sale is unchanged.`,
+        { exact: false },
+      ),
+    ).toBeVisible();
+    expect((await adminDetail(page, b.detail.id)).state).toBe("cancelled");
+    expect((await adminDetail(page, a.detail.id)).credited).toBe(true);
   } finally {
     await f.close();
   }
@@ -179,6 +186,55 @@ test("I-31 I-34 price decision keeps independent date hold and date verification
       outcome.remainingHolds.map((h: { kind: string }) => h.kind),
     ).toContain("date");
     await openReview(page, sale.id, "date");
+    await explain(page);
+    await expect(
+      page.getByRole("button", { name: "Review verified date", exact: true }),
+    ).toBeDisabled();
+    // A native date control prevents malformed calendar input. Exercise the real
+    // endpoint's adversarial rejection and its UI explanation without faking a response.
+    await page.getByLabel("Verified sale date", { exact: true }).fill(saleDay);
+    await page.route(
+      "**/api/admin/sales/*/holds/*/date-decision",
+      async (route) => {
+        await route.continue({
+          postData: JSON.stringify({
+            ...route.request().postDataJSON(),
+            verifiedSaleDate: "2026-02-31",
+          }),
+        });
+      },
+      { times: 1 },
+    );
+    await confirm(page, "Review verified date", 422);
+    await expect(
+      page.getByText(
+        "Enter a valid Lagos calendar date supported by the records.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: "Reload and review current record",
+        exact: true,
+      })
+      .click();
+    await explain(page);
+    await page
+      .getByLabel("Verified sale date", { exact: true })
+      .fill("2026-11-11");
+    await confirm(page, "Review verified date", 422);
+    await expect(
+      page.getByText(
+        "The verified date cannot be after the day the server received this sale.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: "Reload and review current record",
+        exact: true,
+      })
+      .click();
     await explain(page);
     await page.getByLabel("Verified sale date", { exact: true }).fill(saleDay);
     const date = await confirm(page, "Review verified date");
@@ -308,6 +364,7 @@ test("I-07 I-09 stale review and live permission revocation never apply a change
     const reviewer = await other.newPage();
     try {
       await signIn(reviewer, actor.username, actor.password);
+      await expect(reviewer).not.toHaveURL(/sign-in/);
       await openReview(reviewer, sale.id, "price");
       await explain(reviewer);
       await reviewer
@@ -370,3 +427,46 @@ test("I-26 A14 own held detail uses plain language without proof inputs or inter
     await f.close();
   }
 });
+
+for (const kind of ["card", "capture"] as const) {
+  test(`I-26 I-33 P-25 ${kind} cancellation requires uniformly invalid evidence and keeps history`, async ({
+    page,
+    browser,
+  }) => {
+    test.setTimeout(90000);
+    const f = await reviewFixture(page, browser);
+    try {
+      const sale = await heldSale(f, [kind], "1000000", "after");
+      if (kind === "capture") {
+        // Historical revocation at L proves the entire original interval unauthorized.
+        // The fresh session used to view own history is a different context.
+        await f.db.query(
+          "UPDATE capture_context SET revoked_at=signed_in_at WHERE id=$1",
+          [sale.original.captureContextId],
+        );
+      }
+      await openReview(page, sale.id, kind);
+      await explain(page);
+      const result = await confirm(page, "Cancel invalid sale");
+      expect(result.outcome).toBe("cancel");
+      expect(result.creditedAfter).toBe(false);
+      const detail = await adminDetail(page, sale.id);
+      expect(detail.state).toBe("cancelled");
+      expect(detail.original.amountKobo).toBe("1000000");
+      expect(detail.evidence.state).toBe("validated");
+      expect(detail.decisions.some((d) => d.outcome === "cancel")).toBe(true);
+      if (kind === "capture") {
+        const blocks = (
+          await f.db.query(
+            "SELECT closure_kind FROM purchase_validation_block WHERE purchase_id=$1",
+            [sale.id],
+          )
+        ).rows;
+        expect(blocks).toHaveLength(2);
+        expect(blocks.every((b) => b.closure_kind === "cancelled")).toBe(true);
+      }
+    } finally {
+      await f.close();
+    }
+  });
+}

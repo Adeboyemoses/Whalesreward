@@ -146,14 +146,6 @@ export async function acceptedSale(
   );
   expect(lookupResponse.status()).toBe(200);
   const lookup = (await lookupResponse.json()).data;
-  const photoFixtureId = v7();
-  const bytes = await sharp(
-    Buffer.from(
-      `<svg width="640" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="640" height="400" fill="#17344e"/><rect x="75" y="100" width="490" height="155" rx="12" fill="#e2e8dd"/><text x="320" y="155" text-anchor="middle" font-family="monospace" font-size="26" fill="#122230">FICTIONAL TEST METER</text><text x="320" y="220" text-anchor="middle" font-family="monospace" font-size="52" fill="#122230">20.000 L</text><text x="20" y="380" font-family="monospace" font-size="10" fill="#ffffff">${photoFixtureId}</text></svg>`,
-    ),
-  )
-    .jpeg()
-    .toBuffer();
   const quantity =
     basis === "amount"
       ? amountToQuantity(
@@ -162,6 +154,14 @@ export async function acceptedSale(
           session.price.quantityPrecision,
         )
       : value;
+  const photoFixtureId = v7();
+  const bytes = await sharp(
+    Buffer.from(
+      `<svg width="640" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="640" height="400" fill="#17344e"/><rect x="75" y="100" width="490" height="155" rx="12" fill="#e2e8dd"/><text x="320" y="155" text-anchor="middle" font-family="monospace" font-size="26" fill="#122230">FICTIONAL TEST METER</text><text x="320" y="220" text-anchor="middle" font-family="monospace" font-size="52" fill="#122230">${quantity} ${session.product.unit === "litre" ? "L" : "kg"}</text><text x="20" y="380" font-family="monospace" font-size="10" fill="#ffffff">${photoFixtureId}</text></svg>`,
+    ),
+  )
+    .jpeg()
+    .toBuffer();
   const amount =
     basis === "amount"
       ? value

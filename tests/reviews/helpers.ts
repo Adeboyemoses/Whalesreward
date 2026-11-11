@@ -9,7 +9,7 @@ import {
   data,
   type AdminDetail,
 } from "../sales-history/helpers";
-import { seedId } from "../station/helpers";
+import { seedId, attendantSignIn } from "../station/helpers";
 
 export const saleDay = "2026-11-10";
 export type ReviewKind = "price" | "card" | "date" | "capture";
@@ -18,6 +18,8 @@ export type Fixture = Awaited<ReturnType<typeof reviewFixture>>;
 export async function reviewFixture(page: Page, browser: Browser) {
   const f = await salesFixture(page, browser);
   const p = browserReviewPolicy;
+  await f.db.query("BEGIN");
+  await f.db.query("SELECT pg_advisory_xact_lock(9171701)");
   await f.db.query(
     "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,$2,$3,$4,$5,$6,$7,'Fictional local browser approval') ON CONFLICT DO NOTHING",
     [
@@ -31,9 +33,10 @@ export async function reviewFixture(page: Page, browser: Browser) {
     ],
   );
   await f.db.query(
-    "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,$3,$4,$5,'Fictional local browser approval') ON CONFLICT DO NOTHING",
+    "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) SELECT $1,$2,$3,$4,$5,'Fictional local browser approval' WHERE NOT EXISTS(SELECT 1 FROM review_evidence_configuration WHERE id=$1)",
     [seedId(9171), p.scope.stationId, p.scope.environment, p.revision, p],
   );
+  await f.db.query("COMMIT");
   const customerId = v7(),
     cardId = v7(),
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -170,7 +173,7 @@ export async function heldSale(
       );
     }
   }
-  if (kinds.includes("capture")) {
+  if (kinds.includes("capture") || kinds.includes("date")) {
     const existing = await f.db.query(
       "SELECT id FROM settings_version WHERE station_id=$1",
       [seedId(8)],
@@ -227,6 +230,10 @@ export async function heldSale(
     `/api/attendant/sales/${id}`,
   );
   expect(detail.credited).toBe(false);
+  // A fresh sign-in gives the phone a current capture context; the held purchase
+  // keeps its original historical context and interval unchanged.
+  await attendantSignIn(f.phone, f.username, f.password);
+  await expect(f.phone).toHaveURL(/\/attendant\/sale$/);
   return { ...sale, id };
 }
 
@@ -269,6 +276,7 @@ export async function confirm(page: Page, action: string, status = 200) {
     .getByRole("button", { name: "Confirm decision", exact: true })
     .click();
   const result = await response;
-  expect(result.status()).toBe(status);
-  return (await result.json()).data;
+  const json = await result.json();
+  expect(result.status(), JSON.stringify(json.error ?? {})).toBe(status);
+  return json.data;
 }

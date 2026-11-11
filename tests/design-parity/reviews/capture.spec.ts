@@ -14,9 +14,35 @@ const destination = fileURLToPath(new URL("./", import.meta.url));
 test.use({ trace: "off", video: "off", screenshot: "off" });
 async function capture(page: Page, id: string) {
   await page.evaluate(() => document.fonts.ready);
+  await expect
+    .poll(() =>
+      page
+        .locator("img")
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              (image as HTMLImageElement).complete &&
+              (image as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
   const metrics = await page.evaluate(() => ({
     width: innerWidth,
     scroll: document.documentElement.scrollWidth,
+    wordmarkLineBoxes: [...document.querySelectorAll(".wr-brand-name")].map(
+      (el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el.firstChild!);
+        return [...range.getClientRects()].map((r) => ({
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+        }));
+      },
+    ),
+    loyaltyFooters: document.querySelectorAll(".wr-loyalty-foot").length,
     controls: [...document.querySelectorAll("button,a,input,textarea,select")]
       .map((el) => ({
         name: el.textContent?.trim(),
@@ -26,6 +52,10 @@ async function capture(page: Page, id: string) {
       .filter((e) => e.width > 0 && e.height > 0),
   }));
   expect(metrics.scroll, id + " fits").toBeLessThanOrEqual(metrics.width);
+  if (id.startsWith("A14")) {
+    expect(metrics.wordmarkLineBoxes).toHaveLength(1);
+    expect(metrics.wordmarkLineBoxes[0]).toHaveLength(1);
+  }
   if (id.startsWith("A14"))
     expect(
       metrics.controls.filter((c) => c.height < 48),
@@ -89,6 +119,16 @@ test("S03 S04 S09 and A14 at 1440px 390px 360px", async ({ page, browser }) => {
     await expect(
       page.getByText(/Decision recorded|Recorded decision/i).first(),
     ).toBeVisible();
+    await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+    await expect(page.getByText("Not credited", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByText("Awaiting price review", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByLabel("Decision reason", { exact: true }),
+    ).toHaveCount(0);
     await capture(page, "S09-1440");
   } finally {
     await f.close();
