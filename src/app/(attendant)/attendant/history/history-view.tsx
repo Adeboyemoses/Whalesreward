@@ -532,6 +532,7 @@ export function SaleView({
     saleId,
     refresh,
   );
+  const [showHeldDetails, setShowHeldDetails] = useState(false);
   const [value, setValue] = useState("");
   const [reason, setReason] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -613,6 +614,80 @@ export function SaleView({
   const currentCorrection = corrections
     .slice()
     .sort((a, b) => b.localSavedAt.localeCompare(a.localSavedAt))[0];
+  if (!editing && detail?.state === "held" && !showHeldDetails) {
+    const priceHeld = detail.holds.some(
+      (h) => h.kind === "price" && h.state === "open",
+    );
+    return (
+      <Frame
+        title="Sale status"
+        active="History"
+        context={
+          <>
+            {detail.station.code} · {pumpName(detail.pump.code)} ·{" "}
+            {productName[detail.product]}
+          </>
+        }
+      >
+        <ResultBlock
+          title={priceHeld ? "Awaiting price review" : "Held"}
+          tone="held"
+        >
+          {detail.evidence.state === "validated"
+            ? "Uploaded: details and photo received. "
+            : "Sale details received. "}
+          Not counted toward loyalty until an admin reviews it.
+        </ResultBlock>
+        <div className="wr-list">
+          <div className="wr-list-row">
+            <div className="wr-list-main">
+              <b>{detail.customer?.name ?? "Customer pending"}</b>
+              <span className="wr-list-amount">
+                {saleMoney(detail.displayedValues.amountKobo)}
+              </span>
+            </div>
+            <div className="wr-list-meta">
+              {saleQuantity(detail.displayedValues)} ·{" "}
+              {mediumName[detail.original.medium]} · Sale{" "}
+              <span className="wr-mono">{detail.saleCode}</span>
+            </div>
+            <div className="wr-list-foot">
+              <StatusPill small tone="held">
+                {priceHeld ? "Price mismatch" : "Held"}
+              </StatusPill>
+              <Button variant="link" onClick={() => setShowHeldDetails(true)}>
+                View details
+              </Button>
+            </div>
+          </div>
+        </div>
+        <Notice>
+          {priceHeld && (
+            <>
+              The saved price ({saleRate(detail.original)}) needs review against
+              the price at capture.{" "}
+            </>
+          )}
+          <b>An admin needs to review this sale.</b> Your original entry is
+          preserved.
+        </Notice>
+        <p className="wr-help">
+          No need to record this sale again. Re-uploading will not clear the{" "}
+          {priceHeld ? "price review" : "review"}.
+        </p>
+        {error && (
+          <Notice tone="warning" role="status">
+            {error}
+          </Notice>
+        )}
+        {online && (
+          <Button variant="secondary" onClick={() => setRefresh((n) => n + 1)}>
+            Refresh sale
+          </Button>
+        )}
+      </Frame>
+    );
+  }
   const title = editing ? "Correct sale" : "Sale details";
   return (
     <Frame

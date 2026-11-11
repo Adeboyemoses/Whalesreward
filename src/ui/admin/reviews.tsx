@@ -1,6 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { AdminSession } from "@/client/admin-session";
 import type { AdminSaleDetail } from "@/client/admin-sales-api";
 import { correctionDecisionRequest } from "@/client/admin-sales-api";
@@ -46,6 +53,9 @@ import {
   SaleStatus,
 } from "./sales-common";
 import { useMemory } from "./customers-common";
+const RecordedContext = createContext<
+  ((receipt: Decision, label: string) => void) | null
+>(null);
 const titles = {
   duplicate: "Possible duplicate",
   price: "Price review",
@@ -305,7 +315,10 @@ export function ReviewPage({
 }
 function Original({ sale }: { sale: AdminSaleDetail }) {
   return (
-    <Sheet title="Original purchase" badge={<SaleStatus sale={sale} />}>
+    <Sheet title="Original purchase">
+      <div className="wr-review-status">
+        <SaleStatus sale={sale} />
+      </div>
       <KeyValueList
         items={[
           {
@@ -368,20 +381,69 @@ function ReviewRecord({
   reload: () => void;
 }) {
   const { store } = useAdminSession();
+  const api = useReviewApi(),
+    capture = useViewGuard();
+  const [outcome, setOutcome] = useState<{
+    receipt: Decision;
+    label: string;
+  } | null>(null);
+  const [current, setCurrent] = useState<AdminSaleDetail | null>(sale);
+  const [currentError, setCurrentError] = useState("");
+  const recorded = (receipt: Decision, label: string) => {
+    const live = capture();
+    setOutcome({ receipt, label });
+    setCurrent(null);
+    setCurrentError("");
+    void api.detail(sale.id).then(
+      (detail) => {
+        if (live()) setCurrent(detail);
+      },
+      (e) => {
+        if (live()) setCurrentError(reviewMessage(e));
+      },
+    );
+  };
   const pending = store.lists.get("reviews:pending:" + sale.id) as
     FrozenReview | undefined;
   return (
-    <>
-      <Notice>
-        {kind === "duplicate"
-          ? "Similarity alone does not confirm a duplicate. The flag does not change either sale's loyalty credit."
-          : "This sale needs admin review. Resolving one review does not clear other holds or guarantee loyalty credit."}
-      </Notice>
-      <div className="wr-two-col">
-        <Original sale={sale} />
-        <AdminSalePhoto sale={sale} />
-      </div>
-      {pending ? (
+    <RecordedContext.Provider value={recorded}>
+      {outcome ? (
+        <Notice tone={outcome.receipt.creditedAfter ? "success" : "info"}>
+          Decision recorded.{" "}
+          {outcome.receipt.kind === "duplicate"
+            ? "The duplicate decision is recorded below; current purchase status is shown separately."
+            : outcome.receipt.creditedAfter
+              ? "Recorded spend included."
+              : outcome.receipt.outcome === "cancel"
+                ? "The sale is cancelled and has no loyalty credit."
+                : "Not credited; remaining checks still apply."}
+        </Notice>
+      ) : (
+        <Notice>
+          {kind === "duplicate"
+            ? "Similarity alone does not confirm a duplicate. The flag does not change either sale's loyalty credit."
+            : "This sale needs admin review. Resolving one review does not clear other holds or guarantee loyalty credit."}
+        </Notice>
+      )}
+      {current ? (
+        <div className="wr-two-col">
+          <Original sale={current} />
+          <AdminSalePhoto sale={current} />
+        </div>
+      ) : (
+        <Notice role="status">
+          {currentError
+            ? "The decision is recorded, but the current sale could not be refreshed. Use View updated record to retry the read."
+            : "Loading current sale after the recorded decision…"}
+        </Notice>
+      )}
+      {outcome ? (
+        <RecordedDecision
+          receipt={outcome.receipt}
+          recordedLabel={outcome.label}
+          reload={reload}
+        />
+      ) : pending ? (
         <DecisionForm
           sale={sale}
           kind={pending.kind}
@@ -411,10 +473,16 @@ function ReviewRecord({
       ) : (
         <HoldReview sale={sale} kind={kind} session={session} reload={reload} />
       )}
-      <AdminSaleHistory sale={sale} />
-    </>
+      {current && (
+        <AdminSaleHistory
+          key={current.id + ":" + current.version}
+          sale={current}
+        />
+      )}
+    </RecordedContext.Provider>
   );
 }
+
 function DuplicateReview({
   sale,
   session,
@@ -720,6 +788,7 @@ function DecisionForm({
   const api = useReviewApi(),
     { store } = useAdminSession(),
     capture = useViewGuard();
+  const onRecorded = useContext(RecordedContext);
   const memoryKey = "reviews:pending:" + sale.id;
   const [frozen, setFrozen] = useState<FrozenReview | null>(
     () => (store.lists.get(memoryKey) as FrozenReview | undefined) ?? null,
@@ -772,6 +841,7 @@ function DecisionForm({
       store.lists.delete(memoryKey);
       setReceipt(result);
       setRecordedLabel(frozen.label);
+      onRecorded?.(result, frozen.label);
       setFrozen(null);
       setUncertain(false);
       for (const key of store.lists.keys())
@@ -790,54 +860,11 @@ function DecisionForm({
   }
   if (receipt)
     return (
-      <Sheet title="Decision recorded">
-        <Notice tone={receipt.creditedAfter ? "success" : "info"}>
-          {receipt.kind === "duplicate"
-            ? receipt.outcome === "cancel"
-              ? `${recordedLabel.replace(/^Cancel sale /, "Sale ")} was cancelled and has no loyalty credit. The other sale is unchanged.`
-              : "The flag is cleared and both sales are kept. Neither sale’s loyalty credit was changed."
-            : receipt.creditedAfter
-              ? "Recorded spend included."
-              : receipt.outcome === "cancel"
-                ? "Cancelled. This sale has no loyalty credit."
-                : "Not credited; remaining checks still apply."}{" "}
-          The decision is recorded and the original is retained.
-        </Notice>
-        <KeyValueList
-          items={[
-            { label: "Decision", value: recordedLabel },
-            { label: "Outcome", value: adminAction(receipt.outcome) },
-            { label: "Recorded values", value: valuePair(receipt.after) },
-            { label: "Decision reason", value: receipt.reason },
-            { label: "Decided by", value: receipt.actor.name },
-            {
-              label: "Decision time · server",
-              value: adminTime(receipt.decidedAt),
-            },
-            {
-              label: "Remaining holds",
-              value:
-                receipt.remainingHolds
-                  .filter((h) => h.state === "open")
-                  .map((h) => titles[h.kind])
-                  .join(" · ") || "None",
-            },
-            {
-              label: "Other checks",
-              value: receipt.policyBlocks.length
-                ? "Further checks remain"
-                : "None",
-            },
-          ]}
-        />
-        <p className="wr-help">
-          This is the recorded outcome of this operation. Reload to see the
-          current record.
-        </p>
-        <Button variant="secondary" onClick={reload}>
-          View updated record
-        </Button>
-      </Sheet>
+      <RecordedDecision
+        receipt={receipt}
+        recordedLabel={recordedLabel}
+        reload={reload}
+      />
     );
   if (!allowed)
     return (
@@ -1043,6 +1070,67 @@ function DecisionForm({
           </div>
         </>
       )}
+    </Sheet>
+  );
+}
+
+function RecordedDecision({
+  receipt,
+  recordedLabel,
+  reload,
+}: {
+  receipt: Decision;
+  recordedLabel: string;
+  reload: () => void;
+}) {
+  return (
+    <Sheet title="Decision recorded">
+      <Notice tone={receipt.creditedAfter ? "success" : "info"}>
+        {receipt.kind === "duplicate"
+          ? receipt.outcome === "cancel"
+            ? `${recordedLabel.replace(/^Cancel sale /, "Sale ")} was cancelled and has no loyalty credit. The other sale is unchanged.`
+            : "The flag is cleared and both sales are kept. Neither sale’s loyalty credit was changed."
+          : receipt.creditedAfter
+            ? "Recorded spend included."
+            : receipt.outcome === "cancel"
+              ? "Cancelled. This sale has no loyalty credit."
+              : "Not credited; remaining checks still apply."}{" "}
+        The decision is recorded and the original is retained.
+      </Notice>
+      <KeyValueList
+        items={[
+          { label: "Decision", value: recordedLabel },
+          { label: "Outcome", value: adminAction(receipt.outcome) },
+          { label: "Recorded values", value: valuePair(receipt.after) },
+          { label: "Decision reason", value: receipt.reason },
+          { label: "Decided by", value: receipt.actor.name },
+          {
+            label: "Decision time · server",
+            value: adminTime(receipt.decidedAt),
+          },
+          {
+            label: "Remaining holds",
+            value:
+              receipt.remainingHolds
+                .filter((h) => h.state === "open")
+                .map((h) => titles[h.kind])
+                .join(" · ") || "None",
+          },
+          {
+            label: "Other checks",
+            value: receipt.policyBlocks.length
+              ? "Further checks remain"
+              : "None",
+          },
+        ]}
+      />
+      <p className="wr-help">
+        This is the recorded outcome of this operation. Reload to see the
+        current record.
+      </p>
+      <Button variant="secondary" onClick={reload}>
+        View updated record
+      </Button>
     </Sheet>
   );
 }

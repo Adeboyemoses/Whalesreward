@@ -718,3 +718,5 @@ body {
 .wr-review-references { border: 0; padding: 0; margin: var(--space-4) 0; min-width: 0; }
 .wr-review-reference { display: flex; gap: var(--space-3); align-items: center; min-height: var(--control-h); }
 .wr-review-reference input { width: var(--space-5); height: var(--space-5); }
+
+.wr-review-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
