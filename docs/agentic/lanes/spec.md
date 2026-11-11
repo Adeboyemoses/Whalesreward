@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3g (WHR-102) duplicate detection rule P-24: READY since 2026-11-11
+WO-spec-3h (WHR-103) evidence admissibility: READY on reviewed green staging merge
 
 ## In flight
-- [Spec PR #105](https://github.com/Adeboyemoses/Whalesreward/pull/105) merged into staging at fa1d70d with all five checks green. M3 defines advisory entered-value/time or validated-photo matching; no flag holds or changes credit.
-- Code/security/integrity PASS at 908b3e2, round 1, no findings. EM typecheck/lint, 579 unit tests, build, paragraph limit (maximum 119 words) and evidence PASS.
-- Settlement/accepted-revision intents, unique unordered pairs, cancellation guards and 100-pair batches with durable continuation are specified. Missing window disables only time-based matching; protected health gains duplicateWindow as its eleventh status.
-- This separate records PR completes the READY handoff on its reviewed green staging merge. WHR-102 stays In Review; acceptance is not inferred.
+- Branch `spec/wo-3h-evidence-policy` contains the proposal and READY records. Merge and verification links are posted on WHR-103; committed review evidence records the three independent verdicts.
+- `docs/engineering/proposals/evidence-policy.md` is explicitly non-normative. It covers admissible facts, sufficient combinations, counterexamples, immutable policy/configuration versions and proposed protected `reviewEvidence` health reporting.
+- No change to m3.md, runtime code or policy activation. The proposal preserves zero-credit unresolved holds and independent WHR-50 gating.
 
 ## Next
-- Stop at READY. WHR-16 implements detection in its own approved session; no code is part of this work order.
-- Rook should mirror P-24 into product docs; client confirmation Q-555 remains pending.
+- Stop at READY after merge; WHR-103 stays In Review, not accepted.
+- Earl/client questions: EP-1 WHR-109 (closed evidence set), EP-2 WHR-105 (price limits), EP-3 WHR-106 (replacement proof), EP-4 WHR-107 (single-day proof), EP-5 WHR-108 (capture proof). Recommend A in each; no runtime activation without explicit approval.
+- After approval, Rook commissions the normative amendment and a separate core evaluator work order. Q-528 remains pending.
 
 ## Earl's gos
-- 2026-11-11: “Work order WHR-102 (WO-spec-3g) is approved and in Todo.” “Spec only.” “Code, security and integrity verdicts.” “Stop when merged and report READY.”
+- 2026-11-11: “Work order WHR-103 (WO-spec-3h) is approved and in Todo.” “Write a PROPOSAL (not yet normative)”. “Don't change m3.md.” “Code, security and integrity verdicts. Stop when merged and report READY with the questions.”
 
 ## Risks
-- Specification coverage only: no runtime detection, policy activation, migration or board parity claimed. App-reported time remains advisory and grants no credit/eligibility authority.
-- No cloud changes or main promotion. Full runtime model ID unavailable. Metrics include the separate records review.
+- Some genuinely ambiguous cases cannot be resolved by the proposed first evidence set. Price cancellation is unsupported; meter correction remains WHR-50. No new external admission channel.
+- No implementation or board parity claimed; no cloud change or main promotion. Full runtime model ID unavailable.
 
-dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
+dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable

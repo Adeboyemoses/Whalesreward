@@ -2,6 +2,15 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-spec-3h evidence admissibility PROPOSAL (WHR-103)
+
+The [proposal](proposals/evidence-policy.md) describes price, card, date and capture reference types, proof limits, sufficient combinations, exclusions, versioning and protected health reporting. READY takes effect only on its reviewed green staging merge. It is not normative or approved for activation: M3, the runtime evaluator and current fail-closed behavior remain unchanged. Client questions EP-1–EP-5 are WHR-109, WHR-105, WHR-106, WHR-107 and WHR-108; Q-528 and WHR-50 remain separate.
+
+| Invariants / boards | Proposal evidence | Status |
+|---|---|---|
+| I-05a/I-07/I-22/I-25/I-26/I-28/I-31/I-33–I-35/I-41/I-45a/I-46/I-48 | Closed reference set, P-20/P-23 bounds, per-kind sufficiency and independent guards; no invented timestamps, external admission or credit authority | proposal only; no runtime coverage added |
+| S03/S04/S06/S07/S09 | Existing review outcomes used as context; price cancellation and meter correction remain unsupported in proposed v1 | reference only; no UI or parity claim |
+
 ## WO-spec-3c numeric-only correction policy ACCEPTED (WHR-84)
 
 P-22 configures the [M3 correction-evidence policy](contracts/m3.md#own-corrections-and-late-review--a11-s01s09-i-37i-39), resolving WHR-47 for numeric-only corrections in the recorded basis against the retained validated photo. Other fields/evidence remain outside this flow. The amendment merged in [PR #84](https://github.com/Adeboyemoses/Whalesreward/pull/84) with green CI and code/security/integrity PASS at f78f49d. READY records [#85](https://github.com/Adeboyemoses/Whalesreward/pull/85) merged at 6b81b8b with all five checks green. Earl accepted the specification on 9 November 2026 and instructed closure. This docs-only closeout makes closure effective on its reviewed green staging merge; then WHR-84 moves to Done. Verification and full verdicts are posted on WHR-84.
