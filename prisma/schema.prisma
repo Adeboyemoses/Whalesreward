@@ -649,7 +649,7 @@ model PurchaseHold {
   rel_resolved_by            Admin?            @relation("purchase_hold_resolved_by", fields: [resolved_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
   rel_resolution_revision_id PurchaseRevision? @relation("purchase_hold_resolution_revision_id", fields: [resolution_revision_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
-  @@unique([resolved_by, resolution_operation_id], map: "uq_purchase_hold_resolved_by_resolution_operation_id")
+  @@index([resolved_by, resolution_operation_id], map: "purchase_hold_resolution_operation")
   @@index([purchase_id])
   @@index([opened_revision_id])
   @@index([resolved_by])
@@ -658,6 +658,7 @@ model PurchaseHold {
 }
 
 model DuplicateFlag {
+  cancelled_purchase_id String? @db.Uuid
   id                    String    @id @db.Uuid
   created_at            DateTime  @default(now()) @db.Timestamptz(6)
   purchase_id           String    @db.Uuid
@@ -1046,6 +1047,10 @@ model CorrectionRequest {
  @@map("correction_request")
 }
 model SaleDecision {
+ hold_id String? @db.Uuid
+ flag_id String? @db.Uuid
+ evidence_evaluation Json? @db.JsonB
+ replay_response Json? @db.JsonB
  id String @id @db.Uuid
  purchase_id String @db.Uuid
  operation_id String @db.Uuid
@@ -1070,6 +1075,7 @@ model SaleDecision {
  @@map("sale_decision")
 }
 model PurchaseValidationBlock {
+ closure_kind String?
  id String @id @db.Uuid
  purchase_id String @db.Uuid
  code String
