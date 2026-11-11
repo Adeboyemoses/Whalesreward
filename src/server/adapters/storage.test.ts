@@ -1,5 +1,6 @@
-import { it, expect } from "vitest";
-import { createStorage } from "./storage";
+import { it, expect, vi } from "vitest";
+import { S3Client } from "@aws-sdk/client-s3";
+import { createStorage, StorageNotFoundError } from "./storage";
 const config = {
   region: "fra1",
   bucket: "fictional-evidence",
@@ -59,4 +60,44 @@ it("MinIO uses local path style and remote storage requires HTTPS", async () => 
       endpoint: "http://fra1.digitaloceanspaces.com",
     }),
   ).toThrow();
+});
+
+it.each(["NoSuchKey", "NotFound"])(
+  "maps definitive provider %s to a typed missing object",
+  async (name) => {
+    const failure = Object.assign(new Error("provider detail"), { name });
+    const send = vi
+      .spyOn(S3Client.prototype, "send")
+      .mockRejectedValueOnce(failure);
+    try {
+      const storage = createStorage({
+        ...config,
+        endpoint: "http://127.0.0.1:9000",
+      });
+      await expect(
+        storage.read("final/fictional/object", 4096),
+      ).rejects.toBeInstanceOf(StorageNotFoundError);
+    } finally {
+      send.mockRestore();
+    }
+  },
+);
+it("preserves timeout failures for retryable service classification", async () => {
+  const failure = Object.assign(new Error("provider timeout"), {
+    name: "TimeoutError",
+  });
+  const send = vi
+    .spyOn(S3Client.prototype, "send")
+    .mockRejectedValueOnce(failure);
+  try {
+    const storage = createStorage({
+      ...config,
+      endpoint: "http://127.0.0.1:9000",
+    });
+    await expect(storage.read("final/fictional/object", 4096)).rejects.toBe(
+      failure,
+    );
+  } finally {
+    send.mockRestore();
+  }
 });

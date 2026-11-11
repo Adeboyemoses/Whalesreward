@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { enqueueDuplicateDetection } from "../duplicates/service";
 import type pg from "pg";
 import {
   correctionSubmissionSchema,
@@ -122,6 +123,10 @@ async function revision(db: pg.PoolClient, purchaseId: string, id: string) {
   return r;
 }
 async function purchase(db: pg.PoolClient, id: string, attendantId?: string) {
+  await db.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended('reporting:'||station_id::text,0)) FROM purchase WHERE id=$1",
+    [id],
+  );
   const p = (
     await db.query<Purchase>(
       `SELECT * FROM purchase WHERE id=$1 ${attendantId ? "AND originating_attendant_id=$2" : ""} FOR UPDATE`,
@@ -213,7 +218,7 @@ function privateAuditText(value: string) {
       "[secret removed]",
     );
 }
-function safeReason(reason: string) {
+export function safeReason(reason: string) {
   if (
     privateAuditText(reason) !== reason ||
     /\b(?:otp|code|password|token|secret)\s*[:=]/i.test(reason)
@@ -297,6 +302,11 @@ async function apply(
     `UPDATE purchase SET current_revision_id=$2,resolution_candidate_revision_id=NULL,status=CASE WHEN $4 THEN 'held' ELSE status END,version=version+1 WHERE id=$1 AND version=$3`,
     [p.id, r.id, p.version, gate.blocked],
   );
+  await db.query(
+    "INSERT INTO duplicate_reporting_state(station_id,generation) VALUES($1,1) ON CONFLICT(station_id) DO UPDATE SET generation=duplicate_reporting_state.generation+1",
+    [p.station_id],
+  );
+  await enqueueDuplicateDetection(db, p.id);
   await markCampaigns(db, p.id);
 }
 const auditHumanSchema = z.strictObject({
@@ -329,7 +339,7 @@ const auditValuesSchema = z.strictObject({
     .enum(["pending_validation", "awaiting_review", "accepted", "rejected"])
     .nullable(),
 });
-function snapshotText(value: string) {
+export function snapshotText(value: string) {
   return privateAuditText(value).slice(0, 120);
 }
 /** Material effective fields only. A received proposal does not yet change credited values. */

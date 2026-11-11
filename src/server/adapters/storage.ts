@@ -15,6 +15,8 @@ export interface EvidenceStorage {
   writeFinal(key: string, bytes: Buffer): Promise<void>;
 }
 export class StorageSizeError extends Error {}
+/** The provider definitively reported that the requested object is absent. */
+export class StorageNotFoundError extends Error {}
 export type StorageConfig = {
   endpoint: string;
   region: string;
@@ -84,10 +86,19 @@ export function createStorage(config: StorageConfig): EvidenceStorage {
       return { url: signed, headers: { "Content-Type": "image/jpeg" } };
     },
     async read(key, maxBytes) {
-      const result = await client.send(
-        new GetObjectCommand({ Bucket: config.bucket, Key: key }),
-        { abortSignal: AbortSignal.timeout(30000) },
-      );
+      const result = await client
+        .send(new GetObjectCommand({ Bucket: config.bucket, Key: key }), {
+          abortSignal: AbortSignal.timeout(30000),
+        })
+        .catch((error: unknown) => {
+          // Provider details stay inside the adapter; callers receive a typed absence.
+          if (
+            error instanceof Error &&
+            (error.name === "NoSuchKey" || error.name === "NotFound")
+          )
+            throw new StorageNotFoundError();
+          throw error;
+        });
       const body = result.Body;
       if (!body) throw new Error("Storage body absent");
       const stream = body as AsyncIterable<Uint8Array> & {

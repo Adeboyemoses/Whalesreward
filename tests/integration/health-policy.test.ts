@@ -179,6 +179,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       expect(body.policies).toEqual({
         auth: "configured",
         delivery: "unconfigured",
+        duplicateWindow: "unconfigured",
         delegation: "configured",
         phone: "configured",
         meter: "unconfigured",
@@ -323,4 +324,21 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       }
     },
   );
+  it("P-24 configured duplicate window is named only in protected health and hides its threshold and version", async () => {
+    vi.stubEnv("DUPLICATE_WINDOW_STATION_ID", newId());
+    vi.stubEnv(
+      "DUPLICATE_WINDOW_POLICY",
+      JSON.stringify({ version: 789, windowSeconds: 600 }),
+    );
+    const a = await actor(),
+      protectedBody = await call(adminCookie(a.token));
+    expect(protectedBody.policies.duplicateWindow).toBe("configured");
+    expect(JSON.stringify(protectedBody)).not.toContain("windowSeconds");
+    expect(JSON.stringify(protectedBody)).not.toContain("789");
+    expectPublic(await call());
+    vi.stubEnv("DUPLICATE_WINDOW_STATION_ID", undefined);
+    expect((await call(adminCookie(a.token))).policies.duplicateWindow).toBe(
+      "unconfigured",
+    );
+  });
 });
