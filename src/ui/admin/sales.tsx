@@ -14,6 +14,7 @@ import {
   saleFilterSchema,
 } from "@/shared/contracts/sales";
 import {
+  isRecoveryExecutor,
   saleMoney,
   saleQuantity,
   saleRate,
@@ -236,7 +237,7 @@ function SalesResults({
         }
         columns={[
           { key: "sale", label: "Sale / customer" },
-          { key: "purchase", label: "Purchase" },
+          { key: "purchase", label: "Purchase", amount: true },
           { key: "attendant", label: "Attendant / pump" },
           { key: "status", label: "Status" },
           { key: "action", label: "" },
@@ -255,9 +256,7 @@ function SalesResults({
             ),
             purchase: (
               <>
-                <b className="wr-amount-md">
-                  {saleMoney(s.displayedValues.amountKobo)}
-                </b>
+                {saleMoney(s.displayedValues.amountKobo)}
                 <span className="wr-sub">
                   {saleQuantity(s.displayedValues)} · {productNames[s.product]}
                 </span>
@@ -613,9 +612,7 @@ function CorrectionDecision({
   const allowed =
     session.permissions?.includes("sales") &&
     session.permissions.includes("corrections");
-  const executor =
-    c.authorship === "unverified_recovery" &&
-    c.submittedBy.id === session.account.id;
+  const executor = isRecoveryExecutor(c, session.account);
   const confirm = async () => {
     if (!frozen || inFlight.current) return;
     const current = capture();

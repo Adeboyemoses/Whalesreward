@@ -680,3 +680,18 @@ body {
     flex-wrap: wrap;
   }
 }
+.wr-sales-lightbox {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+.wr-sales-lightbox:not([open]) {
+  display: none;
+}
+.wr-sales-lightbox::backdrop {
+  background: var(--surface-inverse);
+}

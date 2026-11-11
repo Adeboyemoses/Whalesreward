@@ -81,3 +81,64 @@ describe("M3 sales transport", () => {
     expect(store.getSnapshot().session?.permissions).toEqual(["sales"]);
   });
 });
+
+describe("M3 frozen decision identity and evidence access", () => {
+  it("retries a decision with the same reviewed guards, reason and operation key", async () => {
+    const transport = vi.fn(async () => {
+      throw new AdminError("network");
+    });
+    const api = new AdminSalesApi(transport as typeof adminRequest);
+    const id = session.account.id;
+    const detail = {
+      id,
+      version: 7,
+      currentRevisionId: id,
+      corrections: [{ id, version: 3 }],
+    } as Parameters<AdminSalesApi["freeze"]>[0];
+    const frozen = api.freeze(detail, id, "reject", "Wrong meter amount");
+    await expect(api.decide(frozen)).rejects.toMatchObject({ code: "network" });
+    await expect(api.decide(frozen)).rejects.toMatchObject({ code: "network" });
+    expect(transport.mock.calls[0]).toEqual(transport.mock.calls[1]);
+    expect(transport).toHaveBeenLastCalledWith(
+      `sales/${id}/corrections/${id}/decision`,
+      {
+        operationId: frozen.body.operationId,
+        expectedVersion: 7,
+        expectedRevisionId: id,
+        expectedCorrectionVersion: 3,
+        outcome: "reject",
+        reason: "Wrong meter amount",
+      },
+      "POST",
+      frozen.body.operationId,
+    );
+  });
+  it("refuses foreign, expired, and credential-bearing photo access responses", async () => {
+    const id = session.account.id,
+      other = "018f0000-0000-7000-8000-000000000002";
+    for (const value of [
+      {
+        assetId: other,
+        url: "https://example.com/private.jpg?signature=fictional",
+        expiresAt: new Date(Date.now() + 60000).toISOString(),
+      },
+      {
+        assetId: id,
+        url: "https://example.com/private.jpg",
+        expiresAt: "2020-01-01T00:00:00.000Z",
+      },
+      {
+        assetId: id,
+        url: "https://user:password@example.com/private.jpg",
+        expiresAt: new Date(Date.now() + 60000).toISOString(),
+      },
+    ]) {
+      const api = new AdminSalesApi(
+        vi.fn(async () => value) as typeof adminRequest,
+      );
+      await expect(api.photoAccess(id, id)).rejects.toMatchObject({
+        code: "invalid_response",
+      });
+    }
+  });
+});

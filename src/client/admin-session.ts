@@ -2,7 +2,7 @@ import { adminRequest, AdminError } from "./admin-api";
 import type { RoleSummary, PermissionCode } from "@/shared/contracts/admin";
 export type AdminSession = {
   state: string;
-  account: { id: string; name: string; username: string };
+  account: { id: string; adminId?: string; name: string; username: string };
   permissions?: PermissionCode[];
   role?: RoleSummary;
   station?: { name: string };

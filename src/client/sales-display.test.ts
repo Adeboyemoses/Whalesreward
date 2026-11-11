@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isRecoveryExecutor,
   correctionPreview,
   inputFromValues,
   salesMessage,
@@ -65,5 +66,38 @@ describe("P-22 correction presentation", () => {
   it("explains stale and pending proposals without promising a retry will overwrite them", () => {
     expect(salesMessage({ code: "base_revision_changed" })).toContain("review");
     expect(salesMessage({ code: "correction_pending" })).toContain("already");
+  });
+});
+
+describe("P-19 known maker identity", () => {
+  it("compares recovered submitter profile ID with session adminId, not auth user ID", () => {
+    const account = { id: "auth-user", adminId: "admin-profile" };
+    expect(
+      isRecoveryExecutor(
+        {
+          authorship: "unverified_recovery",
+          submittedBy: { id: "admin-profile" },
+        },
+        account,
+      ),
+    ).toBe(true);
+    expect(
+      isRecoveryExecutor(
+        {
+          authorship: "unverified_recovery",
+          submittedBy: { id: "another-admin" },
+        },
+        account,
+      ),
+    ).toBe(false);
+    expect(
+      isRecoveryExecutor(
+        {
+          authorship: "authenticated_attendant",
+          submittedBy: { id: "admin-profile" },
+        },
+        account,
+      ),
+    ).toBe(false);
   });
 });

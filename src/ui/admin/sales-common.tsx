@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAdminSession } from "./session";
 import {
   AdminSalesApi,
@@ -116,6 +116,7 @@ export function ReadState({
 export function AdminSalePhoto({ sale }: { sale: AdminSaleDetail }) {
   const api = useSalesApi();
   const { store } = useAdminSession();
+  const dialog = useRef<HTMLDialogElement>(null);
   const [photo, setPhoto] = useState<{ url: string; expiresAt: string } | null>(
       null,
     ),
@@ -144,6 +145,10 @@ export function AdminSalePhoto({ sale }: { sale: AdminSaleDetail }) {
       live = false;
     };
   }, [api, sale.id, sale.evidence.assetId, sale.evidence.state, store, serial]);
+  useEffect(() => {
+    if (full && dialog.current && !dialog.current.open)
+      dialog.current.showModal();
+  }, [full]);
   const unavailable =
     sale.evidence.state === "deleted"
       ? "The meter photo has been deleted under the retention policy."
@@ -203,10 +208,11 @@ export function AdminSalePhoto({ sale }: { sale: AdminSaleDetail }) {
         timestamps are supporting evidence, not proof.
       </p>
       {full && photo && !error && (
-        <div
+        <dialog
+          ref={dialog}
           className="wr-sales-lightbox"
-          role="dialog"
-          aria-modal="true"
+          onCancel={() => setFull(false)}
+          onClose={() => setFull(false)}
           aria-label="Full size meter photo"
         >
           <Button autoFocus variant="secondary" onClick={() => setFull(false)}>
@@ -217,7 +223,7 @@ export function AdminSalePhoto({ sale }: { sale: AdminSaleDetail }) {
             alt="Full size validated meter photo"
             referrerPolicy="no-referrer"
           />
-        </div>
+        </dialog>
       )}
     </Sheet>
   );

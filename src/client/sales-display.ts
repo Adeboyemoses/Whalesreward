@@ -113,3 +113,14 @@ export function salesMessage(e: unknown): string {
       : "This request could not be completed. Check your connection and try again.")
   );
 }
+
+/** M3 actors use profile IDs, while account.id identifies the authentication user. */
+export function isRecoveryExecutor(
+  correction: { authorship: string; submittedBy: { id: string } },
+  account: { id: string; adminId?: string },
+): boolean {
+  return (
+    correction.authorship === "unverified_recovery" &&
+    correction.submittedBy.id === account.adminId
+  );
+}
