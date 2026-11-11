@@ -1,3 +1,4 @@
+import { duplicateWindow } from "../duplicates/config";
 import { adminSessionConfig, requirePolicy } from "../admin-access/config";
 import { emailConfig, mailpitOrigin } from "../../adapters/email-config";
 import { phonePolicy, requirePhonePolicy } from "../../adapters/phone";
@@ -14,6 +15,7 @@ export const policyNames = [
   "reconciliation",
   "timing",
   "cardPrint",
+  "duplicateWindow",
 ] as const;
 export type PolicyName = (typeof policyNames)[number];
 export type PolicyStatus = "configured" | "unconfigured";
@@ -56,6 +58,7 @@ const evaluators: PolicyEvaluators = {
     requirePhonePolicy(phonePolicy(env));
     return true;
   },
+  duplicateWindow: (env) => !!duplicateWindow(env),
   cardPrint: (env) => !!cardPrintLayout(env),
   // M3/M4 evaluators do not exist yet. Absence is deliberately unconfigured.
 };

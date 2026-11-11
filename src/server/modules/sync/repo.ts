@@ -58,6 +58,10 @@ export async function ownedPurchase(
   id: string,
   attendantId: string,
 ): Promise<Purchase> {
+  await db.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended('reporting:'||station_id::text,0)) FROM purchase WHERE id=$1 AND originating_attendant_id=$2",
+    [id, attendantId],
+  );
   const p = (
     await db.query<Purchase>(
       "SELECT * FROM purchase WHERE id=$1 AND originating_attendant_id=$2 FOR UPDATE",
