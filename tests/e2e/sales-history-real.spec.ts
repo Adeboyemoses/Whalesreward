@@ -19,6 +19,7 @@ import { seedId, api, attendantSignIn } from "../station/helpers";
 
 // Evidence URLs and credentials stay out of traces, screenshots and videos.
 test.use({
+  actionTimeout: 15000,
   trace: "off",
   video: "off",
   screenshot: "off",
@@ -118,6 +119,9 @@ test("I-29 P-22 amount correction preserves kobo, recorded basis, reason and ret
       f.phone.request,
       `/api/attendant/sales/${sale.detail.id}`,
     );
+    await expect(
+      f.phone.getByText("Correction applied", { exact: true }).first(),
+    ).toBeVisible({ timeout: 30000 });
     expect(current.original.amountKobo).toBe("2000000");
     expect(current.displayedValues.quantity).toBe("22");
     expect(
@@ -226,11 +230,14 @@ test("I-22 I-38 offline original and correction retain separate identities and w
     await f.phone
       .getByRole("button", { name: "Save correction", exact: true })
       .click();
+    await expect
+      .poll(async () => (await correctionRows(f.phone))[0]?.state)
+      .toBe("waiting_original");
+    const localCorrection = (await correctionRows(f.phone))[0]!;
     await expect(
       f.phone.getByText(/Waiting for the original/i).first(),
     ).toBeVisible();
     expect((await rows(f.phone))[0]!.original).toEqual(original.original);
-    const localCorrection = (await correctionRows(f.phone))[0]!;
     expect(localCorrection.originalOperationId).toBe(original.operationId);
     expect(localCorrection.operationId).not.toBe(original.operationId);
     expect(localCorrection.submission).toBeNull();

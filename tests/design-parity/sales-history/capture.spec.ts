@@ -88,7 +88,18 @@ test("WO-app-7 independent phone fidelity A09 A10 A11 at390/360", async ({
       await image(f.phone, `A09-${width}`);
       await f.phone.goto(`/attendant/history/${main.detail.id}`);
       await ready(f.phone, "Sale details");
-      await expect(f.phone.getByAltText("Validated meter photo")).toBeVisible();
+      await expect(f.phone.getByAltText("Retained meter photo")).toBeVisible();
+      await expect
+        .poll(() =>
+          f.phone
+            .getByAltText("Retained meter photo")
+            .evaluate(
+              (el) =>
+                (el as HTMLImageElement).complete &&
+                (el as HTMLImageElement).naturalWidth > 0,
+            ),
+        )
+        .toBe(true);
       await image(f.phone, `A10-${width}`);
       await f.phone.goto(`/attendant/history/${main.detail.id}/correct`);
       await ready(f.phone, "Correct sale");
