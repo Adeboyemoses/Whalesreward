@@ -1,4 +1,10 @@
-import { randomBytes } from "node:crypto";
+import {
+  legacyReviewFixture,
+  earlierReplacement,
+  unauthorizedCapture,
+} from "../helpers/legacy-review-evidence-fixture";
+import { state, replacement, S } from "../helpers/review-evidence-fixture";
+import { randomBytes, createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -12,13 +18,13 @@ import { COOKIE } from "../../src/server/modules/admin-access/http";
 import { newId } from "../../src/server/lib/ids";
 import { createReviewsService } from "../../src/server/modules/reviews/service";
 import { reviewFixtureHarness } from "../helpers/review-fixture";
-import { changePrice, fixtureId } from "../helpers/sync-fixture";
+import { fixtureId } from "../helpers/sync-fixture";
 
 const root = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const schema = `review_adversaries_${randomBytes(6).toString("hex")}`;
 let pool: pg.Pool;
 let h: ReturnType<typeof reviewFixtureHarness>;
-const date = "2026-11-05";
+const date = "2026-11-10";
 
 describe("M3 PostgreSQL adversarial review history", () => {
   beforeAll(async () => {
@@ -61,20 +67,6 @@ describe("M3 PostgreSQL adversarial review history", () => {
     return createReviewsService({
       pool,
       storage: h.storage,
-      evidencePolicy: {
-        async evaluate(_db, context) {
-          return {
-            policyVersion: "adversarial-fixture-v1",
-            referenceIds: [...context.referenceIds],
-            validPrice: true,
-            beforeReplacement: true,
-            verifiedSaleDate: date,
-            authorizedCapture: true,
-            campaignEligible: true,
-            invalidSale: true,
-          };
-        },
-      },
     });
   }
   async function auditAction(
@@ -95,42 +87,9 @@ describe("M3 PostgreSQL adversarial review history", () => {
     });
   }
   async function held() {
-    await pool.query("TRUNCATE station,card CASCADE");
-    await pool.query(
-      (
-        await readFile(
-          new URL("../../prisma/fixtures.sql", import.meta.url),
-          "utf8",
-        )
-      )
-        .split("\n")
-        .filter((line) =>
-          /^(INSERT INTO (customer|card)|UPDATE card)/.test(line),
-        )
-        .join("\n"),
-    );
-    const bytes = await h.image();
-    const f = await h.context(bytes);
-    await changePrice(pool, f);
-    const sale = await h.settle(f, bytes);
-    const hold = (
-      await pool.query(
-        "SELECT * FROM purchase_hold WHERE purchase_id=$1 AND kind='price'",
-        [sale.purchaseId],
-      )
-    ).rows[0];
-    const reference = (
-      await pool.query(
-        "SELECT id FROM audit_event WHERE target_id=$1 ORDER BY occurred_at LIMIT 1",
-        [sale.purchaseId],
-      )
-    ).rows[0].id;
-    const evidence = {
-      assetId: sale.assetId,
-      notes: "Inspected retained fictional evidence",
-      referenceIds: [reference],
-    };
-    return { f, sale, hold, evidence, token: await h.adminToken() };
+    const x = await legacyReviewFixture(pool);
+    h = x.h;
+    return x;
   }
   async function capture() {
     const fixture = await held();
@@ -172,7 +131,8 @@ describe("M3 PostgreSQL adversarial review history", () => {
   it.each(["date,card", "card,date"])(
     "I-35 %s retains exact independent meter candidate values until the last hold clears",
     async (order) => {
-      const { sale, hold, evidence, token } = await held();
+      const x = await held();
+      const { sale, hold, evidence, token } = x;
       const svc = service();
       await expect(
         svc.decidePrice(token, sale.purchaseId, hold.id, {
@@ -205,19 +165,7 @@ describe("M3 PostgreSQL adversarial review history", () => {
         "UPDATE purchase_hold SET state='resolved',resolved_by=$2,resolution_operation_id=$3,resolution_reason='Historical meter decision',resolved_at=clock_timestamp(),resolution_revision_id=$4,version=version+1 WHERE id=$1",
         [hold.id, fixtureId(5), newId(), candidate],
       );
-      const replacement = newId();
-      await pool.query(
-        "INSERT INTO card(id,batch_id,code,qr_payload,state,version) VALUES($1,$2,'C7K3M9Q','C7K3M9Q','unassigned',1)",
-        [replacement, fixtureId(28)],
-      );
-      await pool.query(
-        "UPDATE card_customer_link SET ended_at='2026-11-05T00:00:00Z' WHERE card_id=$1 AND ended_at IS NULL",
-        [fixtureId(29)],
-      );
-      await pool.query(
-        "UPDATE card SET state='retired',retired_at='2026-11-05T00:00:00Z',retirement_reason='replaced',replaced_by_card_id=$2,version=version+1 WHERE id=$1",
-        [fixtureId(29), replacement],
-      );
+      await earlierReplacement(x);
       const holds = { date: newId(), card: newId() };
       for (const kind of ["date", "card"] as const)
         await pool.query(
@@ -283,7 +231,8 @@ describe("M3 PostgreSQL adversarial review history", () => {
   it.each(["confirm", "cancel"])(
     "I-22 capture %s replay is historical and changed body cannot write again",
     async (outcome) => {
-      const { sale, evidence, token } = await capture();
+      const { sale, evidence, token, f } = await capture();
+      if (outcome === "cancel") await unauthorizedCapture(pool, f);
       const svc = service();
       const body = { ...(await h.guard(sale.purchaseId)), outcome, evidence };
       const originalBounds = await bounds(sale.purchaseId);
@@ -588,11 +537,13 @@ describe("M3 PostgreSQL adversarial review history", () => {
     }
   });
   it.each(["price", "card"] as const)(
-    "I-41 %s cancellation persists the closed audit vocabulary",
+    "I-41 %s cancellation follows v1 evidence and audit rules",
     async (kind) => {
-      const { sale, hold, evidence, token } = await held();
+      const x = await held();
+      const { sale, hold, evidence, token } = x;
       let holdId = hold.id;
       if (kind === "card") {
+        await replacement(x, S);
         holdId = newId();
         await pool.query(
           "INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) VALUES($1,$2,'card','open',$3,'replaced_card',1)",
@@ -604,27 +555,39 @@ describe("M3 PostgreSQL adversarial review history", () => {
         expectedHoldVersion: 1,
         evidence,
       };
-      const result =
-        kind === "price"
-          ? await service().decidePrice(token, sale.purchaseId, holdId, {
-              ...common,
-              decision: { outcome: "cancel" },
-            })
-          : await service().decideCard(token, sale.purchaseId, holdId, {
-              ...common,
-              outcome: "cancel",
-            });
-      await auditAction(
-        result,
-        kind === "price" ? "price_cancelled" : "card_eligibility_cancelled",
-      );
+      if (kind === "price") {
+        const before = await state(x);
+        await expect(
+          service().decidePrice(token, sale.purchaseId, holdId, {
+            ...common,
+            decision: { outcome: "cancel" },
+          }),
+        ).rejects.toMatchObject({ code: "evidence_insufficient", status: 422 });
+        expect(await state(x)).toEqual(before);
+        expect(
+          (
+            await pool.query(
+              "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+              [sale.purchaseId],
+            )
+          ).rows[0].n,
+        ).toBe(0);
+      } else {
+        const result = await service().decideCard(
+          token,
+          sale.purchaseId,
+          holdId,
+          { ...common, outcome: "cancel" },
+        );
+        await auditAction(result, "card_eligibility_cancelled");
+      }
     },
   );
 
   it.each(["keep_both", "cancel"] as const)(
     "I-40 duplicate %s preserves correction receipts and projects the resolved member",
     async (outcome) => {
-      const { sale, f, hold, evidence, token } = await held();
+      const { sale, f, hold, evidence, token, live } = await held();
       const svc = service();
       await svc.decidePrice(token, sale.purchaseId, hold.id, {
         ...(await h.guard(sale.purchaseId)),
@@ -632,7 +595,16 @@ describe("M3 PostgreSQL adversarial review history", () => {
         evidence,
         decision: { outcome: "accept_captured" },
       });
-      const other = await h.settle(f, await h.image());
+      const bytes = await h.image("#123456");
+      const other = await h.settle(f, bytes, {
+        captureContextId: live.contextId,
+        appCapturedAt: new Date().toISOString(),
+        photo: {
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          bytes: bytes.length,
+          mediaType: "image/jpeg",
+        },
+      });
       const flag = newId();
       const ids = [sale.purchaseId, other.purchaseId].sort();
       await pool.query(
