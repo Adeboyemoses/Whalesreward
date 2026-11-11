@@ -128,8 +128,8 @@ beforeEach(async () => {
     },
     capturedCardCode: "A7K3M9X",
     seller: {
-      attendantId: v7(),
-      accountId: s.account.id,
+      attendantId: s.account.id,
+      accountId: v7(),
       staffCode: s.account.staffCode,
       name: s.account.name,
       username: s.account.username,
@@ -215,12 +215,14 @@ async function acceptedLocal(row: OutboxRow) {
   });
 }
 describe("separate durable numeric corrections", () => {
-  it("persists a separate operation with exact amount and frozen base without changing original values", async () => {
+  it("uses the own attendant profile ID with a distinct auth-user ID and preserves exact frozen values", async () => {
     const saved = await client.saveCorrection({
       source: { kind: "server", detail },
       value: "20000.01",
       reason: "Meter amount entered incorrectly",
     });
+    expect(detail.seller.attendantId).toBe(auth.current.account.id);
+    expect(detail.seller.accountId).not.toBe(auth.current.account.id);
     expect(saved.operationId).not.toBe(detail.operationId);
     expect(saved.edit).toEqual({
       basis: "amount",
@@ -288,6 +290,26 @@ describe("separate durable numeric corrections", () => {
     expect(stored.lastErrorCode).toBe("base_revision_changed");
     expect(stored.submission).toBeNull();
     expect(sales.sent).toHaveLength(0);
+  });
+  it("refuses a foreign accepted original even when its auth-user ID equals the local profile ID", async () => {
+    const original = await saveLocal();
+    await client.saveCorrection({
+      source: { kind: "local", operationId: original.operationId },
+      value: "21000",
+      reason: "Meter amount",
+    });
+    await acceptedLocal(original);
+    detail.seller = {
+      ...detail.seller,
+      attendantId: v7(),
+      accountId: auth.current.account.id,
+    };
+    await client.retryUploads();
+    expect(sales.sent).toHaveLength(0);
+    expect((await client.ownCorrections())[0]!.submission).toBeNull();
+    expect((await client.ownCorrections())[0]!.lastErrorCode).toBe(
+      "invalid_response",
+    );
   });
   it("reconciles a lost success response after restart with the same operation and no second POST", async () => {
     sales.lost = true;
@@ -385,7 +407,14 @@ describe("separate durable numeric corrections", () => {
         reason,
       });
     await expect(
-      save({ ...detail, seller: { ...detail.seller, accountId: v7() } }),
+      save({
+        ...detail,
+        seller: {
+          ...detail.seller,
+          attendantId: v7(),
+          accountId: auth.current.account.id,
+        },
+      }),
     ).rejects.toMatchObject({ code: "permission_denied" });
     await expect(
       save({ ...detail, evidence: { ...detail.evidence, state: "deleted" } }),

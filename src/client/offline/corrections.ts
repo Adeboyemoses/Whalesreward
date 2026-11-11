@@ -262,7 +262,7 @@ export class CorrectionSynchronizer {
         if (
           detail.id !== row.purchaseId ||
           detail.operationId !== row.originalOperationId ||
-          detail.seller.accountId !== session.account.id
+          detail.seller.attendantId !== session.account.id
         )
           throw new ClientError(
             "invalid_response",

@@ -1224,7 +1224,7 @@ export class AttendantClient {
     if (input.source.kind === "server") {
       const detail = attendantSaleDetailSchema.parse(input.source.detail);
       if (
-        detail.seller.accountId !== session.account.id ||
+        detail.seller.attendantId !== session.account.id ||
         detail.station.id !== session.station.id
       )
         throw new ClientError(
