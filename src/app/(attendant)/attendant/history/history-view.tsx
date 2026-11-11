@@ -2,7 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { Button, KeyValueList, ListRow, Notice, StatusPill } from "@/ui";
+import {
+  Button,
+  KeyValueList,
+  ListRow,
+  Notice,
+  StatusPill,
+  ResultBlock,
+} from "@/ui";
 import type {
   AttendantSaleRow,
   AttendantSaleDetail,
@@ -702,6 +709,34 @@ export function SaleView({
           </Button>
         </Notice>
       )}
+      {!editing && detail?.state === "held" && (
+        <>
+          <ResultBlock
+            title={
+              detail.holds.some((h) => h.kind === "price" && h.state === "open")
+                ? "Awaiting price review"
+                : "Held"
+            }
+            tone="held"
+          >
+            {detail.evidence.state === "validated"
+              ? "Uploaded: details and photo received. "
+              : "Sale details received. "}
+            Not counted toward loyalty until an admin reviews it.
+          </ResultBlock>
+          <Notice>
+            <b>An admin needs to review this sale.</b> Your original entry is
+            preserved.{" "}
+            {detail.holds.some(
+              (h) => h.kind === "price" && h.state === "open",
+            ) && "The saved price needs review against the price at capture."}
+          </Notice>
+          <p className="wr-help">
+            No need to record this sale again. Re-uploading will not clear the
+            review.
+          </p>
+        </>
+      )}
       {values && (
         <>
           <div>
@@ -784,7 +819,11 @@ export function SaleView({
               {preview && (
                 <div
                   className="wr-card wr-quiet"
-                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
                 >
                   <span className="wr-label">Calculated</span>
                   <strong className="wr-amount-md">

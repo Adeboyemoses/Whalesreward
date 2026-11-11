@@ -713,3 +713,8 @@ body {
 .wr-attendant-shell .wr-header-top { flex-wrap: wrap; }
 .wr-attendant-shell .wr-kv-row dd { overflow-wrap: anywhere; }
 .wr-attendant-shell textarea.wr-input { min-height: var(--control-h); height: auto; padding: var(--space-3); }
+
+/* Review references are server-offered choices, not free-form evidence. */
+.wr-review-references { border: 0; padding: 0; margin: var(--space-4) 0; min-width: 0; }
+.wr-review-reference { display: flex; gap: var(--space-3); align-items: center; min-height: var(--control-h); }
+.wr-review-reference input { width: var(--space-5); height: var(--space-5); }
