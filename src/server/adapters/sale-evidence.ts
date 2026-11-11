@@ -4,7 +4,12 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { createStorage, storageConfig, type StorageConfig } from "./storage";
+import {
+  createStorage,
+  storageConfig,
+  StorageNotFoundError,
+  type StorageConfig,
+} from "./storage";
 export const SALE_PHOTO_TTL_SECONDS = 60;
 export interface SaleEvidenceReader {
   read(key: string, maxBytes: number): Promise<Buffer>;
@@ -78,5 +83,8 @@ export function createSaleEvidenceReader(
   };
 }
 function missing(e: unknown) {
-  return e instanceof Error && ["NoSuchKey", "NotFound"].includes(e.name);
+  return (
+    e instanceof StorageNotFoundError ||
+    (e instanceof Error && ["NoSuchKey", "NotFound"].includes(e.name))
+  );
 }
