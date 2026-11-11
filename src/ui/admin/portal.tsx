@@ -877,11 +877,14 @@ function Management({ path, session }: { path: string[]; session: Session }) {
           });
           if (isNew) await picker;
           else {
-            void picker.catch(() => {
+            void picker.catch((error: unknown) => {
               if (current()) {
                 setRoles([]);
                 setPickerWarning(
-                  "Role choices could not be refreshed. The current role is shown; reload before selecting another role.",
+                  error instanceof AdminError &&
+                    error.code === "delegation_policy_unconfigured"
+                    ? error.message
+                    : "Role choices could not be refreshed. The current role is shown; reload before selecting another role.",
                 );
               }
             });

@@ -1221,6 +1221,17 @@ function NewExportLink({ batch: b }: { batch: Batch }) {
 }
 function FileAction({ batch: b, item: e }: { batch: Batch; item: CardExport }) {
   const file = useProtectedFile();
+  return <FileControls batch={b} item={e} file={file} />;
+}
+function FileControls({
+  batch: b,
+  item: e,
+  file,
+}: {
+  batch: Batch;
+  item: CardExport;
+  file: ReturnType<typeof useProtectedFile>;
+}) {
   const [, setPreview] = useMemory<string | null>("preview:" + b.id, null);
   return (
     <>
@@ -1335,7 +1346,7 @@ function PreparedPreview({ batch: b, id }: { batch: Batch; id: string }) {
               >
                 Load protected PDF preview
               </Button>
-              <FileAction batch={b} item={e} />
+              <FileControls batch={b} item={e} file={file} />
               {url && (
                 <iframe
                   className="wr-cc-pdf"

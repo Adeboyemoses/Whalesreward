@@ -77,6 +77,29 @@ test("I-07 WHR-100 admin delegation 409 does not offer a role or imply user crea
   }
 });
 
+test("I-07 WHR-101 existing user displays the approved delegation policy message", async ({
+  page,
+}) => {
+  const f = await stationFixture(page);
+  try {
+    await refuse(
+      page,
+      "**/api/admin/assignable-roles?*",
+      "delegation_policy_unconfigured",
+    );
+    await page.goto(`/admin/users/${f.adminId}`);
+    await safeMessage(
+      page,
+      "Access settings aren't set up on this server, so roles can't be changed. Contact your system administrator.",
+    );
+    await expect(
+      page.getByRole("button", { name: "Confirm change", exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await f.db.end();
+  }
+});
+
 test("I-12 WHR-100 email policy 409 leaves the address unverified in the portal", async ({
   page,
 }) => {
@@ -147,7 +170,12 @@ test("I-15 WHR-100 phone policy 409 gives station-manager guidance without linki
   }
 });
 
-for (const failurePath of ["download", "metadata", "preview"] as const)
+for (const failurePath of [
+  "download",
+  "metadata",
+  "preview",
+  "preview-download",
+] as const)
   test(`I-20 WHR-101 ${failurePath} failure offers a new export without downloading or changing stock`, async ({
     page,
   }) => {
@@ -202,7 +230,7 @@ for (const failurePath of ["download", "metadata", "preview"] as const)
           }),
       );
       await page.goto(`/admin/cards/${batch.id}`);
-      if (failurePath === "preview") {
+      if (failurePath === "preview" || failurePath === "preview-download") {
         await page
           .getByRole("row")
           .filter({ hasText: "Ready" })
@@ -210,7 +238,10 @@ for (const failurePath of ["download", "metadata", "preview"] as const)
           .click();
         await page
           .getByRole("button", {
-            name: "Load protected PDF preview",
+            name:
+              failurePath === "preview"
+                ? "Load protected PDF preview"
+                : "Download PDF",
             exact: true,
           })
           .click();
@@ -219,10 +250,9 @@ for (const failurePath of ["download", "metadata", "preview"] as const)
           .getByRole("button", { name: "Download PDF", exact: true })
           .click();
       }
-      const exportRow =
-        failurePath === "preview"
-          ? page.locator("main")
-          : page.getByRole("row").filter({ hasText: "PDF" }).last();
+      const exportRow = failurePath.startsWith("preview")
+        ? page.locator("main")
+        : page.getByRole("row").filter({ hasText: "PDF" }).last();
       const fileError = exportRow
         .getByRole("alert")
         .filter({ hasText: "File preparation failed." });
@@ -232,18 +262,54 @@ for (const failurePath of ["download", "metadata", "preview"] as const)
       await expect(
         exportRow.getByRole("button", { name: "Download PDF", exact: true }),
       ).toHaveCount(0);
+      await expect(
+        exportRow.getByRole("button", {
+          name: "Load protected PDF preview",
+          exact: true,
+        }),
+      ).toHaveCount(0);
       await exportRow
         .getByRole("link", { name: "Prepare a new export", exact: true })
         .click();
       await page
         .getByRole("button", { name: "Review export preparation", exact: true })
         .click();
-      await expect(
-        page.getByRole("button", {
+      const prepared = { ...artifact, id: v7(), state: "ready" };
+      const operations: string[] = [];
+      await page.route(
+        `**/api/admin/card-batches/${batch.id}/exports`,
+        (route) => {
+          const operation = route.request().postDataJSON()
+            .operationId as string;
+          operations.push(operation);
+          return route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({ data: prepared }),
+          });
+        },
+      );
+      await page
+        .getByRole("button", {
           name: "Confirm export preparation",
           exact: true,
-        }),
-      ).toBeVisible();
+        })
+        .click();
+      await expect.poll(() => operations.length).toBe(1);
+      await page
+        .getByRole("button", { name: "Review a new export", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "Review export preparation", exact: true })
+        .click();
+      await page
+        .getByRole("button", {
+          name: "Confirm export preparation",
+          exact: true,
+        })
+        .click();
+      await expect.poll(() => operations.length).toBe(2);
+      expect(operations[1]).not.toBe(operations[0]);
       await expect(page.locator("body")).not.toContainText(canary);
       expect(downloads).toEqual([]);
       expect(
