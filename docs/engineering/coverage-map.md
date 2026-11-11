@@ -2,6 +2,17 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-spec-3h evidence admissibility PROPOSAL (WHR-103)
+
+The [proposal](proposals/evidence-policy.md) merged in [PR #109](https://github.com/Adeboyemoses/Whalesreward/pull/109) at 394b654 with all five checks green. It defines reference types, proof limits, minimum combinations, exclusions, versioning and protected health reporting for price/card/date/capture. It is not normative or approved for activation: m3.md and runtime policy remain unchanged. READY takes effect on this separate records PR's reviewed green merge. Questions EP-1–EP-5 are WHR-109 and WHR-105–108; Q-528 and WHR-50 remain separate.
+
+Code/security/integrity PASS at 3257367, round 1, no findings; proposal bytes remained unchanged through base integration. EM typecheck/lint, 663 unit tests, build, paragraph maximum 86 words, local links and evidence checks PASS. These verify the repository and document, not a new evaluator implementation.
+
+| Invariants / boards | Proposal evidence | Status |
+|---|---|---|
+| I-05a/I-07/I-22/I-25/I-26/I-28/I-31/I-33–I-35/I-41/I-45a/I-46/I-48 | Closed reference set, P-20/P-23 bounds, per-kind sufficiency and independent guards; no invented timestamps, external admission or credit authority | proposal only; no runtime coverage added |
+| S03/S04/S06/S07/S09 | Existing review outcomes provide context; price cancellation and meter correction remain unsupported in proposed v1 | reference only; no UI or parity claim |
+
 ## WO-spec-3c numeric-only correction policy ACCEPTED (WHR-84)
 
 P-22 configures the [M3 correction-evidence policy](contracts/m3.md#own-corrections-and-late-review--a11-s01s09-i-37i-39), resolving WHR-47 for numeric-only corrections in the recorded basis against the retained validated photo. Other fields/evidence remain outside this flow. The amendment merged in [PR #84](https://github.com/Adeboyemoses/Whalesreward/pull/84) with green CI and code/security/integrity PASS at f78f49d. READY records [#85](https://github.com/Adeboyemoses/Whalesreward/pull/85) merged at 6b81b8b with all five checks green. Earl accepted the specification on 9 November 2026 and instructed closure. This docs-only closeout makes closure effective on its reviewed green staging merge; then WHR-84 moves to Done. Verification and full verdicts are posted on WHR-84.
