@@ -1,4 +1,8 @@
-# Evidence admissibility — PROPOSAL
+# Evidence admissibility — approved proposal (historical)
+
+**Status: approved; superseded by m3.md.** Earl chose Option A for EP-1–EP-5 on 11 November 2026 (WHR-105–WHR-109). [WO-spec-3i / WHR-110](https://linear.app/phaneum/issue/WHR-110) makes [M3 review-evidence-v1](../contracts/m3.md#duplicate-and-independent-hold-decisions--s02s07) normative and records P-25. Client confirmation remains pending in Q-556; Q-528 remains separate. Q-557 is undecided and adds no two-person path. Runtime implementation and activation remain separate from specification approval.
+
+The revision-1 text below is preserved as proposal history. Its future-tense recommendations and former defaults are superseded by M3; they are not competing rules or evidence that Earl's decision is still pending.
 
 ## For Earl and the client
 
