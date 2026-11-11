@@ -1,6 +1,13 @@
 import type { AttendantSaleRow } from "@/client/sales-api";
 import type { OutboxRow } from "@/client/types";
 import type { CorrectionOutboxRow } from "@/client/offline/correction-types";
+/** M1 session.account.id is the attendant profile ID, not M3's auth account ID. */
+export function ownsAttendantSale(
+  profileId: string,
+  row: Pick<AttendantSaleRow, "seller">,
+) {
+  return row.seller.attendantId === profileId;
+}
 export function mergeOwnHistory(
   accountId: string,
   server: AttendantSaleRow[],
@@ -8,7 +15,7 @@ export function mergeOwnHistory(
 ) {
   const seen = new Set<string>();
   const remote = server
-    .filter((r) => r.seller.accountId === accountId)
+    .filter((r) => ownsAttendantSale(accountId, r))
     .sort(
       (a, b) =>
         b.serverReceivedAt.localeCompare(a.serverReceivedAt) ||

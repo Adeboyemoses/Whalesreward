@@ -7,7 +7,7 @@ import {
 } from "@/client/sales-api";
 import type { CorrectionOutboxRow } from "@/client/offline/correction-types";
 import { useAttendant, useOwnSales, message } from "../_components/runtime";
-import { correctionReceiptKey } from "./history-model";
+import { correctionReceiptKey, ownsAttendantSale } from "./history-model";
 export const salesApi = new HttpAttendantSalesApi();
 // One transient viewed record supports an offline edit while navigating; never persisted.
 let viewed: { identity: string; detail: AttendantSaleDetail } | null = null;
@@ -122,7 +122,7 @@ export function useSale(saleId: string, refresh: number) {
             state?.session?.captureContextId
         )
           return;
-        if (detail.seller.accountId !== account) {
+        if (!ownsAttendantSale(account, detail)) {
           setResult({
             identity,
             id: purchaseId,

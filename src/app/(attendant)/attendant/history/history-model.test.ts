@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { mergeOwnHistory } from "./history-model";
+import { mergeOwnHistory, ownsAttendantSale } from "./history-model";
 import type { AttendantSaleRow } from "@/client/sales-api";
 import type { OutboxRow } from "@/client/types";
 it("merges only the active account and deduplicates original identities in receipt order", () => {
@@ -8,7 +8,7 @@ it("merges only the active account and deduplicates original identities in recei
       id: operationId,
       operationId,
       serverReceivedAt: at,
-      seller: { accountId },
+      seller: { accountId: `auth-${accountId}`, attendantId: accountId },
     }) as AttendantSaleRow;
   const local = (originatingAccountId: string, operationId: string) =>
     ({
@@ -28,4 +28,15 @@ it("merges only the active account and deduplicates original identities in recei
   );
   expect(result.remote.map((x) => x.operationId)).toEqual(["new", "old"]);
   expect(result.pending.map((x) => x.operationId)).toEqual(["unsent"]);
+});
+
+it("I-06 compares the session profile to attendantId while distinct auth IDs never confer ownership", () => {
+  const own = {
+    seller: { attendantId: "profile-own", accountId: "auth-own" },
+  } as AttendantSaleRow;
+  const foreign = {
+    seller: { attendantId: "profile-foreign", accountId: "profile-own" },
+  } as AttendantSaleRow;
+  expect(ownsAttendantSale("profile-own", own)).toBe(true);
+  expect(ownsAttendantSale("profile-own", foreign)).toBe(false);
 });
