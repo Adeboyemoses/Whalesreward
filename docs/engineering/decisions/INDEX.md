@@ -34,6 +34,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | P-24 | Flag distinct non-cancelled station sales for the same customer, product and exact entered value in the same basis within a configured 10 minutes by app-reported capture time, OR byte-identical server-validated photo digests regardless of customer/time. Flags never hold or change credit; phone time grants no eligibility. Missing window disables only time-based matching. Refines F07; client Q-555 pending | Earl, 11 Nov 2026; [WHR-102](https://linear.app/phaneum/issue/WHR-102), [M3](../contracts/m3.md#duplicate-and-independent-hold-decisions--s02s07). Rook to mirror in product docs |
 
+| P-25 | review-evidence-v1 admits only closed server-recorded references and traceable same-sale conclusions. Price accepts only a rate valid throughout I; no price cancellation or WHR-50 activation. Card confirms U<E, cancels L>=E; date requires one Lagos day; capture confirms all open uniform blocks and cancels only uniformly unauthorized capture. Refines P-07/P-12/P-20/P-23 evidence sufficiency; retains other guards. Q-556/Q-528 pending; Q-557 undecided | Earl, 11 Nov 2026; [WHR-103](https://linear.app/phaneum/issue/WHR-103), Option A [WHR-105](https://linear.app/phaneum/issue/WHR-105), [WHR-106](https://linear.app/phaneum/issue/WHR-106), [WHR-107](https://linear.app/phaneum/issue/WHR-107), [WHR-108](https://linear.app/phaneum/issue/WHR-108), [WHR-109](https://linear.app/phaneum/issue/WHR-109); [M3 amendment](../contracts/m3.md#duplicate-and-independent-hold-decisions--s02s07). Rook to mirror in product docs |
+
 ## Technical (this repo)
 
 | ID | Decision | Since |
