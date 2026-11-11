@@ -179,6 +179,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
       expect(body.policies).toEqual({
         auth: "configured",
         delivery: "unconfigured",
+        duplicateWindow: "unconfigured",
         delegation: "configured",
         phone: "configured",
         meter: "unconfigured",
