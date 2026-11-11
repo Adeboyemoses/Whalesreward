@@ -1,3 +1,4 @@
+import { enqueueDuplicateDetection } from "../duplicates/service";
 import type pg from "pg";
 import { lockPriceHistory } from "../../lib/price-history-lock";
 import { newId } from "../../lib/ids";
@@ -177,6 +178,7 @@ export async function settle(
     `UPDATE purchase SET status=$2,current_revision_id=$3,version=version+1 WHERE id=$1 AND status='finalizing'`,
     [p.id, held ? "held" : "credited", held ? null : revisionId],
   );
+  await enqueueDuplicateDetection(db, p.id);
   await audit(
     db,
     userId,

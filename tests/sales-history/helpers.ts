@@ -84,6 +84,32 @@ export async function salesFixture(
   });
   const suffix = v7().replaceAll("-", "").slice(-12).match(/.{4}/g)!.join(":");
   await context.setExtraHTTPHeaders({ "x-test-ip": `2001:db8::${suffix}` });
+  // Independent fictional camera captures must not reuse identical evidence bytes.
+  await context.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 480;
+      const captureId = crypto.randomUUID();
+      const draw = () => {
+        const drawing = canvas.getContext("2d")!;
+        drawing.fillStyle = "white";
+        drawing.fillRect(0, 0, 640, 480);
+        drawing.fillStyle = "black";
+        drawing.font = "30px sans-serif";
+        drawing.fillText("Fictional meter 20.000 litres", 10, 120);
+        drawing.font = "12px monospace";
+        drawing.fillText(captureId, 10, 450);
+      };
+      draw();
+      const timer = window.setInterval(draw, 50);
+      const stream = canvas.captureStream(20);
+      stream
+        .getVideoTracks()[0]!
+        .addEventListener("ended", () => clearInterval(timer));
+      return stream;
+    };
+  });
   const phone = await context.newPage();
   await installLocalStorageBridge(phone);
   await attendantSignIn(phone, username, password);
@@ -120,9 +146,10 @@ export async function acceptedSale(
   );
   expect(lookupResponse.status()).toBe(200);
   const lookup = (await lookupResponse.json()).data;
+  const photoFixtureId = v7();
   const bytes = await sharp(
     Buffer.from(
-      '<svg width="640" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="640" height="400" fill="#17344e"/><rect x="75" y="100" width="490" height="155" rx="12" fill="#e2e8dd"/><text x="320" y="155" text-anchor="middle" font-family="monospace" font-size="26" fill="#122230">FICTIONAL TEST METER</text><text x="320" y="220" text-anchor="middle" font-family="monospace" font-size="52" fill="#122230">20.000 L</text></svg>',
+      `<svg width="640" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="640" height="400" fill="#17344e"/><rect x="75" y="100" width="490" height="155" rx="12" fill="#e2e8dd"/><text x="320" y="155" text-anchor="middle" font-family="monospace" font-size="26" fill="#122230">FICTIONAL TEST METER</text><text x="320" y="220" text-anchor="middle" font-family="monospace" font-size="52" fill="#122230">20.000 L</text><text x="20" y="380" font-family="monospace" font-size="10" fill="#ffffff">${photoFixtureId}</text></svg>`,
     ),
   )
     .jpeg()

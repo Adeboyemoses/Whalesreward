@@ -104,7 +104,7 @@ function historyDefinition(kind: string, own: boolean) {
         id: "f.id",
         where: "(f.purchase_id=p.id OR f.other_purchase_id=p.id)",
         projection:
-          "jsonb_build_object('id',f.id,'version',f.version,'purchaseIds',jsonb_build_array(f.purchase_id,f.other_purchase_id),'state',f.state,'reason',f.reason,'cancelledPurchaseId',NULL)",
+          "jsonb_build_object('id',f.id,'version',f.version,'purchaseIds',jsonb_build_array(f.purchase_id,f.other_purchase_id),'state',f.state,'reason',f.reason,'cancelledPurchaseId',f.cancelled_purchase_id)",
         schema: wire.duplicateFlagSchema,
       };
     default:

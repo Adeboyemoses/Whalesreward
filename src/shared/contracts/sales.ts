@@ -430,3 +430,66 @@ export type Correction = z.infer<typeof correctionSchema>;
 export type AttendantCorrection = z.infer<typeof attendantCorrectionSchema>;
 export type Decision = z.infer<typeof decisionSchema>;
 export type SaleFilter = z.infer<typeof saleFilterSchema>;
+
+export const reviewEvidenceSchema = z.strictObject({
+  assetId: authId,
+  notes: reason,
+  referenceIds: z.array(authId).max(20),
+});
+const reviewGuard = {
+  operationId: authId,
+  expectedVersion: version,
+  expectedRevisionId: authId.nullable(),
+  reason,
+};
+const holdGuard = {
+  ...reviewGuard,
+  expectedHoldVersion: version,
+  evidence: reviewEvidenceSchema,
+};
+export const priceDecisionSchema = z.strictObject({
+  ...holdGuard,
+  decision: z.discriminatedUnion("outcome", [
+    z.strictObject({ outcome: z.literal("accept_captured") }),
+    z.strictObject({
+      outcome: z.literal("correct_meter"),
+      amountKobo: kobo,
+      quantity,
+    }),
+    z.strictObject({ outcome: z.literal("cancel") }),
+  ]),
+});
+export const cardDecisionSchema = z.strictObject({
+  ...holdGuard,
+  outcome: z.enum(["confirm_earlier", "cancel"]),
+});
+export const dateDecisionSchema = z.strictObject({
+  ...holdGuard,
+  verifiedSaleDate: z.string(),
+});
+export const captureDecisionSchema = z.strictObject({
+  ...reviewGuard,
+  outcome: z.enum(["confirm", "cancel"]),
+  evidence: reviewEvidenceSchema,
+});
+export const duplicateDecisionSchema = z.strictObject({
+  operationId: authId,
+  expectedFlagVersion: version,
+  purchases: z.tuple([
+    z.strictObject({
+      id: authId,
+      expectedVersion: version,
+      expectedRevisionId: authId.nullable(),
+    }),
+    z.strictObject({
+      id: authId,
+      expectedVersion: version,
+      expectedRevisionId: authId.nullable(),
+    }),
+  ]),
+  decision: z.discriminatedUnion("outcome", [
+    z.strictObject({ outcome: z.literal("keep_both") }),
+    z.strictObject({ outcome: z.literal("cancel"), cancelPurchaseId: authId }),
+  ]),
+  reason,
+});

@@ -17,7 +17,8 @@ vi.mock("@aws-sdk/client-s3", () => ({
   },
 }));
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: mocks.sign }));
-vi.mock("./storage", () => ({
+vi.mock("./storage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./storage")>()),
   createStorage: mocks.create,
   storageConfig: vi.fn(),
 }));
