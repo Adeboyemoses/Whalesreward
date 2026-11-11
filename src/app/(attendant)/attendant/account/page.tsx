@@ -11,6 +11,7 @@ import {
   go,
   useAttendant,
   useOwnSales,
+  useOwnPendingWork,
   productName,
   pumpName,
   WindowNotice,
@@ -21,7 +22,8 @@ function Account() {
   const { rows } = useOwnSales();
   const router = useRouter();
   const session = state!.session!;
-  const count = rows ? rows.filter(needsUpload).length : null;
+  const { pending, error: pendingError } = useOwnPendingWork();
+  const count = pending ? pending.sales + pending.corrections : null;
   const [configured, setConfigured] = useState<ConfiguredAssignment | null>(
     null,
   );
@@ -133,11 +135,18 @@ function Account() {
               value:
                 count === null
                   ? "Checking…"
-                  : `${count} ${count === 1 ? "sale" : "sales"}${changed && pendingPumps.size ? " · captured at " + [...pendingPumps].map(([pump]) => pumpName(pump)).join(", ") : ""}`,
+                  : pending?.corrections
+                    ? `${pending.sales} ${pending.sales === 1 ? "sale" : "sales"} · ${pending.corrections} ${pending.corrections === 1 ? "correction" : "corrections"}`
+                    : `${count} ${count === 1 ? "sale" : "sales"}${changed && pendingPumps.size ? " · captured at " + [...pendingPumps].map(([pump]) => pumpName(pump)).join(", ") : ""}`,
             },
           ]}
         />
       </div>
+      {pendingError && (
+        <Notice tone="warning" role="alert">
+          {pendingError}
+        </Notice>
+      )}
       {online && loading && (
         <p className="wr-help" role="status">
           Checking configured assignment…

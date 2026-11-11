@@ -39,7 +39,9 @@ registerRoute(
       const shell = await matchPrecache(
         url.pathname.startsWith("/attendant/register/")
           ? "/attendant/register"
-          : "/attendant/sale",
+          : url.pathname.startsWith("/attendant/history/")
+            ? "/attendant/history"
+            : "/attendant/sale",
       );
       return shell ?? Response.error();
     } finally {

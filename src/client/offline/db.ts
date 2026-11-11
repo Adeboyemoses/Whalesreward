@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import type { CorrectionOutboxRow } from "./correction-types";
 import type { Lookup, OfflineWindow, OutboxRow } from "../types";
 export type Installation = {
   key: "installation";
@@ -11,6 +12,7 @@ export type Installation = {
 /** Storage access is internal; the public client only exposes the active partition. */
 export class CaptureDatabase extends Dexie {
   outbox!: Table<OutboxRow, [string, string]>;
+  corrections!: Table<CorrectionOutboxRow, [string, string]>;
   windows!: Table<OfflineWindow, string>;
   customers!: Table<
     Lookup & { originatingAccountId: string; captureContextId?: string },
@@ -25,6 +27,10 @@ export class CaptureDatabase extends Dexie {
       windows: "originatingAccountId",
       customers: "[originatingAccountId+cardCode]",
       meta: "key",
+    });
+    this.version(2).stores({
+      corrections:
+        "[originatingAccountId+operationId],[originatingAccountId+originalOperationId]",
     });
   }
 }

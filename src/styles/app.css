@@ -269,7 +269,7 @@ body {
 
 /* Attendant capture layouts reuse board spacing, type and colour tokens. */
 .wr-capture-shell .wr-nav {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .wr-capture-shell.wr-without-nav .wr-actionbar {
   bottom: 0;
@@ -604,3 +604,112 @@ body {
   flex: none;
   min-height: 48px;
 }
+
+/* M3 sales uses the board's shared surfaces; photos show actual private evidence. */
+.wr-sales {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.wr-sales .wr-sheet {
+  margin: 0;
+}
+.wr-sales-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+.wr-sales-toolbar > .wr-field {
+  min-width: 0;
+}
+.wr-sales-photo .wr-photo-bar {
+  width: 100%;
+  box-sizing: border-box;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.wr-sales-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.wr-sales-photo {
+  background: var(--surface-inverse);
+  color: var(--on-inverse-muted);
+  min-height: 260px;
+  overflow: hidden;
+}
+.wr-sales-photo > img {
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+}
+.wr-sales-photo > p {
+  padding: var(--space-4);
+}
+.wr-sales-history {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.wr-sales-history > li {
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--line-100);
+  overflow-wrap: anywhere;
+}
+.wr-sales-history p {
+  margin-top: var(--space-1);
+}
+.wr-sales-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--surface-inverse);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow: auto;
+}
+.wr-sales-lightbox > img {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.wr-sales-lightbox > button {
+  align-self: flex-end;
+}
+@media (max-width: 899px) {
+  .wr-sales-pair {
+    grid-template-columns: 1fr;
+  }
+  .wr-sales-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+.wr-sales-lightbox {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+.wr-sales-lightbox:not([open]) {
+  display: none;
+}
+.wr-sales-lightbox::backdrop {
+  background: var(--surface-inverse);
+}
+
+/* Sales history reuses the phone tokens and keeps private meter images in view memory. */
+.wr-attendant-shell .wr-history-photo { overflow: hidden; height: auto; min-height: 0; }
+.wr-attendant-shell .wr-history-photo > img { width: 100%; max-height: 28rem; object-fit: contain; }
+.wr-history-photo-dialog { max-width: calc(100vw - var(--space-8)); max-height: 90vh; border: 1px solid var(--line-100); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--surface-000); }
+.wr-history-photo-dialog img { display: block; width: 100%; max-height: 75vh; object-fit: contain; }
+.wr-history-right { text-align: right; }
+.wr-attendant-shell .wr-header-top { flex-wrap: wrap; }
+.wr-attendant-shell .wr-kv-row dd { overflow-wrap: anywhere; }
+.wr-attendant-shell textarea.wr-input { min-height: var(--control-h); height: auto; padding: var(--space-3); }

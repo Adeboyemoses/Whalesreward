@@ -12,6 +12,7 @@ import {
   go,
   useAttendant,
   useOwnSales,
+  useOwnPendingWork,
   message,
   mediumName,
   pumpName,
@@ -25,6 +26,7 @@ import {
 function Uploads() {
   const { client, state, online } = useAttendant();
   const { rows, error: loadError } = useOwnSales();
+  const { pending, error: pendingError } = useOwnPendingWork();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const flight = useRef(false);
@@ -67,7 +69,7 @@ function Uploads() {
         </>
       }
       action={
-        summary?.waiting.length ? (
+        summary?.waiting.length || pending?.corrections ? (
           <>
             <Button
               cta
@@ -96,7 +98,7 @@ function Uploads() {
       )}
       {summary && (
         <>
-          {!summary.waiting.length && (
+          {!summary.waiting.length && pending && !pending.corrections && (
             <ResultBlock
               title={
                 summary.completePhotos
@@ -219,6 +221,30 @@ function Uploads() {
             </section>
           )}
         </>
+      )}
+      {!pending && (
+        <Notice role="status">
+          {pendingError ?? "Checking pending corrections…"}
+        </Notice>
+      )}
+      {!!pending?.corrections && (
+        <Notice tone="warning" role="status">
+          <b>
+            {pending.corrections}{" "}
+            {pending.corrections === 1 ? "correction is" : "corrections are"}{" "}
+            still waiting to upload.
+          </b>
+          <p>
+            The original sale&apos;s accepted values remain effective. Your saved
+            changes stay separate until the server decides.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => go(router, "/attendant/history")}
+          >
+            View corrections in History
+          </Button>
+        </Notice>
       )}
       {error && (
         <Notice tone="danger" role="alert">
