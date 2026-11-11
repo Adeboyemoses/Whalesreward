@@ -2,20 +2,6 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
-
-## WO-spec-3j meter reconciliation PROPOSAL (WHR-112)
-
-[Proposal revision 1](proposals/meter-reconciliation.md) becomes READY only on this change’s reviewed green merge into staging. It proposes exact independent meter values, uniform historical rates over I, measured display tolerances, unchanged T-10 arithmetic, guarded revisions and protected meter configuration. It changes no normative contract or runtime behaviour. EM verified exact worked arithmetic/boundaries, local links and the 120-word paragraph limit; typecheck, lint, 678 unit tests and build passed. Two inherited image lint warnings remain. Independent verdicts are recorded in [.review/spec__wo-3j-meter-proposal.md](../../.review/spec__wo-3j-meter-proposal.md).
-
-| Invariants / board | Proposal verification and future cases | Status |
-|---|---|---|
-| I-29/I-31/I-32/I-44; T-10 | Exact naira/litre/kilogram arithmetic, display allowance boundaries, historical-rate uniformity and retained original price | proposal only; no new runtime coverage |
-| I-07/I-10/I-11/I-25/I-48 | Current sales + priceReview, retained photo, transcription limits, configuration and protected health | proposal only; no permission or activation change |
-| I-22/I-26/I-28/I-35/I-39/I-41/I-45a/I-45b/I-46 | Replay, latest guarded candidate, original interval, independent holds and frozen snapshots | future verification cases listed; implementation statuses unchanged |
-| S04 | HTML/PNG and decision notes inspected; independent fields preserved, fixture tolerance and unconditional-credit limitations identified | reference inspection only; no build or parity claim |
-
-Register-ready MR-1–MR-5 are WHR-118–WHR-122, all needs:human. WHR-50 remains gated. Q-528/Q-556/Q-557 remain separate. No decision index, invariant, M3 contract or product document is amended.
-
 ## WO-spec-3i review-evidence-v1 specification READY (WHR-110)
 
 [Spec PR #111](https://github.com/Adeboyemoses/Whalesreward/pull/111) merged at 418e471 with all five checks green. P-25 makes the [M3 policy](contracts/m3.md#duplicate-and-independent-hold-decisions--s02s07) normative and adds protected reviewEvidence health. Independent code/security/integrity PASS at 62c5535, round 1. EM typecheck/lint, 663 unit tests, build, links, paragraph limit and evidence PASS. READY takes effect on this separate records PR's reviewed green merge; no implementation or board status advances.

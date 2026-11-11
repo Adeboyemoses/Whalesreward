@@ -1,10 +1,9 @@
 # STATUS.md
 Updated: 2026-11-11
 
-## Milestone: M1 phone exit accepted; last M2 registration/customer/card screens READY; batched M2 staging smoke pending (docs/engineering/roadmap.md); M3 corrections backend READY; review-evidence-v1 specification READY; meter reconciliation proposal READY on reviewed green merge
+## Milestone: M1 phone exit accepted; last M2 registration/customer/card screens READY; batched M2 staging smoke pending (docs/engineering/roadmap.md); M3 corrections backend READY; review-evidence-v1 specification READY
 
 ## Done this week
-- WO-spec-3j (WHR-112): [meter reconciliation PROPOSAL](docs/engineering/proposals/meter-reconciliation.md) reaches READY on this change’s reviewed green staging merge. Covers exact readings, historical rates over I, worked tolerances, T-10, permissions, provenance and the existing meter flag. m3.md and runtime remain unchanged. EM typecheck/lint, 678 unit tests, build, exact arithmetic, links and paragraph limit passed; two inherited image warnings. Independent code/security/integrity verdicts are in branch evidence. MR-1–MR-5 (WHR-118–122) await Earl/client decisions; WHR-50 remains gated.
 - WO-spec-3i (WHR-110): [spec PR #111](https://github.com/Adeboyemoses/Whalesreward/pull/111) merged at 418e471 with all five checks green. M3 now makes review-evidence-v1 normative: closed resolvers, exact sufficient combinations, strict configuration, unchanged errors and persisted provenance. P-25 logged; proposal approved and superseded; protected health gains reviewEvidence. RE-01–RE-21 specify T1 verification. Code/security/integrity PASS round 1; EM typecheck/lint, 663 unit tests, build, links, paragraph maximum 119 words and evidence PASS. READY takes effect on this separate records PR's reviewed green merge. No runtime activation or parity claim.
 - WO-spec-3h (WHR-103): [proposal PR #109](https://github.com/Adeboyemoses/Whalesreward/pull/109) merged at 394b654 with all five checks green. READY takes effect on this separate records PR's reviewed green merge. Non-normative evidence proposal covers price/card/date/capture references, proof limits, sufficient combinations, exclusions, versioning and proposed protected reviewEvidence health status. Code/security/integrity PASS round 1; proposal unchanged since review. EM typecheck/lint, 663 unit tests, build, paragraph limit (maximum 86 words), links and evidence PASS. m3.md and runtime policy unchanged. Earl later chose Option A on WHR-109 and WHR-105–108; WO-spec-3i/P-25 supersedes this historical proposal status. Q-556/Q-528 and WHR-50 remain separate.
 - WO-spec-3g (WHR-102): [PR #105](https://github.com/Adeboyemoses/Whalesreward/pull/105) merged at fa1d70d with five green checks. READY after this separate records merge. P-24 defines exact entered-value/time or validated-photo duplicate matching, settlement/revision triggers, unique pairs and 100-pair batches with continuation. Missing window disables time matching only; protected health gains duplicateWindow. Flags never hold or change credit. Code/security/integrity PASS round 1, no findings. EM typecheck/lint, 579 unit tests, build, paragraph limit and evidence PASS. No implementation claimed; WHR-16 remains separate.
@@ -51,7 +50,7 @@ Updated: 2026-11-11
 - WO-core-3 (WHR-4): READY on reviewed green staging merge of [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30). Better Auth username sign-in, revocable database sessions, immutable capture contexts, strict M1 wrappers, durable replay/throttling and safe fixture seeding. EM typecheck/lint/unit 77/build, fresh PostgreSQL integration 65, time 3 per timezone and real HTTP Playwright 1 passed; full browser CI required before merge because local Chromium startup is sandbox-blocked. Independent verdicts are in `.review/core__wo-3-attendant-auth.md`. Runbook: `docs/qa/smoke-2026-11-05-attendant-auth.md`. Stop at READY; Earl's acceptance and real-phone checks remain pending.
 
 ## In progress
-- lane:spec: WHR-112 reaches READY after this proposal’s reviewed green merge, then remains In Review for Earl. WHR-110 is Done in Linear. No further work order starts in this session.
+- lane:spec: WHR-110 reaches READY after this records merge and remains In Review. Earl requested WHR-112 next in a fresh session; WHR-111 implementation remains separate.
 - WHR-99 remains open: WO-spec-3e is READY; WO-core-7c implementation is still pending. This spec session stops without starting it.
 
 - lane:spec is closing accepted WO-spec-2a through this documentation-only PR; WHR-79 moves to Done after its reviewed green merge. Stop after closure; no next work order is started.
@@ -62,7 +61,6 @@ Updated: 2026-11-11
 - WO-app-0 (WHR-33): ACCEPTED by Earl on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Six briefs and three draft phone runbooks merged in PRs #2 and #9; documentation closeout takes effect on green staging merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
-- Meter proposal: WHR-118 historical-rate proof, WHR-119 tolerance, WHR-120 T-10 convention, WHR-121 reviewer count and WHR-122 configuration. Recommendations and Option A/B defaults are in the proposal. No automatic approval or activation; WHR-50 remains open.
 - P-25: Q-556 client confirmation and existing Q-528 remain pending. Rook must mirror the approved build policy in product docs. Q-557 two-person attestation is undecided and supplies no implementation authority.
 - P-24: client Q-555 confirmation remains pending; Rook must mirror the decision in product docs. This does not block the approved specification handoff.
 - WHR-99: Rook reviews 13 other named 503 codes for required UI explanations and follow-on remapping. Existing mappings remain unchanged; generic temporarily_unavailable may stay 503. Q-553 physical card-stock values remain pending.
@@ -79,7 +77,7 @@ Updated: 2026-11-11
 - Launch date versus the December campaign start.
 
 ## Next up
-- lane:spec: stop at WHR-112 READY. Earl/client decisions precede any separate normative meter amendment or implementation work order; no next session is authorized here.
+- lane:spec: start WHR-112 (WO-spec-3j) in a fresh session after WHR-110 merged READY, as Earl requested. T1 implements review-evidence-v1 and RE-01–RE-21 under WHR-111.
 - P-24 implementation belongs to WHR-16 under a separate session; the merged spec supplies matching, batching, configuration and health requirements.
 - WO-core-7c may follow the merged WHR-99 spec: implement the 409 path, staging layout declaration and health flag with tests, under its own session. No core or cloud action is part of this records update.
 
@@ -90,7 +88,6 @@ Updated: 2026-11-11
 - WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in stops at READY after PR #30 merges with green CI; Earl reads verification and runs the phone checks; WO-spec-4 (WHR-51) is accepted; lane:spec stops after closing accepted WO-spec-3b (WHR-61); no new work order is authorized.
 
 ## Known risks
-- Meter reconciliation remains unavailable. Recommended uniform-rate proof cannot resolve activation-spanning I; display steps and physical meter rounding require client validation. S04’s sample pair is illustrative and fails the worked tolerances.
 - WHR-113: one local repeat unit run stalled with six fork-worker startup errors and one failed test; cause unconfirmed. Unchanged full reruns passed 663/663 and final gates passed. No source, assertions, timeouts or retry settings changed.
 - P-24 is specification only. A missing window must never become a credit hold or disable photo-digest detection; phone time supplies no eligibility authority. No policy activation is claimed.
 - WO-core-8: feature dispatch17>8 and four rounds include Earl's one extra review scoped only to3a003d4 by code/security; prior integrity PASS remains applicable. Exact approval and zero open blockers are in evidence. WHR-87 records browser/fixture diagnostics and corrected local verification setup; WHR-89 records separate legacy-redactor function gaps without proved endpoint exposure. No additional feature edits, weakened assertions/timeouts/retries, cloud or manual staging-data operations.
