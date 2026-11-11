@@ -29,3 +29,5 @@ EM verification: typecheck PASS; lint PASS (two inherited image warnings); 631 u
 Proposal paragraph maximum 86 words; relative links, lane size and whitespace checks PASS. m3.md is unchanged.
 No runtime or normative policy is activated. WHR-50 remains separate; no migration, user-flow change or additional integration/browser gate applies.
 Client questions EP-1–EP-5 are WHR-109 and WHR-105–108, each with options, recommendation and an explicit no-activation default.
+Shared records were removed from this PR for the required separate READY update; the proposal remains byte-identical to reviewed_head.
+After merging newer staging 5176260, EM typecheck/lint, 663 unit tests and build PASS. No proposal conflict or source-contract change occurred.
