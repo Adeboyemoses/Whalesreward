@@ -108,11 +108,13 @@ test("WO-app-7 independent phone fidelity A09 A10 A11 at390/360", async ({
       await image(f.phone, `A09-${width}`);
       await f.phone.goto(`/attendant/history/${main.detail.id}`);
       await ready(f.phone, "Sale details");
-      await expect(f.phone.getByAltText("Retained meter photo")).toBeVisible();
+      await expect(
+        f.phone.getByAltText("Retained meter photo", { exact: true }),
+      ).toBeVisible();
       await expect
         .poll(() =>
           f.phone
-            .getByAltText("Retained meter photo")
+            .getByAltText("Retained meter photo", { exact: true })
             .evaluate(
               (el) =>
                 (el as HTMLImageElement).complete &&

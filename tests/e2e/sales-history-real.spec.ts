@@ -44,11 +44,13 @@ async function correctionEditor(phone: Page, id: string) {
   await expect(
     phone.getByRole("heading", { name: "Correct sale", exact: true }),
   ).toBeVisible();
-  await expect(phone.getByAltText("Retained meter photo")).toBeVisible();
+  await expect(
+    phone.getByAltText("Retained meter photo", { exact: true }),
+  ).toBeVisible();
   await expect
     .poll(() =>
       phone
-        .getByAltText("Retained meter photo")
+        .getByAltText("Retained meter photo", { exact: true })
         .evaluate(
           (el) =>
             (el as HTMLImageElement).complete &&
