@@ -715,3 +715,223 @@ test("I-06 pending correction and server history stay with originating account a
     await f.close();
   }
 });
+
+test("P-22 a definitive unsafe-reason refusal needs attention and a newly reviewed operation", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(90000);
+  const f = await salesFixture(page, browser);
+  try {
+    const sale = await acceptedSale(f.phone);
+    await correctionEditor(f.phone, sale.detail.id);
+    await f.phone.getByLabel("Amount (₦)", { exact: true }).fill("26000.00");
+    // A synthetic forbidden shape, never a real credential or personal identifier.
+    await f.phone
+      .getByLabel("Reason", { exact: true })
+      .fill("Fictional review note; token: redacted-fixture");
+    const sent: string[] = [];
+    f.phone.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith(`/sales/${sale.detail.id}/corrections`)
+      )
+        sent.push(request.postDataJSON().operationId);
+    });
+    const refused = f.phone.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith(`/sales/${sale.detail.id}/corrections`),
+    );
+    await f.phone
+      .getByRole("button", { name: "Save correction", exact: true })
+      .click();
+    const response = await refused;
+    expect(response.status()).toBe(400);
+    expect((await response.json()).error.code).toBe("invalid_request");
+    await expect
+      .poll(async () => (await correctionRows(f.phone))[0]?.state)
+      .toBe("needs_attention");
+    await expect(
+      f.phone.getByText("Correction needs attention", { exact: true }).first(),
+    ).toBeVisible();
+    const first = (await correctionRows(f.phone))[0]!;
+    expect(first.lastErrorCode).toBe("invalid_request");
+    expect(first.nextAttemptAt).toBeNull();
+    expect(first.serverCorrection).toBeNull();
+    const retry = f.phone.getByRole("button", {
+      name: "Retry correction",
+      exact: true,
+    });
+    if (await retry.count()) await retry.click();
+    await correctionEditor(f.phone, sale.detail.id);
+    await f.phone.getByLabel("Amount (₦)", { exact: true }).fill("26000.00");
+    await f.phone
+      .getByLabel("Reason", { exact: true })
+      .fill("Meter amount was entered incorrectly");
+    await f.phone
+      .getByRole("button", { name: "Save correction", exact: true })
+      .click();
+    await expect
+      .poll(
+        async () =>
+          (await correctionRows(f.phone)).filter(
+            (row) => row.state === "accepted",
+          ).length,
+        { timeout: 30000 },
+      )
+      .toBe(1);
+    const stored = await correctionRows(f.phone),
+      old = stored.find((row) => row.operationId === first.operationId)!,
+      accepted = stored.find((row) => row.state === "accepted")!;
+    expect(stored).toHaveLength(2);
+    expect(old.submission).toEqual(first.submission);
+    expect(old.state).toBe("needs_attention");
+    expect(accepted.operationId).not.toBe(first.operationId);
+    expect(sent.filter((id) => id === first.operationId)).toHaveLength(1);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM correction_request WHERE purchase_id=$1",
+          [sale.detail.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+  } finally {
+    await f.close();
+  }
+});
+
+test("I-06 correction-only handover warns and upload-first waits for a durable correction receipt", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(120000);
+  const f = await salesFixture(page, browser);
+  let hookInstalled = false;
+  const hook = `test_handover_${v7().replaceAll("-", "")}`;
+  try {
+    const sale = await acceptedSale(f.phone);
+    await waitForWorker(f.phone);
+    await correctionEditor(f.phone, sale.detail.id);
+    await f.phone.getByLabel("Amount (₦)", { exact: true }).fill("27000.00");
+    await f.phone
+      .getByLabel("Reason", { exact: true })
+      .fill("Fictional correction saved before handover");
+    await expect(
+      f.phone.getByRole("button", { name: "Save correction", exact: true }),
+    ).toBeEnabled();
+    await f.context.setOffline(true);
+    await f.phone
+      .getByRole("button", { name: "Save correction", exact: true })
+      .click();
+    await expect
+      .poll(async () => (await correctionRows(f.phone)).length)
+      .toBe(1);
+    expect(await rows(f.phone)).toHaveLength(0);
+    await f.phone.getByRole("link", { name: "Account", exact: true }).click();
+    await f.phone
+      .getByRole("button", { name: "Sign out / hand over device", exact: true })
+      .click();
+    const upload = f.phone.getByRole("button", {
+      name: /^Upload.*then sign out$/,
+    });
+    await expect(upload).toBeVisible();
+    await expect(upload).toBeDisabled();
+    await expect(f.phone.getByRole("main")).toContainText(/1.*correction/i);
+    await f.phone.route(
+      `**/api/attendant/sales/${sale.detail.id}/corrections`,
+      (route) =>
+        route.fulfill({
+          status: 503,
+          json: {
+            error: {
+              code: "temporarily_unavailable",
+              message: "Fictional transient transport failure",
+              retryable: true,
+            },
+            serverTime: new Date().toISOString(),
+            requestId: v7(),
+          },
+        }),
+    );
+    await f.context.setOffline(false);
+    await expect(upload).toBeEnabled();
+    await upload.click();
+    await expect
+      .poll(async () => (await correctionRows(f.phone))[0]?.lastErrorCode, {
+        timeout: 10000,
+      })
+      .toBe("temporarily_unavailable");
+    await expect(f.phone).toHaveURL(/\/attendant\/account\/hand-over$/);
+    expect((await f.phone.request.get("/api/attendant/session")).status()).toBe(
+      200,
+    );
+    expect((await correctionRows(f.phone))[0]?.serverCorrection).toBeNull();
+    // The next actual send is late: transport receipt permits logout, pending review does not imply credit.
+    await f.db.query(
+      `CREATE FUNCTION ${hook}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.purchase_id::text=TG_ARGV[0] THEN NEW.first_received_at=NEW.cutoff_at_receipt; END IF; RETURN NEW; END $$`,
+    );
+    await f.db.query(
+      `CREATE TRIGGER ${hook} BEFORE INSERT ON correction_request FOR EACH ROW EXECUTE FUNCTION ${hook}('${sale.detail.id}')`,
+    );
+    hookInstalled = true;
+    await f.phone.unroute(
+      `**/api/attendant/sales/${sale.detail.id}/corrections`,
+    );
+    await expect
+      .poll(
+        async () => {
+          if (await upload.count())
+            if (await upload.isEnabled()) await upload.click();
+          return /\/attendant\/sign-in$/.test(new URL(f.phone.url()).pathname);
+        },
+        { timeout: 30000 },
+      )
+      .toBe(true);
+    const acknowledged = (await correctionRows(f.phone))[0]!;
+    expect(acknowledged.serverCorrection).not.toBeNull();
+    expect(["pending_validation", "awaiting_review"]).toContain(
+      acknowledged.serverCorrection?.state,
+    );
+    await expect
+      .poll(
+        async () =>
+          (
+            await f.db.query(
+              "SELECT state FROM correction_request WHERE purchase_id=$1",
+              [sale.detail.id],
+            )
+          ).rows[0]?.state,
+        { timeout: 30000 },
+      )
+      .toBe("awaiting_review");
+    expect(
+      (
+        await f.db.query(
+          "SELECT r.amount_kobo::text amount FROM purchase p JOIN purchase_revision r ON r.id=p.current_revision_id WHERE p.id=$1",
+          [sale.detail.id],
+        )
+      ).rows[0].amount,
+    ).toBe("2000000");
+    await attendantSignIn(f.phone, f.username, f.password);
+    await expect(f.phone).toHaveURL(/\/attendant\/sale$/);
+    await f.phone.getByRole("link", { name: "Account", exact: true }).click();
+    await f.phone
+      .getByRole("button", { name: "Sign out / hand over device", exact: true })
+      .click();
+    await expect(
+      f.phone.getByRole("button", { name: "Sign out", exact: true }),
+    ).toBeVisible();
+    await expect(
+      f.phone.getByRole("button", { name: /^Upload.*then sign out$/ }),
+    ).toHaveCount(0);
+  } finally {
+    await f.phone.unrouteAll({ behavior: "wait" });
+    if (hookInstalled) {
+      await f.db.query(`DROP TRIGGER IF EXISTS ${hook} ON correction_request`);
+      await f.db.query(`DROP FUNCTION IF EXISTS ${hook}()`);
+    }
+    await f.close();
+  }
+});
