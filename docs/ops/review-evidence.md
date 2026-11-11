@@ -8,12 +8,48 @@ The release bytes are the UTF-8 string exported as `reviewEvidenceReleaseArtifac
 
 Before staging activation, Earl must approve the concrete release digest, station ID, environment, next configuration revision and activation instant. Record his authorization reference in protected operational storage. No configuration value, fixture or caller-supplied evidence grants this approval.
 
-An authorized operator provisions via a parameterized database transaction using the deployment's existing secured database connection, with no new public endpoint:
+## Operator command
 
-1. Insert `review_evidence_approval` with a new UUID `id`, `release`, `digest`, positive safe integer `revision`, `station_id`, `environment`, exact `activated_at` and `authorization_reference` identifying Earl's recorded authorization. Do not copy credentials or unrestricted messages into the reference.
-2. Insert `review_evidence_configuration` with a new UUID, matching station/environment/revision, `authorization_reference`, and `configuration` containing the exact M3 object. Its active `approvalReference` is the approval UUID, and `activatedAt` matches the approved instant. Commit both rows together. The configuration insert trigger takes the same scope lock as review acceptance and rejects reused or decreasing revisions. These immutable rows are the operational audit history.
-3. Set `WHR_REVIEW_EVIDENCE_POLICY` to that same JSON object through the approved deployment procedure. It must equal the latest stored scope revision. Missing rows, mismatches and future activation remain fail-closed. Confirm the protected health status using a live admin with `settings`.
-4. For deactivation insert a higher configuration revision with `{state:"inactive",approvalReference:null,activatedAt:null}` and the authorization reference, then update the setting. Committing the stored revision immediately stops new decisions using the old setting. Re-activation or rollback requires another higher revision and a new immutable approval even when reusing release bytes.
+Run `pnpm ops:review-evidence --help` from the reviewed checkout using the pinned Node version. Earl supplies `DATABASE_URL` in his own shell through his existing secure credential workflow. The command reads it only into process memory: no dotenv loading, connection-string argument, file, log or raw database error output. Do not paste it into a command argument, authorization reference, shell history, ticket or transcript. Use the approved TLS connection with certificate verification for a managed database.
+
+**Pending WHR-116:** the first-activation database environment authority still needs Earl's decision. Until implemented, the command refuses all database operations. The explicit `--environment` will have to match that database-held identity; `WHR_ENV`, `NODE_ENV` and CLI input cannot establish it.
+
+`--authorization` is a non-secret reference ID (1–200 letters, digits, dots, underscores or hyphens), such as the ID of an authorization held in protected operational storage. It is printed and stored in the immutable rows. Do not put the authorization message, a URL or credentials in it. The reference records Earl's approval; the CLI does not grant approval itself.
+
+First preview activation (replace the fictional station ID, instant and reference with the specifically approved values):
+
+```sh
+pnpm ops:review-evidence activate \
+  --station 019a5000-0000-7000-8000-000000000008 \
+  --environment staging \
+  --digest 5441b61f25cbf2be012fbc8d695ae003ac7a6ff583ffd285ef4a75b2b38e9d1a \
+  --activated-at 2026-11-11T12:00:00Z \
+  --authorization APPROVAL-REFERENCE
+```
+
+Dry run is the default; `--dry-run` is equivalent. It opens a read-only transaction and shows both proposed immutable rows plus the exact `WHR_REVIEW_EVIDENCE_POLICY` JSON. `recorded_at` is assigned by the database at insertion, so no preview claims its future value. The activation instant must be ISO 8601 with timezone and at most six fractional digits; future activation stays fail-closed until that instant.
+
+After reviewing the output against Earl's approval, use the printed apply command with `--apply --expected-revision N`. The expected revision is mandatory for apply and must match the revision Earl approved. Activation inserts approval and matching configuration in one transaction. Each invocation locks the scope before computing one higher than every approval/configuration revision. A preview reserves nothing: concurrent operations may change the next revision, and apply generates fresh IDs. Apply refuses a stale expected revision without writing either row. Run a new dry run and obtain matching authorization before retrying. Always use the successful **apply** output, never the preview, for deployment.
+
+To deactivate, preview and then apply the following command. M3 defines inactive configuration with null approval and activation instant, so deactivation appends only a higher immutable configuration row with the authorization reference; it never creates a fictitious activation approval.
+
+```sh
+pnpm ops:review-evidence deactivate \
+  --station 019a5000-0000-7000-8000-000000000008 \
+  --environment staging \
+  --digest 5441b61f25cbf2be012fbc8d695ae003ac7a6ff583ffd285ef4a75b2b38e9d1a \
+  --authorization DEACTIVATION-REFERENCE
+```
+
+For production both actions require explicit `--environment production` matching the database's recorded identity. Missing or mismatched identity refuses even dry run. The expected revision is only a comparison guard: both actions compute the next revision under the database lock and reject any mismatch. Neither action accepts an arbitrary release digest.
+
+After successful apply:
+
+1. Set `WHR_REVIEW_EVIDENCE_POLICY` to the exact JSON printed after `WHR_REVIEW_EVIDENCE_POLICY=` through the approved deployment procedure. The command does not set it or deploy anything.
+2. Check `/api/health` while signed in as a live admin with `settings` permission. Active, matching, non-future configuration reports `reviewEvidence: configured`; inactive configuration reports `unconfigured`.
+3. Keep the authorization reference and applied revision in protected operational records. If connection/commit acknowledgement fails, inspect the latest immutable rows privately before retrying: the transaction may have committed even without output. A rerun always creates another revision, never reuses one.
+
+Committing an inactive stored revision immediately stops new decisions using the old setting. Re-activation or rollback requires another higher revision and a new immutable approval, even when reusing release bytes. This work order does not authorize running the command against staging or production.
 
 Use bound SQL parameters, never concatenate operator values. No application or health path provisions an approval. Database deployment access is the trust boundary for these operational records. Runtime callers cannot insert them. Review receipts replay after current authority checks even when configuration changes; new operations use current configuration. Configuration changes do not reevaluate purchases or clear holds.
 
