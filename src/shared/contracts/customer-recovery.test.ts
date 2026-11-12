@@ -53,6 +53,8 @@ describe("customer recovery boundaries", () => {
       "Passport inspected in person",
       "Customer cannot access the registered phone",
       "The password was forgotten",
+      "OTP is unavailable",
+      "Passport is lost",
     ])
       expect(recoveryText.safeParse(text).success).toBe(true);
   });
@@ -63,6 +65,11 @@ describe("customer recovery boundaries", () => {
       "password: " + randomBytes(20).toString("hex"),
       "https://example.com",
       "OTP: confidential-value",
+      "OTP is " + randomBytes(12).toString("hex"),
+      "Passport is A1234567",
+      "OTP is confidential-value",
+      "OTP: unavailable",
+      "Passport number = A1234567",
     ])
       expect(recoveryText.safeParse(value).success).toBe(false);
   });

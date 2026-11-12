@@ -5,9 +5,9 @@ const version = z.number().int().positive();
 const cardCode = z.string().regex(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}$/);
 // Mentions describe the checks performed; actual values must never enter notes.
 const sensitiveAssignment =
-  /\b(?:otp|code|password|token|secret|passport|nin|bvn|licen[cs]e)(?:\s+(?:code|number))?\s*(?::|=|\bis\b)\s*\S+/i;
+  /\b(?:otp|code|password|token|secret|passport|nin|bvn|licen[cs]e)(?:\s+(?:code|number))?\s*(:|=|\bis\b)\s*(\S+)/gi;
 const sensitiveValue =
-  /\b(?:otp|code|password|token|secret|passport|nin|bvn|licen[cs]e)(?:\s+(?:code|number))?\s+([a-z0-9_/-]+)/gi;
+  /\b(?:otp|code|password|token|secret|passport|nin|bvn|licen[cs]e)(?:\s+(?:code|number))?\s+(?:is\s+)?([a-z0-9_/-]+)/gi;
 const narrativeWords = new Set([
   "inspected",
   "checked",
@@ -47,7 +47,11 @@ export const recoveryText = z
       /(?:https?:\/\/|@|\d[\d ()+-]{4,}\d|\b[a-f0-9]{32,}\b|\b[A-Z]{1,3}\d{4,}\b)/i.test(
         v,
       ) ||
-      sensitiveAssignment.test(v)
+      [...v.matchAll(sensitiveAssignment)].some(
+        (match) =>
+          match[1]!.toLowerCase() !== "is" ||
+          !narrativeWords.has(match[2]!.toLowerCase().replace(/[.,;!?]+$/, "")),
+      )
     )
       return false;
     return [...v.matchAll(sensitiveValue)].every((match) =>
