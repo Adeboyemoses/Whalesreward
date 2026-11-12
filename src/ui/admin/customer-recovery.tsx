@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ScanLine } from "lucide-react";
+import { CustomerCardScanner } from "./customer-card-scanner";
 import { normalizeMobilePhone } from "@/shared/phone";
 import { useAdminSession } from "./session";
 import { useRead, useViewGuard } from "./station-common";
@@ -157,6 +159,7 @@ export function CustomerRecovery({ id, mode }: { id: string; mode: Mode }) {
   const [unconfigured, setUnconfigured] = useState(false),
     [recorded, setRecorded] = useState<ManagerCase | null>(null);
   const code = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
   const [now, setNow] = useState(0);
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -697,6 +700,18 @@ export function CustomerRecovery({ id, mode }: { id: string; mode: Mode }) {
                     >
                       <TextField
                         label="Unused card number"
+                        action={
+                          <Button
+                            variant="secondary"
+                            disabled={
+                              unavailable || challenge?.state !== "verified"
+                            }
+                            onClick={() => setScanning(true)}
+                            icon={<ScanLine aria-hidden="true" size={20} />}
+                          >
+                            Scan
+                          </Button>
+                        }
                         mono
                         maxLength={7}
                         required
@@ -942,6 +957,12 @@ export function CustomerRecovery({ id, mode }: { id: string; mode: Mode }) {
               </Button>
             )}
         </>
+      )}
+      {scanning && (
+        <CustomerCardScanner
+          onCode={setCard}
+          onClose={() => setScanning(false)}
+        />
       )}
       {mode === "recovery" && (
         <ManagerCases key={recorded?.id ?? "existing"} id={id} />
