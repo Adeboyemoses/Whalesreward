@@ -67,15 +67,13 @@ test("P-27 PR-T1-07/11 repeated cross-tab updates and failed save retain origina
 }) => {
   const f = await priceFixture(page, browser);
   try {
-    let receipt: string | null = null;
-    f.phone.on("response", async (response) => {
-      if (
-        response.url().endsWith("/api/attendant/cards/lookup") &&
-        response.ok()
-      )
-        receipt = (await response.json()).data.lookupReceipt;
-    });
+    const lookupResponse = f.phone.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/attendant/cards/lookup") && response.ok(),
+    );
     await lookup(f.phone, f.codes[0]!);
+    const receipt = (await (await lookupResponse).json()).data.lookupReceipt;
+    expect(receipt).toBeTruthy();
     await value(f.phone, "20000.01");
     await f.phone.getByRole("button", { name: "Vehicle", exact: true }).click();
     await photo(f.phone);

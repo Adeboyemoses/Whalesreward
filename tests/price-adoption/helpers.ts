@@ -29,10 +29,17 @@ export async function priceFixture(
       );
     const current = (
       await f.db.query(
-        "SELECT p.version FROM product_price_version p JOIN product x ON x.id=p.product_id WHERE x.code=$1 ORDER BY p.version DESC LIMIT 1",
+        "SELECT p.version,p.rate_kobo::text,p.quantity_precision FROM product_price_version p JOIN product x ON x.id=p.product_id WHERE x.code=$1 ORDER BY p.version DESC LIMIT 1",
         [product],
       )
     ).rows[0];
+    // Fixture reset may already match after the preceding scenario; the endpoint
+    // correctly rejects no-op activation, so no mutation is needed in that case.
+    if (
+      current?.rate_kobo === rateKobo &&
+      current.quantity_precision === quantityPrecision
+    )
+      return;
     return api(
       admin.request,
       `prices/${product}/activate`,
