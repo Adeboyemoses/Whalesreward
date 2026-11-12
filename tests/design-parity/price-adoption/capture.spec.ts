@@ -125,6 +125,16 @@ for (const width of [390, 360])
         f.phone.getByText(/This sale keeps its original quantity precision/),
       ).toBeVisible();
       await capture(f.phone, "P27-KeptPrecision", width);
+      await f.activate("160000", 3);
+      await other.getByRole("button", { name: "Change", exact: true }).click();
+      await lookup(other, f.codes[0]!);
+      await expect(
+        f.phone.getByText(
+          "Price updated to ₦1,600.00 per kilogram for new sales. This sale keeps ₦1,500.00 per kilogram. Check the meter before saving.",
+          { exact: true },
+        ),
+      ).toBeVisible();
+      await capture(f.phone, "P27-GasKeptPrice", width);
     } finally {
       await f.close();
     }
