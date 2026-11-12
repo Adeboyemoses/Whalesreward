@@ -1,6 +1,6 @@
 # Review evidence release configuration
 
-WHR-111 installs `review-evidence-v1`; it does not activate a deployment. Meter correction and price cancellation remain refused. Twelve protected health statuses include `reviewEvidence`; its status is diagnostic, not authority.
+WHR-111 installs `review-evidence-v1`; it does not activate a deployment. P-25 alone refuses meter correction; the separate approved P-26 policy and verified profiles enable it as described in [the meter runbook](meter.md). Real profiles await Q-559. Price cancellation remains refused. Twelve protected health statuses include `reviewEvidence`; its status is diagnostic, not authority.
 
 The only application setting added is `WHR_REVIEW_EVIDENCE_POLICY`, containing the exact strict JSON object in M3. `WHR_ENV` selects `test`, `staging`, `production`, or `local` (mapped to `development`); absent `WHR_ENV` uses `NODE_ENV`. Set an explicit environment in deployments. There are no activation defaults.
 
