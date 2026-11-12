@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3k (WHR-124) normative meter reconciliation: READY on reviewed green records merge, 2026-11-12
+WO-spec-3l (WHR-125) online price refresh: READY on reviewed green records merge, 2026-11-12
 
 ## In flight
-- [Spec PR #118](https://github.com/Adeboyemoses/Whalesreward/pull/118) merged into staging at 6b8361a with five green checks. Code/security/integrity PASS at 194f493, round 2, no findings. This separate records merge completes READY; WHR-124 remains In Review, not accepted.
-- P-26 makes uniform historical rate and exact display-rounding allowance normative in M3. Versioned approved profiles, provenance, non-5xx errors and meter health are specified; the proposal is superseded.
-- EM typecheck/lint, 689 unit tests, build, 21 exact numeric fixtures/two T-10 calculations, local links and paragraph limit PASS (maximum 119 words). Two inherited image warnings. MR-T1-01–20 are downstream obligations, not runtime coverage or board parity.
+- [Spec PR #122](https://github.com/Adeboyemoses/Whalesreward/pull/122) merged into staging at 237a6d6 with five green checks. Code/security/integrity PASS at 4f8af97, round 1, no findings. This separate records merge completes READY; WHR-125 remains In Review, not accepted.
+- P-27 specifies existing session reads and strict capability-gated lookup snapshots. New drafts adopt with a notice; composed drafts keep and warn. Saved/queued/settled sales, capture bounds and offline behavior stay unchanged; zero requests solely for price refresh.
+- EM typecheck/lint, 689 unit tests, build, local links, paragraph limit (maximum 120 words) and evidence PASS. Two inherited image warnings. PR-T1-01–12 are downstream obligations; no runtime implementation or board parity claimed.
 
 ## Next
-- Start WHR-125 (WO-spec-3l) in a fresh session after this READY handoff, as Earl instructed. No phone-refresh work is included here.
-- Rook should mirror P-26 in product docs and obtain Q-559 measured display steps/verified behaviour. Separate implementation and approved activation remain required.
+- Stop at READY. Rook should draft/number the two high-tier follow-ons in M1: Core P-27 online price snapshots, then App P-27 price adoption and draft notices. Neither is started here.
+- Rook should mirror P-27 in product docs. P-26 meter implementation/profile activation remains separate.
 
 ## Earl's gos
-- 2026-11-12: “Work order WHR-124 (WO-spec-3k) is approved and in Todo.” “Earl decided WHR-118 to WHR-122 as recommended.” “Stop when merged and report READY, then start WHR-125 (WO-spec-3l) in a fresh session.”
+- 2026-11-12: “Start WHR-125 (WO-spec-3l); WHR-124 is READY.” “Log P-27 and list the follow-on core and app work orders.” “Stop when merged and report READY.”
 
 ## Risks
-- Q-559 profiles are still pending; no runtime activation. Different historical rates anywhere in I keep the price hold even with a clear photo.
-- Q-528/Q-556 remain pending; Q-557 attestation stays out of scope. No main/cloud authorization.
-- Full runtime model ID unavailable. Metrics include six spec review dispatches and one separate records reviewer.
+- Refresh reduces stale captured rates but cannot eliminate holds when history changes within the original P-20/P-23 interval. No polling means idle/offline phones learn on their next ordinary successful read.
+- Q-528 and Q-559 remain separate pending inputs. No main/cloud action or runtime activation authorized.
+- Full runtime model ID unavailable. Metrics include three spec reviewers and one separate records reviewer.
 
-dispatches=7 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
