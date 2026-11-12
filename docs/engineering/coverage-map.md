@@ -750,3 +750,20 @@ M3 lists required boundary, concurrency, replay, multi-sale, continuation and he
 | I-41 | MR-T1-19–20: immutable exact provenance, bounded source closure and redaction | Spec on staging; runtime tests pending |
 
 Q-559 measured profiles/verification and separate implementation/activation remain required. P-26 settles the meter policy choice without settling Q-528/Q-556 or Q-557 attestation. Rook should mirror the decision in product docs. WHR-124 remains In Review at READY; Earl requested WHR-125 in a fresh session next.
+
+
+## WO-spec-3l / WHR-125 P-27 online price refresh READY — 12 Nov 2026
+
+[Spec PR #122](https://github.com/Adeboyemoses/Whalesreward/pull/122) merged at 237a6d6 with five green checks. Code/security/integrity PASS at 4f8af97, round 1, no findings. This separate records merge completes READY. P-27 and M1/M2 define refresh through existing calls, additive strict compatibility, atomic adoption and open-draft warnings. This is specification coverage only; the following named cases are downstream obligations, not implemented tests.
+
+| Invariants / boards | Specification verification | Status |
+|---|---|---|
+| I-03, I-04, I-05, I-05a, I-06, I-09 | PR-T1-05/06/09: account/context/generation fences, acknowledged assignment, atomic adoption, expiry and zero extra requests | Spec on staging; core/app tests pending |
+| I-22, I-23, I-28, I-28a, I-28b, I-35 | PR-T1-03/07/10/11: consistent price/receipt read, immutable save/retry, unchanged original bounds, evidence and independent holds | Spec on staging; core/app tests pending |
+| I-29, I-30, I-31, I-32 | PR-T1-02/04/06/08: exact rate/precision validation, monotonic versions, snapshot creation, gas/liquid and T-10 calculations | Spec on staging; core/app tests pending |
+| I-49, I-50 | PR-T1-01/02/05/12: strict legacy capability matrix, malformed/null behavior, no HTTP/SW caching, isolated minimal persistence | Spec on staging; core/app tests pending |
+| A02, A03, A15, A27 | PR-T1-06–09/12: empty-form adoption, composed-draft warnings, new-sale notices and unchanged offline behavior | Future app brief/fidelity scope; no parity claim |
+
+EM typecheck, lint (two inherited image warnings), 689 unit tests, production build, local links, paragraph limit (maximum 120 words) and evidence validation PASS. Existing repository tests confirm the docs change did not break the build; they do not implement P-27.
+
+Rook should draft/number the listed high-tier core snapshot and app adoption/notice work orders, in that order, and mirror P-27 in product docs. Q-528 and Q-559 remain separate pending inputs. No runtime price refresh, meter activation or cloud change is claimed. WHR-125 stays In Review at READY; the session stops here.
