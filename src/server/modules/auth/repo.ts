@@ -1,3 +1,4 @@
+import { readOnlinePrice } from "../../lib/online-price";
 import type pg from "pg";
 import { lockAssignmentHistory } from "../../lib/assignment-history-lock";
 import { AuthError } from "./errors";
@@ -52,9 +53,15 @@ export async function liveSession(
 export async function sessionView(
   db: pg.PoolClient,
   session: LiveSession,
+  refreshPrice = false,
 ): Promise<AttendantSession> {
   if (session.access_scope !== "full" || session.must_change_password)
     throw new AuthError("password_change_required", 403);
+  const currentPrice = refreshPrice
+    ? await readOnlinePrice(db, session.user_id, session.capture_context_id)
+    : null;
+  if (refreshPrice && !currentPrice)
+    throw new AuthError("assignment_unavailable", 422);
   const result = await db.query(
     `SELECT a.id AS attendant_id,a.staff_code,u.display_name,u.username,
  st.id AS station_id,st.code AS station_code,st.name AS station_name,st.timezone,
@@ -90,7 +97,7 @@ export async function sessionView(
     assignment: { id: r.assignment_id, version: r.assignment_version },
     pump: { id: r.pump_id, code: r.pump_code },
     product: { id: r.product_id, code: r.product_code, unit: r.unit },
-    price: {
+    price: currentPrice?.price ?? {
       priceVersionId: r.price_id,
       version: r.price_version,
       rateKobo: r.rate_kobo,
