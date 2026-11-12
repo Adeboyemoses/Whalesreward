@@ -47,13 +47,22 @@ describe("customer recovery boundaries", () => {
       }).success,
     ).toBe(false);
   });
+  it("allows descriptions of verification without secret values", () => {
+    for (const text of [
+      "Customer cannot receive OTP",
+      "Passport inspected in person",
+      "Customer cannot access the registered phone",
+      "The password was forgotten",
+    ])
+      expect(recoveryText.safeParse(text).success).toBe(true);
+  });
   it("rejects sensitive narratives", () => {
     for (const value of [
       "Call +2348012345678",
-      "passport number supplied",
+      "passport number A1234567",
       "password: " + randomBytes(20).toString("hex"),
       "https://example.com",
-      "OTP supplied",
+      "OTP: confidential-value",
     ])
       expect(recoveryText.safeParse(value).success).toBe(false);
   });

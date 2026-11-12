@@ -51,7 +51,12 @@ async function authority(
   else if (action !== "changes") requirePermission(actor, "recovery");
   return actor;
 }
-async function customer(db: pg.PoolClient, id: string) {
+async function customer(
+  db: pg.PoolClient,
+  id: string,
+  token: string | undefined,
+  action = "context",
+) {
   const station = await stationId(db);
   const c = (
     await db.query(
@@ -59,6 +64,7 @@ async function customer(db: pg.PoolClient, id: string) {
       [id, station],
     )
   ).rows[0];
+  await authority(db, token, action);
   if (!c) throw new AuthError("not_found", 404);
   return c;
 }
@@ -100,7 +106,7 @@ async function event(
   action: string,
   reason: string,
   values: Record<string, unknown>,
-  at: Date,
+  at: string,
   operationId: string,
 ) {
   const id = newId();
@@ -124,7 +130,11 @@ async function event(
       id,
       actor.user_id,
       action,
-      action === "manager_case_recorded" ? "manager_case" : "customer",
+      action === "manager_case_recorded"
+        ? "manager_case"
+        : action === "card_replaced"
+          ? "card"
+          : "customer",
       target,
       values,
       reason,
@@ -179,13 +189,25 @@ async function challenge(
   id: string,
   customerId: string,
   actor: LiveAdmin,
+  token: string | undefined,
 ) {
   const r = (
     await db.query(
-      `SELECT v.*,d.state AS delivery_state,d.destination_phone,d.lease_until,clock_timestamp() AS now FROM verification_challenge v JOIN phone_verification_delivery d ON d.id=v.phone_delivery_id WHERE v.id=$1 AND v.customer_id=$2 AND v.purpose='replace_card' AND v.issuer_admin_id=$3 AND v.issuer_session_id=$4 AND d.challenge_id=v.id FOR UPDATE OF v,d`,
+      `SELECT v.*,d.state AS delivery_state,d.destination_phone,d.lease_until FROM verification_challenge v JOIN phone_verification_delivery d ON d.id=v.phone_delivery_id WHERE v.id=$1 AND v.customer_id=$2 AND v.purpose='replace_card' AND v.issuer_admin_id=$3 AND v.issuer_session_id=$4 AND d.challenge_id=v.id FOR UPDATE OF v,d`,
       [id, customerId, actor.admin_id, actor.id],
     )
   ).rows[0];
+  await authority(db, token, "context");
+  if (r)
+    Object.assign(
+      r,
+      (
+        await db.query(
+          `SELECT clock_timestamp()>=v.expires_at AS expired,clock_timestamp()>=d.lease_until AS lease_expired FROM verification_challenge v JOIN phone_verification_delivery d ON d.id=v.phone_delivery_id WHERE v.id=$1`,
+          [r.id],
+        )
+      ).rows[0],
+    );
   if (!r) throw new AuthError("not_found", 404);
   return r;
 }
@@ -196,7 +218,7 @@ function challengeView(r: pg.QueryResultRow) {
       ? r.delivery_state === "failed"
         ? "failed"
         : "revoked"
-      : r.now >= r.expires_at
+      : r.expired
         ? "expired"
         : r.verified_at
           ? "verified"
@@ -225,7 +247,7 @@ function bound(
   return (
     !r.revoked_at &&
     !r.consumed_at &&
-    r.now < r.expires_at &&
+    !r.expired &&
     (r.verified_at || r.attempts < r.max_attempts) &&
     r.delivery_state === "sent" &&
     r.customer_version === c.version &&
@@ -242,7 +264,7 @@ async function insertIdentity(
   c: pg.QueryResultRow,
   input: { operationId: string; reason: string },
   kind: "phone_change" | "card_replacement",
-  at: Date,
+  at: string,
   oldPhone: string | null,
   newPhone: string | null,
   oldCard: string | null,
@@ -261,12 +283,14 @@ async function insertIdentity(
           newCardCode: (
             await db.query("SELECT code FROM card WHERE id=$1", [newCard])
           ).rows[0].code,
+          customerId: c.id,
+          replacementCardId: newCard,
           verificationMethod: method,
         };
   const auditId = await event(
     db,
     actor,
-    c.id,
+    kind === "phone_change" ? c.id : oldCard!,
     kind === "phone_change" ? "phone_changed" : "card_replaced",
     input.reason,
     values,
@@ -310,7 +334,7 @@ export async function recoveryRead(
   if (targetId) authId.parse(targetId);
   return transaction(pool, async (db) => {
     const actor = await authority(db, token, action),
-      c = await customer(db, customerId);
+      c = await customer(db, customerId, token, action);
     if (action === "context") {
       const card = await activeCard(db, c.id);
       return wire.recoveryContextSchema.parse({
@@ -323,7 +347,7 @@ export async function recoveryRead(
       });
     }
     if (action === "challenge")
-      return challengeView(await challenge(db, targetId!, c.id, actor));
+      return challengeView(await challenge(db, targetId!, c.id, actor, token));
     if (action === "case") {
       const r = (
         await db.query(
@@ -403,7 +427,7 @@ export async function recoveryWrite(
   try {
     return await transaction(pool, async (db) => {
       const actor = await authority(db, token, action),
-        c = await customer(db, customerId);
+        c = await customer(db, customerId, token, action);
       if (action === "replace") {
         requirePhoneVerification(options.adapter);
         await challenge(
@@ -411,6 +435,7 @@ export async function recoveryWrite(
           wire.replaceCardSchema.parse(parsed).challengeId,
           c.id,
           actor,
+          token,
         );
       }
       const normalized =
@@ -432,8 +457,10 @@ export async function recoveryWrite(
         async () => {
           if (c.version !== parsed.expectedVersion)
             throw new AuthError("version_conflict", 409);
-          let at = (await db.query("SELECT clock_timestamp() AS now")).rows[0]
-            .now as Date;
+          // Preserve PostgreSQL microseconds across every persisted identity fact.
+          // Millisecond projection happens only when serializing history.
+          let at = (await db.query("SELECT clock_timestamp()::text AS now"))
+            .rows[0].now as string;
           if (action === "case-create") {
             const p = wire.managerCaseSchema.parse(parsed);
             if (
@@ -485,6 +512,9 @@ export async function recoveryWrite(
             await db.query("SELECT id FROM card WHERE id=$1 FOR UPDATE", [
               card.id,
             ]);
+            await authority(db, token, action);
+            at = (await db.query("SELECT clock_timestamp()::text AS now"))
+              .rows[0].now as string;
             if (
               card.code !== p.activeCardCode ||
               card.version !== p.expectedCardVersion
@@ -514,7 +544,7 @@ export async function recoveryWrite(
             );
           }
           const p = wire.replaceCardSchema.parse(parsed);
-          const ch = await challenge(db, p.challengeId, c.id, actor);
+          const ch = await challenge(db, p.challengeId, c.id, actor, token);
           if (
             !bound(ch, c, card, config) ||
             !ch.verified_at ||
@@ -534,10 +564,15 @@ export async function recoveryWrite(
               [card.id, p.newCardCode],
             )
           ).rows;
-          at = (await db.query("SELECT clock_timestamp() AS now")).rows[0]
-            .now as Date;
+          at = (await db.query("SELECT clock_timestamp()::text AS now")).rows[0]
+            .now as string;
           await requireAdminSession(db, token);
-          ch.now = at;
+          ch.expired = (
+            await db.query(
+              "SELECT $1::timestamptz>=expires_at AS expired FROM verification_challenge WHERE id=$2",
+              [at, ch.id],
+            )
+          ).rows[0].expired;
           if (!bound(ch, c, card, config))
             throw new AuthError("verification_unavailable", 422);
           const next = locked.find((r) => r.code === p.newCardCode);
@@ -626,7 +661,7 @@ async function issue(
   // Authenticate and scope before provider configuration or rate information.
   const actor = await transaction(pool, async (db) => {
     const a = await authority(db, token, "issue");
-    await customer(db, customerId);
+    await customer(db, customerId, token);
     return a;
   });
   const adapter = requirePhoneVerification(options.adapter);
@@ -638,7 +673,7 @@ async function issue(
   let created = false;
   const initial = await transaction(pool, async (db) => {
     const live = await authority(db, token, "issue"),
-      c = await customer(db, customerId);
+      c = await customer(db, customerId, token);
     return receipt(
       db,
       config,
@@ -714,7 +749,7 @@ async function issue(
           ],
         );
         created = true;
-        return challengeView(await challenge(db, id, c.id, live));
+        return challengeView(await challenge(db, id, c.id, live, token));
       },
     );
   });
@@ -722,9 +757,9 @@ async function issue(
     // A same-key retry never calls delivery again. An abandoned lease is unusable.
     await transaction(pool, async (db) => {
       const live = await authority(db, token, "issue");
-      await customer(db, customerId);
-      const ch = await challenge(db, initial.id, customerId, live);
-      if (ch.delivery_state === "sending" && ch.lease_until <= ch.now)
+      await customer(db, customerId, token);
+      const ch = await challenge(db, initial.id, customerId, live, token);
+      if (ch.delivery_state === "sending" && ch.lease_expired)
         await failDelivery(db, ch.id, "delivery_uncertain");
     });
     return initial;
@@ -735,12 +770,12 @@ async function issue(
     // permission removal and phone/card changes; acceptance is checked again.
     const result = await transaction(pool, async (db) => {
       const live = await authority(db, token, "issue"),
-        c = await customer(db, customerId),
-        ch = await challenge(db, initial.id, customerId, live),
+        c = await customer(db, customerId, token),
+        ch = await challenge(db, initial.id, customerId, live, token),
         card = await activeCard(db, c.id);
       if (
         ch.delivery_state !== "sending" ||
-        ch.lease_until <= ch.now ||
+        ch.lease_expired ||
         !bound({ ...ch, delivery_state: "sent" }, c, card, config)
       ) {
         await failDelivery(db, ch.id, "authority_unavailable");
@@ -758,8 +793,8 @@ async function issue(
     });
     const completed = await transaction(pool, async (db) => {
       const live = await authority(db, token, "issue"),
-        c = await customer(db, customerId),
-        ch = await challenge(db, initial.id, customerId, live),
+        c = await customer(db, customerId, token),
+        ch = await challenge(db, initial.id, customerId, live, token),
         card = await activeCard(db, c.id);
       if (
         result.outcome !== "sent" ||
@@ -767,8 +802,8 @@ async function issue(
         result.keyVersion !== "test-v1" ||
         ch.delivery_state !== "sending" ||
         ch.revoked_at ||
-        ch.now >= ch.expires_at ||
-        ch.lease_until <= ch.now ||
+        ch.expired ||
+        ch.lease_expired ||
         String(ch.phone_generation) !==
           String(c.phone_verification_generation) ||
         ch.customer_version !== c.version ||
@@ -818,7 +853,7 @@ async function verify(
 ) {
   const actor = await transaction(pool, async (db) => {
     const a = await authority(db, token, "verify");
-    await customer(db, customerId);
+    await customer(db, customerId, token);
     return a;
   });
   const adapter = requirePhoneVerification(options.adapter);
@@ -829,8 +864,8 @@ async function verify(
   ]);
   const result = await transaction(pool, async (db) => {
     const live = await authority(db, token, "verify"),
-      c = await customer(db, customerId);
-    const ch = await challenge(db, challengeId, c.id, live),
+      c = await customer(db, customerId, token);
+    const ch = await challenge(db, challengeId, c.id, live, token),
       card = await activeCard(db, c.id);
     const request = hmac(
       config.secret,
@@ -868,7 +903,12 @@ async function verify(
         verified = false;
       }
       await requireAdminSession(db, token);
-      ch.now = (await db.query("SELECT clock_timestamp() AS now")).rows[0].now;
+      ch.expired = (
+        await db.query(
+          "SELECT clock_timestamp()>=expires_at AS expired FROM verification_challenge WHERE id=$1",
+          [ch.id],
+        )
+      ).rows[0].expired;
       verified = verified && !!bound(ch, c, card, config);
     }
     if (!ch.revoked_at && !ch.consumed_at && ch.attempts < ch.max_attempts) {
@@ -877,7 +917,7 @@ async function verify(
         [verified, ch.id, ch.version],
       );
     }
-    const current = await challenge(db, ch.id, c.id, live),
+    const current = await challenge(db, ch.id, c.id, live, token),
       snapshot = verified ? challengeView(current) : null;
     await db.query(
       "INSERT INTO phone_verification_attempt(id,challenge_id,actor_user_id,operation_id,request_hmac,key_version,outcome,applied_challenge_version,result_snapshot) VALUES($1,$2,$3,$4,$5,'v1',$6,$7,$8)",

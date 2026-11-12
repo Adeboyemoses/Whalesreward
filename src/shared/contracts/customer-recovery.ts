@@ -3,19 +3,57 @@ import { authId } from "./auth";
 import { actorSchema } from "./admin";
 const version = z.number().int().positive();
 const cardCode = z.string().regex(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}$/);
-// Reject sensitive free text before either protected history or audit persistence.
+// Mentions describe the checks performed; actual values must never enter notes.
+const sensitiveAssignment =
+  /\b(?:otp|code|password|token|secret|passport|nin|bvn|licen[cs]e)(?:\s+(?:code|number))?\s*(?::|=|\bis\b)\s*\S+/i;
+const sensitiveValue =
+  /\b(?:otp|code|password|token|secret|passport|nin|bvn|licen[cs]e)(?:\s+(?:code|number))?\s+([a-z0-9_/-]+)/gi;
+const narrativeWords = new Set([
+  "inspected",
+  "checked",
+  "unavailable",
+  "available",
+  "supplied",
+  "presented",
+  "received",
+  "sent",
+  "expired",
+  "lost",
+  "forgotten",
+  "reset",
+  "verification",
+  "cannot",
+  "could",
+  "can",
+  "not",
+  "was",
+  "has",
+  "had",
+  "in",
+  "at",
+  "for",
+  "by",
+  "from",
+  "to",
+  "access",
+]);
 export const recoveryText = z
   .string()
   .trim()
   .min(1)
   .max(1000)
-  .refine(
-    (v) =>
-      !/(?:https?:\/\/|@|\b(?:otp|password|token|secret|passport|nin|bvn|licen[cs]e)\b|\d[\d ()+-]{5,}\d|\b[a-f0-9]{32,}\b)/i.test(
+  .refine((v) => {
+    if (
+      /(?:https?:\/\/|@|\d[\d ()+-]{4,}\d|\b[a-f0-9]{32,}\b|\b[A-Z]{1,3}\d{4,}\b)/i.test(
         v,
-      ),
-    "Invalid narrative",
-  );
+      ) ||
+      sensitiveAssignment.test(v)
+    )
+      return false;
+    return [...v.matchAll(sensitiveValue)].every((match) =>
+      narrativeWords.has(match[1]!.toLowerCase()),
+    );
+  }, "Invalid narrative");
 const mutation = z.object({ operationId: authId, expectedVersion: version });
 export const phoneChangeSchema = mutation
   .extend({

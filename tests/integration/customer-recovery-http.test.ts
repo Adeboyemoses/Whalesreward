@@ -155,8 +155,8 @@ it("intake is protected, accepts manager read but never manager-only intake, and
     operationId: newId(),
     expectedVersion: 1,
     customerPresent: true,
-    reason: "Registered phone unavailable",
-    verificationNotes: "Customer and card history checked",
+    reason: "Customer cannot receive OTP",
+    verificationNotes: "Passport inspected in person",
   };
   expect(
     (await http("case-create", { token: reader.token, body })).status,
@@ -165,7 +165,7 @@ it("intake is protected, accepts manager read but never manager-only intake, and
     (
       await http("case-create", {
         token,
-        body: { ...body, verificationNotes: "Passport supplied" },
+        body: { ...body, verificationNotes: "Passport number A1234567" },
       })
     ).status,
   ).toBe(400);
