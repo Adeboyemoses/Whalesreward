@@ -23,6 +23,23 @@ export const signOutSchema = z.strictObject({});
 export type SignInInput = z.infer<typeof signInSchema>;
 const instant = z.iso.datetime({ offset: true });
 const version = z.number().int().min(1).max(2147483647);
+export const priceSnapshotSchema = z
+  .strictObject({
+    priceVersionId: authId,
+    version,
+    rateKobo: z
+      .string()
+      .refine((v) => /^[1-9][0-9]{0,18}$/.test(v) && BigInt(v) <= 9223372036854775807n),
+    currency: z.literal("NGN"),
+    quantityPrecision: z.number().int().min(0).max(6),
+    effectiveFrom: z.iso.datetime(),
+    fetchedAt: z.iso.datetime(),
+  })
+  .refine(
+    (value) => Date.parse(value.effectiveFrom) <= Date.parse(value.fetchedAt),
+    { message: "Price activation cannot follow its read", path: ["fetchedAt"] },
+  );
+export type PriceSnapshot = z.infer<typeof priceSnapshotSchema>;
 export const attendantSessionSchema = z.strictObject({
   account: z.strictObject({
     id: authId,
@@ -43,18 +60,7 @@ export const attendantSessionSchema = z.strictObject({
     code: z.enum(["pms", "diesel", "kerosene", "cooking_gas"]),
     unit: z.enum(["litre", "kilogram"]),
   }),
-  price: z.strictObject({
-    priceVersionId: authId,
-    version,
-    rateKobo: z
-      .string()
-      .regex(/^[1-9]\d*$/)
-      .refine((v) => BigInt(v) <= 9223372036854775807n),
-    currency: z.literal("NGN"),
-    quantityPrecision: z.number().int().min(0).max(6),
-    effectiveFrom: instant,
-    fetchedAt: instant,
-  }),
+  price: priceSnapshotSchema,
   captureContextId: authId,
   lastOnlineSignInAt: instant,
   offlineExpiresAt: instant,

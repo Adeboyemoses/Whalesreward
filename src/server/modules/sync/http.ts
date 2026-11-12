@@ -109,6 +109,7 @@ export async function handleSync(
           credential,
           body.data,
           request.headers.get("X-WR-Lookup-Receipt") === "1",
+          request.headers.get("X-WR-Price-Refresh") === "1",
         );
       } else if (action === "submit") {
         const body = originalSaleSchema.safeParse(input);

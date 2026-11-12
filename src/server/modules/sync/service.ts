@@ -1,3 +1,4 @@
+import { readOnlinePrice } from "../../lib/online-price";
 import { lookupReceiptConfig, type LookupReceiptKeys } from "./lookup-receipt";
 import { issueLookupReceipt, freezeLookupEvidence } from "./lookup-evidence";
 import type pg from "pg";
@@ -133,6 +134,7 @@ export function createSyncService({
       token: string | undefined,
       input: LookupInput,
       receiptCapable = false,
+      priceRefreshCapable = false,
     ): Promise<Lookup> {
       const body = parsed(lookupSchema, input);
       const code = body.source === "code" ? body.code : body.qr;
@@ -156,10 +158,14 @@ export function createSyncService({
               ).rows[0]
             : undefined;
         if (!customer) throw new SyncError("customer_not_found", 404);
+        const priceRefresh = priceRefreshCapable
+          ? await readOnlinePrice(db, auth.userId, auth.captureContextId)
+          : null;
         return {
           cardCode: code,
           customer,
           lookedUpAt: new Date().toISOString(),
+          ...(priceRefreshCapable ? { priceRefresh } : {}),
           ...(receiptCapable
             ? {
                 lookupReceipt: await issueLookupReceipt(
