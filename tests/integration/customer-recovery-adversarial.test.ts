@@ -14,7 +14,10 @@ import {
   phoneChallengeSchema,
   identityChangeSchema,
 } from "../../src/shared/contracts/customer-recovery";
-import { registerCustomer } from "../../src/server/modules/customers/service";
+import {
+  registerCustomer,
+  customerRead,
+} from "../../src/server/modules/customers/service";
 import { config, fixtureId } from "../helpers/cards-adversarial-fixture";
 import { newSession } from "../helpers/sync-fixture";
 import {
@@ -341,7 +344,32 @@ describe("customer recovery adversarial invariants", () => {
         else {
           await f.waitForLock("card_batch");
           submitting = service.submit(seller.token, seller.original);
-          await f.waitForLock("UPDATE purchase SET card_id");
+          // A correct non-key customer lock lets receipt resolution finish;
+          // the previous UPDATE lock waits here after taking the card FK lock.
+          let completed = false,
+            observed = false;
+          void submitting.then(
+            () => {
+              completed = true;
+            },
+            () => {
+              completed = true;
+            },
+          );
+          for (let attempt = 0; attempt < 200; attempt++) {
+            const wait = (
+              await f.pool.query(
+                "SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock' AND position('UPDATE purchase SET card_id' in query)>0",
+                [f.schema],
+              )
+            ).rowCount;
+            if (completed || wait) {
+              observed = true;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+          expect(observed).toBe(true);
         }
         await gate.query("COMMIT");
         const [, uploaded] = await Promise.all([replacing, submitting!]);
@@ -368,6 +396,19 @@ describe("customer recovery adversarial invariants", () => {
         ).rows[0];
         expect(row.customer_id).toBe(s.c.id);
         expect(row.card_code).toBe(s.c.card.code);
+        expect(
+          await customerRead(
+            f.pool,
+            config,
+            s.actor.token,
+            "profile",
+            {},
+            s.c.id,
+          ),
+        ).toMatchObject({
+          recordedSpendKobo: order === "replacement-first" ? "0" : "2000000",
+          completedPurchaseCount: order === "replacement-first" ? "0" : "1",
+        });
         expect(row.retired_at <= row.server_received_at).toBe(
           order === "replacement-first",
         );
@@ -711,6 +752,8 @@ describe("customer recovery adversarial invariants", () => {
   it("I-21a attempts across generations cannot evade the cumulative verification limit", async () => {
     const s = await setup(10);
     for (let generation = 0; generation < 2; generation++) {
+      s.actor = await f.actor(["customers", "recovery"]);
+      s.options.ip = `test-${newId()}`;
       let ch = await issue(s);
       for (let attempt = 0; attempt < 5; attempt++) {
         await expect(
@@ -740,7 +783,7 @@ describe("customer recovery adversarial invariants", () => {
     "I-21a changed %s binding denies verification with no identity change",
     async (binding) => {
       const s = await setup();
-      if (binding === "expiry") s.h.adapter.policy.lifetimeMs = 200;
+      if (binding === "expiry") s.h.adapter.policy.lifetimeMs = 2000;
       const ch = await issue(s);
       if (binding === "phone")
         await f.pool.query(
@@ -757,7 +800,7 @@ describe("customer recovery adversarial invariants", () => {
           [s.c.id],
         );
       if (binding === "expiry")
-        await new Promise((resolve) => setTimeout(resolve, 220));
+        await new Promise((resolve) => setTimeout(resolve, 2020));
       const before = await f.identity(s.c.id);
       await expect(verify(s, ch)).rejects.toMatchObject({
         code: "verification_unavailable",
