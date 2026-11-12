@@ -18,4 +18,4 @@ WO-spec-3m (WHR-130) audit catalogue reconciliation: READY on reviewed green sta
 - P-25/P-26 activation and pending client confirmations stay separate. No main promotion or deployment authorized.
 - Full runtime model ID unavailable.
 
-dispatches=3 prs=1 rounds_max=1 escalations=0 model=unavailable
+dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
