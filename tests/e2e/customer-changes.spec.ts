@@ -575,3 +575,73 @@ test("I-07 managerRecovery can read an existing case but cannot create or approv
     await f.db.end();
   }
 });
+
+test("I-09 C03 leaving during preflight prevents verification issuance", async ({
+  page,
+}) => {
+  const f = await recoveryFixture(page);
+  const bridge = await verificationBridge(page, f.customerId);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let ready!: () => void;
+  const fetched = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  let posts = 0;
+  try {
+    await page.goto(`${f.root}/replace-card`);
+    await expect(
+      page.getByRole("button", { name: "Send verification code", exact: true }),
+    ).toBeVisible();
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith(`/customers/${f.customerId}/card-verifications`)
+      )
+        posts++;
+    });
+    await page.route(
+      `**/api/admin/customers/${f.customerId}/recovery-context`,
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        ready();
+        await held;
+        await route.fulfill({ response });
+      },
+    );
+    await page
+      .getByRole("button", { name: "Send verification code", exact: true })
+      .click();
+    await fetched;
+    await page
+      .getByRole("link", { name: "Back to profile", exact: true })
+      .first()
+      .click();
+    await expect(page).toHaveURL(new RegExp(`${f.root}$`));
+    await expect(
+      page.getByRole("heading", { name: "Amina Bello", exact: true }),
+    ).toBeVisible();
+    const completed = page.waitForResponse((response) =>
+      response.url().endsWith(`/customers/${f.customerId}/recovery-context`),
+    );
+    release();
+    await completed;
+    // Bounded negative observation: let the released continuation dispatch if stale.
+    await page.waitForTimeout(1000);
+    const challenges = await f.db.query(
+      "SELECT count(*)::int AS count FROM verification_challenge WHERE customer_id=$1",
+      [f.customerId],
+    );
+    expect({ posts, challenges: challenges.rows[0].count }).toEqual({
+      posts: 0,
+      challenges: 0,
+    });
+  } finally {
+    release();
+    await bridge.close();
+    await f.db.end();
+  }
+});
