@@ -14,6 +14,7 @@ import { transaction, receipt, type LiveAdmin } from "../admin-access/repo";
 import type { AdminConfig } from "../admin-access/config";
 import { hmac } from "../auth/crypto";
 import { AuthError } from "../auth/errors";
+import { snapshotText } from "../corrections/service";
 import { consumeLimits } from "../auth/rate-limit";
 import { stationId, cursorId, nextCursor } from "../station/repo";
 import { phoneNormalizer, type PhoneNormalizer } from "../../adapters/phone";
@@ -54,7 +55,7 @@ async function customer(db: pg.PoolClient, id: string) {
   const station = await stationId(db);
   const c = (
     await db.query(
-      `SELECT * FROM customer WHERE id=$1 AND (registered_station_id=$2 OR registered_station_id IS NULL) FOR UPDATE`,
+      `SELECT * FROM customer WHERE id=$1 AND (registered_station_id=$2 OR registered_station_id IS NULL) FOR NO KEY UPDATE`,
       [id, station],
     )
   ).rows[0];
@@ -103,6 +104,20 @@ async function event(
   operationId: string,
 ) {
   const id = newId();
+  const user = (
+    await db.query(
+      "SELECT u.display_name,u.username,a.admin_code,r.name AS role_name FROM auth_user u JOIN admin a ON a.user_id=u.id JOIN role r ON r.id=a.role_id WHERE a.id=$1",
+      [actor.admin_id],
+    )
+  ).rows[0];
+  const actorSnapshot = {
+    kind: "admin",
+    userId: actor.user_id,
+    code: snapshotText(user.admin_code),
+    nameAtEvent: snapshotText(user.display_name),
+    usernameAtEvent: snapshotText(user.username),
+    roleAtEvent: snapshotText(user.role_name),
+  };
   await db.query(
     `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at,operation_id,actor_snapshot) VALUES($1,$2,'user',$3,$4,$5,'null'::jsonb,$6,$7,$8,$9,$10)`,
     [
@@ -115,7 +130,7 @@ async function event(
       reason,
       at,
       operationId,
-      await actorView(db, actor),
+      actorSnapshot,
     ],
   );
   return id;
@@ -714,23 +729,33 @@ async function issue(
     });
     return initial;
   }
-  const generation = (
-    await pool.query(
-      "SELECT phone_generation FROM verification_challenge WHERE id=$1",
-      [initial.id],
-    )
-  ).rows[0].phone_generation as string;
-  let result: Awaited<ReturnType<PhoneVerificationAdapter["request"]>>;
   try {
-    result = await adapter.request(
-      customerId,
-      "replace_card",
-      String(generation),
-    );
-  } catch {
-    result = { outcome: "unavailable" };
-  }
-  try {
+    // Recheck the durable intent immediately before dispatch. Holding security
+    // and customer locks through the adapter call linearizes delivery with
+    // permission removal and phone/card changes; acceptance is checked again.
+    const result = await transaction(pool, async (db) => {
+      const live = await authority(db, token, "issue"),
+        c = await customer(db, customerId),
+        ch = await challenge(db, initial.id, customerId, live),
+        card = await activeCard(db, c.id);
+      if (
+        ch.delivery_state !== "sending" ||
+        ch.lease_until <= ch.now ||
+        !bound({ ...ch, delivery_state: "sent" }, c, card, config)
+      ) {
+        await failDelivery(db, ch.id, "authority_unavailable");
+        return { outcome: "unavailable" } as const;
+      }
+      try {
+        return await adapter.request(
+          customerId,
+          "replace_card",
+          String(ch.phone_generation),
+        );
+      } catch {
+        return { outcome: "unavailable" } as const;
+      }
+    });
     const completed = await transaction(pool, async (db) => {
       const live = await authority(db, token, "issue"),
         c = await customer(db, customerId),
