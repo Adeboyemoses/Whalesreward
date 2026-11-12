@@ -157,3 +157,14 @@
   font-weight: 800;
   overflow-wrap: anywhere;
 }
+
+/* C03's progress pills must wrap instead of widening the phone viewport. */
+@media (max-width: 900px) {
+  .wr-customers-cards .wr-steps {
+    flex-wrap: wrap;
+  }
+}
+/* Keep the card input and its Scan action in the same shrinking field row. */
+.wr-recovery-stack .wr-field .wr-row {
+  flex-wrap: nowrap;
+}
