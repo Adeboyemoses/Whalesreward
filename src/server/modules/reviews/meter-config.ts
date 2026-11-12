@@ -178,11 +178,12 @@ export async function meterHealth(db: pg.PoolClient, env: ReviewEnvironment) {
   try {
     await pinMeterPolicy(db, p.scope.stationId, env);
     // SHARE locks prevent a new pump or price from changing supported scope mid-snapshot.
+    // One statement instant covers every pump, price cutoff and profile boundary.
     await db.query(
       "LOCK TABLE pump,product,product_price_version IN SHARE MODE",
     );
     const scope = await db.query(
-      `SELECT p.id pump_id,p.product_id,v.quantity_precision,v.currency,d.unit,(extract(epoch FROM clock_timestamp())*1000000)::bigint::text now FROM pump p JOIN product d ON d.id=p.product_id LEFT JOIN LATERAL (SELECT quantity_precision,currency FROM product_price_version WHERE station_id=p.station_id AND product_id=p.product_id AND effective_from<=clock_timestamp() ORDER BY version DESC LIMIT 1) v ON true WHERE p.station_id=$1`,
+      `SELECT p.id pump_id,p.product_id,v.quantity_precision,v.currency,d.unit,(extract(epoch FROM statement_timestamp())*1000000)::bigint::text now FROM pump p JOIN product d ON d.id=p.product_id LEFT JOIN LATERAL (SELECT quantity_precision,currency FROM product_price_version WHERE station_id=p.station_id AND product_id=p.product_id AND effective_from<=statement_timestamp() ORDER BY version DESC LIMIT 1) v ON true WHERE p.station_id=$1`,
       [p.scope.stationId],
     );
     if (!scope.rowCount) return false;
