@@ -12,7 +12,31 @@ Before staging activation, Earl must approve the concrete release digest, statio
 
 Run `pnpm ops:review-evidence --help` from the reviewed checkout using the pinned Node version. Earl supplies `DATABASE_URL` in his own shell through his existing secure credential workflow. The command reads it only into process memory: no dotenv loading, connection-string argument, file, log or raw database error output. Do not paste it into a command argument, authorization reference, shell history, ticket or transcript. Use the approved TLS connection with certificate verification for a managed database.
 
-**Pending WHR-116:** the first-activation database environment authority still needs Earl's decision. Until implemented, the command refuses all database operations. The explicit `--environment` will have to match that database-held identity; `WHR_ENV`, `NODE_ENV` and CLI input cannot establish it.
+### One-time database identity (Earl only)
+
+WHR-116 Option A requires Earl to set `whr.environment` once per database with his admin database user. This is separate from the operator command and application environment. Connect through Earl's secured PostgreSQL client workflow to the intended database and verify its identity privately. **Before changing anything**, inspect the persisted value with this query inside psql, not `SHOW` or `current_setting()`:
+
+```sql
+SELECT database.datname, entries.setting
+FROM pg_catalog.pg_db_role_setting AS settings
+JOIN pg_catalog.pg_database AS database ON database.oid = settings.setdatabase
+CROSS JOIN LATERAL pg_catalog.unnest(settings.setconfig) AS entries(setting)
+WHERE database.datname = pg_catalog.current_database()
+  AND settings.setrole = 0
+  AND pg_catalog.split_part(entries.setting, '=', 1) = 'whr.environment';
+```
+
+If exactly one matching value already exists, leave it unchanged. If an existing value differs, is malformed or appears more than once, stop; do not relabel the database to make a command pass. **Only when the query returns no rows**, Earl performs the one-time initial setup below inside psql for staging. For another environment, replace `staging` with exactly `development`, `test` or `production` as appropriate. The identifier is quoted from the actual connected database name; no connection string appears in the SQL.
+
+```sql
+SELECT pg_catalog.format('ALTER DATABASE %I SET whr.environment = %L', pg_catalog.current_database(), 'staging') \gexec
+```
+
+Run the same persisted-value SELECT again. Expect exactly one row with `whr.environment=staging` (or the deliberately selected environment). Database ownership/admin privileges control this setting: restrict those privileges to authorized operators. The operator command never provisions, repairs or changes the setting. No agent or test runs this setup against managed infrastructure.
+
+Every preview and apply compares the explicit `--environment` with this exact database-level catalog entry. Missing, malformed, duplicate or mismatched entries refuse the operation. `WHR_ENV`, `NODE_ENV`, session `SET`, connection-string `options`, role settings and role-in-database settings cannot establish or override database identity. A runtime application setting still needs to match the applied policy as described below.
+
+### Preview and apply
 
 `--authorization` is a non-secret reference ID (1–200 letters, digits, dots, underscores or hyphens), such as the ID of an authorization held in protected operational storage. It is printed and stored in the immutable rows. Do not put the authorization message, a URL or credentials in it. The reference records Earl's approval; the CLI does not grant approval itself.
 

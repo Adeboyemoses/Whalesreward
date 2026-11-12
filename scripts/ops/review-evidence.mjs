@@ -87,21 +87,38 @@ export function parseArguments(args) {
   return parsed.data;
 }
 
-/** Environment authority is pending WHR-116; do not infer it from operator input. */
-export async function checkDatabaseEnvironment() {
-  throw new OperatorError("Database environment authority is not configured.");
+/**
+ * WHR-116: only Earl's persisted database-level setting establishes identity.
+ * current_setting() is unsafe here: session, startup and role options override it.
+ * @param {Pick<import('pg').PoolClient, 'query'>} db
+ * @param {string} environment
+ */
+export async function checkDatabaseEnvironment(db, environment) {
+  const recorded = await db.query(
+    `SELECT setting
+     FROM pg_catalog.pg_db_role_setting AS settings
+     JOIN pg_catalog.pg_database AS database ON database.oid=settings.setdatabase
+     CROSS JOIN LATERAL pg_catalog.unnest(settings.setconfig) AS entries(setting)
+     WHERE database.datname=pg_catalog.current_database() AND settings.setrole=0
+       AND pg_catalog.split_part(setting,'=',1)=$1`,
+    ["whr.environment"],
+  );
+  const expected = `whr.environment=${environment}`;
+  if (
+    !["development", "test", "staging", "production"].includes(environment) ||
+    recorded.rows.length !== 1 ||
+    recorded.rows[0].setting !== expected
+  )
+    throw new OperatorError(
+      "Database environment identity is missing, invalid or does not match --environment. Ask Earl to verify the persisted database setting.",
+    );
 }
 
 /**
  * @param {import('pg').Pool} pool
  * @param {ReturnType<typeof parseArguments>} input
- * @param {(db: import('pg').PoolClient, environment: string) => Promise<void>} checkEnvironment
  */
-export async function operate(
-  pool,
-  input,
-  checkEnvironment = checkDatabaseEnvironment,
-) {
+export async function operate(pool, input) {
   // Validate again at this exported boundary, before opening a connection.
   const parsed = inputSchema.safeParse(input);
   if (
@@ -119,7 +136,7 @@ export async function operate(
         ? "BEGIN ISOLATION LEVEL READ COMMITTED"
         : "BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY",
     );
-    await checkEnvironment(db, input.environment);
+    await checkDatabaseEnvironment(db, input.environment);
     await db.query(
       "SELECT pg_advisory_xact_lock(hashtextextended('review-evidence:'||$1::text||':'||$2::text,0))",
       [input.stationId, input.environment],
