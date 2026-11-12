@@ -3,6 +3,18 @@
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
 
+
+## WO-core-9b review-evidence operator READY (WHR-114)
+
+Feature [#119](https://github.com/Adeboyemoses/Whalesreward/pull/119) merged at `ace2f43` with five green checks; T-19 decision [#117](https://github.com/Adeboyemoses/Whalesreward/pull/117) records Earl's WHR-116 Option A. READY is completed by this separate records merge. [Named verification](../qa/verification-2026-11-12-review-evidence-operator.md) reports 11 unit and 11 PostgreSQL operator tests; full EM suites passed 689 unit and 699 integration tests. No deployed activation or new screen parity is claimed.
+
+| Invariants / boundary | Named verification | Status |
+|---|---|---|
+| I-41 immutable operational history | `review-evidence-operator.test.ts` integration: applies activation atomically and appends higher inactive and reactivation revisions; rolls approval back when the configuration insert fails; includes orphan approval revisions and refuses safe-integer exhaustion | on-staging; operator history only |
+| I-26/I-35 preservation through policy changes | integration: serializes concurrent activation and deactivation and refuses the stale authorized revision; does not reserve preview revisions or IDs; dry run previews exact immutable rows and policy without writes | on-staging; policy serialization coverage, not new credit or hold-resolution implementation |
+| WHR-116 database identity and secret boundary | integration: refuses absent, malformed and duplicated persisted environment identities; ignores session SET and connection options when checking database identity; ignores role-in-database override and refuses role-only identity; real production CLI preview/apply/deactivate. Unit: runs --help without a database and never echoes malformed arguments or connection secrets | on-staging; disposable local Postgres and CI only |
+
+
 ## WO-spec-3j meter reconciliation PROPOSAL (WHR-112)
 
 [Proposal revision 1](proposals/meter-reconciliation.md) merged in [PR #114](https://github.com/Adeboyemoses/Whalesreward/pull/114) at 1875ca0 with all five checks green. READY takes effect on this separate records change’s reviewed green staging merge. It proposes exact independent meter values, uniform historical rates over I, measured display tolerances, unchanged T-10 arithmetic, guarded revisions and protected meter configuration. It changes no normative contract or runtime behaviour. EM verified exact worked arithmetic/boundaries, local links and the 120-word paragraph limit; typecheck, lint, 678 unit tests and build passed. Two inherited image lint warnings remain. Code, security and integrity reviewers all PASS at 5f0c963, round 1, no findings. Independent verdicts are recorded in [.review/spec__wo-3j-meter-proposal.md](../../.review/spec__wo-3j-meter-proposal.md).
