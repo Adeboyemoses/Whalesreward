@@ -60,6 +60,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | T-18 | Render immutable card snapshots locally with pdf-lib 1.17.1, ExcelJS 4.4.0 and node-qrcode 1.5.4 (MIT); keep physical layout and phone policy behind D08 configuration | EM choice under approved WHR-12, 2026-11-09 |
 
+| T-19 | Review-evidence operator commands require the current database's persisted database-level `whr.environment`, set once by Earl with the admin user; refuse missing or mismatched identity and ignore session/role overrides | Earl, 12 Nov 2026; [WHR-116 Option A](https://linear.app/phaneum/issue/WHR-116), WHR-114 |
+
 ## Open product decisions that touch code
 
 D02 (meter settings, halfway rounding; capped capture build default P-20 (refines P-18) awaits Q-528 client confirmation), D05 (other retirement cases), D06 (role matrix, token expiries, providers, loss-of-email process), D07 (photo originals, backups, restore objectives), D08 (field validation), D09 (campaign dates, grace, retention values). See `product-docs/06 Delivery and Handoffs/Design Handoff Readiness.md`. Build them behind configuration or adapters; never invent the client's policy.
