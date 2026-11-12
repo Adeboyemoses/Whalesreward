@@ -1,0 +1,112 @@
+{
+  "width": 390,
+  "scrollWidth": 390,
+  "wordmark": [
+    {
+      "x": 52,
+      "y": 16.5,
+      "width": 118.90625,
+      "height": 21
+    }
+  ],
+  "footer": [
+    {
+      "text": "Counts toward loyalty after the details and photo sync.",
+      "boxes": [
+        {
+          "x": 36,
+          "y": 736,
+          "width": 318,
+          "height": 17
+        }
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "name": "Scan QR card",
+      "width": 358,
+      "height": 56
+    },
+    {
+      "name": "",
+      "width": 276,
+      "height": 48
+    },
+    {
+      "name": "Find",
+      "width": 74,
+      "height": 48
+    },
+    {
+      "name": "Amount (₦)",
+      "width": 173,
+      "height": 48
+    },
+    {
+      "name": "Litres",
+      "width": 173,
+      "height": 48
+    },
+    {
+      "name": "Vehicle",
+      "width": 84.5,
+      "height": 48
+    },
+    {
+      "name": "Keg",
+      "width": 84.5,
+      "height": 48
+    },
+    {
+      "name": "3-wheeler",
+      "width": 84.5,
+      "height": 48
+    },
+    {
+      "name": "Bike",
+      "width": 84.5,
+      "height": 48
+    },
+    {
+      "name": "",
+      "width": 313,
+      "height": 56
+    },
+    {
+      "name": "Take meter photoShow amount and quantity clearly",
+      "width": 358,
+      "height": 120
+    },
+    {
+      "name": "Save sale",
+      "width": 358,
+      "height": 56
+    },
+    {
+      "name": "Sale",
+      "width": 76.390625,
+      "height": 52
+    },
+    {
+      "name": "Register",
+      "width": 76.40625,
+      "height": 52
+    },
+    {
+      "name": "History",
+      "width": 76.390625,
+      "height": 52
+    },
+    {
+      "name": "Uploads",
+      "width": 76.40625,
+      "height": 52
+    },
+    {
+      "name": "Account",
+      "width": 76.40625,
+      "height": 52
+    }
+  ]
+}
