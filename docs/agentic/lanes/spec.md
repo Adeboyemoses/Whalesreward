@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3j (WHR-112) meter reconciliation proposal: READY on reviewed green staging merge, 2026-11-11
+WO-spec-3k (WHR-124) normative meter reconciliation: READY on reviewed green records merge, 2026-11-12
 
 ## In flight
-- [Proposal PR #114](https://github.com/Adeboyemoses/Whalesreward/pull/114) merged into staging at 1875ca0 with five green checks. Code/security/integrity PASS at 5f0c963, round 1, no findings; proposal bytes unchanged. READY takes effect on this separate records PR’s reviewed green merge.
-- EM typecheck/lint, 678 unit tests, build, exact arithmetic/boundaries, local links and paragraph maximum 80 words passed. Two inherited image lint warnings. No runtime test or S04 parity claim.
-- m3.md, normative policy and runtime are unchanged. WHR-110 is Done in Linear; its dependency is satisfied. WHR-112 remains In Review after READY, not accepted.
+- [Spec PR #118](https://github.com/Adeboyemoses/Whalesreward/pull/118) merged into staging at 6b8361a with five green checks. Code/security/integrity PASS at 194f493, round 2, no findings. This separate records merge completes READY; WHR-124 remains In Review, not accepted.
+- P-26 makes uniform historical rate and exact display-rounding allowance normative in M3. Versioned approved profiles, provenance, non-5xx errors and meter health are specified; the proposal is superseded.
+- EM typecheck/lint, 689 unit tests, build, 21 exact numeric fixtures/two T-10 calculations, local links and paragraph limit PASS (maximum 119 words). Two inherited image warnings. MR-T1-01–20 are downstream obligations, not runtime coverage or board parity.
 
 ## Next
-- Stop and await Earl/client decisions on MR-1–MR-5: WHR-118 historical rate, WHR-119 tolerance, WHR-120 rounding, WHR-121 reviewer count, WHR-122 configuration.
-- Rook may copy these register-ready questions. Approval would require separate normative and implementation work orders before any activation; none starts here.
+- Start WHR-125 (WO-spec-3l) in a fresh session after this READY handoff, as Earl instructed. No phone-refresh work is included here.
+- Rook should mirror P-26 in product docs and obtain Q-559 measured display steps/verified behaviour. Separate implementation and approved activation remain required.
 
 ## Earl's gos
-- 2026-11-11: “Work order WHR-112 (WO-spec-3j) is approved and in Todo.” “Write a PROPOSAL (not normative)”; “Don't change m3.md”; “Code, security and integrity verdicts. Stop when merged and report READY with the questions.”
+- 2026-11-12: “Work order WHR-124 (WO-spec-3k) is approved and in Todo.” “Earl decided WHR-118 to WHR-122 as recommended.” “Stop when merged and report READY, then start WHR-125 (WO-spec-3l) in a fresh session.”
 
 ## Risks
-- WHR-50 remains gated. Uniform historical-rate recommendation leaves activation-spanning intervals held; measured display steps and meter behaviour remain unapproved.
-- Q-528/Q-556 confirmations and Q-557 attestation remain separate. One numerical reviewer is a recommendation, not new authority. No main/cloud authorization.
-- Full runtime model ID unavailable. Metrics include the proposal’s three independent reviews and the separate records code review.
+- Q-559 profiles are still pending; no runtime activation. Different historical rates anywhere in I keep the price hold even with a clear photo.
+- Q-528/Q-556 remain pending; Q-557 attestation stays out of scope. No main/cloud authorization.
+- Full runtime model ID unavailable. Metrics include six spec review dispatches and one separate records reviewer.
 
-dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
+dispatches=7 prs=2 rounds_max=2 escalations=0 model=unavailable
