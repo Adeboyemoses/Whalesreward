@@ -39,5 +39,7 @@ No integration/e2e gate triggered: no schema/server or user-flow change.
 M3 maximum prose paragraph 119 words; inventory <=120; local file links PASS.
 Source inventory includes seven runtime audit insert modules, aliases, operator
 non-writers, card issue/verify non-writers, blocked meter and price-cancel branches.
-No new implementation coverage or board parity claimed. Lane/status/coverage bundled.
+No new implementation coverage or board parity claimed. Shared records were removed
+from this feature diff to comply with the current records-only PR gate; they follow
+in a separate READY PR. Contract/inventory bytes remain identical to reviewed_head.
 
