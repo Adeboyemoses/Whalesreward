@@ -27,8 +27,9 @@ The amendment specifies profiles, exact provenance, non-5xx domain errors and he
 All three independent reviewers passed both rounds with no findings.
 Round 2 refreshed evidence after required staging integration added T-19 to INDEX.
 The P-26 amendment stayed unchanged; EM final-head gates passed again.
-EM verification: typecheck, lint (two inherited image warnings), 678 unit tests and build PASS.
+EM verification: typecheck, lint (two inherited image warnings), 689 unit tests and build PASS.
 Exact rational arithmetic: 21 numeric fixtures and two T-10 calculations PASS.
 Local links, diff whitespace and paragraph limit PASS; maximum prose paragraph 119 words.
 MR-T1-01–20 are required future runtime cases, not implemented coverage.
 No code, profile activation or cloud change is included. Q-559 remains pending.
+Later base integration brought reviewed PR #119; no P-26 file changed and evidence remained valid.
