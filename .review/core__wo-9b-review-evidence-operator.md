@@ -2,12 +2,15 @@
 branch: core/wo-9b-review-evidence-operator
 linear: WHR-114
 tier: high
-reviewed_head: d9970ad
-rounds: 0
+reviewed_head: 568c8227e6e9368fc141c14c934844a2f4b4509a
+rounds: 1
 builder: platform-engineer
-reviewers: {}
+reviewers:
+  code-reviewer: PASS
+  security-reviewer: PASS
+  integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 0
+dispatches: 5
 plan:
   goal: Provide an Earl-run dry-run-first activation and deactivation command with no secret output.
   files: scripts/ops/**, package.json, tests/unit/review-evidence-operator.test.ts, tests/integration/review-evidence-operator.test.ts, docs/ops/review-evidence.md
@@ -27,3 +30,12 @@ tickets: []
 - Exercise parallel activation/deactivation, forced second-insert failure, stale-preview revision changes, malformed arguments and child-process error output. Tests use disposable local Postgres only.
 - Update the runbook with exact invocation, secret-safe shell setup, preview versus applied IDs/revision, and manual policy-setting/admin health checks. Record that this command does not deploy or activate an application setting itself.
 - EM reruns typecheck, lint, unit, build and full integration; code/security/integrity review the committed diff within three rounds. Commit evidence separately and merge only with required CI green.
+
+## Verification and review
+
+WHR-116 resolved by Earl on 12 Nov: persisted database-level identity only; no session/role override.
+Both builder dispatches completed; all three independent reviewers PASS round 1, no findings.
+EM typecheck, lint (two existing image warnings), 689 unit tests, build and 699 PostgreSQL tests PASS.
+Targeted CLI/transaction coverage: 11 unit and 11 real-Postgres tests, independently rerun by reviewers.
+Apply requires the authorized expected revision; previews reserve neither revision nor UUIDs.
+No managed environment, public endpoint, policy deployment or purchase/hold mutation performed.
