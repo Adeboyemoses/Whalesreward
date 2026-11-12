@@ -51,7 +51,7 @@ describe("review request boundaries", () => {
     expect(value.decision).toEqual({
       outcome: "correct_meter",
       amountKobo: "9007199254740993",
-      quantity: "1.23",
+      quantity: "1.230000",
     });
   });
   it("requires precisely two purchase guards", () => {
