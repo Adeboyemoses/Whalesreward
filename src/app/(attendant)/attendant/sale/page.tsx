@@ -83,8 +83,19 @@ function Sale() {
   const ensureDraft = useCallback(async () => {
     if (!client) return null;
     setHasComposition(true);
+    const selectedAtStart = selection.current;
     const next = await composition.current.start(
-      () => client.beginCapture(),
+      async () => {
+        const created = await client.beginCapture();
+        return selectedAtStart
+          ? client.selectLookup(
+              created,
+              selectedAtStart.code,
+              selectedAtStart.lookup,
+              { receiptAtComposition: true },
+            )
+          : created;
+      },
       markCaptureStarted,
     );
     if (
@@ -223,8 +234,6 @@ function Sale() {
     if (!client || saving.current) return;
     const generation = ++request.current;
     setFinding(true);
-    setPhoto(null);
-    setPhotoUrl(undefined);
     setLookup(null);
     setResolvedCode("");
     setLookupError(null);
@@ -262,9 +271,14 @@ function Sale() {
     }
   }
   function changeCard() {
+    // Initial typing is not a customer change: a photo may already be composed.
+    // Changing an identified customer explicitly requires a fresh meter photo.
+    if (selection.current || resolvedCode) {
+      setPhoto(null);
+      setPhotoUrl(undefined);
+      setPhotoTime("");
+    }
     selection.current = null;
-    setPhoto(null);
-    setPhotoUrl(undefined);
     setNotFound(null);
     request.current++;
     setFinding(false);
@@ -616,7 +630,7 @@ function Sale() {
           src={photoUrl}
           takenAt={photoTime}
           onCapture={() => void startCamera("photo")}
-          disabled={busy || !customerReady || finding}
+          disabled={busy}
         />
       </section>
       {camera && (
