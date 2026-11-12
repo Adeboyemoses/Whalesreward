@@ -11,6 +11,7 @@ const directory = "tests/design-parity/customer-changes/screenshots";
 async function capture(page: Page, id: string, width: number) {
   await page.setViewportSize({ width, height: 1000 });
   await page.evaluate(() => document.fonts.ready);
+  await expect(page.getByText(/^Loading(?:…|\.\.\.)$/)).toHaveCount(0);
   const metrics = await page.evaluate(() => ({
     viewport: innerWidth,
     document: document.documentElement.scrollWidth,
@@ -26,7 +27,6 @@ async function capture(page: Page, id: string, width: number) {
       },
     ),
   }));
-  expect(metrics.document).toBeLessThanOrEqual(width);
   await page.screenshot({
     path: `${directory}/${id}-${width}.built.png`,
     fullPage: true,
@@ -35,6 +35,7 @@ async function capture(page: Page, id: string, width: number) {
     `${directory}/${id}-${width}.metrics.json`,
     JSON.stringify(metrics, null, 2),
   );
+  expect(metrics.document).toBeLessThanOrEqual(width);
 }
 for (const width of [1440, 390])
   test(`C02-C05 designed states at ${width}px`, async ({ page }) => {
@@ -45,6 +46,14 @@ for (const width of [1440, 390])
       await page.goto(`${f.root}/phone`);
       await fillPhone(page);
       await capture(page, "C02-PhoneChange-edit", width);
+      await page.getByLabel("New phone number", { exact: true }).focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        page.getByLabel(
+          "I checked the customer's active loyalty card in person.",
+          { exact: true },
+        ),
+      ).toBeFocused();
       await page
         .getByRole("button", { name: "Review phone update", exact: true })
         .click();
@@ -84,6 +93,11 @@ for (const width of [1440, 390])
         .getByLabel("Reason for replacement", { exact: true })
         .fill("Card lost; customer reported at the station in person.");
       await capture(page, "C03-CardReplacement-link", width);
+      await page.getByLabel("Unused card number", { exact: true }).focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        page.getByRole("button", { name: "Scan", exact: true }),
+      ).toBeFocused();
       await page
         .getByRole("button", { name: "Review replacement", exact: true })
         .click();
@@ -109,6 +123,11 @@ for (const width of [1440, 390])
       await page.goto(`${f.root}/recovery`);
       await fillIntake(page);
       await capture(page, "C04-RecoveryReview", width);
+      await page.getByLabel("Review notes", { exact: true }).focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        page.getByLabel("Why the code cannot be used", { exact: true }),
+      ).toBeFocused();
     } finally {
       await bridge.close();
       await f.db.end();
