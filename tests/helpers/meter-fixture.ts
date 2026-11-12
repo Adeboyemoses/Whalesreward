@@ -184,7 +184,7 @@ export async function meterFixture(
       unit === "litre" ? "vehicle" : "cylinder",
     ],
   );
-  await x.pool.query(
+  await seedHistorical(x.pool, "purchase_hold",
     "UPDATE purchase_hold SET reason_code='price_uncertain' WHERE id=$1",
     [x.holdId],
   );
@@ -199,7 +199,7 @@ export async function meterFixture(
     version: 1,
     digest: "0".repeat(64),
     stationId: x.f.stationId,
-    pumpId: x.f.original.pumpId,
+    pumpId: x.f.pumpId,
     productId: fixtureId(9),
     currency: "NGN",
     unit,
