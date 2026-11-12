@@ -1067,6 +1067,7 @@ export class AttendantClient {
     session: Session,
     epoch?: number,
     generation?: string | null,
+    preserveExpiredCheckpoint = false,
   ): Promise<OfflineWindow> {
     const meta = await this.db.meta.get("installation");
     const row = await this.db.windows.get(session.account.id);
@@ -1083,7 +1084,7 @@ export class AttendantClient {
     )
       throw new ClientError("account_changed", "Sign in again to continue.");
     const advanced = this.advance(row, this.clock());
-    if (advanced.locked)
+    if (advanced.locked && !preserveExpiredCheckpoint)
       throw new ClientError("access_expired", "Sign in again to continue.");
     return advanced;
   }
@@ -1119,15 +1120,28 @@ export class AttendantClient {
   }
   async beginCapture(): Promise<CaptureDraft> {
     const epoch = this.authEpoch;
-    const session = await this.active();
-    const generation = (await this.installation()).authGeneration ?? null;
+    const session = this.state.session;
+    if (this.state.access !== "active" || !session)
+      throw new ClientError("access_expired", "Sign in again to continue.");
+    // Reserve the snapshot transaction synchronously with composition intent.
+    // Preliminary asynchronous reads let a later lookup/session response overtake
+    // this input and reprice it. Read all persisted authority and price facts here.
     const draft = await this.db.transaction(
       "rw",
       this.db.meta,
       this.db.windows,
       async () => {
-        const row = await this.assertCurrentContext(session, epoch, generation);
+        const generation =
+          (await this.db.meta.get("installation"))?.authGeneration ?? null;
+        const row = await this.assertCurrentContext(
+          session,
+          epoch,
+          generation,
+          true,
+        );
         await this.db.windows.put(row);
+        // Commit the elapsed checkpoint and durable expiry even when capture fails.
+        if (row.locked) return null;
         return {
           operationId: uuidv7(),
           appCapturedAt: new Date(this.clock().wall).toISOString(),
@@ -1136,6 +1150,8 @@ export class AttendantClient {
       },
     );
     await this.checkAccess();
+    if (!draft)
+      throw new ClientError("access_expired", "Sign in again to continue.");
     if (
       epoch !== this.authEpoch ||
       this.state.access !== "active" ||

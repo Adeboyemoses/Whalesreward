@@ -616,3 +616,64 @@ it("P-27 failed session persistence never publishes or stores its candidate", as
   expect(client.getState().session?.price).toEqual(original);
   expect(observed.every((version) => version === original.version)).toBe(true);
 });
+
+it.each([
+  ["lookup", false],
+  ["session", false],
+  ["lookup", true],
+  ["session", true],
+] as const)(
+  "P-27 composition reserves its persisted snapshot before a pending %s response is released (other client: %s)",
+  async (path, otherClient) => {
+    const reader = otherClient ? makeClient() : client;
+    if (otherClient) await reader.initialize();
+    const entered = deferred<void>(),
+      release = deferred<void>();
+    const original = structuredClone(api.current.price);
+    const newer = price(9);
+    if (path === "lookup") {
+      api.lookup = async () => {
+        entered.resolve();
+        await release.promise;
+        return lookup(newer);
+      };
+    } else {
+      api.session = async () => {
+        entered.resolve();
+        await release.promise;
+        return { ...api.current, price: newer };
+      };
+    }
+    const reading =
+      path === "lookup" ? reader.lookup("A7K3M9X") : reader.refresh();
+    await entered.promise;
+    // One event turn: meaningful input begins composition, then the network completes.
+    // No clock advance, settling wait, or UI timing workaround may decide its price.
+    const composing = client.beginCapture();
+    release.resolve();
+    const draft = await composing;
+    await reading;
+    expect(draft.session.price).toEqual(original);
+    expect((await persisted()).session.price).toEqual(newer);
+    expect((await client.beginCapture()).session.price).toEqual(newer);
+  },
+);
+
+it.each(["expiry", "clock rollback"] as const)(
+  "P-27 composition persists its locked checkpoint on %s before rejecting",
+  async (reason) => {
+    if (reason === "expiry") {
+      now += 86400000;
+      mono += 86400000;
+    } else now -= 1;
+    await expect(client.beginCapture()).rejects.toMatchObject({
+      code: "access_expired",
+    });
+    expect((await persisted()).locked).toBe(true);
+    if (reason === "expiry")
+      expect((await persisted()).elapsedAtCheckpointMs).toBeGreaterThanOrEqual(
+        86400000,
+      );
+    expect(client.getState().access).toBe("expired");
+  },
+);
