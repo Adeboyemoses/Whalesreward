@@ -143,6 +143,41 @@ export function realScenarios() {
         await f.close();
       }
     });
+  for (const composed of [false, true])
+    test(`P-27 I-29/I-30 gas rate ${composed ? "warning preserves composed sale" : "notice adopts for new sale"} uses kilograms`, async ({
+      page,
+      browser,
+    }) => {
+      const f = await priceFixture(page, browser, true);
+      try {
+        if (composed) await value(f.phone, "15000");
+        await f.activate("160000", 2);
+        await lookup(f.phone, f.codes[0]!);
+        const message = composed
+          ? "Price updated to ₦1,600.00 per kilogram for new sales. This sale keeps ₦1,500.00 per kilogram. Check the meter before saving."
+          : "Price updated to ₦1,600.00 per kilogram";
+        await expect(f.phone.getByText(message, { exact: true })).toBeVisible();
+        await expect(f.phone.getByText(/Price updated.*per litre/)).toHaveCount(
+          0,
+        );
+        if (!composed) await value(f.phone, "16000");
+        await photo(f.phone);
+        const sale = await frozenSave(f);
+        expect(sale.original).toMatchObject({
+          unit: "kilogram",
+          medium: "cylinder",
+          rateKobo: composed ? "150000" : "160000",
+          entry: {
+            quantity: "10",
+            amountKobo: composed ? "1500000" : "1600000",
+          },
+        });
+        if (composed) expect(sale.original.lookupReceipt ?? null).toBeNull();
+        else expect(sale.original.lookupReceipt).toBeTruthy();
+      } finally {
+        await f.close();
+      }
+    });
   test("P-27 PR-T1-08 gas quantity uses new precision while automatic Cylinder never starts composition", async ({
     page,
     browser,

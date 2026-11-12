@@ -32,8 +32,35 @@ for (const trigger of ["amount", "medium", "photo"] as const)
       if (trigger === "amount") await value(f.phone, "10000");
       if (trigger === "medium")
         await f.phone.getByRole("button", { name: "Keg", exact: true }).click();
-      if (trigger === "photo") await photo(f.phone);
-      release();
+      if (trigger === "photo") {
+        // Release from the actual click event, before awaiting camera setup or
+        // taking a picture. Waiting for photo() hid a price-adoption race here.
+        await f.phone.exposeFunction("releasePriceLookup", release);
+        await f.phone
+          .getByRole("button", { name: /^Take meter photo/ })
+          .evaluate((button) =>
+            button.addEventListener(
+              "click",
+              () => {
+                void (
+                  window as unknown as {
+                    releasePriceLookup: () => Promise<void>;
+                  }
+                ).releasePriceLookup();
+              },
+              { once: true },
+            ),
+          );
+        await f.phone
+          .getByRole("button", { name: /^Take meter photo/ })
+          .click();
+        await f.phone
+          .getByRole("button", { name: "Take photo", exact: true })
+          .click();
+        await expect(
+          f.phone.getByRole("button", { name: "Retake", exact: true }),
+        ).toBeVisible();
+      } else release();
       await expect(
         f.phone.getByText("Amina Bello", { exact: true }),
       ).toBeVisible();
