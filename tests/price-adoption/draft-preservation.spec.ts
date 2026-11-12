@@ -178,6 +178,7 @@ test("P-27 PR-T1-07 discard clears composition and ignores its delayed lookup be
 }) => {
   const f = await priceFixture(page, browser);
   let release = () => {};
+  let discardedReceipt: string | null = null;
   try {
     await value(f.phone, "10000");
     await f.phone.getByRole("button", { name: "Vehicle", exact: true }).click();
@@ -190,6 +191,7 @@ test("P-27 PR-T1-07 discard clears composition and ignores its delayed lookup be
       "**/api/attendant/cards/lookup",
       async (route) => {
         const response = await route.fetch();
+        discardedReceipt = (await response.json()).data.lookupReceipt;
         received();
         await gate;
         await route.fulfill({ response });
@@ -226,7 +228,10 @@ test("P-27 PR-T1-07 discard clears composition and ignores its delayed lookup be
     await photo(f.phone);
     await f.context.setOffline(true);
     await save(f.phone);
-    expect((await rows(f.phone))[0]!.original).toMatchObject({
+    const saved = (await rows(f.phone))[0]!;
+    expect(saved.original.lookupReceipt).toBeTruthy();
+    expect(saved.original.lookupReceipt).not.toBe(discardedReceipt);
+    expect(saved.original).toMatchObject({
       rateKobo: "120000",
       quantityPrecision: 4,
       entry: { amountKobo: "1200000", quantity: "10" },

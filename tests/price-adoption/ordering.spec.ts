@@ -36,7 +36,7 @@ test("P-27 PR-T1-04/06 delayed older session cannot roll back a newer lookup acr
     const latest = (await current(f.phone)).session.price;
     release();
     await expect(
-      other.getByRole("heading", { name: "Record sale", exact: true }),
+      other.getByRole("heading", { name: "New sale", exact: true }),
     ).toBeVisible();
     await lookup(other, f.codes[0]!);
     await value(other, "13000");
