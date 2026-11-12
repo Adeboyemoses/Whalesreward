@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ScanLine, UserRoundPlus } from "lucide-react";
 import {
@@ -40,6 +40,8 @@ import {
 import { Camera } from "../_components/camera";
 import { Receipt } from "../_components/receipt";
 import { formatAmountInput } from "../_components/amount-input";
+import { DraftComposition } from "./draft-composition";
+import { adoptedPriceNotices, retainedPriceWarnings } from "./price-notices";
 function Sale() {
   const { client, state, online } = useAttendant();
   const router = useRouter();
@@ -57,7 +59,9 @@ function Sale() {
   const [basis, setBasis] = useState<"amount" | "quantity">("amount");
   const [value, setValue] = useState("");
   const [valueFocused, setValueFocused] = useState(false);
-  const [medium, setMedium] = useState<Medium | "">("");
+  const [medium, setMedium] = useState<Medium | "">(
+    state!.session!.product.code === "cooking_gas" ? "cylinder" : "",
+  );
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | undefined>();
   const [photoTime, setPhotoTime] = useState("");
@@ -65,82 +69,123 @@ function Sale() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storageWarning, setStorageWarning] = useState(false);
+  const composition = useRef(new DraftComposition());
+  const selection = useRef<{ code: string; lookup: Lookup | null } | null>(
+    null,
+  );
+  const [discarding, setDiscarding] = useState(false);
+  const [hasComposition, setHasComposition] = useState(false);
   const request = useRef(0);
   const mounted = useRef(true);
   const saving = useRef(false);
   const accountId = state!.session!.account.id;
   const contextId = state!.session!.captureContextId;
+  const ensureDraft = useCallback(async () => {
+    if (!client) return null;
+    setHasComposition(true);
+    const next = await composition.current.start(
+      () => client.beginCapture(),
+      markCaptureStarted,
+    );
+    if (
+      !next ||
+      !mounted.current ||
+      client.getState().access !== "active" ||
+      client.getState().session?.account.id !== accountId ||
+      client.getState().session?.captureContextId !== contextId
+    )
+      return null;
+    const selected = selection.current
+      ? client.selectLookup(
+          next,
+          selection.current.code,
+          selection.current.lookup,
+        )
+      : next;
+    composition.current.select(selected);
+    setDraft(selected);
+    return selected;
+  }, [client, accountId, contextId]);
   useEffect(() => {
     let live = true;
     mounted.current = true;
     if (client) {
-      void client.beginCapture().then(
-        (next) => {
-          if (live) {
-            setDraft(next);
-            const pending = handoff.take(next.session);
-            if (pending) {
-              markCaptureStarted();
-              const generation = ++request.current;
-              setCard(pending.cardCode);
-              setFinding(true);
-              void client
-                .lookupCurrent(pending.cardCode)
-                .then(
-                  (found) => {
-                    if (
-                      live &&
-                      generation === request.current &&
-                      client.getState().access === "active" &&
-                      client.getState().session?.captureContextId === contextId
-                    ) {
-                      if (!found || found.customer.id !== pending.customerId) {
-                        setLookupError(
-                          "This customer has no usable matching card. Ask a station manager for help.",
-                        );
-                        return;
-                      }
-                      setDraft(
-                        client.selectLookup(next, found.cardCode, found),
-                      );
-                      setLookup(found);
-                      setResolvedCode(found.cardCode);
-                    }
-                  },
-                  async (error) => {
-                    await client.observeAuthorityError(error, next.session);
-                    if (live && generation === request.current)
-                      setLookupError(message(error));
-                  },
-                )
-                .finally(() => {
-                  if (live && generation === request.current) setFinding(false);
-                });
-            }
-            setMedium(
-              next.session.product.code === "cooking_gas" ? "cylinder" : "",
-            );
-          }
-        },
-        (e) => {
-          if (live) setError(message(e));
-        },
-      );
       void client.storageStatus().then((status) => {
         if (live) setStorageWarning(status.nearFull);
       });
+      void (async () => {
+        // Strict-mode setup/cleanup must not consume a handoff in a dead view.
+        await Promise.resolve();
+        if (!live) return;
+        const current = client.getState().session;
+        if (!current) return;
+        const pending = handoff.take(current);
+        if (!pending) return;
+        markCaptureStarted();
+        const generation = ++request.current;
+        setCard(pending.cardCode);
+        setFinding(true);
+        try {
+          const found = await client.lookupCurrent(pending.cardCode);
+          if (
+            !live ||
+            generation !== request.current ||
+            client.getState().access !== "active" ||
+            client.getState().session?.captureContextId !== contextId
+          )
+            return;
+          if (!found || found.customer.id !== pending.customerId) {
+            setLookupError(
+              "This customer has no usable matching card. Ask a station manager for help.",
+            );
+            return;
+          }
+          selection.current = { code: found.cardCode, lookup: found };
+          const next = await ensureDraft();
+          if (!next || !live || generation !== request.current) return;
+          setLookup(found);
+          setResolvedCode(found.cardCode);
+        } catch (error) {
+          await client.observeAuthorityError(error, current);
+          if (live && generation === request.current)
+            setLookupError(message(error));
+        } finally {
+          if (live && generation === request.current) setFinding(false);
+        }
+      })();
     }
+    const activeComposition = composition.current;
     return () => {
       live = false;
       mounted.current = false;
+      activeComposition.discard();
       markCaptureEnded();
     };
-  }, [client, accountId, contextId, handoff]);
+  }, [client, accountId, contextId, handoff, ensureDraft]);
   useEffect(() => {
     return () => {
       if (photoUrl) URL.revokeObjectURL(photoUrl);
     };
   }, [photoUrl]);
+  const currentPrice = state!.session!.price;
+  const lastPrice = useRef(currentPrice);
+  const [adoptionNotice, setAdoptionNotice] = useState<string[]>([]);
+  useEffect(() => {
+    const previous = lastPrice.current;
+    if (currentPrice.version <= previous.version) return;
+    lastPrice.current = currentPrice;
+    setAdoptionNotice(
+      adoptedPriceNotices(previous, currentPrice, state!.session!.product.unit),
+    );
+  }, [currentPrice, state]);
+  const warnings = draft
+    ? retainedPriceWarnings(
+        draft.session.price,
+        currentPrice,
+        draft.session.product.unit,
+      )
+    : [];
+  const notices = warnings.length ? warnings : adoptionNotice;
   const session = draft?.session ?? state!.session!;
   const gas = session.product.code === "cooking_gas";
   const unitLabel = gas ? "Kilograms" : "Litres";
@@ -194,11 +239,15 @@ function Sale() {
         return;
       const normalized = code.trim().toUpperCase();
       setCard(normalized);
+      selection.current = { code: normalized, lookup: found };
+      // A resolved customer starts composition only after lookup price adoption.
+      // An uncached offline code alone does not freeze a draft.
+      if (found || draft) {
+        const next = await ensureDraft();
+        if (!next || !mounted.current || generation !== request.current) return;
+      }
       setResolvedCode(normalized);
       setLookup(found);
-      setDraft((current) =>
-        current ? client.selectLookup(current, normalized, found) : current,
-      );
     } catch (e) {
       if (mounted.current && generation === request.current) {
         setLookupError(message(e));
@@ -213,6 +262,7 @@ function Sale() {
     }
   }
   function changeCard() {
+    selection.current = null;
     setPhoto(null);
     setPhotoUrl(undefined);
     setNotFound(null);
@@ -224,13 +274,54 @@ function Sale() {
   }
   async function startCamera(mode: "photo" | "qr") {
     if (!client) return;
+    const generation = request.current;
+    if (mode === "photo") markCaptureStarted();
     try {
       await client.checkAccess();
-      if (client.getState().access !== "active") return;
+      if (
+        client.getState().access !== "active" ||
+        !mounted.current ||
+        generation !== request.current ||
+        client.getState().session?.captureContextId !== contextId
+      )
+        return;
+      if (mode === "photo" && !(await ensureDraft())) return;
+      if (generation !== request.current || !mounted.current) return;
       setCamera(mode);
     } catch (e) {
       setError(message(e));
     }
+  }
+  function composeInput() {
+    void ensureDraft().catch((e) => {
+      if (mounted.current) setError(message(e));
+    });
+  }
+  function discardDraft() {
+    if (saving.current) return;
+    request.current++;
+    composition.current.discard();
+    selection.current = null;
+    setDraft(null);
+    setHasComposition(false);
+    setCard("");
+    setLookup(null);
+    setResolvedCode("");
+    setNotFound(null);
+    setLookupError(null);
+    setFinding(false);
+    setBasis("amount");
+    setValue("");
+    setValueFocused(false);
+    setMedium(state!.session!.product.code === "cooking_gas" ? "cylinder" : "");
+    setPhoto(null);
+    setPhotoUrl(undefined);
+    setPhotoTime("");
+    setCamera(null);
+    setError(null);
+    setDiscarding(false);
+    setAdoptionNotice([]);
+    markCaptureEnded();
   }
   async function save() {
     if (!client || !draft || !photo || !medium || !ready || saving.current)
@@ -335,7 +426,7 @@ function Sale() {
             <Button
               cta
               icon={<ScanLine aria-hidden />}
-              disabled={busy || !draft}
+              disabled={busy}
               onClick={() => void startCamera("qr")}
             >
               Scan QR card
@@ -358,7 +449,7 @@ function Sale() {
                 <Button
                   variant="secondary"
                   loading={finding}
-                  disabled={!card.trim() || busy || !draft}
+                  disabled={!card.trim() || busy}
                   onClick={() => void find()}
                 >
                   {finding ? "Finding…" : "Find"}
@@ -435,7 +526,10 @@ function Sale() {
                 { value: "three_wheeler", label: "3-wheeler" },
                 { value: "bike", label: "Bike" },
               ]}
-              onChange={(next) => setMedium(next as Medium)}
+              onChange={(next) => {
+                composeInput();
+                setMedium(next as Medium);
+              }}
             />
           </div>
         )}
@@ -450,7 +544,10 @@ function Sale() {
           }
           onFocus={() => setValueFocused(true)}
           onBlur={() => setValueFocused(false)}
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => {
+            if (event.target.value) composeInput();
+            setValue(event.target.value);
+          }}
           placeholder={basis === "amount" ? "0.00" : "0"}
           prefix={basis === "amount" ? "₦" : undefined}
           large
@@ -461,7 +558,7 @@ function Sale() {
         <div className="wr-card wr-quiet wr-calculated">
           <span className="wr-label">Calculated</span>
           <output className="wr-amount-md" aria-live="polite">
-            {calculation}
+            {hasComposition && !draft ? "Preparing sale…" : calculation}
           </output>
         </div>
         <p className="wr-help">
@@ -473,6 +570,43 @@ function Sale() {
           </b>{" "}
           · Check both values against the meter.
         </p>
+        {notices.map((notice) => (
+          <Notice
+            key={notice}
+            tone={warnings.length ? "warning" : "info"}
+            role="status"
+          >
+            {notice}
+          </Notice>
+        ))}
+        {hasComposition && !discarding && (
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => setDiscarding(true)}
+          >
+            Discard and start a new sale
+          </Button>
+        )}
+        {discarding && (
+          <Notice tone="warning">
+            <b>Discard this unsaved sale?</b>
+            <p>
+              This clears its values, customer selection and meter photo. Look
+              up the card again and take a fresh photo for the new sale.
+            </p>
+            <Button variant="danger" disabled={busy} onClick={discardDraft}>
+              Discard sale
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setDiscarding(false)}
+            >
+              Keep this sale
+            </Button>
+          </Notice>
+        )}
       </section>
       <section className="wr-section">
         <h2 className="wr-section-title">
@@ -482,7 +616,7 @@ function Sale() {
           src={photoUrl}
           takenAt={photoTime}
           onCapture={() => void startCamera("photo")}
-          disabled={busy || !draft || !customerReady || finding}
+          disabled={busy || !customerReady || finding}
         />
       </section>
       {camera && (
