@@ -47,7 +47,7 @@ type HealthPolicies = {
 | `delivery` | M2 email delivery adapter and required valid configuration; `delivery_unconfigured` |
 | `delegation` | M2 approved delegation policy; `delegation_policy_unconfigured` |
 | `phone` | M2/M3 phone normalization and validation policy; `phone_policy_unconfigured` |
-| `meter` | M3 independent meter evidence/reconciliation policy; `meter_policy_unconfigured` |
+| `meter` | M3 P-26 approved active meter-reconciliation-v1 evaluator, active approved P-25 dependency and verified profiles covering supported current pump/product/precision scope; `meter_policy_unconfigured` |
 | `phoneVerification` | M3 phone verification delivery, expiry and attempt policy; `phone_verification_unconfigured` |
 | `recovery` | M3 recovery session/grant expiry and device-binding policy; `recovery_policy_unconfigured` |
 | `reconciliation` | M4 reconciliation checklist and complete-photo receipt evidence policy; `reconciliation_policy_unconfigured` |
@@ -55,6 +55,8 @@ type HealthPolicies = {
 | `cardPrint` | Valid PDF layout under the existing card print validator; `print_layout_unconfigured` |
 | `duplicateWindow` | M3 P-24 valid, active duplicate window policy; missing configuration disables time-based detection only, never photo-digest detection or credit |
 | `reviewEvidence` | M3 P-25 active, approved review-evidence-v1 policy with matching digest/scope and all four installed evaluators; unsupported outcomes retain explicit denials |
+
+**Amended by WO-spec-3k, 12 Nov 2026.** [P-26](m3.md#meter-reconciliation--p-26) defines `meter` readiness. All deployment-supported current pump/product/precision combinations need valid approved profiles; gaps or missing evaluators/dependencies report unconfigured. Health checks configuration only, not historical sale/photo sufficiency. A configured policy can still reject an older sale without full interval coverage. Specification approval does not activate runtime policy. Existing settings-only projection, aggregate public response and redaction apply; expose no profile, step, approval, version or digest. `reviewEvidence` alone never enables meter correction.
 
 **Amended by WO-spec-3i, 11 Nov 2026.** `reviewEvidence` extends the protected closed allowlist to twelve names. Use the [M3 strict configuration and activation validator](m3.md#strict-policy-configuration-and-activation). Missing, malformed, inactive, unapproved or unsupported configuration, digest/scope mismatch or an unavailable evaluator reports `unconfigured`. All four kinds must be installed, including explicit price-cancellation denial. `configured` does not mean every outcome is enabled or every sale has sufficient evidence. WHR-50 remains independently represented by `meter`.
 

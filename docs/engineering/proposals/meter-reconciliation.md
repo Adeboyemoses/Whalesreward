@@ -1,8 +1,8 @@
-# Meter reconciliation — PROPOSAL
+# Meter reconciliation — approved historical proposal
 
 An admin would read the amount and quantity from the sale’s saved meter photo and record both exactly. The server would check that the pair makes sense at the historical price for the whole possible sale period, allowing only an approved display-rounding difference. If the checks pass, a new revision would replace the sale’s effective numbers and clear its price hold. Other holds could still prevent credit. Unreadable evidence, uncertain price history or unexplained differences would leave the sale held.
 
-**PROPOSAL, not normative.** Revision 1, 11 November 2026. For Earl and Whales Energy under [WHR-112 / WO-spec-3j](https://linear.app/phaneum/issue/WHR-112), developing [WHR-50 Option A](https://linear.app/phaneum/issue/WHR-50). Merge and READY approve no tolerance, permission change or activation. [M3](../contracts/m3.md) remains unchanged; `correct_meter` retains `409 meter_policy_unconfigured`. The recommendations below need explicit decisions, a normative amendment and a separate implementation work order.
+**Approved; superseded by m3.md.** Earl approved MR-1–MR-5 (WHR-118–WHR-122) as recommended on 12 November 2026. [P-26 in M3](../contracts/m3.md#meter-reconciliation--p-26), amended by WHR-124 / WO-spec-3k, is normative. Revision 1 below is preserved as historical decision material; its alternatives, proposal defaults and “not approved” wording no longer state the current specification. Q-559 measured display steps and verified behaviour remain client inputs. Approval and specification merge do not implement or activate meter release.
 
 ## What the admin would record
 
