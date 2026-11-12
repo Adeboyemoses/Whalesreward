@@ -31,7 +31,7 @@ Decision notes: Admin Customer Screen Decisions.md and Admin Account Recovery De
 
 ## Contracts needed
 
-Existing WO-core-10 schemas and endpoints supply CustomerRecoveryContext, IdentityChange, PhoneChallenge, ManagerCase. No server/contract changes planned. All IDs/versions come from validated server responses; code secrets bypass generic draft/retry storage.
+Existing WO-core-10 schemas and endpoints supply CustomerRecoveryContext, IdentityChange, PhoneChallenge, ManagerCase. Extract the existing pure phone normalization into a shared helper; retain the server policy and error wrapper unchanged and obtain core review. No endpoint or contract changes planned. All IDs/versions come from validated server responses; code secrets bypass generic draft/retry storage.
 
 ## Open questions
 
