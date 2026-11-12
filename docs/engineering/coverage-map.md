@@ -3,6 +3,18 @@
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
 
+
+## WO-core-9b review-evidence operator READY (WHR-114)
+
+Feature [#119](https://github.com/Adeboyemoses/Whalesreward/pull/119) merged at `ace2f43` with five green checks; T-19 decision [#117](https://github.com/Adeboyemoses/Whalesreward/pull/117) records Earl's WHR-116 Option A. READY is completed by this separate records merge. [Named verification](../qa/verification-2026-11-12-review-evidence-operator.md) reports 11 unit and 11 PostgreSQL operator tests; full EM suites passed 689 unit and 699 integration tests. No deployed activation or new screen parity is claimed.
+
+| Invariants / boundary | Named verification | Status |
+|---|---|---|
+| I-41 immutable operational history | `review-evidence-operator.test.ts` integration: applies activation atomically and appends higher inactive and reactivation revisions; rolls approval back when the configuration insert fails; includes orphan approval revisions and refuses safe-integer exhaustion | on-staging; operator history only |
+| I-26/I-35 preservation through policy changes | integration: serializes concurrent activation and deactivation and refuses the stale authorized revision; does not reserve preview revisions or IDs; dry run previews exact immutable rows and policy without writes | on-staging; policy serialization coverage, not new credit or hold-resolution implementation |
+| WHR-116 database identity and secret boundary | integration: refuses absent, malformed and duplicated persisted environment identities; ignores session SET and connection options when checking database identity; ignores role-in-database override and refuses role-only identity; real production CLI preview/apply/deactivate. Unit: runs --help without a database and never echoes malformed arguments or connection secrets | on-staging; disposable local Postgres and CI only |
+
+
 ## WO-spec-3j meter reconciliation PROPOSAL (WHR-112)
 
 [Proposal revision 1](proposals/meter-reconciliation.md) merged in [PR #114](https://github.com/Adeboyemoses/Whalesreward/pull/114) at 1875ca0 with all five checks green. READY takes effect on this separate records change’s reviewed green staging merge. It proposes exact independent meter values, uniform historical rates over I, measured display tolerances, unchanged T-10 arithmetic, guarded revisions and protected meter configuration. It changes no normative contract or runtime behaviour. EM verified exact worked arithmetic/boundaries, local links and the 120-word paragraph limit; typecheck, lint, 678 unit tests and build passed. Two inherited image lint warnings remain. Code, security and integrity reviewers all PASS at 5f0c963, round 1, no findings. Independent verdicts are recorded in [.review/spec__wo-3j-meter-proposal.md](../../.review/spec__wo-3j-meter-proposal.md).
@@ -723,3 +735,35 @@ Inventory correction: the earlier four-occurrence verification counted table row
 | Health contract | Missing/invalid/inactive window disables only rule (a); rule (b) continues; duplicateWindow joins protected allowlist, aggregate-only public view | Spec on staging; runtime tests pending |
 
 M3 lists required boundary, concurrency, replay, multi-sale, continuation and health cases for implementation. P-24 is logged in INDEX; Rook's mirror request is on WHR-102. Client Q-555 remains pending. WHR-102 stays In Review at READY, and this session starts no implementation work.
+
+
+## WO-spec-3k / WHR-124 P-26 meter reconciliation READY — 12 Nov 2026
+
+[Spec PR #118](https://github.com/Adeboyemoses/Whalesreward/pull/118) merged at 6b8361a with five green checks. Independent code/security/integrity PASS at 194f493, round 2, no findings. EM typecheck/lint, 689 existing unit tests, build, 21 exact numeric fixtures/two T-10 calculations, local links, evidence and paragraph limit PASS. This separate records merge completes READY. The following [MR-T1 cases](contracts/m3.md#p-26-t1-implementation-verification--exact-required-cases) are required future tests, not implemented runtime coverage or board parity.
+
+| Invariants | Required implementation cases | Status |
+|---|---|---|
+| I-29, I-31 | MR-T1-01–13: exact pair, uniform historical rate, display allowance, boundaries, T-10 and verified profiles | Spec on staging; runtime tests pending |
+| I-28, I-28a, I-45a, I-45b | MR-T1-02–03/14: closed original bounds and immutable lookup evidence; no ratio-derived timestamp | Spec on staging; runtime tests pending |
+| I-07, I-09, I-10, I-25, I-48 | MR-T1-14–15/20: inspectable bound evidence, live dual permission, profile approvals and protected health | Spec on staging; runtime tests pending |
+| I-22, I-26, I-35, I-37, I-39, I-40, I-42, I-46 | MR-T1-16–18: guards, replay, policy races, all hold orders, P-19/P-22, candidate/contribution and frozen snapshots | Spec on staging; runtime tests pending |
+| I-41 | MR-T1-19–20: immutable exact provenance, bounded source closure and redaction | Spec on staging; runtime tests pending |
+
+Q-559 measured profiles/verification and separate implementation/activation remain required. P-26 settles the meter policy choice without settling Q-528/Q-556 or Q-557 attestation. Rook should mirror the decision in product docs. WHR-124 remains In Review at READY; Earl requested WHR-125 in a fresh session next.
+
+
+## WO-spec-3l / WHR-125 P-27 online price refresh READY — 12 Nov 2026
+
+[Spec PR #122](https://github.com/Adeboyemoses/Whalesreward/pull/122) merged at 237a6d6 with five green checks. Code/security/integrity PASS at 4f8af97, round 1, no findings. This separate records merge completes READY. P-27 and M1/M2 define refresh through existing calls, additive strict compatibility, atomic adoption and open-draft warnings. This is specification coverage only; the following named cases are downstream obligations, not implemented tests.
+
+| Invariants / boards | Specification verification | Status |
+|---|---|---|
+| I-03, I-04, I-05, I-05a, I-06, I-09 | PR-T1-05/06/09: account/context/generation fences, acknowledged assignment, atomic adoption, expiry and zero extra requests | Spec on staging; core/app tests pending |
+| I-22, I-23, I-28, I-28a, I-28b, I-35 | PR-T1-03/07/10/11: consistent price/receipt read, immutable save/retry, unchanged original bounds, evidence and independent holds | Spec on staging; core/app tests pending |
+| I-29, I-30, I-31, I-32 | PR-T1-02/04/06/08: exact rate/precision validation, monotonic versions, snapshot creation, gas/liquid and T-10 calculations | Spec on staging; core/app tests pending |
+| I-49, I-50 | PR-T1-01/02/05/12: strict legacy capability matrix, malformed/null behavior, no HTTP/SW caching, isolated minimal persistence | Spec on staging; core/app tests pending |
+| A02, A03, A15, A27 | PR-T1-06–09/12: empty-form adoption, composed-draft warnings, new-sale notices and unchanged offline behavior | Future app brief/fidelity scope; no parity claim |
+
+EM typecheck, lint (two inherited image warnings), 689 unit tests, production build, local links, paragraph limit (maximum 120 words) and evidence validation PASS. Existing repository tests confirm the docs change did not break the build; they do not implement P-27.
+
+Rook should draft/number the listed high-tier core snapshot and app adoption/notice work orders, in that order, and mirror P-27 in product docs. Q-528 and Q-559 remain separate pending inputs. No runtime price refresh, meter activation or cloud change is claimed. WHR-125 stays In Review at READY; the session stops here.
