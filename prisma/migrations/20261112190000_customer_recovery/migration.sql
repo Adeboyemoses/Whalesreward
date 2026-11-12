@@ -30,7 +30,7 @@ BEGIN
 END $$;
 CREATE TRIGGER guard_verification_challenge_immutable BEFORE UPDATE OR DELETE ON verification_challenge FOR EACH ROW EXECUTE FUNCTION guard_recovery_challenge();
 ALTER TABLE verification_challenge ADD CONSTRAINT ck_phone_challenge_binding CHECK(purpose<>'replace_card' OR
- (issuer_admin_id IS NOT NULL AND issuer_session_id IS NOT NULL AND customer_version>0 AND active_card_id IS NOT NULL AND active_card_version>0 AND phone_generation>0 AND secret_key_version IS NOT NULL AND target_key_version IS NOT NULL AND phone_delivery_id IS NOT NULL AND resend_after IS NOT NULL AND issuance_generation IS NULL AND mail_request_id IS NULL)) NOT VALID;
+ (issuer_admin_id IS NOT NULL AND issuer_session_id IS NOT NULL AND customer_version IS NOT NULL AND customer_version>0 AND active_card_id IS NOT NULL AND active_card_version IS NOT NULL AND active_card_version>0 AND phone_generation IS NOT NULL AND phone_generation>0 AND secret_key_version IS NOT NULL AND target_key_version IS NOT NULL AND phone_delivery_id IS NOT NULL AND resend_after IS NOT NULL AND issuance_generation IS NULL AND mail_request_id IS NULL)) NOT VALID;
 CREATE TABLE phone_verification_delivery (
  id UUID PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
  customer_id UUID NOT NULL REFERENCES customer(id), generation BIGINT NOT NULL CHECK(generation>0),
@@ -64,7 +64,7 @@ ALTER TABLE customer_identity_change
  ADD COLUMN audit_event_id UUID REFERENCES audit_event(id),
  ADD COLUMN actor_snapshot JSONB;
 ALTER TABLE customer_identity_change ADD CONSTRAINT ck_recovery_identity_change CHECK(
- customer_version>0 AND applied_at IS NOT NULL AND audit_event_id IS NOT NULL AND actor_snapshot IS NOT NULL AND manager_review_reason IS NULL AND
+ customer_version IS NOT NULL AND customer_version>0 AND verification_method IS NOT NULL AND applied_at IS NOT NULL AND audit_event_id IS NOT NULL AND actor_snapshot IS NOT NULL AND manager_review_reason IS NULL AND
  ((kind='phone_change' AND verification_method='card_present' AND old_phone_normalized IS NOT NULL AND new_phone_normalized IS NOT NULL AND old_phone_normalized<>new_phone_normalized AND challenge_id IS NULL AND old_card_id IS NULL AND new_card_id IS NULL)
  OR(kind='card_replacement' AND verification_method='registered_phone_code' AND challenge_id IS NOT NULL AND old_card_id IS NOT NULL AND new_card_id IS NOT NULL AND old_card_id<>new_card_id AND old_phone_normalized IS NULL AND new_phone_normalized IS NULL))) NOT VALID;
 CREATE TABLE customer_recovery_case (
@@ -89,3 +89,16 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER guard_customer_transition BEFORE UPDATE ON customer FOR EACH ROW EXECUTE FUNCTION guard_customer_recovery_transition();
+
+CREATE TRIGGER guard_phone_delivery_binding BEFORE UPDATE OR DELETE ON phone_verification_delivery FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('state','lease_nonce','lease_until','fencing_version','failure_code');
+CREATE FUNCTION check_phone_delivery_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_TABLE_NAME='verification_challenge' THEN
+  IF NEW.purpose='replace_card' AND NOT EXISTS(SELECT 1 FROM phone_verification_delivery d WHERE d.id=NEW.phone_delivery_id AND d.challenge_id=NEW.id AND d.customer_id=NEW.customer_id AND d.generation=NEW.phone_generation AND d.issuer_admin_id=NEW.issuer_admin_id AND d.target_hmac=NEW.target_digest AND d.key_version=NEW.target_key_version AND d.purpose=NEW.purpose) THEN RAISE EXCEPTION 'phone delivery binding mismatch' USING ERRCODE='23514'; END IF;
+ ELSE
+  IF NOT EXISTS(SELECT 1 FROM verification_challenge v WHERE v.id=NEW.challenge_id AND v.phone_delivery_id=NEW.id AND v.customer_id=NEW.customer_id AND v.phone_generation=NEW.generation AND v.issuer_admin_id=NEW.issuer_admin_id AND v.target_digest=NEW.target_hmac AND v.target_key_version=NEW.key_version AND v.purpose=NEW.purpose) THEN RAISE EXCEPTION 'phone challenge binding mismatch' USING ERRCODE='23514'; END IF;
+ END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER check_phone_challenge_delivery AFTER INSERT ON verification_challenge DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_phone_delivery_binding();
+CREATE CONSTRAINT TRIGGER check_phone_delivery_challenge AFTER INSERT ON phone_verification_delivery DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_phone_delivery_binding();

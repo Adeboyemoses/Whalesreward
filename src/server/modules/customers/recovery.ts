@@ -389,7 +389,15 @@ export async function recoveryWrite(
     return await transaction(pool, async (db) => {
       const actor = await authority(db, token, action),
         c = await customer(db, customerId);
-      if (action === "replace") requirePhoneVerification(options.adapter);
+      if (action === "replace") {
+        requirePhoneVerification(options.adapter);
+        await challenge(
+          db,
+          wire.replaceCardSchema.parse(parsed).challengeId,
+          c.id,
+          actor,
+        );
+      }
       const normalized =
         action === "phone-change"
           ? (options.normalizer ?? phoneNormalizer()).normalize(
@@ -409,7 +417,7 @@ export async function recoveryWrite(
         async () => {
           if (c.version !== parsed.expectedVersion)
             throw new AuthError("version_conflict", 409);
-          const at = (await db.query("SELECT clock_timestamp() AS now")).rows[0]
+          let at = (await db.query("SELECT clock_timestamp() AS now")).rows[0]
             .now as Date;
           if (action === "case-create") {
             const p = wire.managerCaseSchema.parse(parsed);
@@ -511,6 +519,12 @@ export async function recoveryWrite(
               [card.id, p.newCardCode],
             )
           ).rows;
+          at = (await db.query("SELECT clock_timestamp() AS now")).rows[0]
+            .now as Date;
+          await requireAdminSession(db, token);
+          ch.now = at;
+          if (!bound(ch, c, card, config))
+            throw new AuthError("verification_unavailable", 422);
           const next = locked.find((r) => r.code === p.newCardCode);
           if (
             !next ||
@@ -822,8 +836,16 @@ async function verify(
       c.version === p.expectedVersion &&
       ch.version === p.expectedChallengeVersion &&
       !ch.verified_at
-    )
-      verified = (await adapter.verify(ch.id, p.code)) === "verified";
+    ) {
+      try {
+        verified = (await adapter.verify(ch.id, p.code)) === "verified";
+      } catch {
+        verified = false;
+      }
+      await requireAdminSession(db, token);
+      ch.now = (await db.query("SELECT clock_timestamp() AS now")).rows[0].now;
+      verified = verified && !!bound(ch, c, card, config);
+    }
     if (!ch.revoked_at && !ch.consumed_at && ch.attempts < ch.max_attempts) {
       await db.query(
         "UPDATE verification_challenge SET attempts=attempts+1,verified_at=CASE WHEN $1 THEN clock_timestamp() ELSE verified_at END,version=version+1 WHERE id=$2 AND version=$3",
