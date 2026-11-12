@@ -8,6 +8,7 @@
     "node": "26.12.0"
   },
   "scripts": {
+    "ops:review-evidence": "node scripts/ops/review-evidence.mjs",
     "dev": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next dev",
     "build": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next build && node src/client/sw/build.mjs",
     "start": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next start",
