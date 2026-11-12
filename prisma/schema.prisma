@@ -7,6 +7,7 @@ datasource db {
 }
 
 model AuthUser {
+  phone_verification_attempt               phone_verification_attempt[]
   last_sign_in_at DateTime? @db.Timestamptz(6)
   created_by_user_id String? @db.Uuid
   auth_user AuthUser? @relation("auth_userToauth_user", fields: [created_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -70,6 +71,9 @@ model Attendant {
 }
 
 model Admin {
+  customer_recovery_case                                                     customer_recovery_case[]
+  phone_verification_delivery                                                phone_verification_delivery[]
+  verification_challenge                                                     VerificationChallenge[]
   verification_generation BigInt @default(0)
   reset_generation BigInt @default(0)
   mail_request mail_request[]
@@ -143,6 +147,7 @@ model RolePermission {
 }
 
 model AuthSession {
+  verification_challenge         VerificationChallenge[]
   access_scope String @default("full")
   last_activity_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
   auth_request_dedup auth_request_dedup[]
@@ -170,6 +175,22 @@ model AuthSession {
 }
 
 model VerificationChallenge {
+  issuer_admin_id                                                                                   String?                      @db.Uuid
+  issuer_session_id                                                                                 String?                      @db.Uuid
+  customer_version                                                                                  Int?
+  active_card_id                                                                                    String?                      @db.Uuid
+  active_card_version                                                                               Int?
+  phone_generation                                                                                  BigInt?
+  verified_at                                                                                       DateTime?                    @db.Timestamptz(6)
+  secret_key_version                                                                                String?
+  phone_delivery_id                                                                                 String?                      @db.Uuid
+  resend_after                                                                                      DateTime?                    @db.Timestamptz(6)
+  phone_verification_attempt                                                                        phone_verification_attempt[]
+  phone_verification_delivery_phone_verification_delivery_challenge_idToverification_challenge      phone_verification_delivery? @relation("phone_verification_delivery_challenge_idToverification_challenge")
+  phone_verification_delivery_verification_challenge_phone_delivery_idTophone_verification_delivery phone_verification_delivery? @relation("verification_challenge_phone_delivery_idTophone_verification_delivery", fields: [phone_delivery_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_phone_delivery")
+  card                                                                                              Card?                        @relation(fields: [active_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  admin                                                                                             Admin?                       @relation(fields: [issuer_admin_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  auth_session                                                                                      AuthSession?                 @relation(fields: [issuer_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   issuance_generation BigInt?
   mail_request_id String? @db.Uuid
   target_key_version String?
@@ -359,6 +380,9 @@ model CaptureContext {
 }
 
 model Customer {
+  phone_verification_generation             BigInt                        @default(0)
+  customer_recovery_case                    customer_recovery_case[]
+  phone_verification_delivery               phone_verification_delivery[]
   registered_station_id String? @db.Uuid
   registered_by_user_id String? @db.Uuid
   id                                        String                   @id @db.Uuid
@@ -396,6 +420,9 @@ model CardBatch {
 }
 
 model Card {
+  customer_identity_change_customer_identity_change_new_card_idTocard CustomerIdentityChange[] @relation("customer_identity_change_new_card_idTocard")
+  customer_identity_change_customer_identity_change_old_card_idTocard CustomerIdentityChange[] @relation("customer_identity_change_old_card_idTocard")
+  verification_challenge                                              VerificationChallenge[]
   id                              String             @id @db.Uuid
   created_at                      DateTime           @default(now()) @db.Timestamptz(6)
   batch_id                        String             @db.Uuid
@@ -439,6 +466,18 @@ model CardCustomerLink {
 }
 
 model CustomerIdentityChange {
+  customer_version                                Int?
+  verification_method                             String?
+  old_phone_normalized                            String?
+  new_phone_normalized                            String?
+  old_card_id                                     String?                @db.Uuid
+  new_card_id                                     String?                @db.Uuid
+  applied_at                                      DateTime?              @db.Timestamptz(6)
+  audit_event_id                                  String?                @db.Uuid
+  actor_snapshot                                  Json?
+  audit_event                                     AuditEvent?            @relation(fields: [audit_event_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  card_customer_identity_change_new_card_idTocard Card?                  @relation("customer_identity_change_new_card_idTocard", fields: [new_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  card_customer_identity_change_old_card_idTocard Card?                  @relation("customer_identity_change_old_card_idTocard", fields: [old_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   id                    String                 @id @db.Uuid
   created_at            DateTime               @default(now()) @db.Timestamptz(6)
   customer_id           String                 @db.Uuid
@@ -795,6 +834,8 @@ model GiveawaySnapshotSource {
 }
 
 model AuditEvent {
+  customer_identity_change    CustomerIdentityChange[]
+  customer_recovery_case      customer_recovery_case[]
   id                String    @id @db.Uuid
   created_at        DateTime  @default(now()) @db.Timestamptz(6)
   actor_user_id     String?   @db.Uuid
@@ -1138,4 +1179,66 @@ model ReviewEvaluation {
  provenance Json @db.JsonB
  created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
  @@map("review_evaluation")
+}
+
+model customer_recovery_case {
+  id                         String     @id @db.Uuid
+  created_at                 DateTime   @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  customer_id                String     @db.Uuid
+  customer_version_at_intake Int
+  actor_id                   String     @db.Uuid
+  operation_id               String     @db.Uuid
+  state                      String     @default("awaiting_policy_and_decision")
+  customer_present           Boolean
+  reason                     String
+  verification_notes         String
+  audit_event_id             String     @db.Uuid
+  version                    Int        @default(1)
+  actor_snapshot             Json
+  admin                      Admin      @relation(fields: [actor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  audit_event                AuditEvent @relation(fields: [audit_event_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer                   Customer   @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([actor_id, operation_id])
+}
+
+model phone_verification_attempt {
+  id                        String                @id @db.Uuid
+  challenge_id              String                @db.Uuid
+  actor_user_id             String                @db.Uuid
+  operation_id              String                @db.Uuid
+  request_hmac              String
+  key_version               String
+  outcome                   String
+  applied_challenge_version Int
+  occurred_at               DateTime              @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  result_snapshot           Json?
+  auth_user                 AuthUser              @relation(fields: [actor_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  verification_challenge    VerificationChallenge @relation(fields: [challenge_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([actor_user_id, operation_id])
+}
+
+model phone_verification_delivery {
+  id                                                                                           String                  @id @db.Uuid
+  created_at                                                                                   DateTime                @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  customer_id                                                                                  String                  @db.Uuid
+  generation                                                                                   BigInt
+  challenge_id                                                                                 String                  @unique @db.Uuid
+  issuer_admin_id                                                                              String                  @db.Uuid
+  purpose                                                                                      String
+  destination_phone                                                                            String
+  target_hmac                                                                                  String
+  key_version                                                                                  String
+  state                                                                                        String
+  lease_nonce                                                                                  String?
+  lease_until                                                                                  DateTime?               @db.Timestamptz(6)
+  fencing_version                                                                              BigInt                  @default(0)
+  failure_code                                                                                 String?
+  verification_challenge_phone_verification_delivery_challenge_idToverification_challenge      VerificationChallenge   @relation("phone_verification_delivery_challenge_idToverification_challenge", fields: [challenge_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  customer                                                                                     Customer                @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  admin                                                                                        Admin                   @relation(fields: [issuer_admin_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  verification_challenge_verification_challenge_phone_delivery_idTophone_verification_delivery VerificationChallenge[] @relation("verification_challenge_phone_delivery_idTophone_verification_delivery")
+
+  @@unique([customer_id, generation])
 }
