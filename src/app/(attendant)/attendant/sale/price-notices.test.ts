@@ -27,7 +27,7 @@ describe("P-27 price notices", () => {
       adoptedPriceNotices(
         price,
         { ...price, version: 2, rateKobo: "150000" },
-        "kg",
+        "kilogram",
       ),
     ).toEqual(["Price updated to ₦1,500.00 per kilogram"]);
   });
@@ -38,7 +38,7 @@ describe("P-27 price notices", () => {
       rateKobo: "150000",
       quantityPrecision: 2,
     };
-    expect(retainedPriceWarnings(price, current, "kg")).toEqual([
+    expect(retainedPriceWarnings(price, current, "kilogram")).toEqual([
       "Price updated to ₦1,500.00 per kilogram for new sales. This sale keeps ₦1,000.00 per kilogram. Check the meter before saving.",
       "Quantity precision updated for new sales. This sale keeps its original quantity precision. Check the meter before saving.",
     ]);

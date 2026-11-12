@@ -291,6 +291,10 @@ function Sale() {
     const generation = request.current;
     if (mode === "photo") markCaptureStarted();
     try {
+      // Reserve the price at photo intent before any other asynchronous read.
+      // beginCapture validates authority inside that same transaction.
+      if (mode === "photo" && !(await ensureDraft())) return;
+      // Existing drafts also need a fresh authority check before camera access.
       await client.checkAccess();
       if (
         client.getState().access !== "active" ||
@@ -299,8 +303,6 @@ function Sale() {
         client.getState().session?.captureContextId !== contextId
       )
         return;
-      if (mode === "photo" && !(await ensureDraft())) return;
-      if (generation !== request.current || !mounted.current) return;
       setCamera(mode);
     } catch (e) {
       setError(message(e));

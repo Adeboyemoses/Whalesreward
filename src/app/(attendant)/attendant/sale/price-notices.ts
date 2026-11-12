@@ -1,13 +1,14 @@
 import { formatNaira, parseKobo } from "../../../../shared/money";
 import type { Session } from "@/client/types";
 type Price = Session["price"];
-const rate = (price: Price, unit: string) =>
-  `${formatNaira(parseKobo(price.rateKobo))} per ${unit === "kg" ? "kilogram" : "litre"}`;
+type Unit = Session["product"]["unit"];
+const rate = (price: Price, unit: Unit) =>
+  `${formatNaira(parseKobo(price.rateKobo))} per ${unit === "kilogram" ? "kilogram" : "litre"}`;
 /** Version comparison is notification-only; adoption belongs to the client transaction. */
 export function adoptedPriceNotices(
   previous: Price,
   current: Price,
-  unit: string,
+  unit: Unit,
 ): string[] {
   if (current.version <= previous.version) return [];
   const messages: string[] = [];
@@ -20,7 +21,7 @@ export function adoptedPriceNotices(
 export function retainedPriceWarnings(
   frozen: Price,
   current: Price,
-  unit: string,
+  unit: Unit,
 ): string[] {
   const messages: string[] = [];
   if (current.rateKobo !== frozen.rateKobo)
