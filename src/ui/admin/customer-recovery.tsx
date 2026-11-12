@@ -225,6 +225,7 @@ export function CustomerRecovery({ id, mode }: { id: string; mode: Mode }) {
     await run(async (live) => {
       const fresh =
         issueUncertain && issueContext ? issueContext : await api.context(id);
+      if (!live()) return;
       if (!fresh.activeCard) throw new AdminError("card_unavailable", 422);
       const operation =
         issueUncertain && issue
@@ -921,7 +922,7 @@ export function CustomerRecovery({ id, mode }: { id: string; mode: Mode }) {
               />
               {mode === "recovery" && (
                 <Notice>
-                  Recorded for a manager, nothing changed yet. No phone or card
+                  This will be recorded for a manager. No phone or card
                   change is authorized by this intake.
                 </Notice>
               )}
