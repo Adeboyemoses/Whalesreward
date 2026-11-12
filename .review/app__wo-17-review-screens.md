@@ -35,3 +35,6 @@ Native macOS browser restrictions required a clean Linux runner for the full sui
 WHR-117 tracks absent replacement read context; WHR-123 tracks an inherited preview-navigation test race observed in the temporary remote-browser harness.
 Dispatch flag exceeded: 14 calls cover builders, independent tests/fidelity, fixture diagnosis/fixes and two formal review rounds; no over-cap escalation was needed.
 No STATUS, coverage-map or lane-file edits in this feature diff, per WHR-63 and Earl's instruction.
+12 Nov refresh: merged staging baeb4c5 at 63ac7c7 without conflicts; app/client/UI/browser-test files are unchanged by the merge, so no new review round per Earl.
+EM reran typecheck, lint, 705 unit tests, build and the full browser gate on 63ac7c7: 296 passed, four existing staging-only skips, zero failures/retries (10.4 minutes).
+Earl merges PR #116 manually after required checks are green; no automatic merge is authorized for this refresh.
