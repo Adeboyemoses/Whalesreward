@@ -454,7 +454,10 @@ export const priceDecisionSchema = z.strictObject({
     z.strictObject({
       outcome: z.literal("correct_meter"),
       amountKobo: kobo,
-      quantity,
+      quantity: z
+        .string()
+        .regex(/^(0|[1-9][0-9]{0,13})(\.[0-9]{1,6})?$/)
+        .refine((v) => /[1-9]/.test(v)),
     }),
     z.strictObject({ outcome: z.literal("cancel") }),
   ]),
