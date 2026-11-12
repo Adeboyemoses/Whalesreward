@@ -6,7 +6,7 @@ import {
   phoneChallengeSchema,
   identityChangeSchema,
   managerCaseViewSchema,
-} from "@/shared/contracts/customer-recovery";
+} from "../shared/contracts/customer-recovery";
 export type RecoveryContext = z.infer<typeof recoveryContextSchema>;
 export type PhoneChallenge = z.infer<typeof phoneChallengeSchema>;
 export type IdentityChange = z.infer<typeof identityChangeSchema>;

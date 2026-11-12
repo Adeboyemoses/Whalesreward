@@ -132,3 +132,28 @@
     min-height: var(--control-h);
   }
 }
+
+/* C02–C05 use the row's two-column form and quiet account summary. */
+.wr-recovery-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.wr-recovery-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-h);
+}
+.wr-recovery-check input {
+  width: var(--space-5);
+  height: var(--space-5);
+  flex-shrink: 0;
+  accent-color: var(--whale-600);
+}
+.wr-recovery-value {
+  font-family: var(--font-display);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}

@@ -1,5 +1,11 @@
 "use client";
 import Link from "next/link";
+import {
+  CustomerRecovery,
+  CustomerChanges,
+  ChangeReceipt,
+  ManagerCases,
+} from "./customer-recovery";
 import { useSearchParams } from "next/navigation";
 import type { AdminSession } from "@/client/admin-session";
 import {
@@ -57,6 +63,24 @@ export function CustomerPortal({
     return (
       <Notice>Open a customer profile to view their purchase history.</Notice>
     );
+  const mode = !scoped && id ? path[2] : undefined;
+  if (mode && ["phone", "replace-card", "recovery"].includes(mode)) {
+    if (!grants.includes("recovery"))
+      return (
+        <Notice tone="danger" role="alert">
+          Your current permissions do not allow account changes.
+        </Notice>
+      );
+    return (
+      <div className="wr-customers-cards">
+        <CustomerRecovery
+          key={id + ":" + mode}
+          id={id!}
+          mode={mode as "phone" | "replace-card" | "recovery"}
+        />
+      </div>
+    );
+  }
   return (
     <div className="wr-customers-cards">
       {id ? (
@@ -234,6 +258,7 @@ function CustomerDetail({
         }}
       />
       <Loading {...result} label="Refreshing customer…" />
+      {!scoped && <ChangeReceipt id={id} />}
       {scoped ? (
         <Notice>
           <b>
@@ -270,6 +295,22 @@ function CustomerDetail({
                   },
                 ]}
               />
+              {session.permissions?.includes("recovery") && (
+                <div className="wr-cc-actions">
+                  <Link
+                    className="wr-btn wr-btn-secondary"
+                    href={`/admin/customers/${encodeURIComponent(id)}/phone`}
+                  >
+                    Update phone number
+                  </Link>
+                  <Link
+                    className="wr-btn wr-btn-secondary"
+                    href={`/admin/customers/${encodeURIComponent(id)}/replace-card`}
+                  >
+                    Replace lost card
+                  </Link>
+                </div>
+              )}
             </Sheet>
             <Sheet title="Loyalty card">
               {c.activeCardCode ? (
@@ -289,6 +330,11 @@ function CustomerDetail({
               </p>
             </Sheet>
           </div>
+          <CustomerChanges id={id} />
+          {(session.permissions?.includes("recovery") ||
+            session.permissions?.includes("managerRecovery")) && (
+            <ManagerCases id={id} />
+          )}
           <div className="wr-cc-kpis">
             <KPI
               label="Recorded spend"
