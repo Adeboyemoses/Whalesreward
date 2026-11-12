@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import {
   meterDatabase,
+  meterState,
   meterFixture,
   meterSucceeded,
   meterDenied,
@@ -20,6 +21,7 @@ import {
 import { fixtureId } from "../helpers/sync-fixture";
 import { newId } from "../../src/server/lib/ids";
 import type { MeterFixture } from "../helpers/meter-fixture";
+let httpUsed = false;
 let db: Awaited<ReturnType<typeof meterDatabase>>;
 describe("P-26 real PostgreSQL exact reconciliation", () => {
   beforeAll(async () => {
@@ -29,6 +31,8 @@ describe("P-26 real PostgreSQL exact reconciliation", () => {
     db = await meterDatabase();
   }, 30000);
   afterAll(async () => {
+    if (httpUsed)
+      await (await import("../../src/server/lib/db")).database().end();
     await db?.close();
     vi.unstubAllEnvs();
   });
@@ -359,25 +363,45 @@ describe("P-26 real PostgreSQL exact reconciliation", () => {
       expect(row.amount_kobo).toBe(amount);
     },
   );
-  it.each([
+  const numericDomainCases = [
     { amountKobo: "0" },
     { amountKobo: "-1" },
     { amountKobo: "9223372036854775808" },
-    { amountKobo: 1.5 },
-    { amountKobo: "1e3" },
+    { amountKobo: "999999999999999999999999999999" },
     { quantity: "0" },
     { quantity: "-1" },
     { quantity: "100000000000000" },
+    { quantity: "1.0000001" },
+  ];
+  const malformedCases = [
+    { amountKobo: 1.5 },
+    { amountKobo: "1e3" },
     { quantity: 1.1 },
     { quantity: "1e0" },
-    { quantity: "1.0000001" },
     { rateKobo: "110000" },
     { tolerance: "10" },
     { profile: newId() },
     { policy: "approved" },
     { captureTime: S },
-  ])(
-    "MR-T1-12 strict invalid scalar or override %j rolls back",
+  ];
+  it.each(numericDomainCases)(
+    "MR-T1-12 numerical domain %j returns calculation_invalid without mutation",
+    async (patch) => {
+      const x = await meterFixture(db);
+      await meterDenied(
+        x,
+        () =>
+          meterDecide(x, {
+            ...x.body,
+            decision: { ...x.body.decision, ...patch },
+          }),
+        "calculation_invalid",
+        422,
+      );
+    },
+  );
+  it.each(malformedCases)(
+    "MR-T1-12 malformed scalar or override %j rolls back",
     async (patch) => {
       const x = await meterFixture(db);
       await meterDenied(
@@ -390,6 +414,70 @@ describe("P-26 real PostgreSQL exact reconciliation", () => {
         "invalid_request",
         400,
       );
+    },
+  );
+  it.each([
+    ...numericDomainCases.map((patch) => ({
+      patch,
+      status: 422,
+      code: "calculation_invalid",
+    })),
+    ...malformedCases
+      .slice(0, 5)
+      .map((patch) => ({ patch, status: 400, code: "invalid_request" })),
+  ])(
+    "MR-T1-12 HTTP $status $code for $patch retains safe nonretryable envelope",
+    async ({ patch, status, code }) => {
+      const x = await meterFixture(db);
+      vi.stubEnv("DATABASE_URL", db.pool.options.connectionString);
+      vi.stubEnv("BETTER_AUTH_URL", "https://meter.example.test");
+      vi.stubEnv("WHR_REVIEW_EVIDENCE_POLICY", JSON.stringify(x.config));
+      vi.stubEnv("WHR_METER_POLICY", JSON.stringify(x.meterPolicy));
+      const { handleReviews } =
+        await import("../../src/server/modules/reviews/http");
+      const { correctionStorage } =
+        await import("../../src/server/modules/corrections/http");
+      httpUsed = true;
+      const spy = vi
+        .spyOn(correctionStorage, "read")
+        .mockImplementation((key, max) => x.h.storage.read(key, max));
+      const before = await meterState(x);
+      try {
+        const response = await handleReviews(
+          new Request(
+            `https://meter.example.test/api/admin/sales/${x.sale.purchaseId}/holds/${x.holdId}/price-decision`,
+            {
+              method: "POST",
+              headers: {
+                origin: "https://meter.example.test",
+                "content-type": "application/json",
+                cookie: `__Host-whr-admin-session=${x.token}`,
+              },
+              body: JSON.stringify({
+                ...x.body,
+                decision: { ...x.body.decision, ...patch },
+              }),
+            },
+          ),
+          "price",
+          x.sale.purchaseId,
+          x.holdId,
+        );
+        expect(response.status).toBe(status);
+        expect(response.headers.get("cache-control")).toBe("no-store");
+        expect(await response.json()).toEqual({
+          error: {
+            code,
+            message: "This request could not be completed.",
+            retryable: false,
+          },
+          serverTime: expect.any(String),
+          requestId: expect.any(String),
+        });
+        expect(await meterState(x)).toEqual(before);
+      } finally {
+        spy.mockRestore();
+      }
     },
   );
   it.each([

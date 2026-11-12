@@ -1,3 +1,4 @@
+import { validateMeterPair } from "./meter-math";
 import { pinMeterPolicy } from "./meter-config";
 import { evaluateMeter } from "./meter-evaluator";
 import {
@@ -639,11 +640,17 @@ export function createReviewsService({
         "decision" in body && body.decision.outcome === "correct_meter"
           ? body.decision
           : null;
+      const meterPair = meterDecision
+        ? validateMeterPair(
+            meterDecision.amountKobo,
+            meterDecision.quantity,
+            r.values.quantityPrecision,
+          )
+        : null;
       if (
-        meterDecision &&
-        BigInt(meterDecision.amountKobo) === BigInt(r.values.amountKobo) &&
-        parseQuantity(meterDecision.quantity) ===
-          parseQuantity(r.values.quantity)
+        meterPair &&
+        meterPair.amount === BigInt(r.values.amountKobo) &&
+        meterPair.quantity === parseQuantity(r.values.quantity)
       )
         throw new AuthError("no_change", 409);
       const meter = meterDecision

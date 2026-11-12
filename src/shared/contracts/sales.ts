@@ -453,11 +453,10 @@ export const priceDecisionSchema = z.strictObject({
     z.strictObject({ outcome: z.literal("accept_captured") }),
     z.strictObject({
       outcome: z.literal("correct_meter"),
-      amountKobo: kobo,
-      quantity: z
-        .string()
-        .regex(/^(0|[1-9][0-9]{0,13})(\.[0-9]{1,6})?$/)
-        .refine((v) => /[1-9]/.test(v)),
+      // Meter syntax is separate from the P-26 numerical domain (422).
+      // Ordinary capture/entry schemas retain their positive bounded types.
+      amountKobo: z.string().regex(/^-?(0|[1-9][0-9]*)$/),
+      quantity: z.string().regex(/^-?(0|[1-9][0-9]*)(\.[0-9]+)?$/),
     }),
     z.strictObject({ outcome: z.literal("cancel") }),
   ]),

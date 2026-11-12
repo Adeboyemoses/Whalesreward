@@ -1,6 +1,23 @@
 import { parseQuantity, QUANTITY_SCALE } from "../../../shared/quantity";
 import { MAX_KOBO } from "../../../shared/money";
 import { AuthError } from "../auth/errors";
+/** Validate the domain before no-change comparison or arithmetic; wire syntax is checked separately. */
+export function validateMeterPair(
+  amount: string,
+  quantity: string,
+  precision: number,
+) {
+  try {
+    // Bound text before conversion; syntactically numeric overflow is a domain denial.
+    if (!/^[1-9][0-9]{0,18}$/.test(amount)) throw new Error();
+    const A = BigInt(amount),
+      Q = parseQuantity(quantity, precision);
+    if (A > MAX_KOBO) throw new Error();
+    return { amount: A, quantity: Q };
+  } catch {
+    throw new AuthError("calculation_invalid", 422);
+  }
+}
 /** Rational kobo. No rounding, division, binary floating point or business tolerance. */
 export function compareMeterPair(
   amount: string,
@@ -11,10 +28,11 @@ export function compareMeterPair(
   precision: number,
 ) {
   try {
-    const A = BigInt(amount),
+    const pair = validateMeterPair(amount, quantity, precision),
+      A = pair.amount,
+      Q = pair.quantity,
       r = BigInt(rate),
       sA = BigInt(amountStep),
-      Q = parseQuantity(quantity, precision),
       sQ = parseQuantity(quantityStep, precision);
     if (
       A <= 0n ||
