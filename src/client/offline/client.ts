@@ -5,12 +5,14 @@ import {
   normalizeCardCode,
   sessionSchema,
   authSessionSchema,
+  lookupResponseSchema,
   isRestricted,
   type RestrictedSession,
   type FirstPasswordInput,
   type ConfiguredAssignment,
   type Session,
   type Lookup,
+  type PriceRefresh,
   type OutboxRow,
   type OfflineWindow,
   type ClientState,
@@ -131,8 +133,9 @@ export class AttendantClient {
         }
         return state.session;
       },
-      lock: (session, code) =>
-        this.lockContext(session, code !== "online_sign_in_required"),
+      lock: async (session, code) => {
+        await this.lockContext(session, code !== "online_sign_in_required");
+      },
       changed: () => this.salesChanged(),
     });
     this.correctionSynchronizer = new CorrectionSynchronizer({
@@ -140,8 +143,9 @@ export class AttendantClient {
       db,
       now: () => this.clock().wall,
       authorize: () => this.authorizeCorrectionSync(),
-      lock: (session, code) =>
-        this.lockContext(session, code !== "online_sign_in_required"),
+      lock: async (session, code) => {
+        await this.lockContext(session, code !== "online_sign_in_required");
+      },
       changed: () => this.salesChanged(),
     });
     if (
@@ -263,7 +267,12 @@ export class AttendantClient {
             await this.db.windows.update(found.activeAccountId, {
               locked: true,
             });
-          const claimed = { ...found, activeAccountId: null, signInAttempt };
+          const claimed = {
+            ...found,
+            activeAccountId: null,
+            signInAttempt,
+            authGeneration: signInAttempt,
+          };
           await this.db.meta.put(claimed);
           return claimed;
         }
@@ -274,6 +283,7 @@ export class AttendantClient {
           logoutPending: false,
           logoutOperationId: null,
           signInAttempt: signInAttempt ?? null,
+          authGeneration: signInAttempt ?? uuidv7(),
         };
         await this.db.meta.add(row);
         return row;
@@ -715,6 +725,7 @@ export class AttendantClient {
         logoutPending: true,
         logoutOperationId: key,
         signInAttempt: null,
+        authGeneration: key,
       });
     });
     this.publish({ session: null, access: "signed_out", logoutPending: true });
@@ -738,7 +749,11 @@ export class AttendantClient {
     const context = before.session?.captureContextId;
     const requestStarted = this.clock();
     try {
-      const response = authSessionSchema.parse(await this.api.session());
+      const raw = await this.api.session();
+      if (epoch !== this.authEpoch) return this.state;
+      const parsed = authSessionSchema.safeParse(raw);
+      if (!parsed.success) throw invalidPriceResponse();
+      const response = parsed.data;
       if (epoch !== this.authEpoch) return this.state;
       if (isRestricted(response)) {
         if (
@@ -756,8 +771,11 @@ export class AttendantClient {
         return this.checkAccess();
       }
       const fresh = sessionSchema.parse(response);
-      if (fresh.account.id !== account || fresh.captureContextId !== context) {
-        await this.lockContext(before.session, true);
+      if (!sameCaptureContext(before.session, fresh)) {
+        await this.lockContext(before.session, true, {
+          epoch,
+          generation: meta.authGeneration ?? null,
+        });
         return this.checkAccess();
       }
       await this.db.transaction(
@@ -766,21 +784,25 @@ export class AttendantClient {
         this.db.windows,
         async () => {
           if (epoch !== this.authEpoch) return;
-          const meta = await this.db.meta.get("installation");
+          const current = await this.db.meta.get("installation");
           const row = await this.db.windows.get(account!);
           if (
-            meta?.activeAccountId !== account ||
-            meta.logoutPending ||
+            !current ||
+            current.activeAccountId !== account ||
+            current.logoutPending ||
+            (current.authGeneration ?? null) !==
+              (meta.authGeneration ?? null) ||
             !row ||
             row.captureContextId !== context ||
-            row.logoutPending
+            row.logoutPending ||
+            !sameCaptureContext(row.session, fresh)
           )
             return;
           if (
             fresh.lastOnlineSignInAt !== row.lastOnlineSignInAt ||
             fresh.offlineExpiresAt !== row.offlineExpiresAt
           ) {
-            await this.db.windows.update(account, { locked: true });
+            await this.db.windows.update(account!, { locked: true });
             return;
           }
           // Reconcile at this transaction's clock sample. Neither a slow response
@@ -788,28 +810,45 @@ export class AttendantClient {
           const now = this.clock();
           const transit = requestDuration(requestStarted, now);
           const advanced = this.advance(row, now);
-          const next = {
-            ...advanced,
-            session: {
-              ...fresh,
-              // A same-context response may predate the configured-target read.
-              // Only explicit sign-in acknowledges a new assignment.
-              reassignmentRequiresSignIn:
-                row.session.reassignmentRequiresSignIn ||
-                fresh.reassignmentRequiresSignIn,
+          const trustedTime =
+            Date.parse(fresh.serverTime) > Date.parse(row.lastTrustedServerTime)
+              ? fresh.serverTime
+              : row.lastTrustedServerTime;
+          let next = this.advance(
+            {
+              ...advanced,
+              session: {
+                ...row.session,
+                serverTime: trustedTime,
+                // A same-context response may predate the configured-target read.
+                // Only explicit sign-in acknowledges a new assignment.
+                reassignmentRequiresSignIn:
+                  row.session.reassignmentRequiresSignIn ||
+                  fresh.reassignmentRequiresSignIn,
+              },
+              lastTrustedServerTime: trustedTime,
+              elapsedAtCheckpointMs: Math.max(
+                advanced.elapsedAtCheckpointMs,
+                Date.parse(fresh.serverTime) -
+                  Date.parse(row.lastOnlineSignInAt) +
+                  (transit ?? 0),
+              ),
+              locked: advanced.locked || transit === null,
             },
-            lastTrustedServerTime: fresh.serverTime,
-            elapsedAtCheckpointMs: Math.max(
-              advanced.elapsedAtCheckpointMs,
-              Date.parse(fresh.serverTime) -
-                Date.parse(row.lastOnlineSignInAt) +
-                (transit ?? 0),
-            ),
-            locked: advanced.locked || transit === null,
-          };
-          await this.db.windows.put(this.advance(next, now));
+            now,
+          );
+          if (!next.locked)
+            next = {
+              ...next,
+              session: {
+                ...next.session,
+                price: adoptPrice(row.session.price, fresh.price),
+              },
+            };
+          await this.db.windows.put(next);
         },
       );
+      this.signal();
     } catch (error) {
       if (
         error instanceof ClientError &&
@@ -820,9 +859,17 @@ export class AttendantClient {
         ].includes(error.code)
       ) {
         if (epoch !== this.authEpoch) return this.state;
-        if (before.session) await this.lockContext(before.session, true);
+        if (before.session)
+          await this.lockContext(before.session, true, {
+            epoch,
+            generation: meta.authGeneration ?? null,
+          });
         else if (this.restricted) await this.clearRestricted();
-      }
+      } else if (
+        error instanceof ClientError &&
+        ["invalid_response", "app_update_required"].includes(error.code)
+      )
+        throw error;
     }
     return this.checkAccess();
   }
@@ -841,32 +888,47 @@ export class AttendantClient {
     )
       await this.lockContext(session, true);
   }
-  private async lockContext(session: Session, clearVisible = false) {
-    await this.db.transaction("rw", this.db.meta, this.db.windows, async () => {
-      const meta = await this.db.meta.get("installation");
-      const row = await this.db.windows.get(session.account.id);
-      // An old response can revoke only the context that issued its request.
-      if (
-        meta?.activeAccountId === session.account.id &&
-        row?.captureContextId === session.captureContextId
-      ) {
-        await this.db.windows.update(session.account.id, { locked: true });
-        if (clearVisible) {
-          await this.db.meta.update("installation", {
-            activeAccountId: null,
-            signInAttempt: null,
-          });
-          ++this.authEpoch;
-          this.restricted = null;
-          this.accessNotice =
-            "Your session ended. Sign in online again. Pending sales and photos stay on this phone.";
-          this.synchronizer.stop();
-          this.correctionSynchronizer.stop();
+  private async lockContext(
+    session: Session,
+    clearVisible = false,
+    expected?: { epoch: number; generation: string | null },
+  ) {
+    const locked = await this.db.transaction(
+      "rw",
+      this.db.meta,
+      this.db.windows,
+      async () => {
+        const meta = await this.db.meta.get("installation");
+        const row = await this.db.windows.get(session.account.id);
+        // An old response can revoke only the context that issued its request.
+        if (
+          meta?.activeAccountId === session.account.id &&
+          row?.captureContextId === session.captureContextId &&
+          (!expected ||
+            (expected.epoch === this.authEpoch &&
+              expected.generation === (meta.authGeneration ?? null)))
+        ) {
+          await this.db.windows.update(session.account.id, { locked: true });
+          if (clearVisible) {
+            await this.db.meta.update("installation", {
+              activeAccountId: null,
+              signInAttempt: null,
+            });
+            ++this.authEpoch;
+            this.restricted = null;
+            this.accessNotice =
+              "Your session ended. Sign in online again. Pending sales and photos stay on this phone.";
+            this.synchronizer.stop();
+            this.correctionSynchronizer.stop();
+          }
+          return true;
         }
-      }
-    });
+        return false;
+      },
+    );
     this.signal();
     await this.checkAccess();
+    return locked;
   }
   private async active(): Promise<Session> {
     const state = await this.checkAccess();
@@ -899,7 +961,10 @@ export class AttendantClient {
     source: "code" | "qr",
     requireOnline: boolean,
   ): Promise<Lookup | null> {
+    const epoch = this.authEpoch;
     const session = await this.active();
+    const generation = (await this.installation()).authGeneration ?? null;
+    if (epoch !== this.authEpoch) throw this.accountChanged();
     const code = normalizeCardCode(value);
     if (requireOnline && !this.online())
       throw new ClientError(
@@ -913,7 +978,7 @@ export class AttendantClient {
         this.db.windows,
         this.db.customers,
         async () => {
-          await this.assertCurrentContext(session);
+          await this.assertCurrentContext(session, epoch, generation);
           const cached = await this.db.customers.get([
             session.account.id,
             code,
@@ -931,11 +996,14 @@ export class AttendantClient {
         },
       );
     }
-    let found: Lookup;
+    let found: ReturnType<typeof lookupResponseSchema.parse>;
     try {
-      found = await this.api.lookup(
+      const response = await this.api.lookup(
         source === "qr" ? { source: "qr", qr: code } : { source: "code", code },
       );
+      const parsed = lookupResponseSchema.safeParse(response);
+      if (!parsed.success) throw invalidPriceResponse();
+      found = parsed.data;
     } catch (error) {
       if (
         error instanceof ClientError &&
@@ -944,8 +1012,15 @@ export class AttendantClient {
           "permission_denied",
           "assignment_unavailable",
         ].includes(error.code)
-      )
-        await this.lockContext(session, true);
+      ) {
+        const locked = await this.lockContext(session, true, {
+          epoch,
+          generation,
+        });
+        // A stale authority denial must not be handed back as a current denial:
+        // callers also observe errors, and could otherwise revoke the new context.
+        if (!locked) throw this.accountChanged();
+      }
       throw error;
     }
     if (found.cardCode !== code)
@@ -959,7 +1034,16 @@ export class AttendantClient {
       this.db.windows,
       this.db.customers,
       async () => {
-        await this.assertCurrentContext(session);
+        const row = await this.assertCurrentContext(session, epoch, generation);
+        if (found.priceRefresh) {
+          if (!matchesRefresh(row.session, found.priceRefresh))
+            throw invalidPriceResponse();
+          const price = adoptPrice(row.session.price, found.priceRefresh.price);
+          await this.db.windows.put({
+            ...row,
+            session: { ...row.session, price },
+          });
+        }
         await this.db.customers.put({
           cardCode: found.cardCode,
           customer: {
@@ -974,45 +1058,92 @@ export class AttendantClient {
         });
       },
     );
-    return found;
+    this.signal();
+    await this.checkAccess();
+    if (epoch !== this.authEpoch) throw this.accountChanged();
+    return minimalLookup(found);
   }
-  private async assertCurrentContext(session: Session) {
+  private async assertCurrentContext(
+    session: Session,
+    epoch?: number,
+    generation?: string | null,
+  ): Promise<OfflineWindow> {
     const meta = await this.db.meta.get("installation");
     const row = await this.db.windows.get(session.account.id);
     if (
       meta?.activeAccountId !== session.account.id ||
       meta.logoutPending ||
+      (epoch !== undefined && epoch !== this.authEpoch) ||
+      (generation !== undefined &&
+        generation !== (meta.authGeneration ?? null)) ||
       row?.captureContextId !== session.captureContextId ||
+      !sameCaptureContext(row.session, session) ||
+      row.logoutPending ||
       row.locked
     )
       throw new ClientError("account_changed", "Sign in again to continue.");
+    const advanced = this.advance(row, this.clock());
+    if (advanced.locked)
+      throw new ClientError("access_expired", "Sign in again to continue.");
+    return advanced;
   }
-  /** Select before taking a photo. Later cache refreshes cannot change this snapshot. */
+  /** Only evidence already available at composition can become original evidence. */
   selectLookup(
     draft: CaptureDraft,
     value: string,
     lookup: Lookup | null,
+    options: { receiptAtComposition?: boolean } = {},
   ): CaptureDraft {
     const cardCode = normalizeCardCode(value);
     if (lookup && lookup.cardCode !== cardCode)
       throw new ClientError("lookup_required", "Look up this card again.");
-    const customer = lookup ? structuredClone(lookup) : null;
+    const selected = draft.selectedLookup;
+    const lookupReceipt = selected
+      ? selected.cardCode === cardCode
+        ? selected.lookupReceipt
+        : null
+      : options.receiptAtComposition
+        ? (lookup?.lookupReceipt ?? null)
+        : null;
+    const customer = lookup
+      ? { ...minimalLookup(lookup), lookupReceipt }
+      : null;
     return {
       ...draft,
       selectedLookup: {
         cardCode,
-        lookupReceipt: lookup?.lookupReceipt ?? null,
+        lookupReceipt,
         customer,
       },
     };
   }
   async beginCapture(): Promise<CaptureDraft> {
+    const epoch = this.authEpoch;
     const session = await this.active();
-    return {
-      operationId: uuidv7(),
-      appCapturedAt: new Date(this.clock().wall).toISOString(),
-      session: structuredClone(session),
-    };
+    const generation = (await this.installation()).authGeneration ?? null;
+    const draft = await this.db.transaction(
+      "rw",
+      this.db.meta,
+      this.db.windows,
+      async () => {
+        const row = await this.assertCurrentContext(session, epoch, generation);
+        await this.db.windows.put(row);
+        return {
+          operationId: uuidv7(),
+          appCapturedAt: new Date(this.clock().wall).toISOString(),
+          session: structuredClone(row.session),
+        };
+      },
+    );
+    await this.checkAccess();
+    if (
+      epoch !== this.authEpoch ||
+      this.state.access !== "active" ||
+      !this.state.session ||
+      !sameCaptureContext(draft.session, this.state.session)
+    )
+      throw this.accountChanged();
+    return draft;
   }
   async saveCapture(
     draft: CaptureDraft,
@@ -1133,7 +1264,7 @@ export class AttendantClient {
         pumpCode: draft.session.pump.code,
         product: draft.session.product.code,
       },
-      customerCache: customer ? structuredClone(customer) : null,
+      customerCache: customer ? minimalLookup(customer) : null,
       photoBlob: photo.blob,
       photoDigest: digest,
       state: "saved",
@@ -1483,6 +1614,67 @@ export class AttendantClient {
     this.channel?.close();
     this.db.close();
   }
+}
+function invalidPriceResponse() {
+  return new ClientError(
+    "invalid_response",
+    "The service returned an invalid response. Try again.",
+  );
+}
+function sameCaptureContext(left: Session, right: Session) {
+  return (
+    left.account.id === right.account.id &&
+    left.captureContextId === right.captureContextId &&
+    left.station.id === right.station.id &&
+    left.assignment.id === right.assignment.id &&
+    left.pump.id === right.pump.id &&
+    left.product.id === right.product.id
+  );
+}
+function matchesRefresh(session: Session, candidate: PriceRefresh) {
+  return (
+    candidate.originatingAccountId === session.account.id &&
+    candidate.captureContextId === session.captureContextId &&
+    candidate.stationId === session.station.id &&
+    candidate.assignmentId === session.assignment.id &&
+    candidate.pumpId === session.pump.id &&
+    candidate.productId === session.product.id
+  );
+}
+/** Compare persisted versions, never response timing or the direction of the rate change. */
+function adoptPrice(
+  known: Session["price"],
+  candidate: Session["price"],
+): Session["price"] {
+  if (candidate.version < known.version) return known;
+  if (candidate.version === known.version) {
+    for (const field of [
+      "priceVersionId",
+      "rateKobo",
+      "currency",
+      "quantityPrecision",
+      "effectiveFrom",
+    ] as const) {
+      if (known[field] !== candidate[field]) throw invalidPriceResponse();
+    }
+    return known;
+  }
+  return structuredClone(candidate);
+}
+/** Wire refresh metadata belongs only to the current window, never a customer hint. */
+function minimalLookup(lookup: Lookup): Lookup {
+  return {
+    cardCode: lookup.cardCode,
+    customer: {
+      id: lookup.customer.id,
+      name: lookup.customer.name,
+      category: lookup.customer.category,
+    },
+    lookedUpAt: lookup.lookedUpAt,
+    ...(lookup.lookupReceipt !== undefined
+      ? { lookupReceipt: lookup.lookupReceipt }
+      : {}),
+  };
 }
 function canonicalQuantity(value: string, precision: number) {
   const scaled = parseQuantity(value, precision);

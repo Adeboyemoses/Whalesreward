@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { lookupReceiptSchema } from "../shared/contracts/lookup-receipt";
+import { priceSnapshotSchema } from "../shared/contracts/auth";
+import { priceRefreshSchema } from "../shared/contracts/sync";
 const id = z.uuidv7();
 const instant = z.iso.datetime({ offset: true });
 const label = z
@@ -8,10 +10,6 @@ const label = z
   .max(120)
   .regex(/^[^\u0000-\u001f\u007f]*$/);
 const version = z.number().int().min(1).max(2147483647);
-const kobo = z
-  .string()
-  .regex(/^(0|[1-9]\d*)$/)
-  .refine((v) => BigInt(v) > 0n && BigInt(v) <= 9223372036854775807n);
 export const productSchema = z.enum([
   "pms",
   "diesel",
@@ -26,15 +24,8 @@ export const categorySchema = z.enum([
   "keg_buyer",
   "cooking_gas_customer",
 ]);
-export const priceSchema = z.strictObject({
-  priceVersionId: id,
-  version,
-  rateKobo: kobo,
-  currency: z.literal("NGN"),
-  quantityPrecision: z.number().int().min(0).max(6),
-  effectiveFrom: instant,
-  fetchedAt: instant,
-});
+export const priceSchema = priceSnapshotSchema;
+export type PriceRefresh = z.infer<typeof priceRefreshSchema>;
 export const sessionSchema = z
   .strictObject({
     account: z.strictObject({
@@ -144,6 +135,15 @@ export type Session = z.infer<typeof sessionSchema>;
 export const lookupResponseSchema = z
   .union([
     lookupSchema
+      .extend({
+        lookupReceipt: lookupReceiptSchema.nullable(),
+        priceRefresh: priceRefreshSchema.nullable(),
+      })
+      .strict(),
+    lookupSchema
+      .extend({ priceRefresh: priceRefreshSchema.nullable() })
+      .strict(),
+    lookupSchema
       .extend({ lookupReceipt: lookupReceiptSchema.nullable() })
       .strict(),
     lookupSchema,
@@ -151,7 +151,10 @@ export const lookupResponseSchema = z
   .transform((value) => ({
     ...value,
     lookupReceipt: "lookupReceipt" in value ? value.lookupReceipt : null,
+    priceRefresh: "priceRefresh" in value ? value.priceRefresh : null,
   }));
+/** Wire-only extension; public lookup hints and persisted customer rows exclude it. */
+export type LookupResponse = Lookup & { priceRefresh?: PriceRefresh | null };
 export type Lookup = z.infer<typeof lookupSchema> & {
   lookupReceipt?: string | null;
 };

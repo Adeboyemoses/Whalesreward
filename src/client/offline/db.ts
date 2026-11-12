@@ -8,6 +8,8 @@ export type Installation = {
   logoutPending: boolean;
   logoutOperationId: string | null;
   signInAttempt?: string | null;
+  /** Optional for existing installations; fences reads across same-context sign-in replays. */
+  authGeneration?: string;
 };
 /** Storage access is internal; the public client only exposes the active partition. */
 export class CaptureDatabase extends Dexie {
