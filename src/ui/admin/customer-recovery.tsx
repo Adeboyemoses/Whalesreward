@@ -995,7 +995,7 @@ export function CustomerChanges({ id }: { id: string }) {
     identityChangeSchema,
   );
   return (
-    <Sheet title="Account change history">
+    <section className="wr-sheet">
       <PageState page={page} empty="No account changes recorded." />
       <DataTable
         caption="Account change history"
@@ -1043,7 +1043,7 @@ export function CustomerChanges({ id }: { id: string }) {
         Every change keeps old and new values, the actor, the verification
         method and the reason. A repeated confirmation never applies twice.
       </p>
-    </Sheet>
+    </section>
   );
 }
 export function ManagerCases({ id }: { id: string }) {
