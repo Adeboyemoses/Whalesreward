@@ -11,9 +11,9 @@ The small default CI regression set uses real authenticated lookup responses but
 | PR-T1-03 | Real activation → lookup/session → new draft → immutable saved payload | Core activation/receipt race serialization |
 | PR-T1-04 | Delayed response order; decreasing rate; precision-only notice | Same-version conflicts and whole-snapshot atomic monotonic comparison |
 | PR-T1-05 | Two-tab ordering and original expiry retained; context-change matrix owned by units | Full logout/account/fresh-signin/revocation/reassignment matrix |
-| PR-T1-06 | Empty lookup adoption before selection; earlier amount/medium/photo; two tabs | Transaction failure and latest persisted snapshot ordering |
+| PR-T1-06 | Empty lookup adoption before selection; earlier amount/medium/photo, photo-click immediate response release; two tabs | Transaction failure and latest persisted snapshot ordering |
 | PR-T1-07 | Repeated warning, discard clears photo/evidence/values, save-refresh race, quota failure retry | Frozen draft/operation behavior |
-| PR-T1-08 | Liquid amount and gas quantity, old/new precision and exact saved arithmetic | Shared exact math; precision-only versions never rewrite originals |
+| PR-T1-08 | Liquid amount and gas quantity, kilogram rate notices/warnings, old/new precision and exact saved arithmetic | Shared exact math; precision-only versions never rewrite originals |
 | PR-T1-09 | Offline after adoption; idle/reconnect request count; unchanged window anchors | 429/503/null/legacy fallback and existing capture-window suites |
 | PR-T1-10 | Saved evidence and original snapshot compared across repeated refresh, refresh timestamps excluded | Core P-23 on/off activation-at-U/recovery/hold tests |
 | PR-T1-11 | Before/after original+photo digest comparison; queue metadata absent | Populated legacy store rows retained byte/semantic identity, existing settled/finalized core preservation |
@@ -38,3 +38,9 @@ The initial run exposed a real composition race: a held lookup overtook the firs
 Independent screenshot inspection and measured phone layout are recorded in [the fidelity report](../design-parity/price-adoption/REPORT.md).
 
 Offline-builder unit sources: `src/client/price-refresh.test.ts` (four rollout shapes/header and malformed responses) and `src/client/offline/price-adoption.test.ts` (atomic adoption and preservation). Specific invariants include: whole newer snapshot before composition without customer-cache enrichment; delayed session cannot roll back newer lookup or elapsed checkpoint; equal-version conflicts reject both paths before any write; persistence failure publishes no adopted state; two clients compose from latest persisted version; stale logout/account/fresh-sign-in/expiry/lock/context bindings reject; legacy v1 original/blob/evidence and correction rows remain unchanged; failed-save retry retains original; late receipts never backfill; explicit customer change clears only incompatible selected evidence. These unit results are reported by the builder and remain subject to EM final-head gates.
+
+## Round 1 regression follow-up
+
+Executed on test candidate `39615a4143acd7fec7b444a135c696792524bbc5` (production fix `7dd5ed6`), 12 Nov 2026, in the same isolated native Linux environment. The full dedicated suite now reports **16 passed (38.2s), 0 failed, 0 skipped, 0 retries**. The affected gas fidelity cases report **2 passed (10.2s)** at 390 and 360 pixels. The default four-case result above belongs to the earlier candidate; the EM reruns the full default browser gate on the final feature head.
+
+Before the fix, the three focused regressions reported **3 failed, 0 passed**: both real gas rate-change notices incorrectly used litres, and a pending lookup released from the actual photo-start click event changed the draft rate to ₦1,200.00 instead of retaining ₦1,000.00. The same assertions pass after the fix. The photo test releases before awaiting camera setup or taking the photo; it adds no artificial IndexedDB delay and uses an ordinary Playwright click. Saved originals still assert the earlier price/precision and absence of a later signed receipt. The gas cases assert both per-kilogram copy and exact immutable saved arithmetic, including the composed-draft receipt boundary.

@@ -26,3 +26,13 @@ Actual output on the candidate:
 - Fidelity capture and phone metrics: **4 passed (13.4s), 0 failed, 0 skipped**, producing twelve screenshots and twelve metric files.
 
 Reproduce with the guarded isolated database and commands in [the verification map](../../price-adoption/verification.md). The initial medium-versus-delayed-lookup race failed before client fix `61aabe0`; its original browser assertion is green on this candidate. No production files were changed by the checker.
+
+## Round 1 gas warning follow-up
+
+Candidate `39615a4143acd7fec7b444a135c696792524bbc5` includes production fix `7dd5ed6`. Two affected gas fidelity cases passed (10.2s), with zero failures, skips or retries. The two new `P27-GasKeptPrice-{390,360}.built.png` captures and matching metrics were inspected against the read-only A15 board and the approved P-27 brief. The prior twelve captures remain baseline evidence from the candidate identified above; they were not relabelled as this rerun.
+
+| Board | Match | Differences | Severity |
+| --- | --- | --- | --- |
+| P27-GasKeptPrice, 390 and 360 | Warning correctly says future ₦1,600.00 per kilogram and retained ₦1,500.00 per kilogram; original ₦15,000.00 and 10 kg remain | Approved rate and precision warnings add height under the original rate. Both wrap without overlap or clipping. No dedicated source board exists; checked against the exact approved brief. | note |
+
+Both new states measure viewport-width scroll area, one wordmark line, one footer text line and no visible controls below 48 CSS pixels. No new blocking difference was found. Baseline limitations above, including focus-ring and transient-state coverage, remain unchanged. The inherited offline footer difference is tracked in WHR-129. Functional regression evidence now totals 16 dedicated real cases, including both gas update/retained-rate notice cases and immediate photo-click lookup release; all pass after three focused pre-fix failures.
