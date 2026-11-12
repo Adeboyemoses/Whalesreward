@@ -1,0 +1,54 @@
+{
+  "viewport": 1440,
+  "document": 1440,
+  "forms": [
+    {
+      "tag": "A",
+      "type": null,
+      "width": 128,
+      "height": 40
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": null,
+      "width": 592.65625,
+      "height": 62
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": null,
+      "width": 592.65625,
+      "height": 62
+    },
+    {
+      "tag": "INPUT",
+      "type": "checkbox",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "tag": "BUTTON",
+      "type": "submit",
+      "width": 186,
+      "height": 40
+    },
+    {
+      "tag": "A",
+      "type": null,
+      "width": 151,
+      "height": 40
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 65,
+      "height": 40
+    }
+  ]
+}

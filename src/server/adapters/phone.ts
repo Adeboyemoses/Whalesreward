@@ -1,3 +1,4 @@
+import { normalizeMobilePhone } from "../../shared/phone";
 import { AuthError } from "../modules/auth/errors";
 /** Proposed D08 mobile policy, isolated so client approval never silently widens identity matching. */
 export interface PhoneNormalizer {
@@ -25,11 +26,8 @@ export function createPhoneNormalizer(options: PhonePolicy): PhoneNormalizer {
   return {
     normalize(input) {
       requirePhonePolicy(options);
-      if (input.length > 32 || !input || /[^+0-9 ()-]/.test(input))
-        throw new AuthError("phone_invalid", 422);
-      const value = input.replace(/[ ()-]/g, "");
-      if (/^0[789][01][0-9]{8}$/.test(value)) return `+234${value.slice(1)}`;
-      if (/^\+234[789][01][0-9]{8}$/.test(value)) return value;
+      const value = normalizeMobilePhone(input);
+      if (value !== null) return value;
       throw new AuthError("phone_invalid", 422);
     },
   };
