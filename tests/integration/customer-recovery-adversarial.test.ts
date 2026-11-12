@@ -138,6 +138,18 @@ async function rawChallenge(id: string) {
   ).rows[0].value;
 }
 
+async function recoveryPersistence(s: Setup) {
+  const rows = await f.pool.query(
+    `SELECT
+    (SELECT jsonb_agg(to_jsonb(v)) FROM verification_challenge v WHERE customer_id=$1) AS challenges,
+    (SELECT jsonb_agg(to_jsonb(d)) FROM phone_verification_delivery d WHERE customer_id=$1) AS deliveries,
+    (SELECT jsonb_agg(to_jsonb(r)) FROM mutation_receipt r WHERE actor_user_id=$2) AS receipts,
+    (SELECT jsonb_agg(to_jsonb(a)) FROM audit_event a WHERE actor_user_id=$2) AS audit`,
+    [s.c.id, s.actor.userId],
+  );
+  return JSON.stringify(rows.rows);
+}
+
 describe("customer recovery adversarial invariants", () => {
   it("I-15 concurrent canonical phone changes assign one customer and preserve the losing identity", async () => {
     const a = await setup(),
@@ -489,6 +501,237 @@ describe("customer recovery adversarial invariants", () => {
       body,
       s.options,
     );
+  });
+  it.each(["reject", "throw"] as const)(
+    "I-21a delivery %s fails closed durably and same-key retry never resends",
+    async (failure) => {
+      const s = await setup(),
+        providerCanary = randomBytes(24).toString("hex");
+      const input = { operationId: newId(), expectedVersion: s.c.version };
+      let sends = 0;
+      const adapter = {
+        ...s.h.adapter,
+        async request() {
+          sends++;
+          if (failure === "throw") throw new Error(providerCanary);
+          return {
+            outcome: "unavailable" as const,
+            providerPayload: providerCanary,
+          };
+        },
+      };
+      const options = { ...s.options, adapter };
+      const failed = await recoveryWrite(
+        f.pool,
+        config,
+        s.actor.token,
+        "issue",
+        s.c.id,
+        input,
+        options,
+      ).then(
+        () => null,
+        (error) => error as Error & { code: string; status: number },
+      );
+      expect(failed).toMatchObject({
+        code: "delivery_unavailable",
+        status: 503,
+      });
+      expect(JSON.stringify(failed).includes(providerCanary)).toBe(false);
+      expect(failed?.message.includes(providerCanary)).toBe(false);
+      const row = (
+        await f.pool.query(
+          "SELECT v.id,v.revoked_at,v.consumed_at,d.state,d.failure_code FROM verification_challenge v JOIN phone_verification_delivery d ON d.challenge_id=v.id WHERE v.customer_id=$1",
+          [s.c.id],
+        )
+      ).rows[0];
+      expect(row).toMatchObject({
+        state: "failed",
+        failure_code: "delivery_unavailable",
+        consumed_at: null,
+      });
+      expect(row.revoked_at).not.toBeNull();
+      const before = await rawChallenge(row.id);
+      const historical = phoneChallengeSchema.parse(
+        await recoveryWrite(
+          f.pool,
+          config,
+          s.actor.token,
+          "issue",
+          s.c.id,
+          input,
+          options,
+        ),
+      );
+      expect(historical).toMatchObject({
+        id: row.id,
+        state: "delivery_pending",
+        version: 1,
+      });
+      expect(sends).toBe(1);
+      expect(await rawChallenge(row.id)).toEqual(before);
+      expect(
+        await recoveryRead(
+          f.pool,
+          config,
+          s.actor.token,
+          "challenge",
+          s.c.id,
+          {},
+          row.id,
+        ),
+      ).toMatchObject({ state: "failed" });
+      const persisted = await recoveryPersistence(s);
+      expect(persisted.includes(providerCanary)).toBe(false);
+    },
+  );
+  it("I-21a an expired abandoned delivery lease is revoked on retry without another dispatch", async () => {
+    const s = await setup(),
+      input = { operationId: newId(), expectedVersion: s.c.version };
+    const providerCanary = randomBytes(24).toString("hex");
+    let entered!: () => void,
+      release!: () => void,
+      sends = 0;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const adapter = {
+      ...s.h.adapter,
+      async request() {
+        sends++;
+        entered();
+        await gate;
+        throw new Error(providerCanary);
+      },
+    };
+    // Real connection loss after the intent commit, while dispatch is in flight.
+    // The provider promise stays unresolved until a second request reconciles.
+    const original = recoveryWrite(
+      f.pool,
+      config,
+      s.actor.token,
+      "issue",
+      s.c.id,
+      input,
+      { ...s.options, adapter },
+    );
+    const settled = Promise.allSettled([original]);
+    try {
+      await started;
+      const active = await f.pool.query(
+        "SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND state='idle in transaction'",
+        [f.schema],
+      );
+      expect(active.rows).toHaveLength(1);
+      await f.pool.query("SELECT pg_terminate_backend($1)", [
+        active.rows[0].pid,
+      ]);
+      await f.pool.query(
+        "UPDATE phone_verification_delivery SET lease_until=clock_timestamp()-interval '1 second' WHERE customer_id=$1 AND state='sending'",
+        [s.c.id],
+      );
+      const pending = phoneChallengeSchema.parse(
+        await recoveryWrite(
+          f.pool,
+          config,
+          s.actor.token,
+          "issue",
+          s.c.id,
+          input,
+          { ...s.options, adapter },
+        ),
+      );
+      expect(pending.state).toBe("delivery_pending");
+      const current = phoneChallengeSchema.parse(
+        await recoveryRead(
+          f.pool,
+          config,
+          s.actor.token,
+          "challenge",
+          s.c.id,
+          {},
+          pending.id,
+        ),
+      );
+      expect(current.state).toBe("failed");
+      expect(current.expiresAt).toBe(pending.expiresAt);
+      const row = (
+        await f.pool.query(
+          "SELECT v.revoked_at,v.consumed_at,d.state,d.failure_code,d.lease_nonce,d.lease_until FROM verification_challenge v JOIN phone_verification_delivery d ON d.challenge_id=v.id WHERE v.id=$1",
+          [pending.id],
+        )
+      ).rows[0];
+      expect(row).toMatchObject({
+        state: "failed",
+        failure_code: "delivery_uncertain",
+        consumed_at: null,
+        lease_nonce: null,
+        lease_until: null,
+      });
+      expect(row.revoked_at).not.toBeNull();
+      expect(sends).toBe(1);
+      release();
+      expect((await settled)[0]!.status).toBe("rejected");
+      expect((await recoveryPersistence(s)).includes(providerCanary)).toBe(
+        false,
+      );
+    } finally {
+      release();
+      await settled;
+    }
+  });
+  it("I-21a lost issuance response replays the original nonsecret receipt without a second send", async () => {
+    const s = await setup(),
+      input = { operationId: newId(), expectedVersion: s.c.version };
+    const first = phoneChallengeSchema.parse(
+      await recoveryWrite(
+        f.pool,
+        config,
+        s.actor.token,
+        "issue",
+        s.c.id,
+        input,
+        s.options,
+      ),
+    );
+    const before = await rawChallenge(first.id),
+      code = s.h.code(first.id);
+    const replay = await recoveryWrite(
+      f.pool,
+      config,
+      s.actor.token,
+      "issue",
+      s.c.id,
+      input,
+      s.options,
+    );
+    expect(replay).toEqual(first);
+    expect(s.h.sends()).toBe(1);
+    expect(await rawChallenge(first.id)).toEqual(before);
+    expect(
+      await recoveryRead(
+        f.pool,
+        config,
+        s.actor.token,
+        "challenge",
+        s.c.id,
+        {},
+        first.id,
+      ),
+    ).toMatchObject({ state: "sent", expiresAt: first.expiresAt });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int AS n FROM phone_verification_delivery WHERE customer_id=$1",
+          [s.c.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect((await recoveryPersistence(s)).includes(code)).toBe(false);
+    expect(JSON.stringify(replay).includes(code)).toBe(false);
   });
   it("I-21a verification and consumed replacement replay preserve historical results without renewing authority", async () => {
     const s = await setup(),
