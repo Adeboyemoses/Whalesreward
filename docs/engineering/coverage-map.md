@@ -735,3 +735,18 @@ Inventory correction: the earlier four-occurrence verification counted table row
 | Health contract | Missing/invalid/inactive window disables only rule (a); rule (b) continues; duplicateWindow joins protected allowlist, aggregate-only public view | Spec on staging; runtime tests pending |
 
 M3 lists required boundary, concurrency, replay, multi-sale, continuation and health cases for implementation. P-24 is logged in INDEX; Rook's mirror request is on WHR-102. Client Q-555 remains pending. WHR-102 stays In Review at READY, and this session starts no implementation work.
+
+
+## WO-spec-3k / WHR-124 P-26 meter reconciliation READY — 12 Nov 2026
+
+[Spec PR #118](https://github.com/Adeboyemoses/Whalesreward/pull/118) merged at 6b8361a with five green checks. Independent code/security/integrity PASS at 194f493, round 2, no findings. EM typecheck/lint, 689 existing unit tests, build, 21 exact numeric fixtures/two T-10 calculations, local links, evidence and paragraph limit PASS. This separate records merge completes READY. The following [MR-T1 cases](contracts/m3.md#p-26-t1-implementation-verification--exact-required-cases) are required future tests, not implemented runtime coverage or board parity.
+
+| Invariants | Required implementation cases | Status |
+|---|---|---|
+| I-29, I-31 | MR-T1-01–13: exact pair, uniform historical rate, display allowance, boundaries, T-10 and verified profiles | Spec on staging; runtime tests pending |
+| I-28, I-28a, I-45a, I-45b | MR-T1-02–03/14: closed original bounds and immutable lookup evidence; no ratio-derived timestamp | Spec on staging; runtime tests pending |
+| I-07, I-09, I-10, I-25, I-48 | MR-T1-14–15/20: inspectable bound evidence, live dual permission, profile approvals and protected health | Spec on staging; runtime tests pending |
+| I-22, I-26, I-35, I-37, I-39, I-40, I-42, I-46 | MR-T1-16–18: guards, replay, policy races, all hold orders, P-19/P-22, candidate/contribution and frozen snapshots | Spec on staging; runtime tests pending |
+| I-41 | MR-T1-19–20: immutable exact provenance, bounded source closure and redaction | Spec on staging; runtime tests pending |
+
+Q-559 measured profiles/verification and separate implementation/activation remain required. P-26 settles the meter policy choice without settling Q-528/Q-556 or Q-557 attestation. Rook should mirror the decision in product docs. WHR-124 remains In Review at READY; Earl requested WHR-125 in a fresh session next.

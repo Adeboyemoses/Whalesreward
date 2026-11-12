@@ -6,6 +6,7 @@ WO-core-9b (WHR-114) review-evidence operator: READY since 2026-11-12
 - Decision [#117](https://github.com/Adeboyemoses/Whalesreward/pull/117), `0b2fa7e`, records T-19/WHR-116: persisted database-level identity, no session/role override. Earl-only setup and read-back are in docs/ops/review-evidence.md.
 - Default read-only dry run; explicit apply plus expected revision; built-in digest, scope lock, exact next revision and bound atomic immutable writes. Activation writes both rows; inactive policy follows M3 null approval/time. Policy output gives manual steps; DATABASE_URL remains process-only.
 - Code/security/integrity PASS round 1 at `568c822`; later merge touched only unrelated decision docs and evidence still validates. EM typecheck/lint/build, unit689 and PostgreSQL699 PASS. CI matches plus timezone5+5, browser276/four existing skips and storage1.
+- Shared records preserve the concurrent P-26 handoff; the conflict resolution received a separate code-reviewer recheck. Feature review remains round 1.
 - Named verification: docs/qa/verification-2026-11-12-review-evidence-operator.md. No open findings or review escalation.
 
 ## Next
@@ -20,4 +21,4 @@ WO-core-9b (WHR-114) review-evidence operator: READY since 2026-11-12
 - No public endpoint, cloud operation, managed data change, main promotion or deployed policy activation. Database identity setup is Earl-only and refuses relabelling an existing mismatched database.
 - Two inherited image lint warnings; four existing browser skips. No assertion, timeout or retry setting weakened.
 
-dispatches=8 prs=3 rounds_max=1 escalations=0 model=unavailable
+dispatches=9 prs=3 rounds_max=2 escalations=0 model=unavailable
