@@ -130,7 +130,7 @@ export async function verificationBridge(page: Page, customerId: string) {
   const previousNodeEnv = process.env.NODE_ENV,
     previousEnv = process.env.WHR_ENV;
   Object.assign(process.env, { NODE_ENV: "test", WHR_ENV: "local" });
-  let challengeId: string | undefined;
+  let challengeId: string | undefined, previousChallengeId: string | undefined;
   const errors: string[] = [];
   const routePattern = `**/api/admin/customers/${customerId}/**`;
   await page.route(routePattern, async (route) => {
@@ -169,7 +169,10 @@ export async function verificationBridge(page: Page, customerId: string) {
         { adapter: delivery.adapter, ip: "192.0.2.89" },
         target,
       );
-      if (action === "issue") challengeId = (data as { id: string }).id;
+      if (action === "issue") {
+        previousChallengeId = challengeId;
+        challengeId = (data as { id: string }).id;
+      }
       await route.fulfill({
         status: action === "issue" ? 202 : 200,
         contentType: "application/json",
@@ -206,11 +209,13 @@ export async function verificationBridge(page: Page, customerId: string) {
   });
   return {
     errors,
-    async enterCode(correct = true) {
+    async enterCode(correct = true, previous = false) {
       if (!challengeId) throw new Error("No issued challenge");
       // Never pass the secret to expect, test titles, attachments, console or traces.
+      const selected = previous ? previousChallengeId : challengeId;
+      if (!selected) throw new Error("No previous challenge");
       let value = correct
-        ? delivery.code(challengeId)
+        ? delivery.code(selected)
         : randomBytes(12).toString("hex");
       await page
         .getByLabel("Verification code", { exact: true })

@@ -33,17 +33,20 @@ test("I-15 I-41 C02 requires card attestation, masks review and preserves identi
     await page
       .getByLabel("Reason for change", { exact: true })
       .fill("Customer changed network provider.");
+    await page
+      .getByRole("button", { name: "Review phone update", exact: true })
+      .click();
     await expect(
-      page.getByRole("button", { name: "Review phone update", exact: true }),
-    ).toBeDisabled();
+      page.getByRole("button", { name: "Confirm change", exact: true }),
+    ).toHaveCount(0);
+    expect(await identityState(f)).toEqual(before);
     await fillPhone(page, nextPhone);
     await page
       .getByRole("button", { name: "Review phone update", exact: true })
       .click();
-    const review = page.locator("section").filter({
+    const review = page.locator(".wr-sheet").filter({
       has: page.getByRole("heading", {
-        name: "Confirm account change",
-        exact: true,
+        name: /^Confirm account change/,
       }),
     });
     await expect(review).toBeVisible();
@@ -54,10 +57,12 @@ test("I-15 I-41 C02 requires card attestation, masks review and preserves identi
       .click();
     await expect(page.getByText(/Change applied/).first()).toBeVisible();
     await expect(
-      page.getByRole("heading", {
-        name: "Account change history",
-        exact: true,
-      }),
+      page
+        .getByRole("heading", {
+          name: "Account change history",
+          exact: true,
+        })
+        .first(),
     ).toBeVisible();
     await expect(
       page
@@ -150,6 +155,16 @@ test("I-15 I-21 C02 refreshes context before review and refuses a changed card a
       .getByRole("button", { name: "Review phone update", exact: true })
       .click();
     expect((await (await read).json()).data.customerVersion).toBe(2);
+    await expect(
+      page.getByRole("alert").filter({ hasText: /changed/i }),
+    ).toBeVisible();
+    await fillPhone(page);
+    await page
+      .getByRole("button", { name: "Review phone update", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Confirm change", exact: true }),
+    ).toBeVisible();
     await f.db.query("UPDATE card SET version=version+1 WHERE id=$1", [
       f.oldCardId,
     ]);
@@ -166,7 +181,9 @@ test("I-15 I-21 C02 refreshes context before review and refuses a changed card a
       expectedCardVersion: 2,
     });
     expect((await response.json()).error.code).toBe("card_changed");
-    await expect(page.getByRole("alert")).toContainText(/card|changed/i);
+    await expect(
+      page.getByRole("alert").filter({ hasText: /card|changed/i }),
+    ).toBeVisible();
     expect((await identityState(f))[0].phone_normalized).toBe(
       `+234${f.phone.slice(1)}`,
     );
@@ -201,7 +218,8 @@ test("I-21a unconfigured C03 offers C04 and intake records one open case without
       .getByRole("button", { name: "Record for manager review", exact: true })
       .click();
     await expect(
-      page.getByText("Recorded for a manager, nothing changed yet", {
+      page.getByRole("heading", {
+        name: "Recorded for a manager, nothing changed yet",
         exact: true,
       }),
     ).toBeVisible();
@@ -245,10 +263,12 @@ test("I-07 customers-only can read C05 history but cannot enter recovery actions
   try {
     await page.goto(f.root);
     await expect(
-      page.getByRole("heading", {
-        name: "Account change history",
-        exact: true,
-      }),
+      page
+        .getByRole("heading", {
+          name: "Account change history",
+          exact: true,
+        })
+        .first(),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Update phone number", exact: true }),
@@ -287,17 +307,24 @@ test("I-09 revocation after review prevents a phone change and clears the action
     await page
       .getByRole("button", { name: "Review phone update", exact: true })
       .click();
+    await expect(
+      page.getByRole("button", { name: "Confirm change", exact: true }),
+    ).toBeVisible();
     await f.db.query(
       "DELETE FROM role_permission WHERE role_id=(SELECT role_id FROM admin WHERE id=$1) AND permission_code='recovery'",
       [f.adminId],
     );
-    const denied = page.waitForResponse((r) =>
-      r.url().endsWith("/phone-change"),
-    );
+
     await page
       .getByRole("button", { name: "Confirm change", exact: true })
       .click();
-    expect((await denied).status()).toBe(403);
+    expect(
+      (
+        await page.request.get(
+          `/api/admin/customers/${f.customerId}/recovery-context`,
+        )
+      ).status(),
+    ).toBe(403);
     await expect(
       page.getByRole("button", { name: "Confirm change", exact: true }),
     ).toHaveCount(0);
@@ -317,27 +344,51 @@ test("I-21 I-21a C03 verifies only through the server adapter, clears code memor
     await page
       .getByRole("button", { name: "Send verification code", exact: true })
       .click();
+    await page
+      .getByRole("button", { name: "Check verification status", exact: true })
+      .click();
     await expect(
       page.getByLabel("Verification code", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /^Resend code/ }),
     ).toBeDisabled();
-    await bridge.enterCode(false);
+    await expect(
+      page.getByRole("button", { name: "Resend code", exact: true }),
+    ).toBeEnabled({ timeout: 10000 });
+    await page
+      .getByRole("button", { name: "Resend code", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Check verification status", exact: true })
+      .click();
+    await bridge.enterCode(true, true);
     await page
       .getByRole("button", { name: "Verify code", exact: true })
       .click();
     await expect(
       page.getByLabel("Verification code", { exact: true }),
-    ).toHaveValue("");
-    await expect(page.getByRole("alert")).toContainText(/verification|code/i);
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("alert").filter({ hasText: /verification|code/i }),
+    ).toBeVisible();
     expect(bridge.errors).toContain("verification_unavailable");
+    await page
+      .getByRole("button", { name: "Check verification status", exact: true })
+      .click();
+    await expect(
+      page.getByLabel("Verification code", { exact: true }),
+    ).toBeVisible();
+    expect(
+      (await page.getByLabel("Verification code", { exact: true }).inputValue())
+        .length === 0,
+    ).toBe(true);
     await bridge.enterCode();
     await page
       .getByRole("button", { name: "Verify code", exact: true })
       .click();
     await expect(
-      page.getByText("Phone verified", { exact: true }),
+      page.getByText("Phone verified", { exact: true }).first(),
     ).toBeVisible();
     expect(
       (await page.getByLabel("Verification code", { exact: true }).count()) ===
@@ -347,12 +398,38 @@ test("I-21 I-21a C03 verifies only through the server adapter, clears code memor
           .inputValue()) === "",
     ).toBe(true);
     expect(await bridge.hasPersistedCode()).toBe(false);
+    await page.evaluate(() => {
+      Reflect.deleteProperty(window, "BarcodeDetector");
+    });
+    await page.getByRole("button", { name: "Scan", exact: true }).click();
+    await expect(
+      page.getByText(
+        "QR scanning is unavailable in this browser. Enter the printed code.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Enter printed code", exact: true })
+      .click();
     await page
       .getByLabel("Unused card number", { exact: true })
-      .fill(f.newCard.toLowerCase());
+      .fill("A7K3M9Q");
     await page
       .getByLabel("Reason for replacement", { exact: true })
       .fill("Card lost; customer reported at the station in person.");
+    await page
+      .getByRole("button", { name: "Review replacement", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm change", exact: true })
+      .click();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "This card is unavailable" }),
+    ).toBeVisible();
+    expect((await identityState(f))[0].card_id).toBe(f.oldCardId);
+    await page
+      .getByLabel("Unused card number", { exact: true })
+      .fill(f.newCard.toLowerCase());
     await page
       .getByRole("button", { name: "Review replacement", exact: true })
       .click();
@@ -404,6 +481,97 @@ test("I-02 recovery forms never queue an offline account change", async ({
     await noPII(page, [f.phone]);
   } finally {
     await context.setOffline(false);
+    await f.db.end();
+  }
+});
+
+test("I-15 C02 explains unchanged and occupied phones without applying a change", async ({
+  page,
+}) => {
+  const f = await recoveryFixture(page);
+  try {
+    const before = await identityState(f);
+    for (const [phone, code] of [
+      [f.phone, "no_change"],
+      ["08000000027", "phone_in_use"],
+    ]) {
+      await page.goto(`${f.root}/phone`);
+      await fillPhone(page, phone);
+      await page
+        .getByRole("button", { name: "Review phone update", exact: true })
+        .click();
+      const write = page.waitForResponse((r) =>
+        r.url().endsWith("/phone-change"),
+      );
+      await page
+        .getByRole("button", { name: "Confirm change", exact: true })
+        .click();
+      const response = await write;
+      expect(response.status()).toBe(409);
+      expect((await response.json()).error.code).toBe(code);
+      await expect(
+        page.getByRole("alert").filter({ hasText: /phone/i }),
+      ).toBeVisible();
+      expect(await identityState(f)).toEqual(before);
+    }
+  } finally {
+    await f.db.end();
+  }
+});
+
+test("I-07 managerRecovery can read an existing case but cannot create or approve an intake", async ({
+  page,
+}) => {
+  const f = await recoveryFixture(page);
+  try {
+    const recorded = await api<{ id: string }>(
+      page.request,
+      `customers/${f.customerId}/manager-cases`,
+      {
+        operationId: v7(),
+        expectedVersion: 1,
+        customerPresent: true,
+        reason: "Customer cannot access the registered phone.",
+        verificationNotes: "Passport inspected in person.",
+      },
+      201,
+    );
+    await f.db.query(
+      "DELETE FROM role_permission WHERE role_id=(SELECT role_id FROM admin WHERE id=$1) AND permission_code='recovery'",
+      [f.adminId],
+    );
+    await f.db.query(
+      "INSERT INTO role_permission(role_id,permission_code) SELECT role_id,'managerRecovery' FROM admin WHERE id=$1",
+      [f.adminId],
+    );
+    await page.goto(f.root);
+    await expect(page.getByText(/manager|case/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Replace lost card", exact: true }),
+    ).toHaveCount(0);
+    expect(
+      (
+        await page.request.get(
+          `/api/admin/customers/${f.customerId}/manager-cases/${recorded.id}`,
+        )
+      ).status(),
+    ).toBe(200);
+    const denied = await page.request.post(
+      `/api/admin/customers/${f.customerId}/manager-cases`,
+      {
+        headers: { origin: "http://127.0.0.1:3000" },
+        data: {
+          operationId: v7(),
+          expectedVersion: 1,
+          customerPresent: true,
+          reason: "Customer cannot access the registered phone.",
+          verificationNotes: "Passport inspected in person.",
+        },
+      },
+    );
+    expect(denied.status()).toBe(403);
+    expect((await identityState(f))[0].version).toBe(1);
+  } finally {
     await f.db.end();
   }
 });

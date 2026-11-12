@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { permissionCodes } from "../../../src/shared/contracts/admin";
 import { mkdir, writeFile } from "node:fs/promises";
 import {
   recoveryFixture,
@@ -38,7 +39,7 @@ async function capture(page: Page, id: string, width: number) {
 for (const width of [1440, 390])
   test(`C02-C05 designed states at ${width}px`, async ({ page }) => {
     await mkdir(directory, { recursive: true });
-    const f = await recoveryFixture(page);
+    const f = await recoveryFixture(page, [...permissionCodes]);
     const bridge = await verificationBridge(page, f.customerId);
     try {
       await page.goto(`${f.root}/phone`);
@@ -49,8 +50,7 @@ for (const width of [1440, 390])
         .click();
       await expect(
         page.getByRole("heading", {
-          name: "Confirm account change",
-          exact: true,
+          name: /^Confirm account change/,
         }),
       ).toBeVisible();
       await capture(page, "C02-PhoneChange-review", width);
@@ -58,12 +58,15 @@ for (const width of [1440, 390])
       await page
         .getByRole("button", { name: "Send verification code", exact: true })
         .click();
+      await page
+        .getByRole("button", { name: "Check verification status", exact: true })
+        .click();
       await bridge.enterCode();
       await page
         .getByRole("button", { name: "Verify code", exact: true })
         .click();
       await expect(
-        page.getByText("Phone verified", { exact: true }),
+        page.getByText("Phone verified", { exact: true }).first(),
       ).toBeVisible();
       // No capture is allowed while the ephemeral verification input is present.
       expect(
@@ -86,8 +89,7 @@ for (const width of [1440, 390])
         .click();
       await expect(
         page.getByRole("heading", {
-          name: "Confirm account change",
-          exact: true,
+          name: /^Confirm account change/,
         }),
       ).toBeVisible();
       await capture(page, "C03-CardReplacement-review", width);
@@ -96,10 +98,12 @@ for (const width of [1440, 390])
         .click();
       await expect(page.getByText(/Change applied/).first()).toBeVisible();
       await expect(
-        page.getByRole("heading", {
-          name: "Account change history",
-          exact: true,
-        }),
+        page
+          .getByRole("heading", {
+            name: "Account change history",
+            exact: true,
+          })
+          .first(),
       ).toBeVisible();
       await capture(page, "C05-AccountChangeApplied", width);
       await page.goto(`${f.root}/recovery`);
