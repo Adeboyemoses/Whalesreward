@@ -23,7 +23,36 @@ Backend verification only; screens and device smoke belong to WHR-19.
 
 ## Verification results
 
-Implementation verification pending. Baseline at 36c98bd: 689 unit tests and 699 real-PostgreSQL tests passed.
+EM verification at bf0ba00:
+
+- `pnpm typecheck && pnpm lint && pnpm test && pnpm build`: PASS; 73 unit files / 695 tests. Lint has two pre-existing image warnings, zero errors.
+- `DATABASE_URL=<local disposable PostgreSQL> pnpm test:integration --maxWorkers=2`: PASS; 34 files / 735 tests. The 36 new PostgreSQL cases comprise 5 service/schema, 5 HTTP and 26 independent adversarial cases.
+- `pnpm test:time`: PASS; 5 tests in UTC and 5 in America/New_York.
+- All 21 migrations applied from scratch and fictional seed completed in a dedicated local database.
+- `pnpm test:e2e --max-failures=1`: local browser launch blocked by macOS sandbox (`MachPortRendezvousServer`, permission denied). Required browser CI must pass before merge; no local browser pass is claimed.
+
+An earlier unrestricted parallel integration run timed out in existing duplicate-continuation and operator-cleanup tests while build/browser gates competed. A complete 731-test rerun passed with two workers; after adding four delivery tests, the final complete 735-test rerun also passed. No timeout or application assertion was weakened.
+
+## Named C02–C05 proof
+
+All names below are real-PostgreSQL tests under `tests/integration/`.
+
+| Required downstream bullet | Test file and names |
+|---|---|
+| Canonical phone uniqueness race | `customer-recovery-adversarial.test.ts`: “I-15 concurrent canonical phone changes assign one customer and preserve the losing identity” |
+| Card-present attestation and preserved account | `customer-recovery-http.test.ts`: “rejects Origin, oversized/malformed bodies, extra fields, missing attestation and malformed routes”; `customer-recovery.test.ts`: “card-present phone change preserves identity and historical receipt; intake never changes identity” |
+| Wrong target/purpose/session | Adversarial: “I-21a a challenge for another customer is unavailable and cannot consume attempts”, “I-21a a second session of the same admin cannot replay or consume verification”, “I-21a changed %s binding denies verification with no identity change” (phone/card/generation/expiry); service: “purpose-bound phone verification cannot consume an email challenge” |
+| Attempts/resends and expiry | Adversarial: “I-21a failed attempts commit once and a correct final permitted attempt can replace”, “I-21a resend revokes verified unused authority and preserves cumulative customer send limits”, “I-21a attempts across generations cannot evade the cumulative verification limit”; changed-binding expiry case |
+| Phone change, logout and permission revocation | Adversarial: “I-21a session revocation and phone change invalidate unused verified authority”, “I-09 permission removal while confirmation waits prevents consumption”; service: “rechecks live issuer permission between durable intent and dispatch, before adapter invocation” |
+| Lost delivery/response | Adversarial: “I-21a delivery %s fails closed durably and same-key retry never resends” (reject/throw), “I-21a an expired abandoned delivery lease is revoked on retry without another dispatch”, “I-21a lost issuance response replays the original nonsecret receipt without a second send” |
+| Candidate claim and original upload races | Adversarial: “I-19 replacement and registration cannot claim the same candidate card”, “I-33 %s race preserves historical identity and credits only cards valid at receipt” (replacement-first/receipt-first) |
+| Atomic rollback and consumed-authority replay | Adversarial: “I-21 audit failure rolls back retirement links customer version and challenge consumption”, “I-21a verification and consumed replacement replay preserve historical results without renewing authority”, “I-21a consumed replacement replay remains scoped to the issuing session” |
+| C04 never changes identity | Adversarial: “I-21a concurrent manager intakes create one protected case without changing identity or verification authority”; HTTP: “intake is protected, accepts manager read but never manager-only intake, and rejects sensitive notes” |
+| Privacy, protected history and fail-closed configuration | Adversarial: “I-41 recovery audit and receipts contain no raw verification code phone or private intake narrative”, “I-21a %s rejects the test adapter before delivery” (staging/production); HTTP: “history is masked and cursor binds customer, actor and action”, “fails closed before issuance and retains the strict no-store error envelope” |
+
+The receipt-first concurrency test reproduced a PostgreSQL deadlock before the customer lock changed to `FOR NO KEY UPDATE`. The same interleaving now preserves the permanent customer/card identity and credits only a card valid at first receipt. Replacement-first is held with zero spend. Delivery-crash testing terminates only its isolated test backend after the intent commits and proves the expired lease cannot send again.
+
+Migration SQL is additive and was applied to isolated PostgreSQL schemas and validated against the Prisma model. It was authored directly rather than generating unrelated baseline foreign-key drift. Existing email verification constraints and tests remain in the full regression suite.
 
 ## Release boundary
 
