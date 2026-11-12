@@ -38,6 +38,8 @@ Settled decisions, one line each. Read at session start. Full reasoning: product
 
 | P-26 | Supersedes P-25's unresolved WHR-50 meter gate only: correct_meter requires one historical rate throughout I and exact display allowance D≤r×sQ/2+sA/2 from approved immutable server profiles. No business tolerance or pre-comparison rounding; preserve exact transcriptions and T-10. One live sales AND priceReview admin, existing independence retained. Q-559 measurements/verification and separate implementation/activation remain required; [M3](../contracts/m3.md#meter-reconciliation--p-26) is normative | Earl, 12 Nov 2026; [WHR-50](https://linear.app/phaneum/issue/WHR-50), [WHR-112](https://linear.app/phaneum/issue/WHR-112), [WHR-118](https://linear.app/phaneum/issue/WHR-118), [WHR-119](https://linear.app/phaneum/issue/WHR-119), [WHR-120](https://linear.app/phaneum/issue/WHR-120), [WHR-121](https://linear.app/phaneum/issue/WHR-121), [WHR-122](https://linear.app/phaneum/issue/WHR-122), [WHR-124](https://linear.app/phaneum/issue/WHR-124). Rook to mirror in product docs |
 
+| P-27 | Online phones learn current acknowledged-pump prices through existing session reads and opt-in card lookup, using strict legacy-tolerant shapes. New drafts adopt the snapshot with a notice; composed drafts keep their price with a warning (recommended), and saved/queued/settled sales never change. Extends P-08 distribution; preserves P-20/P-23 bounds, offline behavior, T-10 and all settlement gates. No price polling | Earl, 12 Nov 2026; [WHR-125](https://linear.app/phaneum/issue/WHR-125), [M1](../contracts/m1.md#online-price-refresh--p-27-wo-spec-3l-whr-125). Rook to mirror in product docs; separate core/app implementation |
+
 ## Technical (this repo)
 
 | ID | Decision | Since |
