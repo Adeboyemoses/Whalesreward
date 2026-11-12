@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   lookupWireResponseSchema,
+  lookupResponseEnvelopeSchema,
   normalizedLookupResponseSchema,
 } from "../../src/shared/contracts/sync";
 import { priceSnapshotSchema } from "../../src/shared/contracts/auth";
@@ -88,6 +89,22 @@ describe("P-27 strict compatibility (PR-T1-01/02)", () => {
       }).success,
     ).toBe(false);
   });
+  it("compares fractional UTC instants without losing sub-millisecond order", () => {
+    expect(
+      priceSnapshotSchema.safeParse({
+        ...price,
+        effectiveFrom: "2026-11-12T10:01:00.0002Z",
+        fetchedAt: "2026-11-12T10:01:00.0001Z",
+      }).success,
+    ).toBe(false);
+    expect(
+      priceSnapshotSchema.safeParse({
+        ...price,
+        effectiveFrom: "2026-11-12T10:01:00Z",
+        fetchedAt: "2026-11-12T10:01:00.000Z",
+      }).success,
+    ).toBe(true);
+  });
   it("accepts exact bounds and equal instants", () => {
     for (const quantityPrecision of [0, 6])
       expect(
@@ -99,5 +116,58 @@ describe("P-27 strict compatibility (PR-T1-01/02)", () => {
           fetchedAt: price.effectiveFrom,
         }).success,
       ).toBe(true);
+  });
+  it.each([
+    "captureContextId",
+    "originatingAccountId",
+    "stationId",
+    "assignmentId",
+    "pumpId",
+    "productId",
+  ])("requires a canonical UUIDv7 for %s", (field) => {
+    for (const invalid of [
+      "bad",
+      "019a5000-0000-4000-8000-000000000001",
+      "019A5000-0000-7000-8000-000000000001",
+      null,
+      1,
+    ]) {
+      expect(
+        lookupWireResponseSchema.safeParse({
+          ...base,
+          priceRefresh: { ...refresh, [field]: invalid },
+        }).success,
+      ).toBe(false);
+    }
+  });
+  it("keeps envelopes strict and rejects non-UTC or malformed response times", () => {
+    const envelope = {
+      data: { ...base, priceRefresh: refresh },
+      serverTime: base.lookedUpAt,
+      requestId: id,
+    };
+    expect(lookupResponseEnvelopeSchema.safeParse(envelope).success).toBe(true);
+    for (const value of [
+      { ...envelope, extra: true },
+      { ...envelope, serverTime: "bad" },
+      { ...envelope, requestId: "bad" },
+      { ...envelope, data: { ...envelope.data, extra: true } },
+      {
+        ...envelope,
+        data: { ...envelope.data, lookedUpAt: "2026-11-12T11:01:00+01:00" },
+      },
+      { ...envelope, data: { ...envelope.data, lookedUpAt: "bad" } },
+      {
+        ...envelope,
+        data: {
+          ...envelope.data,
+          priceRefresh: {
+            ...refresh,
+            price: { ...price, effectiveFrom: "2026-11-12T11:00:00+01:00" },
+          },
+        },
+      },
+    ])
+      expect(lookupResponseEnvelopeSchema.safeParse(value).success).toBe(false);
   });
 });

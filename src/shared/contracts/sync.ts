@@ -109,7 +109,7 @@ export const legacyLookupResponseSchema = z.strictObject({
       "cooking_gas_customer",
     ]),
   }),
-  lookedUpAt: instant,
+  lookedUpAt: z.iso.datetime(),
 });
 export const lookupReceiptResponseSchema = legacyLookupResponseSchema
   .extend({ lookupReceipt: lookupReceiptSchema.nullable() })
