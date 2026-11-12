@@ -62,6 +62,12 @@ At 4befee0, replacement audit targets the retired card and includes immutable cu
 
 EM gates at 4befee0: typecheck, lint, build, 696 unit tests and timezone 5+5 pass. The full local PostgreSQL run reached 741/744 passing; the unchanged bulk-duplicate suite timed out and had two follow-on failures. Its isolated rerun also timed out, so a staging-baseline comparison is being recorded separately. No timeout was increased and no failed test was skipped. Local browser execution remains blocked by the same macOS launch denial. Required full integration and browser CI must pass before merge; final review/CI results belong in the committed review evidence.
 
+## Final EM verification
+
+At ca3c501, after the final narrative regression fix: typecheck, lint, production build and all 696 unit tests PASS. The complete PostgreSQL suite ran without competing gates using `pnpm test:integration --maxWorkers=1`: **35 files / 744 tests PASS**, including all 45 recovery cases. No timeouts changed or cases skipped. Isolated duplicate comparisons also passed on untouched staging (22 tests, 26 seconds) and this feature (22 tests, 42 seconds); the earlier variable-duration failures remain disclosed above.
+
+“OTP is unavailable” and “Passport is lost” now pass narrative validation, while actual code/document-number assignments remain rejected. The regression failed before the focused fix. Browser launch remains an OS sandbox limitation, so the required CI browser result is still a merge gate. STATUS, coverage and lane files have no feature diff.
+
 ## Release boundary
 
 WHR-49 still decides the phone provider and security policy. The deployed adapter remains unconfigured; this work does not activate SMS delivery. WHR-48 owns final manager decisions; WHR-115 owns stranded queues. STATUS, coverage and lane files are excluded by Earl's session instruction.
