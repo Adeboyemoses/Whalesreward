@@ -26,6 +26,7 @@ Decision notes: Admin Customer Screen Decisions.md and Admin Account Recovery De
 - Explain old card is disabled immediately, never reassigned; offline sales uploaded on it are held for replaced-card review.
 - Boards show six-character demo codes; use the existing seven-character contract. Never reproduce the board's sample verification secret.
 - Use "Code to the registered phone" rather than promise SMS: provider/channel is unconfigured. Never claim candidate availability or phone uniqueness before server confirmation. No inventory read is available to ordinary recovery callers.
+- C03 uses typed printed-card input. The board Scan affordance is omitted because the existing admin surface has no scanner; both selection and validation use the existing card-code contract.
 - C04 splits reason from verificationNotes to meet the contract; it is intake only. C05 history only lists server change records; do not invent registration as an IdentityChange.
 - C02/C03 review is a real interactive state. Admin responsive layout at 1440 px and phone width uses vendored wr-* classes and tokens.
 
