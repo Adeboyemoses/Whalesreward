@@ -10,6 +10,19 @@ const directory = import.meta.dirname;
 async function capture(page: Page, id: string, width: number) {
   await page.setViewportSize({ width, height: 844 });
   await page.evaluate(() => document.fonts.ready);
+  await expect
+    .poll(() =>
+      page
+        .locator("img")
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              (image as HTMLImageElement).complete &&
+              (image as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
   const metrics = await page.evaluate(() => {
     const lines = (el: Element | null) => {
       if (!el) return [];
@@ -28,7 +41,7 @@ async function capture(page: Page, id: string, width: number) {
       width: innerWidth,
       scrollWidth: document.documentElement.scrollWidth,
       wordmark: lines(document.querySelector(".wr-brand-name")),
-      footer: [...document.querySelectorAll(".wr-caption")]
+      footer: [...document.querySelectorAll(".wr-help")]
         .filter((el) => /loyalty|saved price/.test(el.textContent ?? ""))
         .map((el) => ({ text: el.textContent, boxes: lines(el) })),
       controls: [...document.querySelectorAll("button,input,a")]
@@ -42,6 +55,8 @@ async function capture(page: Page, id: string, width: number) {
   });
   expect(metrics.scrollWidth).toBe(width);
   expect(metrics.wordmark).toHaveLength(1);
+  expect(metrics.footer).toHaveLength(1);
+  expect(metrics.footer[0]!.boxes.length).toBeGreaterThan(0);
   expect(metrics.controls.filter((x) => x.height < 48)).toEqual([]);
   await mkdir(directory, { recursive: true });
   await writeFile(
