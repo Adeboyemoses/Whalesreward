@@ -3,14 +3,14 @@ branch: spec/wo-3k-meter
 linear: WHR-124
 tier: high
 builder: spec-em
-reviewed_head: 0d6ffcd263e66aab59f412255dd1d0b2e1ac6c33
-rounds: 1
+reviewed_head: 194f493648ae7c533d743c1094d11a6d72da6e59
+rounds: 2
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 3
+dispatches: 6
 invariants: [I-07, I-09, I-10, I-22, I-25, I-26, I-28, I-29, I-31, I-35, I-37, I-39, I-40, I-41, I-42, I-45a, I-46, I-48]
 p1: []
 tickets: []
@@ -24,7 +24,9 @@ plan:
 
 P-26 makes the approved uniform-rate, display-rounding-only meter rule normative.
 The amendment specifies profiles, exact provenance, non-5xx domain errors and health semantics.
-All three independent reviewers passed the immutable head in round 1 with no findings.
+All three independent reviewers passed both rounds with no findings.
+Round 2 refreshed evidence after required staging integration added T-19 to INDEX.
+The P-26 amendment stayed unchanged; EM final-head gates passed again.
 EM verification: typecheck, lint (two inherited image warnings), 678 unit tests and build PASS.
 Exact rational arithmetic: 21 numeric fixtures and two T-10 calculations PASS.
 Local links, diff whitespace and paragraph limit PASS; maximum prose paragraph 119 words.
