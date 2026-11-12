@@ -54,6 +54,14 @@ The receipt-first concurrency test reproduced a PostgreSQL deadlock before the c
 
 Migration SQL is additive and was applied to isolated PostgreSQL schemas and validated against the Prisma model. It was authored directly rather than generating unrelated baseline foreign-key drift. Existing email verification constraints and tests remain in the full regression suite.
 
+## Round-one review corrections
+
+At 4befee0, replacement audit targets the retired card and includes immutable customer/replacement IDs consumed by the existing evidence resolver. PostgreSQL timestamp text retains microseconds in retirement, links, challenge consumption, identity history and audit. Authorization is refreshed after customer/card/challenge lock waits. Narrative validation allows harmless verification descriptions while rejecting sensitive values.
+
+`customer-recovery-review-regressions.test.ts` adds nine PostgreSQL cases: “replacement produces authoritative evidence that resolves a queued old-card hold and restores credit”; “preserves same-millisecond PostgreSQL receipt-before-replacement ordering without false card hold”; absolute/idle expiry behind the card lock; context/intake/issue/verify expiry behind the customer lock; and “verification rechecks issuer expiry after a challenge row lock and writes no attempt”. The actual review service resolves the hold and restores credit; the retired card stays retired. All 45 recovery integration cases pass in the EM full run.
+
+EM gates at 4befee0: typecheck, lint, build, 696 unit tests and timezone 5+5 pass. The full local PostgreSQL run reached 741/744 passing; the unchanged bulk-duplicate suite timed out and had two follow-on failures. Its isolated rerun also timed out, so a staging-baseline comparison is being recorded separately. No timeout was increased and no failed test was skipped. Local browser execution remains blocked by the same macOS launch denial. Required full integration and browser CI must pass before merge; final review/CI results belong in the committed review evidence.
+
 ## Release boundary
 
 WHR-49 still decides the phone provider and security policy. The deployed adapter remains unconfigured; this work does not activate SMS delivery. WHR-48 owns final manager decisions; WHR-115 owns stranded queues. STATUS, coverage and lane files are excluded by Earl's session instruction.
