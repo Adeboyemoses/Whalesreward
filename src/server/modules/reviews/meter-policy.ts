@@ -11,7 +11,9 @@ const instant = z.iso
 const kobo = z
   .string()
   .regex(/^[1-9][0-9]{0,18}$/)
-  .refine((v) => BigInt(v) <= 9223372036854775807n);
+  .refine(
+    (v) => /^[1-9][0-9]{0,18}$/.test(v) && BigInt(v) <= 9223372036854775807n,
+  );
 const quantity = z
   .string()
   .regex(/^(0|[1-9][0-9]{0,13})(\.[0-9]{1,6})?$/)

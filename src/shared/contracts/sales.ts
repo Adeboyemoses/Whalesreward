@@ -16,7 +16,7 @@ const reason = text.trim().min(1).max(1000);
 const kobo = z
   .string()
   .regex(/^[1-9][0-9]{0,18}$/)
-  .refine((v) => BigInt(v) <= MAX_KOBO);
+  .refine((v) => /^[1-9][0-9]{0,18}$/.test(v) && BigInt(v) <= MAX_KOBO);
 const quantity = z
   .string()
   .regex(/^(0|[1-9][0-9]{0,13})(\.[0-9]{1,6})?$/)

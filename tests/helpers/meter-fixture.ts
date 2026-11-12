@@ -99,24 +99,18 @@ export async function addMeterPrice(
   version = 2,
 ) {
   const id = newId();
+  const productId = (
+    await x.pool.query("SELECT product_id FROM pump WHERE id=$1", [x.f.pumpId])
+  ).rows[0].product_id;
   await x.pool.query(
     "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,$4,$5,'NGN',$6,$7,$8,'Fictional meter price history')",
-    [
-      id,
-      x.f.stationId,
-      fixtureId(9),
-      version,
-      rate,
-      precision,
-      at,
-      fixtureId(5),
-    ],
+    [id, x.f.stationId, productId, version, rate, precision, at, fixtureId(5)],
   );
   await sourceAudit(
     x.pool,
     "price_activated",
     "product",
-    fixtureId(9),
+    productId,
     {
       priceVersionId: id,
       version,
@@ -155,13 +149,50 @@ export async function meterFixture(
     "UPDATE audit_event SET after=jsonb_set(after,'{quantityPrecision}',$2::jsonb) WHERE id=$1",
     [x.priceAudit, JSON.stringify(precision)],
   );
-  if (unit !== "litre")
-    await seedHistorical(
-      x.pool,
-      "product",
-      "UPDATE product SET unit=$2,code='cooking_gas' WHERE id=$1",
-      [fixtureId(9), unit],
-    );
+  const productId = unit === "litre" ? fixtureId(9) : fixtureId(12);
+  if (unit !== "litre") {
+    const c = await x.pool.connect();
+    try {
+      await c.query("BEGIN");
+      for (const table of [
+        "pump",
+        "product_price_version",
+        "purchase",
+        "audit_event",
+      ])
+        await c.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+      await c.query("UPDATE pump SET product_id=$2 WHERE id=$1", [
+        x.f.pumpId,
+        productId,
+      ]);
+      await c.query(
+        "UPDATE product_price_version SET product_id=$2 WHERE id=$1",
+        [x.f.priceId, productId],
+      );
+      await c.query("UPDATE purchase SET product_id=$2 WHERE id=$1", [
+        x.sale.purchaseId,
+        productId,
+      ]);
+      await c.query("UPDATE audit_event SET target_id=$2 WHERE id=$1", [
+        x.priceAudit,
+        productId,
+      ]);
+      await c.query("SET CONSTRAINTS ALL IMMEDIATE");
+      for (const table of [
+        "pump",
+        "product_price_version",
+        "purchase",
+        "audit_event",
+      ])
+        await c.query(`ALTER TABLE ${table} ENABLE TRIGGER USER`);
+      await c.query("COMMIT");
+    } catch (e) {
+      await c.query("ROLLBACK");
+      throw e;
+    } finally {
+      c.release();
+    }
+  }
   await seedHistorical(
     x.pool,
     "purchase",
@@ -184,7 +215,9 @@ export async function meterFixture(
       unit === "litre" ? "vehicle" : "cylinder",
     ],
   );
-  await seedHistorical(x.pool, "purchase_hold",
+  await seedHistorical(
+    x.pool,
+    "purchase_hold",
     "UPDATE purchase_hold SET reason_code='price_uncertain' WHERE id=$1",
     [x.holdId],
   );
@@ -200,7 +233,7 @@ export async function meterFixture(
     digest: "0".repeat(64),
     stationId: x.f.stationId,
     pumpId: x.f.pumpId,
-    productId: fixtureId(9),
+    productId,
     currency: "NGN",
     unit,
     quantityPrecision: precision,
