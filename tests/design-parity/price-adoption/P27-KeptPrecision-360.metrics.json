@@ -1,0 +1,92 @@
+{
+  "width": 360,
+  "scrollWidth": 360,
+  "wordmark": [
+    {
+      "x": 52,
+      "y": 17,
+      "width": 118.90625,
+      "height": 21
+    }
+  ],
+  "footer": [
+    {
+      "text": "Counts toward loyalty after the details and photo sync.",
+      "boxes": [
+        {
+          "x": 21,
+          "y": 736,
+          "width": 318,
+          "height": 17
+        }
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "name": "Change",
+      "width": 55,
+      "height": 48
+    },
+    {
+      "name": "Amount (₦)",
+      "width": 158,
+      "height": 48
+    },
+    {
+      "name": "Kilograms",
+      "width": 158,
+      "height": 48
+    },
+    {
+      "name": "",
+      "width": 328,
+      "height": 48
+    },
+    {
+      "name": "",
+      "width": 283,
+      "height": 56
+    },
+    {
+      "name": "Discard and start a new sale",
+      "width": 328,
+      "height": 48
+    },
+    {
+      "name": "Retake",
+      "width": 48,
+      "height": 48
+    },
+    {
+      "name": "Save sale",
+      "width": 328,
+      "height": 56
+    },
+    {
+      "name": "Sale",
+      "width": 70.390625,
+      "height": 52
+    },
+    {
+      "name": "Register",
+      "width": 70.40625,
+      "height": 52
+    },
+    {
+      "name": "History",
+      "width": 70.390625,
+      "height": 52
+    },
+    {
+      "name": "Uploads",
+      "width": 70.40625,
+      "height": 52
+    },
+    {
+      "name": "Account",
+      "width": 70.40625,
+      "height": 52
+    }
+  ]
+}

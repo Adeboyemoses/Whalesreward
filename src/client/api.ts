@@ -6,7 +6,7 @@ import {
   lookupResponseSchema,
   authSessionSchema,
   configuredAssignmentSchema,
-  type Lookup,
+  type LookupResponse,
   type AuthSession,
   type FirstPasswordInput,
   type ConfiguredAssignment,
@@ -47,7 +47,7 @@ export interface AttendantApi {
   configuredAssignment(): Promise<ConfiguredAssignment>;
   lookup(
     input: { source: "code"; code: string } | { source: "qr"; qr: string },
-  ): Promise<Lookup>;
+  ): Promise<LookupResponse>;
 }
 export class HttpAttendantApi implements AttendantApi {
   constructor(
@@ -77,7 +77,7 @@ export class HttpAttendantApi implements AttendantApi {
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
           ...(key ? { "Idempotency-Key": key } : {}),
           ...(path === "/api/attendant/cards/lookup"
-            ? { "X-WR-Lookup-Receipt": "1" }
+            ? { "X-WR-Lookup-Receipt": "1", "X-WR-Price-Refresh": "1" }
             : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),

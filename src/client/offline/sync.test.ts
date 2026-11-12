@@ -52,10 +52,15 @@ async function save(evidence?: string) {
   const draft = await client.beginCapture();
   return client.saveCapture(
     evidence
-      ? client.selectLookup(draft, "A7K3M9X", {
-          ...found!,
-          lookupReceipt: evidence,
-        })
+      ? client.selectLookup(
+          draft,
+          "A7K3M9X",
+          {
+            ...found!,
+            lookupReceipt: evidence,
+          },
+          { receiptAtComposition: true },
+        )
       : draft,
     {
       cardCode: "A7K3M9X",
