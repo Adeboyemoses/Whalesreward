@@ -104,6 +104,7 @@ export function representativeScenarios(real: boolean) {
           ),
         },
       });
+      expect(sale.original.lookupReceipt ?? null).toBeNull();
       expect((await windowPrice(f.phone)).session.price.rateKobo).toBe(target);
     } finally {
       await f.close();
@@ -137,6 +138,7 @@ export function realScenarios() {
         const sale = await frozenSave(f);
         expect(sale.original.rateKobo).toBe("100000");
         expect(sale.original.quantityPrecision).toBe(3);
+        expect(sale.original.lookupReceipt ?? null).toBeNull();
       } finally {
         await f.close();
       }

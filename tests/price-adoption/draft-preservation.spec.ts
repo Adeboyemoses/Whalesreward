@@ -52,6 +52,9 @@ for (const trigger of ["amount", "medium", "photo"] as const)
         rateKobo: "100000",
         quantityPrecision: 3,
       });
+      expect(
+        (await rows(f.phone))[0]!.original.lookupReceipt ?? null,
+      ).toBeNull();
     } finally {
       release();
       await f.close();
@@ -105,6 +108,11 @@ test("P-27 PR-T1-07/11 repeated cross-tab updates and failed save retain origina
         ...args: Parameters<IDBObjectStore["add"]>
       ) {
         if (this.name === "outbox") {
+          Object.assign(window, {
+            attemptedOriginal: structuredClone(
+              (args[0] as { original: unknown }).original,
+            ),
+          });
           IDBObjectStore.prototype.add = add;
           throw new DOMException(
             "Fictional quota failure",
@@ -121,6 +129,11 @@ test("P-27 PR-T1-07/11 repeated cross-tab updates and failed save retain origina
       f.phone.getByText(/storage|space|save failed|could not save/i).first(),
     ).toBeVisible();
     expect(await rows(f.phone)).toEqual([]);
+    const attemptedOriginal = await f.phone.evaluate(
+      () =>
+        (window as unknown as { attemptedOriginal: unknown }).attemptedOriginal,
+    );
+    expect(attemptedOriginal).toBeTruthy();
     await expect(
       f.phone.getByLabel("Amount in naira", { exact: true }),
     ).toHaveValue("20,000.01");
@@ -136,11 +149,12 @@ test("P-27 PR-T1-07/11 repeated cross-tab updates and failed save retain origina
       lookupReceipt: receipt,
       entry: { amountKobo: "2000001", quantity: "20" },
     });
+    expect(saved.original).toEqual(attemptedOriginal);
     expect(saved.photoDigest).toBe(saved.photoBlob.digest);
     const frozen = { original: saved.original, photo: saved.photoBlob };
-    await f.context.setOffline(false);
     // Avoid upload mutation while proving a later ordinary lookup cannot rewrite saved payload bytes.
     await f.context.route("**/api/sync/**", (route) => route.abort("failed"));
+    await f.context.setOffline(false);
     await f.activate("140000", 5);
     await other.getByRole("button", { name: "Change", exact: true }).click();
     await lookup(other, f.codes[0]!);
