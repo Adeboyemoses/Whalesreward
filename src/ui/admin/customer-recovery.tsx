@@ -781,15 +781,18 @@ export function CustomerRecovery({ id, mode }: { id: string; mode: Mode }) {
                     >
                       The customer is present for an in-person review.
                     </Presence>
-                    <KeyValueList
-                      items={[
-                        {
-                          label: "Case",
-                          value: "Recorded as needing a manager decision",
-                        },
-                        { label: "Phone and card", value: "Unchanged" },
-                      ]}
-                    />
+                    <div className="wr-card wr-quiet">
+                      <h3>What happens next</h3>
+                      <KeyValueList
+                        items={[
+                          {
+                            label: "Case",
+                            value: "Recorded as needing a manager decision",
+                          },
+                          { label: "Phone and card", value: "Unchanged" },
+                        ]}
+                      />
+                    </div>
                     <div className="wr-cc-actions">
                       <Button type="submit" disabled={unavailable || !context}>
                         Review manager intake
@@ -987,6 +990,27 @@ export function ChangeReceipt({ id }: { id: string }) {
         current account.
       </p>
     </Notice>
+  );
+}
+export function CustomerCardConsequence({ id }: { id: string }) {
+  const { store } = useAdminSession();
+  const receipt = store.lists.get(`customer-change:${id}`) as
+    IdentityChange | undefined;
+  return (
+    <p className="wr-help">
+      {receipt?.kind === "card_replacement" ? (
+        <>
+          Previous card <span className="wr-mono">{receipt.oldCardCode}</span>{" "}
+          is disabled and will never be reassigned. Offline sales still carrying
+          it are held for replaced-card review when uploaded after the change.
+        </>
+      ) : (
+        <>
+          The printed number and QR identify the same card. The customer ID
+          stays the same when a card is replaced.
+        </>
+      )}
+    </p>
   );
 }
 export function CustomerChanges({ id }: { id: string }) {

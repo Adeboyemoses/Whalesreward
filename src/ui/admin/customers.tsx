@@ -4,6 +4,7 @@ import {
   CustomerRecovery,
   CustomerChanges,
   ChangeReceipt,
+  CustomerCardConsequence,
   ManagerCases,
 } from "./customer-recovery";
 import { useSearchParams } from "next/navigation";
@@ -324,10 +325,7 @@ function CustomerDetail({
               ) : (
                 <Notice>No active card is linked to this customer.</Notice>
               )}
-              <p className="wr-help">
-                The printed number and QR identify the same card. The customer
-                ID stays the same when a card is replaced.
-              </p>
+              <CustomerCardConsequence id={id} />
             </Sheet>
           </div>
           <CustomerChanges id={id} />
