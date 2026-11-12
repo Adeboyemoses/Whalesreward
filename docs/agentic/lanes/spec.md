@@ -1,21 +1,21 @@
 # lane:spec
-WO-spec-3m (WHR-130) audit catalogue reconciliation: READY on reviewed green staging merge, 2026-11-13
+WO-spec-3l (WHR-125) online price refresh: READY on reviewed green records merge, 2026-11-12
 
 ## In flight
-- Branch spec/wo-3m-audit-catalogue contains the M3 amendment and complete source writer inventory at fdcf789. PR/merge, independent verdicts and EM verification are recorded in WHR-130 and .review/spec__wo-3m-audit-catalogue.md.
-- READY takes effect only after code/security/integrity PASS and green staging merge. WHR-130 remains In Review for Earl, not accepted.
-- No runtime audit coverage, UI parity, policy activation or cloud change is claimed.
+- [Spec PR #122](https://github.com/Adeboyemoses/Whalesreward/pull/122) merged into staging at 237a6d6 with five green checks. Code/security/integrity PASS at 4f8af97, round 1, no findings. This separate records merge completes READY; WHR-125 remains In Review, not accepted.
+- P-27 specifies existing session reads and strict capability-gated lookup snapshots. New drafts adopt with a notice; composed drafts keep and warn. Saved/queued/settled sales, capture bounds and offline behavior stay unchanged; zero requests solely for price refresh.
+- EM typecheck/lint, 689 unit tests, build, local links, paragraph limit (maximum 120 words) and evidence PASS. Two inherited image warnings. PR-T1-01–12 are downstream obligations; no runtime implementation or board parity claimed.
 
 ## Next
-- Stop at READY. Rook folds AU-01–AU-09 into WO-core-11 / WHR-20; AU-10 tracks unbuilt recovery/meter hooks. Neither implementation is started here.
-- Historical aliases use safe schemaVersion=0 projection, never row rewrites or invented event-time values.
+- Stop at READY. Rook should draft/number the two high-tier follow-ons in M1: Core P-27 online price snapshots, then App P-27 price adoption and draft notices. Neither is started here.
+- Rook should mirror P-27 in product docs. P-26 meter implementation/profile activation remains separate.
 
 ## Earl's gos
-- 2026-11-13: “Start WHR-130 (WO-spec-3m).” “Spec only.” “Code, security and integrity verdicts.” “Stop when merged and report READY.”
+- 2026-11-12: “Start WHR-125 (WO-spec-3l); WHR-124 is READY.” “Log P-27 and list the follow-on core and app work orders.” “Stop when merged and report READY.”
 
 ## Risks
-- Existing writer omissions and privacy/shape gaps are inventoried for implementation, not fixed by a spec merge.
-- P-25/P-26 activation and pending client confirmations stay separate. No main promotion or deployment authorized.
-- Full runtime model ID unavailable.
+- Refresh reduces stale captured rates but cannot eliminate holds when history changes within the original P-20/P-23 interval. No polling means idle/offline phones learn on their next ordinary successful read.
+- Q-528 and Q-559 remain separate pending inputs. No main/cloud action or runtime activation authorized.
+- Full runtime model ID unavailable. Metrics include three spec reviewers and one separate records reviewer.
 
-dispatches=6 prs=1 rounds_max=2 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
