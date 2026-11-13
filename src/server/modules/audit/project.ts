@@ -8,7 +8,7 @@ import {
   auditRules,
   auditChangeSchema,
   currentAuditEventSchema,
-  m4SettingsAuditSchema,
+  m4AuditSchema,
   historicalAuditEventSchema,
   type AuditAction,
   type AuditEvent,
@@ -249,7 +249,7 @@ export function projectAudit(
 ): AuditEvent | null {
   if (row.schema_version === 1 || row.schema_version === 2) {
     const parsed = (
-      row.schema_version === 2 ? m4SettingsAuditSchema : currentAuditEventSchema
+      row.schema_version === 2 ? m4AuditSchema : currentAuditEventSchema
     ).safeParse({
       id: row.id,
       eventCode: row.event_code,
