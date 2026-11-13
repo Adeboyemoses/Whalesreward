@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { authId } from "./auth";
 import { actorSchema } from "./admin";
+import { categorySchema } from "./customers-cards";
 import { saleDateSchema } from "./sales";
 export const REPORT_LIMITS = {
   days: 366,
@@ -145,3 +146,61 @@ export type ReportSnapshot = {
   report: Report;
   sources: ReportSource[];
 };
+
+export const overviewSchema = z.strictObject({
+  asOf: instant,
+  day: saleDateSchema,
+  timezone: z.literal("Africa/Lagos"),
+  dataVersion: dataVersionSchema,
+  recordedToday: totalsSchema,
+  customersSinceLaunch: count.nullable(),
+  launchConfigured: z.boolean(),
+  attention: z
+    .array(
+      z.strictObject({
+        status: z.enum(["late_correction", "incomplete", "duplicate"]),
+        count,
+        destination: z
+          .strictObject({
+            path: z.literal("/admin/sales"),
+            filter: z.strictObject({
+              status: z.enum(["late_correction", "incomplete", "duplicate"]),
+            }),
+          })
+          .nullable(),
+      }),
+    )
+    .max(3)
+    .nullable(),
+  recentSales: z
+    .array(
+      z.strictObject({
+        id: authId,
+        saleCode: z.string(),
+        customerName: z.string().nullable(),
+        receivedAt: instant,
+        attendantName: z.string(),
+        username: z.string(),
+        pumpCode: z.string(),
+        state,
+        duplicateFlag: z.boolean(),
+        correctionPending: z.boolean(),
+        amountKobo: amount,
+        currency,
+      }),
+    )
+    .max(5)
+    .nullable(),
+  recentCustomers: z
+    .array(
+      z.strictObject({
+        id: authId,
+        customerCode: z.string(),
+        name: z.string(),
+        category: categorySchema,
+        createdAt: instant,
+      }),
+    )
+    .max(5)
+    .nullable(),
+});

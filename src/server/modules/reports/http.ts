@@ -113,7 +113,7 @@ export async function handleReports(
         pool,
         token,
         id!,
-        createReportArtifactStorage(),
+        createReportArtifactStorage,
       );
       headers.set("Content-Type", file.contentType);
       headers.set(

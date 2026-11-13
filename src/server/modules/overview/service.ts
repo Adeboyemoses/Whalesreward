@@ -1,3 +1,4 @@
+import { overviewSchema } from "../../../shared/contracts/reports";
 import type pg from "pg";
 import type { AdminConfig } from "../admin-access/config";
 import { transaction } from "../admin-access/repo";
@@ -20,9 +21,9 @@ export async function readOverview(
       { from: day, to: day, product: null, groupBy: "product" },
       true,
     );
-    return {
+    return overviewSchema.parse({
       asOf: d.asOf,
-      day,
+      day: stationDate(new Date(d.asOf)),
       timezone: "Africa/Lagos" as const,
       dataVersion: d.dataVersion,
       recordedToday: totals(d.sources.filter((r) => r.included)),
@@ -41,6 +42,6 @@ export async function readOverview(
       recentCustomers: actor.permissions.includes("customers")
         ? d.recent_customers
         : null,
-    };
+    });
   });
 }

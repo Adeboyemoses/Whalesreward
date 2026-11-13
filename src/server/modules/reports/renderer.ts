@@ -222,24 +222,31 @@ export async function renderReportExport(
     y = 800;
   for (const line of lines) {
     const clean = safe(line);
-    for (let at = 0; at < clean.length; at += 88) {
+    let part = "";
+    const draw = () => {
       if (y < 55) {
         page = doc.addPage([595, 842]);
         y = 800;
       }
-      page.drawText(clean.slice(at, at + 88), { x: 36, y, size: 10, font });
+      page.drawText(part, { x: 36, y, size: 10, font });
       y -= 15;
+    };
+    for (const character of clean) {
+      if (part && font.widthOfTextAtSize(part + character, 10) > 523) {
+        draw();
+        part = "";
+      }
+      part += character;
     }
+    if (part) draw();
   }
-  doc
-    .getPages()
-    .forEach((p, i) =>
-      p.drawText(`Page ${i + 1} of ${doc.getPageCount()}`, {
-        x: 36,
-        y: 25,
-        size: 9,
-        font,
-      }),
-    );
+  doc.getPages().forEach((p, i) =>
+    p.drawText(`Page ${i + 1} of ${doc.getPageCount()}`, {
+      x: 36,
+      y: 25,
+      size: 9,
+      font,
+    }),
+  );
   return { bytes: await doc.save(), contentType: "application/pdf" };
 }

@@ -9,7 +9,8 @@ BEGIN
  ELSE SELECT station_id INTO sid FROM purchase WHERE id=(payload->>'purchase_id')::uuid;
  END IF;
  IF sid IS NULL THEN
-   UPDATE station_reporting_state SET data_version=data_version+1;
+   INSERT INTO station_reporting_state(station_id,data_version) SELECT id,1 FROM station
+   ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1;
  ELSE
    INSERT INTO station_reporting_state(station_id,data_version) VALUES(sid,1)
    ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1;

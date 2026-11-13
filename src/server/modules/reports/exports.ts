@@ -194,7 +194,7 @@ export async function downloadReportExport(
   pool: pg.Pool,
   token: string | undefined,
   id: string,
-  storage: CardArtifactStorage,
+  storage: CardArtifactStorage | (() => CardArtifactStorage),
 ) {
   const authorize = () =>
     transaction(pool, async (db) => {
@@ -221,8 +221,9 @@ export async function downloadReportExport(
   const first = await authorize();
   let bytes: Uint8Array;
   try {
+    const adapter = typeof storage === "function" ? storage() : storage;
     bytes = await cardStorageDeadline((signal) =>
-      storage.read(first.object_key, REPORT_LIMITS.artifactBytes, signal),
+      adapter.read(first.object_key, REPORT_LIMITS.artifactBytes, signal),
     );
     if (
       BigInt(bytes.byteLength) !== BigInt(first.byte_size) ||

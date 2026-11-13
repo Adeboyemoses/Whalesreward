@@ -54,7 +54,17 @@ export async function dataset(
   station: string,
   filters: ReportFilter,
   overview = false,
-): Promise<{sources:ReportSource[];asOf:string;dataVersion:string;launch_at:Date|null;customers:string|null;attention:Record<string,string>;recent_sales:unknown[];recent_customers:unknown[]}> {
+  sourceLimit: number | null = null,
+): Promise<{
+  sources: ReportSource[];
+  asOf: string;
+  dataVersion: string;
+  launch_at: Date | null;
+  customers: string | null;
+  attention: Record<string, string>;
+  recent_sales: unknown[];
+  recent_customers: unknown[];
+}> {
   const r = (
     await db.query(
       `WITH source AS (SELECT p.*,pr.code product,pu.code pump_code,pu.name pump_name,a.staff_code,
@@ -65,15 +75,22 @@ export async function dataset(
  CASE WHEN p.status='cancelled' THEN 'cancelled' WHEN p.status='held' OR EXISTS(SELECT 1 FROM purchase_hold h WHERE h.purchase_id=p.id AND h.state='open') OR EXISTS(SELECT 1 FROM purchase_validation_block b WHERE b.purchase_id=p.id AND b.resolved_at IS NULL) THEN 'held' WHEN p.status IN ('received','photo_pending','finalizing') THEN 'pending' ELSE 'ineligible' END excluded,
  EXISTS(SELECT 1 FROM duplicate_flag f WHERE (f.purchase_id=p.id OR f.other_purchase_id=p.id) AND f.state='open') duplicate,
  EXISTS(SELECT 1 FROM correction_request cr WHERE cr.purchase_id=p.id AND cr.state IN ('pending_validation','awaiting_review')) correction_pending
- FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id JOIN pump pu ON pu.id=p.pump_id JOIN product pr ON pr.id=p.product_id LEFT JOIN purchase_revision r ON r.id=p.current_revision_id AND r.purchase_id=p.id AND r.state='accepted' WHERE p.station_id=$1), filtered AS (SELECT * FROM source WHERE sale_day BETWEEN $2::date AND $3::date AND ($4::text IS NULL OR product=$4))
+ FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id JOIN pump pu ON pu.id=p.pump_id JOIN product pr ON pr.id=p.product_id LEFT JOIN purchase_revision r ON r.id=p.current_revision_id AND r.purchase_id=p.id AND r.state='accepted' WHERE p.station_id=$1), filtered AS (SELECT * FROM source WHERE sale_day BETWEEN CASE WHEN $5 THEN (statement_timestamp() AT TIME ZONE 'Africa/Lagos')::date ELSE $2::date END AND CASE WHEN $5 THEN (statement_timestamp() AT TIME ZONE 'Africa/Lagos')::date ELSE $3::date END AND ($4::text IS NULL OR product=$4))
  SELECT statement_timestamp() AS at,coalesce((SELECT data_version::text FROM station_reporting_state WHERE station_id=$1),'0') version,
- coalesce((SELECT jsonb_agg(jsonb_build_object('purchaseId',id,'saleCode',sale_code,'revisionId',revision_id,'saleDate',sale_day::text,'dateEvidence',CASE WHEN display_verified IS NULL THEN 'reported' ELSE 'verified' END,'appCapturedAt',app_captured_at,'verifiedSaleDate',display_verified::text,'serverReceivedAt',server_received_at,'attendant',jsonb_build_object('id',originating_attendant_id,'staffCode',staff_code,'name',seller_name,'username',seller_username),'pump',jsonb_build_object('id',pump_id,'code',pump_code,'name',pump_name),'product',product,'unit',display_unit,'amountKobo',display_amount,'currency',display_currency,'quantity',display_quantity,'state',status,'included',included,'exclusion',CASE WHEN included THEN NULL ELSE excluded END,'valuesSource',CASE WHEN revision_id IS NULL THEN 'original' ELSE 'accepted_revision' END,'duplicateFlag',duplicate,'correctionPending',correction_pending) ORDER BY server_received_at DESC,id DESC) FROM filtered),'[]') sources,
+ coalesce((SELECT jsonb_agg(jsonb_build_object('purchaseId',id,'saleCode',sale_code,'revisionId',revision_id,'saleDate',sale_day::text,'dateEvidence',CASE WHEN display_verified IS NULL THEN 'reported' ELSE 'verified' END,'appCapturedAt',app_captured_at,'verifiedSaleDate',display_verified::text,'serverReceivedAt',server_received_at,'attendant',jsonb_build_object('id',originating_attendant_id,'staffCode',staff_code,'name',seller_name,'username',seller_username),'pump',jsonb_build_object('id',pump_id,'code',pump_code,'name',pump_name),'product',product,'unit',display_unit,'amountKobo',display_amount,'currency',display_currency,'quantity',display_quantity,'state',status,'included',included,'exclusion',CASE WHEN included THEN NULL ELSE excluded END,'valuesSource',CASE WHEN revision_id IS NULL THEN 'original' ELSE 'accepted_revision' END,'duplicateFlag',duplicate,'correctionPending',correction_pending) ORDER BY server_received_at DESC,id DESC) FROM (SELECT * FROM filtered ORDER BY server_received_at DESC,id DESC LIMIT $6) bounded),'[]') sources,
  CASE WHEN $5 THEN (SELECT launch_at FROM station_reporting_state WHERE station_id=$1) ELSE NULL END launch_at,
  CASE WHEN $5 THEN (SELECT count(*)::text FROM customer c WHERE c.registered_station_id=$1 AND c.created_at >= (SELECT launch_at FROM station_reporting_state WHERE station_id=$1)) ELSE NULL END customers,
  CASE WHEN $5 THEN jsonb_build_object('late_correction',(SELECT count(*)::text FROM source s WHERE EXISTS(SELECT 1 FROM correction_request cr WHERE cr.purchase_id=s.id AND cr.state='awaiting_review')),'incomplete',(SELECT count(*)::text FROM source WHERE status IN ('received','photo_pending','finalizing')),'duplicate',(SELECT count(*)::text FROM source WHERE duplicate)) ELSE NULL END attention,
  CASE WHEN $5 THEN coalesce((SELECT jsonb_agg(jsonb_build_object('id',s.id,'saleCode',s.sale_code,'customerName',c.name,'receivedAt',s.server_received_at,'attendantName',s.seller_name,'username',s.seller_username,'pumpCode',s.pump_code,'state',s.status,'duplicateFlag',s.duplicate,'correctionPending',s.correction_pending,'amountKobo',s.display_amount,'currency',s.display_currency) ORDER BY s.server_received_at DESC,s.id DESC) FROM (SELECT * FROM source ORDER BY server_received_at DESC,id DESC LIMIT 5) s LEFT JOIN customer c ON c.id=s.customer_id),'[]') ELSE NULL END recent_sales,
  CASE WHEN $5 THEN coalesce((SELECT jsonb_agg(jsonb_build_object('id',c.id,'customerCode',c.customer_code,'name',c.name,'category',c.category,'createdAt',c.created_at) ORDER BY c.created_at DESC,c.id DESC) FROM (SELECT * FROM customer WHERE registered_station_id=$1 ORDER BY created_at DESC,id DESC LIMIT 5)c),'[]') ELSE NULL END recent_customers`,
-      [station, filters.from, filters.to, filters.product, overview],
+      [
+        station,
+        filters.from,
+        filters.to,
+        filters.product,
+        overview,
+        sourceLimit,
+      ],
     )
   ).rows[0]!;
   return {
@@ -152,14 +169,18 @@ export function reportFromRows(
         : filters.groupBy === "attendant"
           ? r.attendant.id
           : r.pump.id;
-    groups.set(key, [...(groups.get(key) ?? []), r]);
-    days.set(r.saleDate, [...(days.get(r.saleDate) ?? []), r]);
+    const group = groups.get(key) ?? [];
+    group.push(r);
+    groups.set(key, group);
+    const day = days.get(r.saleDate) ?? [];
+    day.push(r);
+    days.set(r.saleDate, day);
   }
   const summary = totals(included);
   const items = [...groups].map(([key, rs]) => {
     const latest = [...rs].sort(
       (a, b) =>
-        b.serverReceivedAt.localeCompare(a.serverReceivedAt) ||
+        b.appCapturedAt.localeCompare(a.appCapturedAt) ||
         b.purchaseId.localeCompare(a.purchaseId),
     )[0]!;
     return {

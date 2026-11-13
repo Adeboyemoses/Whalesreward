@@ -61,7 +61,13 @@ export async function createReportExport(
       async () => {
         replayed = false;
         validateFilter(p.filters);
-        const d = await dataset(db, station.id, p.filters);
+        const d = await dataset(
+          db,
+          station.id,
+          p.filters,
+          false,
+          REPORT_LIMITS.sources + 1,
+        );
         if (d.dataVersion !== p.expectedDataVersion)
           throw new AuthError("read_view_stale", 409);
         if (d.sources.length > REPORT_LIMITS.sources)

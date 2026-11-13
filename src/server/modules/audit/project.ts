@@ -384,6 +384,7 @@ export function projectAudit(
     review_evidence_configuration: "settings",
   };
   const historicalArea = [
+    "reports",
     "sales",
     "customers",
     "cards",
