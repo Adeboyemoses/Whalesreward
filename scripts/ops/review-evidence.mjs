@@ -3,6 +3,10 @@ import { pathToFileURL } from "node:url";
 import pg from "pg";
 import { v7 as newId } from "uuid";
 import { z } from "zod";
+import {
+  writeAudit,
+  auditSystem,
+} from "../../src/server/modules/audit/write.ts";
 import { reviewEvidenceReleaseArtifact } from "../../src/server/modules/reviews/release.ts";
 
 export const releaseDigest = createHash("sha256")
@@ -197,6 +201,12 @@ export async function operate(pool, input) {
       authorization_reference: input.authorizationReference,
     };
     if (input.apply) {
+      const previous = (
+        await db.query(
+          "SELECT id,revision,environment,configuration FROM review_evidence_configuration WHERE station_id=$1 AND environment=$2 ORDER BY revision DESC LIMIT 1",
+          [input.stationId, input.environment],
+        )
+      ).rows[0];
       if (approval)
         await db.query(
           "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
@@ -222,6 +232,68 @@ export async function operate(pool, input) {
           input.authorizationReference,
         ],
       );
+      const configuredEventId = newId(),
+        approvedEventId = approval ? newId() : null,
+        correlationId = newId();
+      const occurredAt = (
+        await db.query("SELECT clock_timestamp()::text AS at")
+      ).rows[0].at;
+      if (approval)
+        await writeAudit(db, {
+          id: approvedEventId,
+          stationId: input.stationId,
+          action: "review_evidence_approved",
+          actor: auditSystem("operations"),
+          target: {
+            kind: "review_evidence_approval",
+            id: approval.id,
+            code: `APPROVAL-${approval.id}`,
+            subjectAtEvent: null,
+          },
+          correlationId,
+          relatedEventIds: [configuredEventId],
+          occurredAt,
+          reason: "Review evidence approved",
+          before: null,
+          after: {
+            approvalId: approval.id,
+            policyRelease: policy.release,
+            policyRevision: String(revision),
+            policyEnvironment: input.environment,
+            activatedAt: input.activatedAt,
+          },
+        });
+      const configurationValues = (row) => ({
+        configurationId: row.id,
+        approvalId: row.configuration.activation.approvalReference,
+        policyRelease: row.configuration.release,
+        policyRevision: String(row.revision),
+        policyEnvironment: row.environment,
+        policyState: row.configuration.activation.state,
+        activatedAt: row.configuration.activation.activatedAt,
+      });
+      await writeAudit(db, {
+        id: configuredEventId,
+        stationId: input.stationId,
+        action: approval
+          ? "review_evidence_configured"
+          : "review_evidence_deactivated",
+        actor: auditSystem("operations"),
+        target: {
+          kind: "review_evidence_configuration",
+          id: configurationId,
+          code: `CONFIG-${configurationId}`,
+          subjectAtEvent: null,
+        },
+        correlationId,
+        relatedEventIds: approvedEventId ? [approvedEventId] : [],
+        occurredAt,
+        reason: approval
+          ? "Review evidence configured"
+          : "Review evidence deactivated",
+        before: previous ? configurationValues(previous) : null,
+        after: configurationValues(configuration),
+      });
       await db.query("COMMIT");
     } else await db.query("ROLLBACK");
     return {

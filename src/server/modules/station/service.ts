@@ -113,7 +113,8 @@ export async function stationWrite(
             "pump_created",
             "Pump created",
             null,
-            { name: parsed.name, productId: product.id, version: 1 },
+            { productId: product.id, pumpVersion: "1" },
+            { operationId: parsed.operationId },
           );
           return result;
         });
@@ -183,17 +184,26 @@ export async function stationWrite(
               old
                 ? {
                     priceVersionId: old.id,
-                    version: old.version,
+                    priceVersion: String(old.version),
+                    currency: old.currency,
+                    effectiveFrom: await storedBoundary(
+                      db,
+                      "product_price_version",
+                      old.id,
+                    ),
                     rateKobo: old.rate_kobo,
-                    quantityPrecision: old.quantity_precision,
+                    quantityPrecision: String(old.quantity_precision),
                   }
                 : null,
               {
                 priceVersionId: id,
-                version: result.version,
+                priceVersion: String(result.version),
+                currency: parsed.currency,
+                effectiveFrom: boundary,
                 rateKobo: parsed.rateKobo,
-                quantityPrecision: parsed.quantityPrecision,
+                quantityPrecision: String(parsed.quantityPrecision),
               },
+              { operationId: parsed.operationId, occurredAt: boundary },
             );
             return result;
           },
@@ -227,9 +237,10 @@ export async function stationWrite(
             "INSERT INTO attendant(id,user_id,staff_code,version) VALUES($1,$2,$3,1)",
             [id, user, code],
           );
+          const initialBoundary = await trustedBoundary(db, "assignment");
           await db.query(
-            "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,changed_by,reason) VALUES($1,$2,$3,1,clock_timestamp(),$4,'Initial assignment at account creation')",
-            [assignment, id, pump.id, actor.admin_id],
+            "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,changed_by,reason) VALUES($1,$2,$3,1,$5,$4,'Initial assignment at account creation')",
+            [assignment, id, pump.id, actor.admin_id, initialBoundary],
           );
           const result = await attendantView(db, id, station);
           await audit(
@@ -240,12 +251,8 @@ export async function stationWrite(
             "attendant_created",
             "Attendant created",
             null,
-            {
-              staffCode: code,
-              username: parsed.username,
-              name: parsed.name,
-              version: 1,
-            },
+            { attendantVersion: "1" },
+            { operationId: parsed.operationId },
           );
           await audit(
             db,
@@ -255,7 +262,13 @@ export async function stationWrite(
             "assignment_changed",
             "Initial assignment at account creation",
             null,
-            { assignmentId: assignment, pumpId: pump.id, version: 1 },
+            {
+              assignmentId: assignment,
+              pumpId: pump.id,
+              assignmentVersion: "1",
+              effectiveFrom: initialBoundary,
+            },
+            { operationId: parsed.operationId, occurredAt: initialBoundary },
           );
           return result;
         });
@@ -472,14 +485,21 @@ export async function stationWrite(
                 ? {
                     assignmentId: old.id,
                     pumpId: old.pump_id,
-                    version: old.assignment_version,
+                    assignmentVersion: String(old.assignment_version),
+                    effectiveFrom: await storedBoundary(
+                      db,
+                      "assignment",
+                      old.id,
+                    ),
                   }
                 : null,
               {
                 assignmentId: id,
                 pumpId: pump.id,
-                version: nextVersion,
+                assignmentVersion: String(nextVersion),
+                effectiveFrom: boundary,
               },
+              { operationId: parsed.operationId, occurredAt: boundary },
             );
             const change = assignmentChange(await eventView(db, id));
             return {
@@ -658,6 +678,18 @@ export async function stationRead(
   });
 }
 
+async function storedBoundary(
+  db: pg.PoolClient,
+  table: "assignment" | "product_price_version",
+  id: string,
+): Promise<string> {
+  return (
+    await db.query(
+      `SELECT to_char(effective_from AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS boundary FROM ${table} WHERE id=$1`,
+      [id],
+    )
+  ).rows[0].boundary;
+}
 async function trustedBoundary(
   db: pg.PoolClient,
   table: "assignment" | "product_price_version",

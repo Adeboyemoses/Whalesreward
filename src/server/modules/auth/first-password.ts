@@ -82,6 +82,7 @@ export async function firstPassword(
           "First password changed",
           null,
           null,
+          { operationId: parsed.operationId },
         );
         return { signInRequired: true };
       },

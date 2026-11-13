@@ -144,10 +144,8 @@ export async function registerCustomer(
             "Customer registration",
             null,
             {
-              customerCode,
-              category: parsed.category,
+              customerCategory: parsed.category,
               cardId: card.id,
-              stationId: actor.station_id,
             },
             {
               operationId: parsed.operationId,
