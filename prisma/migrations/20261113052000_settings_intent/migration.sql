@@ -52,5 +52,13 @@ ALTER TABLE settings_version ADD CONSTRAINT settings_new_timing_shape CHECK(sect
  AND (launch_at IS NULL OR purchase_start IS NULL OR launch_at<=purchase_start)));
 DROP TRIGGER guard_campaign_immutable ON campaign;
 CREATE TRIGGER guard_campaign_immutable BEFORE UPDATE OR DELETE ON campaign FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('name','version','reconciliation_required','current_timing_version_id','latest_snapshot_id','reconciled_data_version');
-UPDATE campaign c SET current_timing_version_id=v.id FROM
+UPDATE campaign c SET current_timing_version_id=v.id,version=c.version+1 FROM
  (SELECT DISTINCT ON(campaign_id) campaign_id,id FROM settings_version WHERE campaign_id IS NOT NULL ORDER BY campaign_id,version DESC) v WHERE c.id=v.campaign_id;
+
+ALTER TABLE audit_event DROP CONSTRAINT audit_canonical_envelope;
+ALTER TABLE audit_event ADD CONSTRAINT audit_canonical_envelope CHECK (
+ schema_version IS NULL OR (schema_version IN (1,2) AND station_id IS NOT NULL
+ AND event_code IS NOT NULL AND area IS NOT NULL AND target_snapshot IS NOT NULL
+ AND actor_snapshot IS NOT NULL AND correlation_id IS NOT NULL
+ AND jsonb_typeof(changes)='array' AND jsonb_array_length(changes)<=100
+ AND related_event_ids IS NOT NULL AND cardinality(related_event_ids)<=20));

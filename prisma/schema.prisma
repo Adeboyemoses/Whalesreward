@@ -8,14 +8,14 @@ datasource db {
 
 model AuthUser {
   phone_verification_attempt               phone_verification_attempt[]
-  last_sign_in_at                          DateTime?                    @db.Timestamptz(6)
-  created_by_user_id                       String?                      @db.Uuid
-  auth_user                                AuthUser?                    @relation("auth_userToauth_user", fields: [created_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_auth_user                          AuthUser[]                   @relation("auth_userToauth_user")
-  admin_access_event                       admin_access_event[]
-  mutation_receipt                         mutation_receipt[]
-  id                                       String                       @id @db.Uuid
-  created_at                               DateTime                     @default(now()) @db.Timestamptz(6)
+  last_sign_in_at DateTime? @db.Timestamptz(6)
+  created_by_user_id String? @db.Uuid
+  auth_user AuthUser? @relation("auth_userToauth_user", fields: [created_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_auth_user AuthUser[] @relation("auth_userToauth_user")
+  admin_access_event admin_access_event[]
+  mutation_receipt mutation_receipt[]
+  id                                       String                  @id @db.Uuid
+  created_at                               DateTime                @default(now()) @db.Timestamptz(6)
   kind                                     String
   username                                 String
   username_normalized                      String
@@ -23,16 +23,16 @@ model AuthUser {
   enabled                                  Boolean
   auth_version                             Int
   must_change_password                     Boolean
-  updated_at                               DateTime                     @db.Timestamptz(6)
-  back_auth_credential_user_id             AuthCredential[]             @relation("auth_credential_user_id")
-  back_attendant_user_id                   Attendant[]                  @relation("attendant_user_id")
-  back_admin_user_id                       Admin[]                      @relation("admin_user_id")
-  back_auth_session_user_id                AuthSession[]                @relation("auth_session_user_id")
-  back_verification_challenge_user_id      VerificationChallenge[]      @relation("verification_challenge_user_id")
-  back_card_customer_link_actor_user_id    CardCustomerLink[]           @relation("card_customer_link_actor_user_id")
-  back_purchase_revision_actor_user_id     PurchaseRevision[]           @relation("purchase_revision_actor_user_id")
-  back_purchase_revision_decision_actor_id PurchaseRevision[]           @relation("purchase_revision_decision_actor_id")
-  back_audit_event_actor_user_id           AuditEvent[]                 @relation("audit_event_actor_user_id")
+  updated_at                               DateTime                @db.Timestamptz(6)
+  back_auth_credential_user_id             AuthCredential[]        @relation("auth_credential_user_id")
+  back_attendant_user_id                   Attendant[]             @relation("attendant_user_id")
+  back_admin_user_id                       Admin[]                 @relation("admin_user_id")
+  back_auth_session_user_id                AuthSession[]           @relation("auth_session_user_id")
+  back_verification_challenge_user_id      VerificationChallenge[] @relation("verification_challenge_user_id")
+  back_card_customer_link_actor_user_id    CardCustomerLink[]      @relation("card_customer_link_actor_user_id")
+  back_purchase_revision_actor_user_id     PurchaseRevision[]      @relation("purchase_revision_actor_user_id")
+  back_purchase_revision_decision_actor_id PurchaseRevision[]      @relation("purchase_revision_decision_actor_id")
+  back_audit_event_actor_user_id           AuditEvent[]            @relation("audit_event_actor_user_id")
 
   @@unique([username_normalized], map: "uq_user_username_normalized")
   @@map("auth_user")
@@ -71,32 +71,32 @@ model Attendant {
 }
 
 model Admin {
-  customer_recovery_case                      customer_recovery_case[]
-  phone_verification_delivery                 phone_verification_delivery[]
-  verification_challenge                      VerificationChallenge[]
-  verification_generation                     BigInt                        @default(0)
-  reset_generation                            BigInt                        @default(0)
-  mail_request                                mail_request[]
-  id                                          String                        @id @db.Uuid
-  created_at                                  DateTime                      @default(now()) @db.Timestamptz(6)
-  user_id                                     String                        @db.Uuid
+  customer_recovery_case                                                     customer_recovery_case[]
+  phone_verification_delivery                                                phone_verification_delivery[]
+  verification_challenge                                                     VerificationChallenge[]
+  verification_generation BigInt @default(0)
+  reset_generation BigInt @default(0)
+  mail_request mail_request[]
+  id                                          String                   @id @db.Uuid
+  created_at                                  DateTime                 @default(now()) @db.Timestamptz(6)
+  user_id                                     String                   @db.Uuid
   admin_code                                  String
   email_normalized                            String?
-  email_verified_at                           DateTime?                     @db.Timestamptz(6)
-  role_id                                     String                        @db.Uuid
+  email_verified_at                           DateTime?                @db.Timestamptz(6)
+  role_id                                     String                   @db.Uuid
   version                                     Int
-  rel_user_id                                 AuthUser                      @relation("admin_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_role_id                                 Role                          @relation("admin_role_id", fields: [role_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  back_recovery_grant_admin_id                RecoveryGrant[]               @relation("recovery_grant_admin_id")
-  back_assignment_changed_by                  Assignment[]                  @relation("assignment_changed_by")
-  back_product_price_version_actor_id         ProductPriceVersion[]         @relation("product_price_version_actor_id")
-  back_card_batch_created_by                  CardBatch[]                   @relation("card_batch_created_by")
-  back_customer_identity_change_actor_id      CustomerIdentityChange[]      @relation("customer_identity_change_actor_id")
-  back_purchase_hold_resolved_by              PurchaseHold[]                @relation("purchase_hold_resolved_by")
-  back_duplicate_flag_resolved_by             DuplicateFlag[]               @relation("duplicate_flag_resolved_by")
-  back_settings_version_retention_approved_by SettingsVersion[]             @relation("settings_version_retention_approved_by")
-  back_settings_version_actor_id              SettingsVersion[]             @relation("settings_version_actor_id")
-  back_giveaway_snapshot_actor_id             GiveawaySnapshot[]            @relation("giveaway_snapshot_actor_id")
+  rel_user_id                                 AuthUser                 @relation("admin_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_role_id                                 Role                     @relation("admin_role_id", fields: [role_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  back_recovery_grant_admin_id                RecoveryGrant[]          @relation("recovery_grant_admin_id")
+  back_assignment_changed_by                  Assignment[]             @relation("assignment_changed_by")
+  back_product_price_version_actor_id         ProductPriceVersion[]    @relation("product_price_version_actor_id")
+  back_card_batch_created_by                  CardBatch[]              @relation("card_batch_created_by")
+  back_customer_identity_change_actor_id      CustomerIdentityChange[] @relation("customer_identity_change_actor_id")
+  back_purchase_hold_resolved_by              PurchaseHold[]           @relation("purchase_hold_resolved_by")
+  back_duplicate_flag_resolved_by             DuplicateFlag[]          @relation("duplicate_flag_resolved_by")
+  back_settings_version_retention_approved_by SettingsVersion[]        @relation("settings_version_retention_approved_by")
+  back_settings_version_actor_id              SettingsVersion[]        @relation("settings_version_actor_id")
+  back_giveaway_snapshot_actor_id             GiveawaySnapshot[]       @relation("giveaway_snapshot_actor_id")
 
   @@unique([user_id], map: "uq_admin_user_id")
   @@unique([admin_code], map: "uq_admin_admin_code")
@@ -148,22 +148,22 @@ model RolePermission {
 
 model AuthSession {
   verification_challenge         VerificationChallenge[]
-  access_scope                   String                   @default("full")
-  last_activity_at               DateTime                 @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
-  auth_request_dedup             auth_request_dedup[]
-  id                             String                   @id @db.Uuid
-  created_at                     DateTime                 @default(now()) @db.Timestamptz(6)
-  user_id                        String                   @db.Uuid
-  secret_verifier                String
-  expires_at                     DateTime                 @db.Timestamptz(6)
-  revoked_at                     DateTime?                @db.Timestamptz(6)
-  auth_version                   Int
-  last_online_sign_in_at         DateTime                 @db.Timestamptz(6)
-  assignment_id                  String?                  @db.Uuid
-  capture_context_id             String?                  @db.Uuid
-  rel_user_id                    AuthUser                 @relation("auth_session_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_assignment_id              Assignment?              @relation("auth_session_assignment_id", fields: [assignment_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_capture_context_id         CaptureContext?          @relation("auth_session_capture_context_id", fields: [capture_context_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  access_scope String @default("full")
+  last_activity_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  auth_request_dedup auth_request_dedup[]
+  id                     String          @id @db.Uuid
+  created_at             DateTime        @default(now()) @db.Timestamptz(6)
+  user_id                String          @db.Uuid
+  secret_verifier        String
+  expires_at             DateTime        @db.Timestamptz(6)
+  revoked_at             DateTime?       @db.Timestamptz(6)
+  auth_version           Int
+  last_online_sign_in_at DateTime        @db.Timestamptz(6)
+  assignment_id          String?         @db.Uuid
+  capture_context_id     String?         @db.Uuid
+  rel_user_id            AuthUser        @relation("auth_session_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_assignment_id      Assignment?     @relation("auth_session_assignment_id", fields: [assignment_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_capture_context_id CaptureContext? @relation("auth_session_capture_context_id", fields: [capture_context_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   back_attendant_sign_in_request AttendantSignInRequest[]
 
   @@unique([secret_verifier], map: "uq_auth_session_secret_verifier")
@@ -191,28 +191,28 @@ model VerificationChallenge {
   card                                                                                              Card?                        @relation(fields: [active_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   admin                                                                                             Admin?                       @relation(fields: [issuer_admin_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   auth_session                                                                                      AuthSession?                 @relation(fields: [issuer_session_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  issuance_generation                                                                               BigInt?
-  mail_request_id                                                                                   String?                      @db.Uuid
-  target_key_version                                                                                String?
-  mail_request_mail_request_challenge_idToverification_challenge                                    mail_request[]               @relation("mail_request_challenge_idToverification_challenge")
-  mail_request_verification_challenge_mail_request_idTomail_request                                 mail_request?                @relation("verification_challenge_mail_request_idTomail_request", fields: [mail_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  id                                                                                                String                       @id @db.Uuid
-  created_at                                                                                        DateTime                     @default(now()) @db.Timestamptz(6)
-  user_id                                                                                           String?                      @db.Uuid
-  customer_id                                                                                       String?                      @db.Uuid
-  purpose                                                                                           String
-  target_digest                                                                                     String
-  secret_hash                                                                                       String
-  expires_at                                                                                        DateTime                     @db.Timestamptz(6)
-  attempts                                                                                          Int
-  max_attempts                                                                                      Int
-  consumed_at                                                                                       DateTime?                    @db.Timestamptz(6)
-  revoked_at                                                                                        DateTime?                    @db.Timestamptz(6)
-  operation_id                                                                                      String                       @db.Uuid
-  version                                                                                           Int
-  rel_user_id                                                                                       AuthUser?                    @relation("verification_challenge_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_customer_id                                                                                   Customer?                    @relation("verification_challenge_customer_id", fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  back_customer_identity_change_challenge_id                                                        CustomerIdentityChange[]     @relation("customer_identity_change_challenge_id")
+  issuance_generation BigInt?
+  mail_request_id String? @db.Uuid
+  target_key_version String?
+  mail_request_mail_request_challenge_idToverification_challenge    mail_request[]           @relation("mail_request_challenge_idToverification_challenge")
+  mail_request_verification_challenge_mail_request_idTomail_request mail_request?            @relation("verification_challenge_mail_request_idTomail_request", fields: [mail_request_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                                         String                   @id @db.Uuid
+  created_at                                 DateTime                 @default(now()) @db.Timestamptz(6)
+  user_id                                    String?                  @db.Uuid
+  customer_id                                String?                  @db.Uuid
+  purpose                                    String
+  target_digest                              String
+  secret_hash                                String
+  expires_at                                 DateTime                 @db.Timestamptz(6)
+  attempts                                   Int
+  max_attempts                               Int
+  consumed_at                                DateTime?                @db.Timestamptz(6)
+  revoked_at                                 DateTime?                @db.Timestamptz(6)
+  operation_id                               String                   @db.Uuid
+  version                                    Int
+  rel_user_id                                AuthUser?                @relation("verification_challenge_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_customer_id                            Customer?                @relation("verification_challenge_customer_id", fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  back_customer_identity_change_challenge_id CustomerIdentityChange[] @relation("customer_identity_change_challenge_id")
 
   @@unique([secret_hash], map: "uq_verification_challenge_secret_hash")
   @@unique([operation_id], map: "uq_verification_challenge_operation_id")
@@ -259,18 +259,18 @@ model RecoveryGrantItem {
 model Station {
   reporting_state                       StationReportingState?
   settings_changes                      SettingsChange[]
-  duplicate_reporting_state             DuplicateReportingState?
-  id                                    String                   @id @db.Uuid
-  created_at                            DateTime                 @default(now()) @db.Timestamptz(6)
+ duplicate_reporting_state DuplicateReportingState?
+  id                                    String                @id @db.Uuid
+  created_at                            DateTime              @default(now()) @db.Timestamptz(6)
   code                                  String
   name                                  String
   timezone                              String
   version                               Int
-  back_pump_station_id                  Pump[]                   @relation("pump_station_id")
-  back_product_price_version_station_id ProductPriceVersion[]    @relation("product_price_version_station_id")
-  back_purchase_station_id              Purchase[]               @relation("purchase_station_id")
-  back_campaign_station_id              Campaign[]               @relation("campaign_station_id")
-  back_settings_version_station_id      SettingsVersion[]        @relation("settings_version_station_id")
+  back_pump_station_id                  Pump[]                @relation("pump_station_id")
+  back_product_price_version_station_id ProductPriceVersion[] @relation("product_price_version_station_id")
+  back_purchase_station_id              Purchase[]            @relation("purchase_station_id")
+  back_campaign_station_id              Campaign[]            @relation("campaign_station_id")
+  back_settings_version_station_id      SettingsVersion[]     @relation("settings_version_station_id")
 
   @@unique([code], map: "uq_station_code")
   @@map("station")
@@ -290,7 +290,7 @@ model Product {
 }
 
 model Pump {
-  name                    String
+  name String
   id                      String       @id @db.Uuid
   created_at              DateTime     @default(now()) @db.Timestamptz(6)
   station_id              String       @db.Uuid
@@ -385,20 +385,20 @@ model Customer {
   phone_verification_generation             BigInt                        @default(0)
   customer_recovery_case                    customer_recovery_case[]
   phone_verification_delivery               phone_verification_delivery[]
-  registered_station_id                     String?                       @db.Uuid
-  registered_by_user_id                     String?                       @db.Uuid
-  id                                        String                        @id @db.Uuid
-  created_at                                DateTime                      @default(now()) @db.Timestamptz(6)
+  registered_station_id String? @db.Uuid
+  registered_by_user_id String? @db.Uuid
+  id                                        String                   @id @db.Uuid
+  created_at                                DateTime                 @default(now()) @db.Timestamptz(6)
   customer_code                             String
   name                                      String
   phone_normalized                          String
   category                                  String
   version                                   Int
-  back_verification_challenge_customer_id   VerificationChallenge[]       @relation("verification_challenge_customer_id")
-  back_card_customer_link_customer_id       CardCustomerLink[]            @relation("card_customer_link_customer_id")
-  back_customer_identity_change_customer_id CustomerIdentityChange[]      @relation("customer_identity_change_customer_id")
-  back_purchase_customer_id                 Purchase[]                    @relation("purchase_customer_id")
-  back_giveaway_snapshot_row_customer_id    GiveawaySnapshotRow[]         @relation("giveaway_snapshot_row_customer_id")
+  back_verification_challenge_customer_id   VerificationChallenge[]  @relation("verification_challenge_customer_id")
+  back_card_customer_link_customer_id       CardCustomerLink[]       @relation("card_customer_link_customer_id")
+  back_customer_identity_change_customer_id CustomerIdentityChange[] @relation("customer_identity_change_customer_id")
+  back_purchase_customer_id                 Purchase[]               @relation("purchase_customer_id")
+  back_giveaway_snapshot_row_customer_id    GiveawaySnapshotRow[]    @relation("giveaway_snapshot_row_customer_id")
 
   @@unique([customer_code], map: "uq_customer_customer_code")
   @@unique([phone_normalized], map: "uq_customer_phone")
@@ -406,7 +406,7 @@ model Customer {
 }
 
 model CardBatch {
-  name               String?
+  name String?
   id                 String   @id @db.Uuid
   created_at         DateTime @default(now()) @db.Timestamptz(6)
   batch_code         String
@@ -425,21 +425,21 @@ model Card {
   customer_identity_change_customer_identity_change_new_card_idTocard CustomerIdentityChange[] @relation("customer_identity_change_new_card_idTocard")
   customer_identity_change_customer_identity_change_old_card_idTocard CustomerIdentityChange[] @relation("customer_identity_change_old_card_idTocard")
   verification_challenge                                              VerificationChallenge[]
-  id                                                                  String                   @id @db.Uuid
-  created_at                                                          DateTime                 @default(now()) @db.Timestamptz(6)
-  batch_id                                                            String                   @db.Uuid
-  code                                                                String
-  qr_payload                                                          String
-  state                                                               String
-  retired_at                                                          DateTime?                @db.Timestamptz(6)
-  retirement_reason                                                   String?
-  replaced_by_card_id                                                 String?                  @db.Uuid
-  version                                                             Int
-  rel_batch_id                                                        CardBatch                @relation("card_batch_id", fields: [batch_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_replaced_by_card_id                                             Card?                    @relation("card_replaced_by_card_id", fields: [replaced_by_card_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  back_card_replaced_by_card_id                                       Card[]                   @relation("card_replaced_by_card_id")
-  back_card_customer_link_card_id                                     CardCustomerLink[]       @relation("card_customer_link_card_id")
-  back_purchase_card_id                                               Purchase[]               @relation("purchase_card_id")
+  id                              String             @id @db.Uuid
+  created_at                      DateTime           @default(now()) @db.Timestamptz(6)
+  batch_id                        String             @db.Uuid
+  code                            String
+  qr_payload                      String
+  state                           String
+  retired_at                      DateTime?          @db.Timestamptz(6)
+  retirement_reason               String?
+  replaced_by_card_id             String?            @db.Uuid
+  version                         Int
+  rel_batch_id                    CardBatch          @relation("card_batch_id", fields: [batch_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_replaced_by_card_id         Card?              @relation("card_replaced_by_card_id", fields: [replaced_by_card_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  back_card_replaced_by_card_id   Card[]             @relation("card_replaced_by_card_id")
+  back_card_customer_link_card_id CardCustomerLink[] @relation("card_customer_link_card_id")
+  back_purchase_card_id           Purchase[]         @relation("purchase_card_id")
 
   @@unique([code], map: "uq_card_code")
   @@unique([qr_payload], map: "uq_card_qr_payload")
@@ -480,19 +480,19 @@ model CustomerIdentityChange {
   audit_event                                     AuditEvent?            @relation(fields: [audit_event_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   card_customer_identity_change_new_card_idTocard Card?                  @relation("customer_identity_change_new_card_idTocard", fields: [new_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   card_customer_identity_change_old_card_idTocard Card?                  @relation("customer_identity_change_old_card_idTocard", fields: [old_card_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  id                                              String                 @id @db.Uuid
-  created_at                                      DateTime               @default(now()) @db.Timestamptz(6)
-  customer_id                                     String                 @db.Uuid
-  actor_id                                        String                 @db.Uuid
-  operation_id                                    String                 @db.Uuid
-  kind                                            String
-  challenge_id                                    String?                @db.Uuid
-  manager_review_reason                           String?
-  verification_evidence                           String
-  reason                                          String
-  rel_customer_id                                 Customer               @relation("customer_identity_change_customer_id", fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_actor_id                                    Admin                  @relation("customer_identity_change_actor_id", fields: [actor_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_challenge_id                                VerificationChallenge? @relation("customer_identity_change_challenge_id", fields: [challenge_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id                    String                 @id @db.Uuid
+  created_at            DateTime               @default(now()) @db.Timestamptz(6)
+  customer_id           String                 @db.Uuid
+  actor_id              String                 @db.Uuid
+  operation_id          String                 @db.Uuid
+  kind                  String
+  challenge_id          String?                @db.Uuid
+  manager_review_reason String?
+  verification_evidence String
+  reason                String
+  rel_customer_id       Customer               @relation("customer_identity_change_customer_id", fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_actor_id          Admin                  @relation("customer_identity_change_actor_id", fields: [actor_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_challenge_id      VerificationChallenge? @relation("customer_identity_change_challenge_id", fields: [challenge_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([actor_id, operation_id], map: "uq_customer_identity_change_actor_id_operation_id")
   @@index([customer_id])
@@ -502,68 +502,68 @@ model CustomerIdentityChange {
 }
 
 model Purchase {
-  duplicate_detection_intents               DuplicateDetectionIntent[]
-  lookup_receipt_input                      Json?                      @db.JsonB
-  lookup_receipt_input_json                 String?                    @db.Text
-  lookup_receipt_status                     String                     @default("fallback")
-  lookup_receipt_claims                     Json?                      @db.JsonB
-  capture_lower_bound                       DateTime?                  @db.Timestamptz(6)
-  capture_policy_version                    String?
-  id                                        String                     @id @db.Uuid
-  created_at                                DateTime                   @default(now()) @db.Timestamptz(6)
-  originating_attendant_id                  String                     @db.Uuid
-  operation_id                              String                     @db.Uuid
+ duplicate_detection_intents DuplicateDetectionIntent[]
+  lookup_receipt_input Json? @db.JsonB
+  lookup_receipt_input_json String? @db.Text
+  lookup_receipt_status String @default("fallback")
+  lookup_receipt_claims Json? @db.JsonB
+  capture_lower_bound DateTime? @db.Timestamptz(6)
+  capture_policy_version String?
+  id                                        String                   @id @db.Uuid
+  created_at                                DateTime                 @default(now()) @db.Timestamptz(6)
+  originating_attendant_id                  String                   @db.Uuid
+  operation_id                              String                   @db.Uuid
   payload_digest                            String
   sale_code                                 String
-  capture_context_id                        String                     @db.Uuid
-  assignment_id                             String                     @db.Uuid
-  station_id                                String                     @db.Uuid
-  pump_id                                   String                     @db.Uuid
-  product_id                                String                     @db.Uuid
+  capture_context_id                        String                   @db.Uuid
+  assignment_id                             String                   @db.Uuid
+  station_id                                String                   @db.Uuid
+  pump_id                                   String                   @db.Uuid
+  product_id                                String                   @db.Uuid
   seller_name                               String
   seller_username                           String
   card_code                                 String
-  app_captured_at                           DateTime                   @db.Timestamptz(6)
-  server_received_at                        DateTime                   @db.Timestamptz(6)
-  price_version_id                          String                     @db.Uuid
+  app_captured_at                           DateTime                 @db.Timestamptz(6)
+  server_received_at                        DateTime                 @db.Timestamptz(6)
+  price_version_id                          String                   @db.Uuid
   basis                                     String
   entered_amount_kobo                       BigInt?
-  entered_quantity                          Decimal?                   @db.Decimal(20, 6)
+  entered_quantity                          Decimal?                 @db.Decimal(20, 6)
   amount_kobo                               BigInt
-  quantity                                  Decimal                    @db.Decimal(20, 6)
+  quantity                                  Decimal                  @db.Decimal(20, 6)
   rate_kobo                                 BigInt
-  currency                                  String                     @db.Char(3)
+  currency                                  String                   @db.Char(3)
   unit                                      String
-  quantity_precision                        Int                        @db.SmallInt
+  quantity_precision                        Int                      @db.SmallInt
   medium                                    String
   expected_photo_digest                     String
   expected_photo_bytes                      BigInt
-  card_id                                   String?                    @db.Uuid
-  customer_id                               String?                    @db.Uuid
+  card_id                                   String?                  @db.Uuid
+  customer_id                               String?                  @db.Uuid
   status                                    String
-  current_revision_id                       String?                    @db.Uuid
-  resolution_candidate_revision_id          String?                    @db.Uuid
-  correction_cutoff_at                      DateTime?                  @db.Timestamptz(6)
+  current_revision_id                       String?                  @db.Uuid
+  resolution_candidate_revision_id          String?                  @db.Uuid
+  correction_cutoff_at                      DateTime?                @db.Timestamptz(6)
   correction_time_policy_version            String?
-  correction_date_reliable                  Boolean                    @default(false)
-  verified_sale_date                        DateTime?                  @db.Date
+  correction_date_reliable                  Boolean                  @default(false)
+  verified_sale_date                        DateTime?                @db.Date
   cancellation_reason                       String?
   version                                   Int
-  rel_originating_attendant_id              Attendant                  @relation("purchase_originating_attendant_id", fields: [originating_attendant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_capture_context_id                    CaptureContext             @relation("purchase_capture_context_id", fields: [capture_context_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_assignment_id                         Assignment                 @relation("purchase_assignment_id", fields: [assignment_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_station_id                            Station                    @relation("purchase_station_id", fields: [station_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_pump_id                               Pump                       @relation("purchase_pump_id", fields: [pump_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_product_id                            Product                    @relation("purchase_product_id", fields: [product_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_price_version_id                      ProductPriceVersion        @relation("purchase_price_version_id", fields: [price_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_card_id                               Card?                      @relation("purchase_card_id", fields: [card_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_customer_id                           Customer?                  @relation("purchase_customer_id", fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  back_purchase_revision_purchase_id        PurchaseRevision[]         @relation("purchase_revision_purchase_id")
-  back_photo_asset_purchase_id              PhotoAsset[]               @relation("photo_asset_purchase_id")
-  back_purchase_hold_purchase_id            PurchaseHold[]             @relation("purchase_hold_purchase_id")
-  back_duplicate_flag_purchase_id           DuplicateFlag[]            @relation("duplicate_flag_purchase_id")
-  back_duplicate_flag_other_purchase_id     DuplicateFlag[]            @relation("duplicate_flag_other_purchase_id")
-  back_giveaway_snapshot_source_purchase_id GiveawaySnapshotSource[]   @relation("giveaway_snapshot_source_purchase_id")
+  rel_originating_attendant_id              Attendant                @relation("purchase_originating_attendant_id", fields: [originating_attendant_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_capture_context_id                    CaptureContext           @relation("purchase_capture_context_id", fields: [capture_context_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_assignment_id                         Assignment               @relation("purchase_assignment_id", fields: [assignment_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_station_id                            Station                  @relation("purchase_station_id", fields: [station_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_pump_id                               Pump                     @relation("purchase_pump_id", fields: [pump_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_product_id                            Product                  @relation("purchase_product_id", fields: [product_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_price_version_id                      ProductPriceVersion      @relation("purchase_price_version_id", fields: [price_version_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_card_id                               Card?                    @relation("purchase_card_id", fields: [card_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_customer_id                           Customer?                @relation("purchase_customer_id", fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  back_purchase_revision_purchase_id        PurchaseRevision[]       @relation("purchase_revision_purchase_id")
+  back_photo_asset_purchase_id              PhotoAsset[]             @relation("photo_asset_purchase_id")
+  back_purchase_hold_purchase_id            PurchaseHold[]           @relation("purchase_hold_purchase_id")
+  back_duplicate_flag_purchase_id           DuplicateFlag[]          @relation("duplicate_flag_purchase_id")
+  back_duplicate_flag_other_purchase_id     DuplicateFlag[]          @relation("duplicate_flag_other_purchase_id")
+  back_giveaway_snapshot_source_purchase_id GiveawaySnapshotSource[] @relation("giveaway_snapshot_source_purchase_id")
 
   @@unique([originating_attendant_id, operation_id], map: "uq_purchase_operation")
   @@unique([sale_code], map: "uq_purchase_sale_code")
@@ -699,7 +699,7 @@ model PurchaseHold {
 }
 
 model DuplicateFlag {
-  cancelled_purchase_id String?   @db.Uuid
+  cancelled_purchase_id String? @db.Uuid
   id                    String    @id @db.Uuid
   created_at            DateTime  @default(now()) @db.Timestamptz(6)
   purchase_id           String    @db.Uuid
@@ -757,26 +757,26 @@ model SettingsVersion {
   stored_copy_policy                         String                  @default("unconfigured")
   operation_id                               String?                 @db.Uuid
   change                                     SettingsChange?
-  id                                         String                  @id @db.Uuid
-  created_at                                 DateTime                @default(now()) @db.Timestamptz(6)
-  station_id                                 String                  @db.Uuid
-  campaign_id                                String?                 @db.Uuid
+  id                                         String             @id @db.Uuid
+  created_at                                 DateTime           @default(now()) @db.Timestamptz(6)
+  station_id                                 String             @db.Uuid
+  campaign_id                                String?            @db.Uuid
   version                                    Int
-  purchase_start                             DateTime?               @db.Timestamptz(6)
-  purchase_cutoff                            DateTime?               @db.Timestamptz(6)
-  upload_deadline                            DateTime?               @db.Timestamptz(6)
+  purchase_start                             DateTime?          @db.Timestamptz(6)
+  purchase_cutoff                            DateTime?          @db.Timestamptz(6)
+  upload_deadline                            DateTime?          @db.Timestamptz(6)
   timezone                                   String
   retention_days                             Int?
-  retention_approved_by                      String?                 @db.Uuid
-  retention_approved_at                      DateTime?               @db.Timestamptz(6)
-  effective_from                             DateTime                @db.Timestamptz(6)
-  actor_id                                   String                  @db.Uuid
+  retention_approved_by                      String?            @db.Uuid
+  retention_approved_at                      DateTime?          @db.Timestamptz(6)
+  effective_from                             DateTime           @db.Timestamptz(6)
+  actor_id                                   String             @db.Uuid
   reason                                     String
-  rel_station_id                             Station                 @relation("settings_version_station_id", fields: [station_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_campaign_id                            Campaign?               @relation("settings_version_campaign_id", fields: [campaign_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_retention_approved_by                  Admin?                  @relation("settings_version_retention_approved_by", fields: [retention_approved_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  rel_actor_id                               Admin                   @relation("settings_version_actor_id", fields: [actor_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  back_giveaway_snapshot_settings_version_id GiveawaySnapshot[]      @relation("giveaway_snapshot_settings_version_id")
+  rel_station_id                             Station            @relation("settings_version_station_id", fields: [station_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_campaign_id                            Campaign?          @relation("settings_version_campaign_id", fields: [campaign_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_retention_approved_by                  Admin?             @relation("settings_version_retention_approved_by", fields: [retention_approved_by], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rel_actor_id                               Admin              @relation("settings_version_actor_id", fields: [actor_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  back_giveaway_snapshot_settings_version_id GiveawaySnapshot[] @relation("giveaway_snapshot_settings_version_id")
 
   @@unique([actor_id, operation_id], map: "uq_settings_actor_operation")
   @@unique([station_id, id], map: "uq_settings_station_identity")
@@ -859,32 +859,32 @@ model GiveawaySnapshotSource {
 
 model AuditEvent {
   settings_change   SettingsChange?
-  schema_version    Int?            @db.SmallInt
-  station_id        String?         @db.Uuid
-  event_code        String?
-  area              String?
-  target_snapshot   Json?           @db.JsonB
-  correlation_id    String?         @db.Uuid
-  changes           Json?           @db.JsonB
-  related_event_ids String[]        @db.Uuid
+  schema_version Int? @db.SmallInt
+  station_id String? @db.Uuid
+  event_code String?
+  area String?
+  target_snapshot Json? @db.JsonB
+  correlation_id String? @db.Uuid
+  changes Json? @db.JsonB
+  related_event_ids String[] @db.Uuid
 
   customer_identity_change    CustomerIdentityChange[]
   customer_recovery_case      customer_recovery_case[]
-  id                          String                   @id @db.Uuid
-  created_at                  DateTime                 @default(now()) @db.Timestamptz(6)
-  actor_user_id               String?                  @db.Uuid
-  actor_kind                  String
-  action                      String
-  target_type                 String
-  target_id                   String                   @db.Uuid
-  operation_id                String?                  @db.Uuid
-  actor_snapshot              Json?                    @db.JsonB
-  originating_seller_snapshot Json?                    @db.JsonB
-  before                      Json                     @db.JsonB
-  after                       Json                     @db.JsonB
-  reason                      String
-  occurred_at                 DateTime                 @db.Timestamptz(6)
-  rel_actor_user_id           AuthUser?                @relation("audit_event_actor_user_id", fields: [actor_user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id                String    @id @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  actor_user_id     String?   @db.Uuid
+  actor_kind        String
+  action            String
+  target_type       String
+  target_id         String    @db.Uuid
+  operation_id      String?   @db.Uuid
+  actor_snapshot              Json?     @db.JsonB
+  originating_seller_snapshot Json?     @db.JsonB
+  before            Json      @db.JsonB
+  after             Json      @db.JsonB
+  reason            String
+  occurred_at       DateTime  @db.Timestamptz(6)
+  rel_actor_user_id AuthUser? @relation("audit_event_actor_user_id", fields: [actor_user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([actor_user_id])
   @@index([target_type, target_id, occurred_at])
@@ -914,21 +914,21 @@ model MaintenanceRun {
 }
 
 model AttendantSignInRequest {
-  request_key     String      @id @db.Uuid
-  request_hmac    String
-  session_id      String      @db.Uuid
-  created_at      DateTime    @default(now()) @db.Timestamptz(6)
-  expires_at      DateTime    @db.Timestamptz(6)
-  tombstone_until DateTime    @db.Timestamptz(6)
-  rel_session_id  AuthSession @relation(fields: [session_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  request_key String @id @db.Uuid
+  request_hmac String
+  session_id String @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  expires_at DateTime @db.Timestamptz(6)
+  tombstone_until DateTime @db.Timestamptz(6)
+  rel_session_id AuthSession @relation(fields: [session_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   @@index([tombstone_until], map: "attendant_sign_in_request_expiry")
   @@map("attendant_sign_in_request")
 }
 
 model AuthRateBucket {
-  key_digest String   @id
-  tokens     Decimal  @db.Decimal(30, 15)
+  key_digest String @id
+  tokens Decimal @db.Decimal(30, 15)
   updated_at DateTime @db.Timestamptz(6)
 
   @@index([updated_at], map: "auth_rate_bucket_updated")
@@ -937,25 +937,25 @@ model AuthRateBucket {
 
 /// M1 durable finalize replay; foreign keys and immutable guards in reviewed SQL.
 model SyncFinalizeOperation {
-  purchaseId      String    @map("purchase_id") @db.Uuid
-  operationId     String    @map("operation_id") @db.Uuid
-  payloadDigest   String    @map("payload_digest")
-  uploadId        String    @map("upload_id") @db.Uuid
-  expectedVersion Int       @map("expected_version")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+  purchaseId String @map("purchase_id") @db.Uuid
+  operationId String @map("operation_id") @db.Uuid
+  payloadDigest String @map("payload_digest")
+  uploadId String @map("upload_id") @db.Uuid
+  expectedVersion Int @map("expected_version")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
 
   @@id([purchaseId, operationId])
   @@map("sync_finalize_operation")
 }
 
 model SyncValidation {
-  captureEvidence  Json?    @map("capture_evidence")
-  purchaseId       String   @id @map("purchase_id") @db.Uuid
-  policyVersion    Int      @map("policy_version")
-  reasons          Json
-  campaignEligible Boolean  @map("campaign_eligible")
-  evaluatedAt      DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
+  captureEvidence Json? @map("capture_evidence")
+  purchaseId String @id @map("purchase_id") @db.Uuid
+  policyVersion Int @map("policy_version")
+  reasons Json
+  campaignEligible Boolean @map("campaign_eligible")
+  evaluatedAt DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
 
   @@map("sync_validation")
 }
@@ -1041,193 +1041,193 @@ model security_state {
 
 /// Immutable inventory snapshot, guarded by reviewed SQL.
 model CardExport {
-  id              String    @id @db.Uuid
-  created_at      DateTime  @default(now()) @db.Timestamptz(6)
-  batch_id        String    @db.Uuid
-  created_by      String    @db.Uuid
-  operation_id    String    @db.Uuid
-  format          String
-  batch_version   Int
-  batch_status    String
-  batch_code      String
-  batch_name      String
-  snapshot_at     DateTime  @db.Timestamptz(6)
-  status          String
-  prepared_at     DateTime? @db.Timestamptz(6)
-  expires_at      DateTime? @db.Timestamptz(6)
-  object_key      String?   @unique
-  sha256          String?
-  byte_size       BigInt?
-  failure_code    String?
-  lease_nonce     String?
-  lease_until     DateTime? @db.Timestamptz(6)
-  fencing_version BigInt    @default(0)
-  attempts        Int       @default(0)
-  next_attempt_at DateTime? @db.Timestamptz(6)
+ id String @id @db.Uuid
+ created_at DateTime @default(now()) @db.Timestamptz(6)
+ batch_id String @db.Uuid
+ created_by String @db.Uuid
+ operation_id String @db.Uuid
+ format String
+ batch_version Int
+ batch_status String
+ batch_code String
+ batch_name String
+ snapshot_at DateTime @db.Timestamptz(6)
+ status String
+ prepared_at DateTime? @db.Timestamptz(6)
+ expires_at DateTime? @db.Timestamptz(6)
+ object_key String? @unique
+ sha256 String?
+ byte_size BigInt?
+ failure_code String?
+ lease_nonce String?
+ lease_until DateTime? @db.Timestamptz(6)
+ fencing_version BigInt @default(0)
+ attempts Int @default(0)
+ next_attempt_at DateTime? @db.Timestamptz(6)
 
   @@unique([created_by, operation_id])
   @@index([status, next_attempt_at])
-  @@map("card_export")
+ @@map("card_export")
 }
 
 model CardExportItem {
-  export_id           String  @db.Uuid
-  card_id             String  @db.Uuid
-  ordinal             Int
-  code                String
-  qr_payload          String
-  card_state          String
-  assignment_eligible Boolean
+ export_id String @db.Uuid
+ card_id String @db.Uuid
+ ordinal Int
+ code String
+ qr_payload String
+ card_state String
+ assignment_eligible Boolean
 
   @@id([export_id, card_id])
   @@unique([export_id, ordinal])
-  @@map("card_export_item")
+ @@map("card_export_item")
 }
 
 model CorrectionRequest {
-  id                            String    @id @db.Uuid
-  purchase_id                   String    @db.Uuid
-  originating_attendant_id      String    @db.Uuid
-  operation_id                  String    @db.Uuid
-  payload_digest                String
-  frozen_request_digest         String
-  based_on_revision_id          String    @db.Uuid
-  expected_purchase_version     Int
-  proposed_revision_id          String    @db.Uuid
-  first_received_at             DateTime  @db.Timestamptz(6)
-  cutoff_at_receipt             DateTime? @db.Timestamptz(6)
-  time_policy_version           String
-  timing                        String
-  state                         String
-  reason                        String
-  decision_id                   String?   @db.Uuid
-  submitted_by_user_id          String    @db.Uuid
-  verified_author_attendant_id  String?   @db.Uuid
-  authorship                    String
-  recovery_executor_id          String?   @db.Uuid
-  recovery_authorizing_admin_id String?   @db.Uuid
-  policy_blocks                 String[]  @default([])
-  version                       Int       @default(1)
-  authority_session_id          String    @db.Uuid
-  reserved_purchase_version     Int
-  lease_token                   String?   @db.Uuid
-  lease_until                   DateTime? @db.Timestamptz(6)
-  attempts                      Int       @default(0)
-  next_attempt_at               DateTime  @default(now()) @db.Timestamptz(6)
-  validation_error              String?
-  decided_at                    DateTime? @db.Timestamptz(6)
-  decision_reason               String?
-  decided_by_user_id            String?   @db.Uuid
-  receipt                       Json      @db.JsonB
+ id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ originating_attendant_id String @db.Uuid
+ operation_id String @db.Uuid
+ payload_digest String
+ frozen_request_digest String
+ based_on_revision_id String @db.Uuid
+ expected_purchase_version Int
+ proposed_revision_id String @db.Uuid
+ first_received_at DateTime @db.Timestamptz(6)
+ cutoff_at_receipt DateTime? @db.Timestamptz(6)
+ time_policy_version String
+ timing String
+ state String
+ reason String
+ decision_id String? @db.Uuid
+ submitted_by_user_id String @db.Uuid
+ verified_author_attendant_id String? @db.Uuid
+ authorship String
+ recovery_executor_id String? @db.Uuid
+ recovery_authorizing_admin_id String? @db.Uuid
+ policy_blocks String[] @default([])
+ version Int @default(1)
+ authority_session_id String @db.Uuid
+ reserved_purchase_version Int
+ lease_token String? @db.Uuid
+ lease_until DateTime? @db.Timestamptz(6)
+ attempts Int @default(0)
+ next_attempt_at DateTime @default(now()) @db.Timestamptz(6)
+ validation_error String?
+ decided_at DateTime? @db.Timestamptz(6)
+ decision_reason String?
+ decided_by_user_id String? @db.Uuid
+ receipt Json @db.JsonB
 
   @@unique([originating_attendant_id, operation_id])
   @@unique([purchase_id, id])
-  @@map("correction_request")
+ @@map("correction_request")
 }
 
 model SaleDecision {
-  capture_evaluation         Json?    @db.JsonB
-  resolved_capture_block_ids String[] @default([]) @db.Uuid
-  hold_id                    String?  @db.Uuid
-  flag_id                    String?  @db.Uuid
-  evidence_evaluation        Json?    @db.JsonB
-  replay_response            Json?    @db.JsonB
-  id                         String   @id @db.Uuid
-  purchase_id                String   @db.Uuid
-  operation_id               String   @db.Uuid
-  actor_user_id              String   @db.Uuid
-  payload_digest             String
-  kind                       String
-  outcome                    String
-  correction_id              String?  @db.Uuid
-  expected_purchase_version  Int
-  expected_revision_id       String?  @db.Uuid
-  result_revision_id         String?  @db.Uuid
-  applied_purchase_version   Int
-  before_values              Json     @db.JsonB
-  after_values               Json     @db.JsonB
-  evidence_asset_id          String?  @db.Uuid
-  reason                     String
-  decided_at                 DateTime @db.Timestamptz(6)
-  audit_event_id             String   @db.Uuid
-  response                   Json     @db.JsonB
+ capture_evaluation Json? @db.JsonB
+ resolved_capture_block_ids String[] @default([]) @db.Uuid
+ hold_id String? @db.Uuid
+ flag_id String? @db.Uuid
+ evidence_evaluation Json? @db.JsonB
+ replay_response Json? @db.JsonB
+ id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ operation_id String @db.Uuid
+ actor_user_id String @db.Uuid
+ payload_digest String
+ kind String
+ outcome String
+ correction_id String? @db.Uuid
+ expected_purchase_version Int
+ expected_revision_id String? @db.Uuid
+ result_revision_id String? @db.Uuid
+ applied_purchase_version Int
+ before_values Json @db.JsonB
+ after_values Json @db.JsonB
+ evidence_asset_id String? @db.Uuid
+ reason String
+ decided_at DateTime @db.Timestamptz(6)
+ audit_event_id String @db.Uuid
+ response Json @db.JsonB
 
   @@unique([actor_user_id, operation_id])
   @@unique([purchase_id, id])
-  @@map("sale_decision")
+ @@map("sale_decision")
 }
 
 model PurchaseValidationBlock {
-  closure_kind         String?
-  id                   String    @id @db.Uuid
-  purchase_id          String    @db.Uuid
-  code                 String
-  policy_reference     String
-  opened_at            DateTime  @db.Timestamptz(6)
-  resolved_at          DateTime? @db.Timestamptz(6)
-  resolution_reference String?   @db.Uuid
-  version              Int
+ closure_kind String?
+ id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ code String
+ policy_reference String
+ opened_at DateTime @db.Timestamptz(6)
+ resolved_at DateTime? @db.Timestamptz(6)
+ resolution_reference String? @db.Uuid
+ version Int
 
-  @@map("purchase_validation_block")
+ @@map("purchase_validation_block")
 }
 
 model DuplicateDetectionIntent {
-  id          String   @id @db.Uuid
-  purchase_id String   @db.Uuid
-  policy      Json?    @db.JsonB
-  cursor_id   String?  @db.Uuid
-  done        Boolean  @default(false)
-  created_at  DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
-  purchase    Purchase @relation(fields: [purchase_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+ id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ policy Json? @db.JsonB
+ cursor_id String? @db.Uuid
+ done Boolean @default(false)
+ created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ purchase Purchase @relation(fields: [purchase_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([purchase_id], map: "duplicate_detection_purchase")
-  @@map("duplicate_detection_intent")
+ @@index([purchase_id], map: "duplicate_detection_purchase")
+ @@map("duplicate_detection_intent")
 }
 
 model DuplicateReportingState {
-  station_id String  @id @db.Uuid
-  generation BigInt  @default(0)
-  station    Station @relation(fields: [station_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+ station_id String @id @db.Uuid
+ generation BigInt @default(0)
+ station Station @relation(fields: [station_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@map("duplicate_reporting_state")
+ @@map("duplicate_reporting_state")
 }
 
 /// Immutable operational approval, provisioned only after explicit deployment authorization.
 model ReviewEvidenceApproval {
-  id                      String   @id @db.Uuid
-  release                 String
-  digest                  String
-  revision                BigInt
-  station_id              String   @db.Uuid
-  environment             String
-  activated_at            DateTime @db.Timestamptz(6)
-  authorization_reference String
-  recorded_at             DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ id String @id @db.Uuid
+ release String
+ digest String
+ revision BigInt
+ station_id String @db.Uuid
+ environment String
+ activated_at DateTime @db.Timestamptz(6)
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
   @@unique([station_id, environment, revision])
-  @@map("review_evidence_approval")
+ @@map("review_evidence_approval")
 }
 
 model ReviewEvidenceConfiguration {
-  id                      String   @id @db.Uuid
-  station_id              String   @db.Uuid
-  environment             String
-  revision                BigInt
-  configuration           Json     @db.JsonB
-  authorization_reference String
-  recorded_at             DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ environment String
+ revision BigInt
+ configuration Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
   @@unique([station_id, environment, revision])
-  @@map("review_evidence_configuration")
+ @@map("review_evidence_configuration")
 }
 
 model ReviewEvaluation {
-  decision_id String   @id @db.Uuid
-  purchase_id String   @db.Uuid
-  provenance  Json     @db.JsonB
-  created_at  DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ decision_id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ provenance Json @db.JsonB
+ created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
-  @@map("review_evaluation")
+ @@map("review_evaluation")
 }
 
 model customer_recovery_case {
@@ -1293,65 +1293,65 @@ model phone_verification_delivery {
 }
 
 model MeterVerification {
-  id                      String   @id @db.Uuid
-  station_id              String   @db.Uuid
-  content                 Json     @db.JsonB
-  authorization_reference String
-  recorded_at             DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ content Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
-  @@map("meter_verification")
+ @@map("meter_verification")
 }
 
 model MeterProfileApproval {
-  id                      String   @id @db.Uuid
-  station_id              String   @db.Uuid
-  profile_id              String   @db.Uuid
-  profile_version         BigInt
-  digest                  String
-  profile_content         Json     @db.JsonB
-  authorization_reference String
-  recorded_at             DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ profile_id String @db.Uuid
+ profile_version BigInt
+ digest String
+ profile_content Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
   @@unique([profile_id, profile_version])
-  @@map("meter_profile_approval")
+ @@map("meter_profile_approval")
 }
 
 model MeterPolicyApproval {
-  id                      String   @id @db.Uuid
-  station_id              String   @db.Uuid
-  environment             String
-  revision                BigInt
-  configuration           Json     @db.JsonB
-  artifact                String
-  resolver_artifact       String
-  authorization_reference String
-  recorded_at             DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ environment String
+ revision BigInt
+ configuration Json @db.JsonB
+ artifact String
+ resolver_artifact String
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
   @@unique([station_id, environment, revision])
-  @@map("meter_policy_approval")
+ @@map("meter_policy_approval")
 }
 
 model MeterConfiguration {
-  id                      String   @id @db.Uuid
-  station_id              String   @db.Uuid
-  environment             String
-  revision                BigInt
-  configuration           Json     @db.JsonB
-  authorization_reference String
-  recorded_at             DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ environment String
+ revision BigInt
+ configuration Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
   @@unique([station_id, environment, revision])
-  @@map("meter_configuration")
+ @@map("meter_configuration")
 }
 
 model MeterEvaluation {
-  decision_id String   @id @db.Uuid
-  purchase_id String   @db.Uuid
-  revision_id String   @unique @db.Uuid
-  provenance  Json     @db.JsonB
-  created_at  DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ decision_id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ revision_id String @unique @db.Uuid
+ provenance Json @db.JsonB
+ created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
 
-  @@map("meter_evaluation")
+ @@map("meter_evaluation")
 }
 
 model SettingsChange {
