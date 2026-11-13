@@ -223,6 +223,7 @@ export async function firstPassword(
         "First password changed",
         null,
         null,
+        input.operationId,
       );
       return { changed: true };
     });

@@ -97,6 +97,14 @@ async function counts(station: string) {
     ),
   );
 }
+async function auditRows(station: string) {
+  return (
+    await db.pool.query(
+      "SELECT * FROM audit_event WHERE station_id=$1 ORDER BY occurred_at,id",
+      [station],
+    )
+  ).rows;
+}
 it("dry run previews exact immutable rows and policy without writes", async () => {
   const request = await input();
   const result = await operate(db.pool, request);
@@ -107,6 +115,7 @@ it("dry run previews exact immutable rows and policy without writes", async () =
     `WHR_REVIEW_EVIDENCE_POLICY=${JSON.stringify(result.policy)}`,
   );
   expect(await counts(request.stationId)).toEqual([0, 0]);
+  expect(await auditRows(request.stationId)).toEqual([]);
 });
 it("applies activation atomically and appends higher inactive and reactivation revisions", async () => {
   const request = await input("activate", true);
@@ -132,6 +141,47 @@ it("applies activation atomically and appends higher inactive and reactivation r
     activatedAt: null,
   });
   expect(await counts(request.stationId)).toEqual([2, 3]);
+  const events = await auditRows(request.stationId);
+  expect(
+    events.filter((e) => e.action === "review_evidence_approved"),
+  ).toHaveLength(2);
+  expect(
+    events.filter((e) => e.action === "review_evidence_configured"),
+  ).toHaveLength(2);
+  expect(
+    events.filter((e) => e.action === "review_evidence_deactivated"),
+  ).toHaveLength(1);
+  const first = events.filter(
+    (e) => e.correlation_id === events[0].correlation_id,
+  );
+  expect(first).toHaveLength(2);
+  expect(first[0].related_event_ids).toEqual([first[1].id]);
+  expect(first[1].related_event_ids).toEqual([first[0].id]);
+  for (const e of events) {
+    expect(e.actor_snapshot).toMatchObject({
+      kind: "system",
+      service: "operations",
+    });
+    expect(e.schema_version).toBe(1);
+    expect(e.occurred_at.getTime()).toBeGreaterThan(
+      Date.parse(request.activatedAt!),
+    );
+  }
+  expect(JSON.stringify(events)).not.toContain(releaseDigest);
+  expect(JSON.stringify(events)).not.toContain(request.authorizationReference);
+  const deactivated = events.find(
+    (e) => e.action === "review_evidence_deactivated",
+  )!;
+  expect(deactivated.before).toMatchObject({
+    policyState: "active",
+    policyRevision: "1",
+  });
+  expect(deactivated.after).toMatchObject({
+    approvalId: null,
+    activatedAt: null,
+    policyState: "inactive",
+    policyRevision: "2",
+  });
   const stored = await db.pool.query(
     "SELECT configuration FROM review_evidence_configuration WHERE id=$1",
     [active.configuration.id],
@@ -166,6 +216,9 @@ it("serializes concurrent activation and deactivation and refuses the stale auth
   const count = await counts(request.stationId);
   expect(count[1]).toBe(1);
   expect(count[0]).toBeLessThanOrEqual(1);
+  expect(await auditRows(request.stationId)).toHaveLength(
+    count[0]! + count[1]!,
+  );
 });
 it("rolls approval back when the configuration insert fails", async () => {
   const request = await input("activate", true);
@@ -178,6 +231,7 @@ it("rolls approval back when the configuration insert fails", async () => {
   try {
     await expect(operate(db.pool, request)).rejects.toThrow();
     expect(await counts(request.stationId)).toEqual([0, 0]);
+    expect(await auditRows(request.stationId)).toEqual([]);
   } finally {
     await db.pool.query(
       "DROP TRIGGER reject_operator_config ON review_evidence_configuration",
@@ -210,6 +264,7 @@ it("refuses digest and environment mismatches with no rows", async () => {
     operate(db.pool, { ...request, environment: "production" }),
   ).rejects.toThrow();
   expect(await counts(request.stationId)).toEqual([0, 0]);
+  expect(await auditRows(request.stationId)).toEqual([]);
 });
 it("does not reserve preview revisions or IDs", async () => {
   const request = await input();
@@ -246,6 +301,7 @@ it("refuses absent, malformed and duplicated persisted environment identities", 
   );
   await expect(operate(db.pool, request)).rejects.toThrow("environment");
   expect(await counts(request.stationId)).toEqual([0, 0]);
+  expect(await auditRows(request.stationId)).toEqual([]);
 });
 it("ignores session SET and connection options when checking database identity", async () => {
   const client = await db.pool.connect();
@@ -355,6 +411,7 @@ it("runs real CLI dry run and guarded production apply against persisted identit
   const preview = run(args);
   expect(preview.status).toBe(0);
   expect(await counts(request.stationId)).toEqual([0, 0]);
+  expect(await auditRows(request.stationId)).toEqual([]);
   const applied = run([...args, "--apply", "--expected-revision", "1"]);
   expect(applied.status).toBe(0);
   expect(applied.stderr).toBe("");

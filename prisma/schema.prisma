@@ -834,6 +834,15 @@ model GiveawaySnapshotSource {
 }
 
 model AuditEvent {
+  schema_version Int? @db.SmallInt
+  station_id String? @db.Uuid
+  event_code String?
+  area String?
+  target_snapshot Json? @db.JsonB
+  correlation_id String? @db.Uuid
+  changes Json? @db.JsonB
+  related_event_ids String[] @db.Uuid
+
   customer_identity_change    CustomerIdentityChange[]
   customer_recovery_case      customer_recovery_case[]
   id                String    @id @db.Uuid

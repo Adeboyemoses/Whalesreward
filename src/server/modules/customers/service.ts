@@ -144,14 +144,13 @@ export async function registerCustomer(
             "Customer registration",
             null,
             {
-              customerCode,
-              category: parsed.category,
+              customerCategory: parsed.category,
               cardId: card.id,
-              stationId: actor.station_id,
             },
             {
               operationId: parsed.operationId,
               occurredAt: r.created_at.toISOString(),
+              stationId: actor.station_id,
             },
           );
           return registrationReceiptWithLookupSchema.parse({

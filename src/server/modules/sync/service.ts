@@ -1,3 +1,10 @@
+import {
+  writeAudit,
+  auditActor,
+  auditTarget,
+  auditSeller,
+  auditSystem,
+} from "../audit/write";
 import { readOnlinePrice } from "../../lib/online-price";
 import { lookupReceiptConfig, type LookupReceiptKeys } from "./lookup-receipt";
 import { issueLookupReceipt, freezeLookupEvidence } from "./lookup-evidence";
@@ -31,7 +38,6 @@ import {
   authority,
   ownedPurchase,
   view,
-  audit,
   type Purchase,
 } from "./repo";
 import { validatePhoto } from "./photo";
@@ -115,14 +121,21 @@ export function createSyncService({
         ],
       );
       if (!linked)
-        await audit(
-          db,
-          auth.userId,
-          p.id,
-          p.operation_id,
-          "purchase.cancelled",
-          { reason: "customer_not_found" },
-        );
+        await writeAudit(db, {
+          stationId: p.station_id,
+          action: "sale_cancelled_unmatched",
+          actor: auditSystem("sync"),
+          target: await auditTarget(db, "purchase", p.id, p.station_id),
+          originatingSeller: await auditSeller(db, p.id),
+          operationId: p.operation_id,
+          reason: "Unmatched sale cancelled",
+          before: { state: p.status, credited: false, creditedSpendKobo: "0" },
+          after: {
+            state: "cancelled",
+            credited: false,
+            creditedSpendKobo: "0",
+          },
+        });
       return view(db, await ownedPurchase(db, id, auth.attendantId));
     });
   }
@@ -238,9 +251,9 @@ export function createSyncService({
           sale.cardCode,
           lookupReceiptKeys(),
         );
-        await db.query(
+        const insertedPurchase = await db.query<{ received_at: string }>(
           `INSERT INTO purchase(id,originating_attendant_id,operation_id,payload_digest,sale_code,capture_context_id,assignment_id,station_id,pump_id,product_id,seller_name,seller_username,card_code,app_captured_at,server_received_at,price_version_id,basis,entered_amount_kobo,entered_quantity,amount_kobo,quantity,rate_kobo,currency,unit,quantity_precision,medium,expected_photo_digest,expected_photo_bytes,status,version,lookup_receipt_input,lookup_receipt_status,lookup_receipt_claims,capture_lower_bound,capture_policy_version,lookup_receipt_input_json)
-     VALUES($1,$2,$3,$4,'S'||nextval('sync_sale_code_seq'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$27::timestamptz,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'received',1,$28::jsonb,$29,$30::jsonb,$31::timestamptz,'p23-3',$32)`,
+     VALUES($1,$2,$3,$4,'S'||nextval('sync_sale_code_seq'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$27::timestamptz,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,'received',1,$28::jsonb,$29,$30::jsonb,$31::timestamptz,'p23-3',$32) RETURNING server_received_at::text AS received_at`,
           [
             id,
             auth.attendantId,
@@ -278,6 +291,18 @@ export function createSyncService({
             canonicalJson(sale.lookupReceipt ?? null),
           ],
         );
+        await writeAudit(db, {
+          stationId: ctx.station_id,
+          action: "sale_received",
+          actor: await auditActor(db, auth.userId),
+          target: await auditTarget(db, "purchase", id, ctx.station_id),
+          originatingSeller: await auditSeller(db, id),
+          operationId: sale.operationId,
+          reason: "Sale received",
+          before: null,
+          after: { state: "received", detailsReceived: true },
+          occurredAt: insertedPurchase.rows[0]!.received_at,
+        });
         return { id, created: true };
       });
       // This separate transaction is intentional: a lookup outage cannot erase R.

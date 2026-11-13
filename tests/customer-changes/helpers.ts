@@ -30,14 +30,19 @@ export async function recoveryFixture(
   const oldCard = cardCode(),
     newCard = cardCode(),
     phone = phoneNumber();
-  const customerCode = `REC-${customerId.slice(-8)}`;
+  // Match server-generated display code shapes; UUID tails keep fixtures distinct.
+  const customerCode = `CUST${BigInt(`0x${customerId.slice(-12)}`).toString()}`;
   await f.db.query(
     "INSERT INTO customer(id,customer_code,name,phone_normalized,category,version,registered_station_id,registered_by_user_id) VALUES($1,$2,'Amina Bello',$3,'car_owner',1,$4,$5)",
     [customerId, customerCode, `+234${phone.slice(1)}`, seedId(8), f.userId],
   );
   await f.db.query(
     "INSERT INTO card_batch(id,batch_code,name,status,version,created_by) VALUES($1,$2,'Fictional recovery stock','generated',1,$3)",
-    [batchId, `REC-${batchId.slice(-8)}`, f.adminId],
+    [
+      batchId,
+      `BATCH${BigInt(`0x${batchId.slice(-12)}`).toString()}`,
+      f.adminId,
+    ],
   );
   await f.db.query(
     "UPDATE card_batch SET status='printed',version=2 WHERE id=$1",

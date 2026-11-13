@@ -8,6 +8,29 @@ import type {
   EvidenceCategory,
   ResolvedEvidence,
 } from "./evidence-types";
+/** Canonical audit fields are evidence only when the retained price version and
+ * exact committed activation boundary agree. Historical fields remain explicit. */
+export function priceAuditMatches(a: Fact, v: Fact) {
+  const after =
+    a.after && typeof a.after === "object" && !Array.isArray(a.after)
+      ? (a.after as Record<string, unknown>)
+      : {};
+  if (after.priceVersionId !== v.id || after.rateKobo !== v.rate_kobo)
+    return false;
+  if (after.priceVersion !== undefined)
+    return (
+      after.priceVersion === String(v.version) &&
+      after.quantityPrecision === String(v.quantity_precision) &&
+      after.currency === v.currency &&
+      typeof after.effectiveFrom === "string" &&
+      trustedMicros(after.effectiveFrom) === trustedMicros(v.effective_from) &&
+      trustedMicros(a.occurred_at) === trustedMicros(v.effective_from)
+    );
+  return (
+    after.version === v.version &&
+    after.quantityPrecision === v.quantity_precision
+  );
+}
 export const EVIDENCE_CATEGORIES: readonly EvidenceCategory[] = [
   "original_purchase",
   "capturing_context",
@@ -151,13 +174,7 @@ export async function resolveEvidenceSources(
     const after = object(a.after),
       before = object(a.before);
     if (a.action === "price_activated")
-      return prices.some(
-        (v) =>
-          after.priceVersionId === v.id &&
-          after.version === v.version &&
-          after.rateKobo === v.rate_kobo &&
-          after.quantityPrecision === v.quantity_precision,
-      );
+      return prices.some((v) => priceAuditMatches(a, v));
     if (a.action === "assignment_ended")
       return assignments.some(
         (v) =>
@@ -168,7 +185,18 @@ export async function resolveEvidenceSources(
             trustedMicros(v.effective_until),
       );
     if (a.action === "assignment_changed")
-      return assignments.some((v) => after.assignmentId === v.id);
+      return assignments.some(
+        (v) =>
+          after.assignmentId === v.id &&
+          (after.assignmentVersion === undefined ||
+            (after.assignmentVersion === String(v.assignment_version) &&
+              after.pumpId === v.pump_id &&
+              typeof after.effectiveFrom === "string" &&
+              trustedMicros(after.effectiveFrom) ===
+                trustedMicros(v.effective_from) &&
+              trustedMicros(a.occurred_at) ===
+                trustedMicros(v.effective_from))),
+      );
     if (a.action === "attendant_disabled")
       return (
         context.revoked_at !== null &&
@@ -189,7 +217,8 @@ export async function resolveEvidenceSources(
         (a.action === "card_linked"
           ? links.some((l) => after.linkId === l.id)
           : card !== null &&
-            (after.replacementCardId === card.replaced_by_card_id ||
+            (after.newCardId === card.replaced_by_card_id ||
+              after.replacementCardId === card.replaced_by_card_id ||
               after.replacedByCardId === card.replaced_by_card_id))
       );
     return settings.some(

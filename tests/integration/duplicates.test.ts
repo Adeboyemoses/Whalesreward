@@ -194,7 +194,9 @@ describe("P-24 real-Postgres advisory duplicates", () => {
         )
       ).rows[0].n,
     ).toBe(0);
-  }, 60000);
+    // This fixture commits 5,151 canonical audit snapshots as well as the pairs.
+    // Keep a finite allowance for real PostgreSQL I/O on local/CI runners.
+  }, 120000);
   it("same effective value in a different entered basis is not a time duplicate", async () => {
     const a = await h.image(),
       b = await h.image("#010203"),

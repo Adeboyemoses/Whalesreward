@@ -4,6 +4,7 @@ import { stationDate } from "../../lib/time";
 import { AuthError } from "../auth/errors";
 import {
   fingerprint,
+  priceAuditMatches,
   insufficient,
   resolveEvidenceSources,
   resolveReferenceClosure,
@@ -177,14 +178,10 @@ function price(
   const auditIds: string[] = [];
   for (const v of segments) {
     const matches = f.audits.filter((a) => {
-      const after = record(a.after);
       return (
         a.action === "price_activated" &&
         a.target_id === p.product_id &&
-        after.priceVersionId === v.id &&
-        after.version === v.version &&
-        after.rateKobo === v.rate_kobo &&
-        after.quantityPrecision === v.quantity_precision
+        priceAuditMatches(a, v)
       );
     });
     if (matches.length !== 1) return insufficient();
@@ -238,7 +235,8 @@ function card(
       a.target_id === c.id &&
       (before.customerId === p.customer_id ||
         after.customerId === p.customer_id) &&
-      (after.replacedByCardId === c.replaced_by_card_id ||
+      (after.newCardId === c.replaced_by_card_id ||
+        after.replacedByCardId === c.replaced_by_card_id ||
         after.replacementCardId === c.replaced_by_card_id) &&
       trustedMicros(a.occurred_at) === E
     );

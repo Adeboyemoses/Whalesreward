@@ -1,3 +1,9 @@
+import {
+  writeAudit,
+  auditTarget,
+  auditSeller,
+  auditSystem,
+} from "../audit/write";
 import type pg from "pg";
 import { newId } from "../../lib/ids";
 import { duplicateWindow, duplicateWindowSchema } from "./config";
@@ -80,14 +86,20 @@ AND abs(extract(epoch FROM (a.app_captured_at-b.app_captured_at)))<=$3))`,
         "INSERT INTO duplicate_reporting_state(station_id,generation) VALUES($1,1) ON CONFLICT(station_id) DO UPDATE SET generation=duplicate_reporting_state.generation+1",
         [intent.station_id],
       );
-      await db.query(
-        "INSERT INTO audit_event(id,actor_kind,action,target_type,target_id,before,after,reason,occurred_at) VALUES($1,'system','duplicate_flagged','purchase',$2,'{}',$3,'Suspected duplicate',clock_timestamp())",
-        [
-          newId(),
-          pair[0],
-          JSON.stringify({ flagId: inserted.rows[0].id, purchaseIds: pair }),
-        ],
-      );
+      await writeAudit(db, {
+        stationId: intent.station_id,
+        action: "duplicate_flagged",
+        actor: auditSystem("validation"),
+        target: await auditTarget(db, "purchase", pair[0]!, intent.station_id),
+        originatingSeller: await auditSeller(db, pair[0]!),
+        reason: "Suspected duplicate",
+        before: null,
+        after: {
+          flagId: inserted.rows[0].id,
+          purchaseIds: pair,
+          duplicateState: "open",
+        },
+      });
     }
     await db.query(
       "UPDATE duplicate_detection_intent SET cursor_id=$2,done=$3 WHERE id=$1",

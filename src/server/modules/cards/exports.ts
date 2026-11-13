@@ -11,7 +11,8 @@ import { AuthError } from "../auth/errors";
 import { renderCardExport } from "./renderer";
 import { CARD_POLICY, type CardOptions } from "./config";
 import type { CardArtifactStorage } from "../../adapters/card-artifacts";
-import { audit } from "../station/repo";
+import { stationId } from "../station/repo";
+import { writeAudit, auditTarget, auditSystem } from "../audit/write";
 export type ExportOptions = CardOptions & {
   storage: CardArtifactStorage;
   render?: typeof renderCardExport;
@@ -24,6 +25,27 @@ async function creatorAllowed(db: pg.PoolClient, admin: string) {
     )
   ).rows[0];
   return row?.id as string | undefined;
+}
+async function exportEvent(
+  db: pg.PoolClient,
+  row: { id: string; batch_id: string; format: string; operation_id?: string },
+  action: "export_prepared" | "export_failed",
+) {
+  const station = await stationId(db);
+  await writeAudit(db, {
+    stationId: station,
+    action,
+    actor: auditSystem("export"),
+    target: await auditTarget(db, "card_batch", row.batch_id, station),
+    operationId: row.operation_id,
+    correlationId: row.id,
+    reason:
+      action === "export_prepared"
+        ? "Batch export prepared"
+        : "Batch export failed",
+    before: { exportId: row.id, exportFormat: row.format },
+    after: { exportId: row.id, exportFormat: row.format },
+  });
 }
 export async function prepareCardExport(
   pool: pg.Pool,
@@ -38,7 +60,7 @@ export async function prepareCardExport(
     // leases remain owned by their renderer, regardless of local configuration.
     const unavailable = (
       await db.query(
-        "SELECT id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND status='pending' AND(attempts>=$2 OR(format='pdf' AND NOT $3::boolean)) AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
+        "SELECT id,batch_id,format,operation_id,fencing_version,lease_nonce FROM card_export WHERE($1::uuid IS NULL OR id=$1) AND status='pending' AND(attempts>=$2 OR(format='pdf' AND NOT $3::boolean)) AND(lease_until IS NULL OR lease_until<=clock_timestamp()) ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",
         [exportId ?? null, CARD_POLICY.maxAttempts, !!options.layout],
       )
     ).rows[0];
@@ -53,6 +75,8 @@ export async function prepareCardExport(
           !!options.layout,
         ],
       );
+      if (recovered.rowCount === 1)
+        await exportEvent(db, unavailable, "export_failed");
       return recovered.rowCount === 1 ? { denied: true } : null;
     }
     const r = (
@@ -68,6 +92,7 @@ export async function prepareCardExport(
         "UPDATE card_export SET status='failed',failure_code='preparation_failed',attempts=$2,lease_nonce=NULL,lease_until=NULL WHERE id=$1",
         [r.id, CARD_POLICY.maxAttempts],
       );
+      await exportEvent(db, r, "export_failed");
       return { denied: true };
     }
     const nonce = randomBytes(24).toString("hex");
@@ -166,24 +191,15 @@ export async function prepareCardExport(
         ],
       );
       if (updated.rowCount !== 1) return false;
-      await audit(
-        db,
-        (await creatorAllowed(db, claim.creator!))!,
-        "card_batch",
-        claim.batch!,
-        "batch_export_prepared",
-        "Batch export prepared",
-        null,
-        { exportId: claim.id },
-      );
+      await exportEvent(db, row, "export_prepared");
       return true;
     });
     return { processed: true, delivered };
   } catch {
     await transaction(pool, async (db) => {
       await securityLock(db);
-      await db.query(
-        "UPDATE card_export SET status=CASE WHEN attempts>=$5 THEN 'failed' ELSE 'pending' END,failure_code=CASE WHEN attempts>=$5 THEN 'preparation_failed' ELSE NULL END,lease_nonce=NULL,lease_until=NULL,next_attempt_at=CASE WHEN attempts>=$5 THEN NULL ELSE clock_timestamp()+($4::bigint*interval '1 millisecond') END WHERE id=$1 AND status='pending' AND lease_nonce=$2 AND fencing_version=$3",
+      const terminal = await db.query(
+        "UPDATE card_export SET status=CASE WHEN attempts>=$5 THEN 'failed' ELSE 'pending' END,failure_code=CASE WHEN attempts>=$5 THEN 'preparation_failed' ELSE NULL END,lease_nonce=NULL,lease_until=NULL,next_attempt_at=CASE WHEN attempts>=$5 THEN NULL ELSE clock_timestamp()+($4::bigint*interval '1 millisecond') END WHERE id=$1 AND status='pending' AND lease_nonce=$2 AND fencing_version=$3 RETURNING id,batch_id,format,operation_id,status",
         [
           claim.id,
           claim.nonce,
@@ -192,6 +208,8 @@ export async function prepareCardExport(
           CARD_POLICY.maxAttempts,
         ],
       );
+      if (terminal.rows[0]?.status === "failed")
+        await exportEvent(db, terminal.rows[0], "export_failed");
     });
     return { processed: true, delivered: false };
   }

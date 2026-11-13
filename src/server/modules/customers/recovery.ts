@@ -1,3 +1,5 @@
+import { writeAudit, auditActor, auditTarget } from "../audit/write";
+import type { AuditAction } from "../../../shared/contracts/audit";
 import type pg from "pg";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -14,7 +16,6 @@ import { transaction, receipt, type LiveAdmin } from "../admin-access/repo";
 import type { AdminConfig } from "../admin-access/config";
 import { hmac } from "../auth/crypto";
 import { AuthError } from "../auth/errors";
-import { snapshotText } from "../corrections/service";
 import { consumeLimits } from "../auth/rate-limit";
 import { stationId, cursorId, nextCursor } from "../station/repo";
 import { phoneNormalizer, type PhoneNormalizer } from "../../adapters/phone";
@@ -103,48 +104,52 @@ async function event(
   db: pg.PoolClient,
   actor: LiveAdmin,
   target: string,
-  action: string,
+  action: AuditAction,
   reason: string,
   values: Record<string, unknown>,
   at: string,
   operationId: string,
 ) {
-  const id = newId();
-  const user = (
-    await db.query(
-      "SELECT u.display_name,u.username,a.admin_code,r.name AS role_name FROM auth_user u JOIN admin a ON a.user_id=u.id JOIN role r ON r.id=a.role_id WHERE a.id=$1",
-      [actor.admin_id],
-    )
-  ).rows[0];
-  const actorSnapshot = {
-    kind: "admin",
-    userId: actor.user_id,
-    code: snapshotText(user.admin_code),
-    nameAtEvent: snapshotText(user.display_name),
-    usernameAtEvent: snapshotText(user.username),
-    roleAtEvent: snapshotText(user.role_name),
-  };
-  await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at,operation_id,actor_snapshot) VALUES($1,$2,'user',$3,$4,$5,'null'::jsonb,$6,$7,$8,$9,$10)`,
-    [
-      id,
-      actor.user_id,
-      action,
-      action === "manager_case_recorded"
-        ? "manager_case"
-        : action === "card_replaced"
-          ? "card"
-          : "customer",
-      target,
-      values,
-      reason,
-      at,
-      operationId,
-      actorSnapshot,
-    ],
-  );
-  return id;
+  const station = await stationId(db);
+  const kind =
+    action === "manager_case_recorded"
+      ? "manager_case"
+      : action === "card_replaced"
+        ? "card"
+        : "customer";
+  return writeAudit(db, {
+    stationId: station,
+    action,
+    actor: await auditActor(db, actor.user_id),
+    target:
+      kind === "manager_case"
+        ? { kind, id: target, code: `CASE-${target}`, subjectAtEvent: null }
+        : await auditTarget(db, kind, target, station),
+    reason,
+    before:
+      action === "card_verification_verified"
+        ? { ...values, verificationState: "issued" }
+        : action === "phone_changed"
+          ? {
+              phoneChanged: false,
+              verificationMethod: null,
+              identityChangeId: null,
+            }
+          : action === "card_replaced"
+            ? {
+                customerId: values.customerId,
+                oldCardId: values.oldCardId,
+                newCardId: null,
+                verificationMethod: null,
+                identityChangeId: null,
+              }
+            : null,
+    after: values,
+    occurredAt: at,
+    operationId,
+  });
 }
+
 async function identityView(db: pg.PoolClient, id: string) {
   const r = (
     await db.query(
@@ -275,16 +280,12 @@ async function insertIdentity(
     method = kind === "phone_change" ? "card_present" : "registered_phone_code";
   const values =
     kind === "phone_change"
-      ? { phoneChanged: true, verificationMethod: method }
+      ? { phoneChanged: true, verificationMethod: method, identityChangeId: id }
       : {
-          oldCardCode: (
-            await db.query("SELECT code FROM card WHERE id=$1", [oldCard])
-          ).rows[0].code,
-          newCardCode: (
-            await db.query("SELECT code FROM card WHERE id=$1", [newCard])
-          ).rows[0].code,
+          oldCardId: oldCard,
+          newCardId: newCard,
           customerId: c.id,
-          replacementCardId: newCard,
+          identityChangeId: id,
           verificationMethod: method,
         };
   const auditId = await event(
@@ -748,6 +749,20 @@ async function issue(
             newId(),
           ],
         );
+        await event(
+          db,
+          live,
+          c.id,
+          "card_verification_issued",
+          "Card verification issued",
+          {
+            challengeId: id,
+            verificationMethod: "registered_phone_code",
+            verificationState: "issued",
+          },
+          (await db.query("SELECT clock_timestamp()::text AS at")).rows[0].at,
+          p.operationId,
+        );
         created = true;
         return challengeView(await challenge(db, id, c.id, live, token));
       },
@@ -932,6 +947,21 @@ async function verify(
         snapshot,
       ],
     );
+    if (verified)
+      await event(
+        db,
+        live,
+        c.id,
+        "card_verification_verified",
+        "Card verification verified",
+        {
+          challengeId: ch.id,
+          verificationMethod: "registered_phone_code",
+          verificationState: "verified",
+        },
+        current.verified_at.toISOString(),
+        p.operationId,
+      );
     return snapshot;
   });
   if (!result) throw new AuthError("verification_unavailable", 422);
