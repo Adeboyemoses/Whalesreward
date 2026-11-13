@@ -13,7 +13,10 @@ import {
   reviewSettings,
   confirmSettings,
 } from "../../src/server/modules/settings/service";
-import { resolveEvidenceSources } from "../../src/server/modules/reviews/evidence-resolvers";
+import {
+  resolveEvidenceSources,
+  fingerprint,
+} from "../../src/server/modules/reviews/evidence-resolvers";
 import { createReviewsService } from "../../src/server/modules/reviews/service";
 import { newId } from "../../src/server/lib/ids";
 let db: Awaited<ReturnType<typeof evidenceDatabase>>;
@@ -227,4 +230,120 @@ describe("retention never enters campaign timing lineage", () => {
       ).rows[0].status,
     ).toBe("held");
   });
+});
+
+describe("pre-upgrade P25 campaign provenance", () => {
+  it.each([false, true])(
+    "reuses exact old campaign snapshots without ignoring changed meaningful fields altered=%s",
+    async (altered) => {
+      const x = await evidenceFixture(db, "capture");
+      await db.pool.query(
+        "INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES($1,$2,'capture_time_unresolved','fixture',clock_timestamp(),1)",
+        [newId(), x.sale.purchaseId],
+      );
+      await trackLegacy(x.f.stationId);
+      const svc = createReviewsService({
+        pool: db.pool,
+        storage: x.h.storage,
+        env: {
+          ...process.env,
+          WHR_ENV: "test",
+          WHR_REVIEW_EVIDENCE_POLICY: JSON.stringify(x.config),
+        },
+      });
+      const previous = await svc.decideCapture(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const stored = (
+        await db.pool.query(
+          "SELECT provenance FROM review_evaluation WHERE decision_id=$1",
+          [previous.id],
+        )
+      ).rows[0].provenance;
+      // Reconstruct the exact pre-WHR-26 to_jsonb(settings_version)-reason shape
+      // from the original table columns, independent of the upgraded resolver.
+      for (const source of stored.sources) {
+        if (source.category !== "campaign_history") continue;
+        const old = (
+          await db.pool.query(
+            `SELECT to_jsonb(legacy) AS snapshot FROM
+    (SELECT id,created_at,station_id,campaign_id,version,purchase_start,purchase_cutoff,
+     upload_deadline,timezone,retention_days,retention_approved_by,retention_approved_at,
+     effective_from,actor_id FROM settings_version WHERE id=$1) legacy`,
+            [source.id],
+          )
+        ).rows[0].snapshot;
+        expect(source.snapshot).toEqual(old);
+        source.snapshot = old;
+        if (altered)
+          source.snapshot.purchase_cutoff = "2026-12-01T00:00:00.000001+00:00";
+      }
+      stored.historyGeneration = fingerprint(stored.sources);
+      await seedHistorical(
+        db.pool,
+        "review_evaluation",
+        "UPDATE review_evaluation SET provenance=$2 WHERE decision_id=$1",
+        [previous.id, stored],
+      );
+      const oldStored = JSON.stringify(
+        (
+          await db.pool.query(
+            "SELECT provenance FROM review_evaluation WHERE decision_id=$1",
+            [previous.id],
+          )
+        ).rows[0].provenance,
+      );
+      await retain(x.token, 60);
+      await retain(x.token, 61);
+      await seedHistorical(
+        db.pool,
+        "purchase",
+        "UPDATE purchase SET status='held',version=version+1 WHERE id=$1 AND status='credited'",
+        [x.sale.purchaseId],
+      );
+      const hold = newId();
+      await db.pool.query(
+        "INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) VALUES($1,$2,'date','open',$3,'capture_date_uncertain',1)",
+        [hold, x.sale.purchaseId, x.original],
+      );
+      const body = {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedHoldVersion: 1,
+        verifiedSaleDate: "2026-11-10",
+        evidence: { ...x.evidence, referenceIds: [previous.id] },
+      };
+      const operation = () =>
+        svc.decideDate(x.token, x.sale.purchaseId, hold, body);
+      if (altered)
+        await expect(operation()).rejects.toMatchObject({
+          code: "evidence_insufficient",
+          status: 422,
+        });
+      else {
+        const result = await operation();
+        expect(result.creditedAfter).toBe(true);
+        expect(await operation()).toEqual(result);
+      }
+      expect(
+        JSON.stringify(
+          (
+            await db.pool.query(
+              "SELECT provenance FROM review_evaluation WHERE decision_id=$1",
+              [previous.id],
+            )
+          ).rows[0].provenance,
+        ),
+      ).toBe(oldStored);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int AS count FROM review_evaluation WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].count,
+      ).toBe(altered ? 1 : 2);
+    },
+  );
 });
