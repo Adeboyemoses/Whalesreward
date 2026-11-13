@@ -5,12 +5,14 @@ import { useAdminSession } from "./session";
 import { StationPortal, stationSections } from "./station";
 import { CustomerPortal } from "./customers";
 import { CardsPortal } from "./cards";
+import { AuditPortal } from "./audit";
 import { SalesPortal } from "./sales";
 const customerSections = [
   { grant: "customers", label: "Customers", href: "/admin/customers" },
   { grant: "cards", label: "Loyalty cards", href: "/admin/cards" },
 ] as const;
 const portalSections = [
+  { grant: "audit", label: "Audit history", href: "/admin/audit" } as const,
   { grant: "sales", label: "Sales", href: "/admin/sales" } as const,
   ...stationSections,
   ...customerSections,
@@ -60,7 +62,9 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
         .filter(Boolean)
     : initialPath;
   const route = path.join("/");
-  const customerRoute = ["customers", "cards", "sales"].includes(path[0] ?? "");
+  const customerRoute = ["customers", "cards", "sales", "audit"].includes(
+    path[0] ?? "",
+  );
   const stationRoute = ["pumps", "prices", "attendants"].includes(
     path[0] ?? "",
   );
@@ -165,11 +169,13 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
         station={session.station?.name ?? ""}
         active={
           customerRoute
-            ? path[0] === "sales"
-              ? "Sales"
-              : path[0] === "cards"
-                ? "Loyalty cards"
-                : "Customers"
+            ? path[0] === "audit"
+              ? "Audit history"
+              : path[0] === "sales"
+                ? "Sales"
+                : path[0] === "cards"
+                  ? "Loyalty cards"
+                  : "Customers"
             : stationRoute
               ? (stationSections.find(
                   (item) => item.href === "/admin/" + path[0],
@@ -222,7 +228,9 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           </p>
         )}
         {customerRoute ? (
-          path[0] === "sales" ? (
+          path[0] === "audit" ? (
+            <AuditPortal key={epoch} path={path} session={session} />
+          ) : path[0] === "sales" ? (
             <SalesPortal key={epoch} path={path} session={session} />
           ) : path[0] === "cards" ? (
             <CardsPortal key={epoch} path={path} session={session} />
