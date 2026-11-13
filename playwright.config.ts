@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
+import { browserMeterPolicy } from "./tests/reviews/meter-policy";
 import { browserReviewPolicy } from "./tests/reviews/policy";
 
 export default defineConfig({
@@ -18,6 +19,7 @@ export default defineConfig({
   webServer: {
     env: {
       WHR_ENV: "local",
+      WHR_METER_POLICY: JSON.stringify(browserMeterPolicy),
       WHR_REVIEW_EVIDENCE_POLICY: JSON.stringify(browserReviewPolicy),
       WHR_TRUSTED_IP_HEADER: "x-test-ip",
       // Explicit fictional local policies/storage; never configure a deployed app.
