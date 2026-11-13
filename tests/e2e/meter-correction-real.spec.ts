@@ -103,7 +103,7 @@ test("I-31 outside display allowance leaves meter decision and contribution unch
     const before = await adminDetail(page, sale.id);
     await edit(page, sale.id, "11000.00", "9.00");
     await confirm(page, "Review correction", 422);
-    await expect(page.getByRole("alert")).toContainText(
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
       /rate|allowance|rounding/i,
     );
     const after = await adminDetail(page, sale.id);
@@ -145,7 +145,9 @@ test("I-39 stale meter confirmation cannot overwrite a newer sale version", asyn
       .getByRole("button", { name: "Confirm decision", exact: true })
       .click();
     expect((await response).status()).toBe(409);
-    await expect(page.getByRole("alert")).toContainText(/changed|reload/i);
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      /changed|reload/i,
+    );
     expect(
       (
         await f.db.query(
@@ -169,7 +171,7 @@ test("I-22 I-31 unchanged pair is refused and lost meter response replays one ex
     const sale = await heldSale(f, ["price"]);
     await edit(page, sale.id, "10000.00", sale.original.entry.quantity);
     await confirm(page, "Review correction", 409);
-    await expect(page.getByRole("alert")).toContainText(
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
       /same|match|unchanged/i,
     );
     await page.reload();
