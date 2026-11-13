@@ -41,8 +41,19 @@ export function auditValue(
   const value = change[side];
   if (value === null) return "Not recorded";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (Array.isArray(value))
-    return value.length ? value.map(adminAction).join(" · ") : "None";
+  if (Array.isArray(value)) {
+    const enums = [
+      "holdKinds",
+      "policyBlocks",
+      "reviewConclusions",
+      "permissions",
+    ];
+    return value.length
+      ? (enums.includes(change.field) ? value.map(adminAction) : value).join(
+          " · ",
+        )
+      : "None";
+  }
   if (["amountKobo", "rateKobo", "creditedSpendKobo"].includes(change.field))
     return formatNaira(parseKobo(value));
   if (change.field === "quantity") {
@@ -55,14 +66,29 @@ export function auditValue(
     return adminTime(value);
   if (change.field === "verifiedSaleDate")
     return adminTime(`${value}T12:00:00+01:00`).split(" · ")[0] ?? value;
-  if (
-    change.field.endsWith("Id") ||
-    change.field.endsWith("Version") ||
-    change.field.endsWith("Revision") ||
-    ["quantityPrecision", "recordCount"].includes(change.field)
-  )
-    return value;
-  return adminAction(value);
+  // Only closed enum fields receive presentation labels. All free text, IDs,
+  // revisions and release references remain the exact recorded strings.
+  const enums = [
+    "state",
+    "currency",
+    "unit",
+    "medium",
+    "basis",
+    "calculation",
+    "duplicateState",
+    "correctionState",
+    "outcome",
+    "meterConclusion",
+    "customerCategory",
+    "verificationMethod",
+    "verificationState",
+    "recoveryState",
+    "batchStatus",
+    "exportFormat",
+    "policyEnvironment",
+    "policyState",
+  ];
+  return enums.includes(change.field) ? adminAction(value) : value;
 }
 export function auditMessage(e: unknown) {
   if (e instanceof AdminError) {

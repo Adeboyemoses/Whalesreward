@@ -12,6 +12,54 @@ const event = {
   changes: [{ field: "unit", before: "litre", after: "kilogram" }],
 } as AuditEvent;
 describe("audit presentation boundary", () => {
+  it("preserves distinct free text role names exactly", () => {
+    const change = {
+      field: "roleName",
+      before: "night_shift",
+      after: "Night shift",
+    } as const;
+    expect(auditValue(event, change, "before")).toBe("night_shift");
+    expect(auditValue(event, change, "after")).toBe("Night shift");
+  });
+  it("preserves reference arrays and closed release identifiers byte-for-byte", () => {
+    const ids: [string, string] = [
+      "a18f0000-0000-7000-8000-000000000001",
+      "b18f0000-0000-7000-8000-000000000001",
+    ];
+    expect(
+      auditValue(
+        event,
+        { field: "purchaseIds", before: null, after: ids },
+        "after",
+      ),
+    ).toBe(ids.join(" · "));
+    for (const field of ["reviewPolicyRelease", "policyRelease"] as const)
+      expect(
+        auditValue(
+          event,
+          { field, before: null, after: "review-evidence-v1" },
+          "after",
+        ),
+      ).toBe("review-evidence-v1");
+    expect(
+      auditValue(
+        event,
+        {
+          field: "meterPolicyRelease",
+          before: null,
+          after: "meter-reconciliation-v1",
+        },
+        "after",
+      ),
+    ).toBe("meter-reconciliation-v1");
+    expect(
+      auditValue(
+        event,
+        { field: "state", before: null, after: "photo_pending" },
+        "after",
+      ),
+    ).toBe("Photo pending");
+  });
   it("labels money values by display units in sentence case", () => {
     expect(auditFieldLabel("amountKobo")).toBe("Amount");
     expect(auditFieldLabel("rateKobo")).toBe("Captured unit price");
