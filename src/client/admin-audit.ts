@@ -77,3 +77,29 @@ export function auditMessage(e: unknown) {
   }
   return "Audit history could not be loaded. Check the filters and try again.";
 }
+
+/** Human labels describe displayed units rather than the wire representation. */
+export function auditFieldLabel(field: AuditChange["field"]) {
+  const labels: Partial<Record<AuditChange["field"], string>> = {
+    amountKobo: "Amount",
+    rateKobo: "Captured unit price",
+    creditedSpendKobo: "Credited spend",
+    quantity: "Quantity",
+    batchStatus: "Batch status",
+    correctionState: "Review status",
+    duplicateState: "Duplicate status",
+    state: "Sale status",
+    basis: "Entry basis",
+    phoneChanged: "Phone changed",
+    verifiedSaleDate: "Verified sale date",
+  };
+  return (
+    labels[field] ??
+    adminAction(
+      field
+        .replace(/([A-Z])/g, " $1")
+        .toLowerCase()
+        .replace(/\bid\b/g, "ID"),
+    )
+  );
+}

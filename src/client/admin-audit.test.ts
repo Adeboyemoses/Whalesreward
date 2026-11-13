@@ -4,6 +4,7 @@ import {
   auditValue,
   auditMessage,
   auditTitle,
+  auditFieldLabel,
 } from "./admin-audit";
 import { AdminError, type adminRequest } from "./admin-api";
 import type { AuditEvent } from "../shared/contracts/audit";
@@ -11,6 +12,12 @@ const event = {
   changes: [{ field: "unit", before: "litre", after: "kilogram" }],
 } as AuditEvent;
 describe("audit presentation boundary", () => {
+  it("labels money values by display units in sentence case", () => {
+    expect(auditFieldLabel("amountKobo")).toBe("Amount");
+    expect(auditFieldLabel("rateKobo")).toBe("Captured unit price");
+    expect(auditFieldLabel("creditedSpendKobo")).toBe("Credited spend");
+    expect(auditFieldLabel("quantityPrecision")).toBe("Quantity precision");
+  });
   it("preserves exact integer money beyond floating point precision", () => {
     expect(
       auditValue(

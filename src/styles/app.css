@@ -722,3 +722,5 @@ body {
   .wr-audit-toolbar { grid-template-columns: minmax(0, 1fr); }
   .wr-audit-toolbar .wr-field:last-child { grid-column: auto; }
 }
+.wr-audit-context { display: flex; flex-direction: column; gap: var(--space-6); }
+.wr-audit-reason { background: var(--whale-050); border-color: transparent; }

@@ -7,11 +7,13 @@ import {
   auditMessage,
   auditTitle,
   auditValue,
+  auditFieldLabel,
 } from "@/client/admin-audit";
 import {
   auditAreas,
   auditDate,
   type AuditEvent,
+  type AuditChange,
   type AuditSearch,
 } from "@/shared/contracts/audit";
 import { AdminError } from "@/client/admin-api";
@@ -388,14 +390,15 @@ function Event({ event: e }: { event: AuditEvent }) {
             ]}
           />
         </Sheet>
-        <div>
-          <Sheet title="Reason / reference">
+        <div className="wr-audit-context">
+          <section className="wr-sheet wr-audit-reason">
+            <h2>Reason / reference</h2>
             <p>
               {e.action === "legacy_event"
                 ? "older event, details not available"
                 : e.reason}
             </p>
-          </Sheet>
+          </section>
           <Sheet title="Original seller">
             {e.originatingSeller ? (
               <>
@@ -425,9 +428,9 @@ function Event({ event: e }: { event: AuditEvent }) {
           rows={e.changes.map((c) => ({
             id: c.field,
             cells: {
-              field: <b>{adminAction(c.field.replace(/([A-Z])/g, " $1"))}</b>,
-              before: auditValue(e, c, "before"),
-              after: auditValue(e, c, "after"),
+              field: <b>{auditFieldLabel(c.field)}</b>,
+              before: <ChangeValue event={e} change={c} side="before" />,
+              after: <ChangeValue event={e} change={c} side="after" />,
             },
           }))}
         />
@@ -451,4 +454,48 @@ function Event({ event: e }: { event: AuditEvent }) {
       </p>
     </>
   );
+}
+
+function ChangeValue({
+  event,
+  change,
+  side,
+}: {
+  event: AuditEvent;
+  change: AuditChange;
+  side: "before" | "after";
+}) {
+  const value = change[side];
+  const text = auditValue(event, change, side);
+  const states = [
+    "state",
+    "batchStatus",
+    "correctionState",
+    "duplicateState",
+    "recoveryState",
+    "verificationState",
+    "policyState",
+  ];
+  if (value === null || !states.includes(change.field)) return text;
+  const tone = [
+    "cancelled",
+    "rejected",
+    "revoked",
+    "expired",
+    "inactive",
+  ].includes(String(value))
+    ? "failed"
+    : [
+          "credited",
+          "active",
+          "accepted",
+          "verified",
+          "cleared",
+          "submitted",
+        ].includes(String(value))
+      ? "synced"
+      : value === "awaiting_review" || value === "held"
+        ? "held"
+        : "pending";
+  return <span className={`wr-pill wr-sm wr-${tone}`}>{text}</span>;
 }
