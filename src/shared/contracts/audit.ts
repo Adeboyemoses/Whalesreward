@@ -85,7 +85,10 @@ export const auditFieldValues = {
   amountKobo: kobo,
   rateKobo: kobo,
   creditedSpendKobo: kobo,
-  quantity: z.string().regex(/^(0|[1-9][0-9]{0,13})(\.[0-9]{1,6})?$/),
+  quantity: z
+    .string()
+    .regex(/^(0|[1-9][0-9]{0,13})(\.[0-9]{1,6})?$/)
+    .refine((v) => /[1-9]/.test(v)),
   currency: z.literal("NGN"),
   unit: z.enum(["litre", "kilogram"]),
   medium: z.enum(["vehicle", "keg", "three_wheeler", "bike", "cylinder"]),

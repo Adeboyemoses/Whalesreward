@@ -101,6 +101,7 @@ describe("M3 closed typed audit catalogue", () => {
       { field: "oldCardCode", before: null, after: "A7K3M9Q" },
       { field: "manifestDigest", before: null, after: "a".repeat(64) },
       { field: "quantity", before: null, after: 0.1 },
+      { field: "quantity", before: null, after: "0.000000" },
       { field: "amountKobo", before: null, after: 1 },
       { field: "outcome", before: null, after: "enabled" },
       { field: "purchaseIds", before: null, after: [id, id] },
