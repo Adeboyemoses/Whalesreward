@@ -1,3 +1,8 @@
+import {
+  readSettings,
+  reviewSettings,
+  confirmSettings,
+} from "../../src/server/modules/settings/service";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
@@ -272,6 +277,39 @@ describe("WO-core-13 operational reporting adversaries", () => {
     await expect(
       query({ expectedDataVersion: first.dataVersion }),
     ).rejects.toMatchObject({ code: "read_view_stale", status: 409 });
+  });
+  it("retention intent preserves operational generation and source-page validity", async () => {
+    await historicalSale(f.pool, {});
+    const before = await query(),
+      administrator = await f.actor(["settings"]);
+    const settings = await readSettings(
+      f.pool,
+      config,
+      administrator.token,
+      "get",
+    );
+    if (!("version" in settings)) throw new Error("Settings expected");
+    const proposal = {
+      days: 31,
+      expectedVersion: settings.version,
+      reason: "Record retention intent without enabling deletion",
+    };
+    const review = await reviewSettings(
+      f.pool,
+      config,
+      administrator.token,
+      "retention",
+      proposal,
+    );
+    await confirmSettings(f.pool, config, administrator.token, "retention", {
+      ...proposal,
+      reviewDigest: review.reviewDigest,
+      operationId: newId(),
+    });
+    const after = await query();
+    expect(after.dataVersion).toBe(before.dataVersion);
+    expect(after.totals).toEqual(before.totals);
+    expect((await sources(before.dataVersion)).items).toHaveLength(1);
   });
   it("flag and original validation changes invalidate the report generation", async () => {
     const a = await historicalSale(f.pool, {}),

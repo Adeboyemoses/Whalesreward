@@ -52,8 +52,10 @@ async function retain(token: string, days: number) {
   });
 }
 async function trackLegacy(stationId: string) {
+  // Source-generation triggers may already have created this station row.
+  // Install only the legacy settings pointer; preserve its reporting generation.
   await db.pool.query(
-    "INSERT INTO station_reporting_state(station_id,settings_version,current_settings_version_id) SELECT station_id,version,id FROM settings_version WHERE station_id=$1 ORDER BY version DESC LIMIT 1",
+    "INSERT INTO station_reporting_state(station_id,settings_version,current_settings_version_id) SELECT station_id,version,id FROM settings_version WHERE station_id=$1 ORDER BY version DESC LIMIT 1 ON CONFLICT(station_id) DO UPDATE SET settings_version=EXCLUDED.settings_version,current_settings_version_id=EXCLUDED.current_settings_version_id",
     [stationId],
   );
   await db.pool.query(

@@ -27,7 +27,9 @@ CREATE TRIGGER reports_photo AFTER INSERT OR UPDATE OR DELETE ON photo_asset FOR
 CREATE TRIGGER reports_correction AFTER INSERT OR UPDATE OR DELETE ON correction_request FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
 CREATE TRIGGER reports_duplicate AFTER INSERT OR UPDATE OR DELETE ON duplicate_flag FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
 CREATE TRIGGER reports_customer AFTER INSERT OR UPDATE OR DELETE ON customer FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
-CREATE TRIGGER reports_settings AFTER INSERT ON settings_version FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
+-- Retention intent changes no contribution, report field or campaign timing.
+-- Keep existing campaign dataVersion stable for these unrelated settings writes.
+CREATE TRIGGER reports_settings AFTER INSERT ON settings_version FOR EACH ROW WHEN (NEW.section IS DISTINCT FROM 'retention') EXECUTE FUNCTION advance_report_generation();
 CREATE TRIGGER reports_launch AFTER UPDATE OF launch_at ON station_reporting_state FOR EACH ROW WHEN (OLD.launch_at IS DISTINCT FROM NEW.launch_at) EXECUTE FUNCTION advance_report_generation();
 CREATE TABLE report_export (
  id uuid PRIMARY KEY, station_id uuid NOT NULL REFERENCES station(id), created_by uuid NOT NULL REFERENCES admin(id), operation_id uuid NOT NULL,
