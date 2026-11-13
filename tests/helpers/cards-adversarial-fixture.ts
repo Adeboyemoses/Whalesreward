@@ -123,6 +123,7 @@ export async function historicalSale(
   pool: pg.Pool,
   options: {
     customerId?: string;
+    currency?: "NGN" | "USD";
     product?: "pms" | "diesel" | "cooking_gas";
     state?:
       | "received"
@@ -141,6 +142,7 @@ export async function historicalSale(
   const gas = product === "cooking_gas",
     diesel = product === "diesel";
   const amount = options.amount ?? "1234567";
+  const currency = options.currency ?? "NGN";
   const quantity = (value: string) =>
     `${BigInt(value) / 1000000n}.${(BigInt(value) % 1000000n).toString().padStart(6, "0")}`;
   const id = newId(),
@@ -177,17 +179,18 @@ export async function historicalSale(
       );
     }
     await db.query(
-      "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) SELECT $1,$2,$3,coalesce(max(version),0)+1,1000000,'NGN',6,clock_timestamp(),$4,'Fictional exact aggregate fixture' FROM product_price_version WHERE station_id=$2 AND product_id=$3",
+      "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) SELECT $1,$2,$3,coalesce(max(version),0)+1,1000000,$5,6,clock_timestamp(),$4,'Fictional exact aggregate fixture' FROM product_price_version WHERE station_id=$2 AND product_id=$3",
       [
         priceId,
         fixtureId(8),
         fixtureId(gas ? 12 : diesel ? 10 : 9),
         fixtureId(5),
+        currency,
       ],
     );
     await db.query(
       `INSERT INTO purchase(id,originating_attendant_id,operation_id,payload_digest,sale_code,capture_context_id,assignment_id,station_id,pump_id,product_id,seller_name,seller_username,card_code,app_captured_at,server_received_at,price_version_id,basis,entered_amount_kobo,amount_kobo,quantity,rate_kobo,currency,unit,quantity_precision,medium,expected_photo_digest,expected_photo_bytes,customer_id,card_id,status,version)
-      VALUES($1,$2,$3,'fictional aggregate',$4,$5,$6,$7,$8,$9,'Grace Okon','grace.okon','A7K3M9Q',clock_timestamp(),clock_timestamp(),$10,'amount',$11,$11,$12,1000000,'NGN',$13,6,$14,$15,100,$16,$17,'received',1)`,
+      VALUES($1,$2,$3,'fictional aggregate',$4,$5,$6,$7,$8,$9,'Grace Okon','grace.okon','A7K3M9Q',clock_timestamp(),clock_timestamp(),$10,'amount',$11,$11,$12,1000000,$18,$13,6,$14,$15,100,$16,$17,'received',1)`,
       [
         id,
         sellerId,
@@ -206,6 +209,7 @@ export async function historicalSale(
         "a".repeat(64),
         customerId,
         fixtureId(29),
+        currency,
       ],
     );
     if (state !== "received")
