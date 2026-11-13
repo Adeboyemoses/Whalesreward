@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
-import { v7 } from "uuid";
 import { stationFixture } from "../station/helpers";
 import {
   settingsFixture,
@@ -14,6 +13,9 @@ import {
   daysLabel,
   reasonLabel,
   timingLocked,
+  changeCatalogPrecision,
+  rejectedMetadataReview,
+  type RetentionReview,
 } from "../settings/helpers";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
@@ -217,24 +219,50 @@ test("I-39 I-45 competing retention confirmation requires a fresh explicit revie
 test("I-40 I-45 committed response loss and a rate-limited retry preserve the frozen retention operation", async ({
   page,
 }) => {
-  const f = await settingsFixture(page);
+  const f = await settingsFixture(page, ["settings", "prices"]);
+  await f.db.query("SELECT pg_advisory_lock(80511)");
   try {
     const before = await readSettings(page),
       days = nextDays(before, 61);
     await editIntent(page, days, "Fictional lost retention response");
-    expect((await reviewIntent(page)).status()).toBe(200);
+    const initialReview = await reviewIntent(page);
+    expect(initialReview.status()).toBe(200);
+    let reviewed = (await initialReview.json()).data as RetentionReview;
+    const precision = await changeCatalogPrecision(
+      page,
+      f.db,
+      before.station.id,
+    );
+    expect(precision.after).not.toBe(precision.before);
+    const rejectedOperations: string[] = [];
     const bodies: unknown[] = [];
     let committed: unknown;
+    type Attempt = { status: number; code?: string; operationId: string };
+    let resolveAttempt!: (result: Attempt) => void;
     await page.route(
       "**/api/admin/settings/retention/confirm",
       async (route) => {
-        bodies.push(route.request().postDataJSON());
-        if (bodies.length === 1) {
+        const input = route.request().postDataJSON();
+        if (committed === undefined) {
           const response = await route.fetch();
-          expect(response.status()).toBe(201);
-          committed = (await response.json()).data;
-          await route.abort("failed");
-        } else if (bodies.length === 2) {
+          const result = await response.json();
+          if (response.status() === 201) {
+            committed = result.data;
+            bodies.push(input);
+            await route.abort("failed");
+          } else {
+            // A definitive refusal reaches the UI unchanged; no fault occurs yet.
+            await route.fulfill({ response });
+          }
+          resolveAttempt({
+            status: response.status(),
+            code: result.error?.code,
+            operationId: input.operationId,
+          });
+          return;
+        }
+        bodies.push(input);
+        if (bodies.length === 2) {
           // The receipt already exists. A limiter cannot prove the original failed.
           await route.fulfill({
             status: 429,
@@ -252,12 +280,41 @@ test("I-40 I-45 committed response loss and a rate-limited retry preserve the fr
         } else await route.continue();
       },
     );
-    await page
-      .getByRole("button", { name: "Confirm changes", exact: true })
-      .click();
+    // At most three real reviews before the first commit. After commit, only replay is allowed.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const settled = new Promise<Attempt>((resolve) => {
+        resolveAttempt = resolve;
+      });
+      await page
+        .getByRole("button", { name: "Confirm changes", exact: true })
+        .click();
+      const result = await settled;
+      expect(rejectedOperations).not.toContain(result.operationId);
+      if (result.status === 201) break;
+      expect(result.status).toBe(409);
+      expect(result.code).toBe("review_stale");
+      await rejectedMetadataReview(page, reviewed, result.operationId);
+      rejectedOperations.push(result.operationId);
+      expect(attempt, "All three pre-commit reviews became stale").toBeLessThan(
+        2,
+      );
+      await expect(page.getByRole("main").getByRole("alert")).toContainText(
+        /review is out of date/,
+      );
+      await page
+        .getByRole("button", { name: "Reload settings", exact: true })
+        .click();
+      await expect(page.getByLabel(daysLabel, { exact: true })).toBeEnabled();
+      const nextReview = await reviewIntent(page);
+      expect(nextReview.status()).toBe(200);
+      reviewed = (await nextReview.json()).data as RetentionReview;
+    }
+    expect(committed).toBeDefined();
+    expect(rejectedOperations.length).toBeGreaterThanOrEqual(1);
+    expect(bodies).toHaveLength(1);
     await expect(
       page.getByRole("button", { name: "Retry confirmation", exact: true }),
-    ).toBeVisible();
+    ).toBeEnabled();
     await expect(
       page.getByRole("button", { name: "Keep editing", exact: true }),
     ).toBeDisabled();
@@ -306,6 +363,17 @@ test("I-40 I-45 committed response loss and a rate-limited retry preserve the fr
     expect(bodies[2]).toEqual(bodies[0]);
     expect((await readSettings(page)).version).toBe(before.version + 1);
     const operation = bodies[0] as { operationId: string };
+    expect(rejectedOperations).not.toContain(operation.operationId);
+    expect(
+      (
+        await f.db.query(
+          `SELECT
+      (SELECT count(*)::int FROM settings_version WHERE operation_id=ANY($1::uuid[])) AS versions,
+      (SELECT count(*)::int FROM mutation_receipt WHERE operation_id=ANY($1::uuid[])) AS receipts`,
+          [rejectedOperations],
+        )
+      ).rows[0],
+    ).toEqual({ versions: 0, receipts: 0 });
     expect(
       (
         await f.db.query(
@@ -319,8 +387,12 @@ test("I-40 I-45 committed response loss and a rate-limited retry preserve the fr
       ).rows[0],
     ).toEqual({ versions: 1, history: 1, receipts: 1 });
   } finally {
-    await page.unrouteAll({ behavior: "wait" });
-    await f.close();
+    try {
+      await page.unrouteAll({ behavior: "wait" });
+    } finally {
+      await f.db.query("SELECT pg_advisory_unlock(80511)");
+      await f.close();
+    }
   }
 });
 
@@ -528,29 +600,12 @@ test("I-45 real catalog metadata change refuses the old review and requires an e
       "Fictional concurrent catalog metadata review",
     );
     expect((await reviewIntent(page)).status()).toBe(200);
-    const price = (
-      await f.db.query(
-        `SELECT v.version, v.rate_kobo::text, v.quantity_precision
-      FROM product_price_version v JOIN product p ON p.id=v.product_id
-      WHERE p.code='kerosene' AND v.station_id=$1 ORDER BY v.version DESC LIMIT 1`,
-        [before.station.id],
-      )
-    ).rows[0];
-    const changed = await page.request.post(
-      "/api/admin/prices/kerosene/activate",
-      {
-        headers: { Origin: "http://127.0.0.1:3000" },
-        data: {
-          operationId: v7(),
-          expectedVersion: price.version,
-          rateKobo: price.rate_kobo,
-          currency: "NGN",
-          quantityPrecision: price.quantity_precision === 5 ? 6 : 5,
-          reason: "Fictional concurrent quantity precision change",
-        },
-      },
+    const precision = await changeCatalogPrecision(
+      page,
+      f.db,
+      before.station.id,
     );
-    expect(changed.status()).toBe(201);
+    expect(precision.after).not.toBe(precision.before);
     const confirmations: import("@playwright/test").Response[] = [];
     page.on("response", (response) => {
       if (
@@ -560,16 +615,24 @@ test("I-45 real catalog metadata change refuses the old review and requires an e
         confirmations.push(response);
     });
     await confirmIntent(page);
-    expect(confirmations.map((response) => response.status())).toEqual([
-      409, 201,
-    ]);
-    expect((await confirmations[0]!.json()).error.code).toBe("review_stale");
-    const first = confirmations[0]!.request().postDataJSON();
-    const second = confirmations[1]!.request().postDataJSON();
-    expect(first.expectedVersion).toBe(before.version);
-    expect(second.expectedVersion).toBe(before.version);
-    expect(second.operationId).not.toBe(first.operationId);
-    expect(second.reviewDigest).not.toBe(first.reviewDigest);
+    expect(confirmations.length).toBeGreaterThanOrEqual(2);
+    expect(confirmations.length).toBeLessThanOrEqual(3);
+    for (const refusal of confirmations.slice(0, -1)) {
+      expect(refusal.status()).toBe(409);
+      expect((await refusal.json()).error.code).toBe("review_stale");
+    }
+    expect(confirmations.at(-1)!.status()).toBe(201);
+    const proposals = confirmations.map((response) =>
+      response.request().postDataJSON(),
+    );
+    for (const proposal of proposals)
+      expect(proposal.expectedVersion).toBe(before.version);
+    expect(
+      new Set(proposals.map((proposal) => proposal.operationId)).size,
+    ).toBe(proposals.length);
+    expect(
+      new Set(proposals.map((proposal) => proposal.reviewDigest)).size,
+    ).toBe(proposals.length);
     expect((await readSettings(page)).version).toBe(before.version + 1);
   } finally {
     await f.db.query("SELECT pg_advisory_unlock(80511)");

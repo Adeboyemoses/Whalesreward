@@ -215,3 +215,39 @@ export async function confirmIntent(page: Page, status = 201) {
   }
   throw new Error("Unreachable UI review state");
 }
+
+/** Actual local price activation; changes a catalog field bound into settings review. */
+export async function changeCatalogPrecision(
+  page: Page,
+  db: StationFixture["db"],
+  stationId: string,
+) {
+  const price = (
+    await db.query(
+      `SELECT v.version, v.rate_kobo::text, v.quantity_precision
+    FROM product_price_version v JOIN product p ON p.id=v.product_id
+    WHERE p.code='kerosene' AND v.station_id=$1 ORDER BY v.version DESC LIMIT 1`,
+      [stationId],
+    )
+  ).rows[0];
+  const quantityPrecision = price.quantity_precision === 5 ? 6 : 5;
+  const changed = await page.request.post(
+    "/api/admin/prices/kerosene/activate",
+    {
+      headers: { Origin: origin },
+      data: {
+        operationId: v7(),
+        expectedVersion: price.version,
+        rateKobo: price.rate_kobo,
+        currency: "NGN",
+        quantityPrecision,
+        reason: "Fictional concurrent quantity precision change",
+      },
+    },
+  );
+  expect(changed.status()).toBe(201);
+  return {
+    before: price.quantity_precision as number,
+    after: quantityPrecision,
+  };
+}
