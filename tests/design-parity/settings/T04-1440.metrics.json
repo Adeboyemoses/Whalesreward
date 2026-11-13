@@ -1,0 +1,88 @@
+{
+  "overflow": [],
+  "viewport": 1440,
+  "document": 1440,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "Back to settings",
+      "rect": {
+        "x": 1263,
+        "y": 70,
+        "width": 137,
+        "height": 40,
+        "top": 70,
+        "right": 1400,
+        "bottom": 110,
+        "left": 1263
+      }
+    },
+    {
+      "label": "Confirm changes",
+      "rect": {
+        "x": 309,
+        "y": 524,
+        "width": 143,
+        "height": 40,
+        "top": 524,
+        "right": 452,
+        "bottom": 564,
+        "left": 309
+      }
+    },
+    {
+      "label": "Keep editing",
+      "rect": {
+        "x": 460,
+        "y": 524,
+        "width": 115,
+        "height": 40,
+        "top": 524,
+        "right": 575,
+        "bottom": 564,
+        "left": 460
+      }
+    },
+    {
+      "label": "Cancel",
+      "rect": {
+        "x": 583,
+        "y": 524,
+        "width": 78,
+        "height": 40,
+        "top": 524,
+        "right": 661,
+        "bottom": 564,
+        "left": 583
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 288,
+      "y": 134,
+      "width": 614.953125,
+      "height": 451,
+      "top": 134,
+      "right": 902.953125,
+      "bottom": 585,
+      "left": 288
+    },
+    {
+      "x": 926.953125,
+      "y": 134,
+      "width": 473.03125,
+      "height": 451,
+      "top": 134,
+      "right": 1399.984375,
+      "bottom": 585,
+      "left": 926.953125
+    }
+  ],
+  "tables": [
+    {
+      "width": 571,
+      "scrollWidth": 650
+    }
+  ]
+}

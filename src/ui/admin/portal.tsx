@@ -7,6 +7,7 @@ import { CustomerPortal } from "./customers";
 import { CardsPortal } from "./cards";
 import { AuditPortal } from "./audit";
 import { SalesPortal } from "./sales";
+import { SettingsPortal } from "./settings";
 const customerSections = [
   { grant: "customers", label: "Customers", href: "/admin/customers" },
   { grant: "cards", label: "Loyalty cards", href: "/admin/cards" },
@@ -16,6 +17,7 @@ const portalSections = [
   { grant: "sales", label: "Sales", href: "/admin/sales" } as const,
   ...stationSections,
   ...customerSections,
+  { grant: "settings", label: "Settings", href: "/admin/settings" } as const,
 ];
 import type { AdminSession as Session } from "@/client/admin-session";
 import { adminTime, adminAction } from "@/client/admin-display";
@@ -65,6 +67,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
   const customerRoute = ["customers", "cards", "sales", "audit"].includes(
     path[0] ?? "",
   );
+  const settingsRoute = path[0] === "settings";
   const stationRoute = ["pumps", "prices", "attendants"].includes(
     path[0] ?? "",
   );
@@ -168,21 +171,23 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
       <AdminShell
         station={session.station?.name ?? ""}
         active={
-          customerRoute
-            ? path[0] === "audit"
-              ? "Audit history"
-              : path[0] === "sales"
-                ? "Sales"
-                : path[0] === "cards"
-                  ? "Loyalty cards"
-                  : "Customers"
-            : stationRoute
-              ? (stationSections.find(
-                  (item) => item.href === "/admin/" + path[0],
-                )?.label ?? "Station pumps")
-              : path[0] === "roles"
-                ? "Roles & permissions"
-                : "Admin users"
+          settingsRoute
+            ? "Settings"
+            : customerRoute
+              ? path[0] === "audit"
+                ? "Audit history"
+                : path[0] === "sales"
+                  ? "Sales"
+                  : path[0] === "cards"
+                    ? "Loyalty cards"
+                    : "Customers"
+              : stationRoute
+                ? (stationSections.find(
+                    (item) => item.href === "/admin/" + path[0],
+                  )?.label ?? "Station pumps")
+                : path[0] === "roles"
+                  ? "Roles & permissions"
+                  : "Admin users"
         }
         items={[
           ...portalSections
@@ -208,7 +213,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           </>
         }
       >
-        {!stationRoute && !customerRoute && (
+        {!stationRoute && !customerRoute && !settingsRoute && (
           <div className="wr-pagehead">
             <div>
               <div className="wr-eyebrow">Access management</div>
@@ -227,7 +232,9 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
             {error}
           </p>
         )}
-        {customerRoute ? (
+        {settingsRoute ? (
+          <SettingsPortal key={epoch} path={path} session={session} />
+        ) : customerRoute ? (
           path[0] === "audit" ? (
             <AuditPortal key={epoch} path={path} session={session} />
           ) : path[0] === "sales" ? (

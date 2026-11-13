@@ -11,3 +11,22 @@ WHR-26; local fictional PostgreSQL data only. UI coverage belongs to WHR-27.
 7. Clear retention to null through explicit review and confirm. Deletion remains false for every response. Verify preserved evidence and unchanged sections; no deletion endpoint or job is introduced.
 
 Automated names and final gate results are posted to WHR-26 after implementation.
+
+---
+
+# WHR-27 admin settings smoke
+
+Use the local real stack or the reviewed staging build with a fictional admin who has settings permission. Never seed live/staging data by hand.
+
+1. Open /admin/settings at 1440 px and at phone width. Check station, timezone, launch/start, cutoff, grace and server-derived upload deadline. Null values say Not set. Zero grace must remain 0 hours.
+2. Open giveaway timing. Expect “Campaign dates can't be changed until Whales approves the timing rules”. No editable timing form or confirm control is available until WHR-55.
+3. Open photo retention. Verify current days or an empty field for Not set. No board defaults. Try 0, negative, decimal and nonnumeric values; expect accessible validation. A reason is required.
+4. Enter positive whole days and a fictional reason. Review changes shows server before/after, reason, and automatic deletion Disabled. Keep editing and Cancel do not save.
+5. Review again and Confirm changes. The overview and newest history entry show the saved intent, actor, Lagos timestamp, reason and previous/new values. Reload and check persistence. Photos are never deleted automatically.
+6. Clear days and review/confirm to record Not set. Verify no deletion and complete history.
+7. Open two sessions. Confirm a competing edit, then confirm the earlier review. Expect a version conflict or stale review explanation and an explicit new review; never silently substitute versions. An unrelated catalog change can also invalidate the canonical review; reload and explicitly review again.
+8. Retry a confirmation after an interrupted response. The same operation must resolve once, including a rate-limited retry before the response can be recovered. Never label an uncertain result saved.
+9. Remove settings permission in a separate authorized local fixture/session. Direct settings/editor access must deny without disclosing values or history; a permission loss before confirmation must not save.
+10. Review unchanged days and explain no_change without creating history. Inspect newest-first pagination and accessible empty/error/retry states.
+
+Automated evidence: 870 unit tests passed; typecheck, lint and production build passed. The focused real-stack settings suite passed 22 cases with zero failures/skips/retries. Independent fidelity passed with 12 screenshots and 12 metrics at 1440/390/360 px, including 48 px phone targets and keyboard focus. See `tests/design-parity/settings/REPORT.md`. Complete browser-suite counts and final CI/reviewer results are recorded in `.review/app__WHR-27-settings.md` and the feature PR. Timing editable/review screens intentionally remain locked under WHR-55.

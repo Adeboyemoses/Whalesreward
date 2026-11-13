@@ -1,0 +1,178 @@
+{
+  "overflow": [
+    {
+      "tag": "TABLE",
+      "class": "wr-table",
+      "text": "Settings historyWhenSettingPreviousNewByReason",
+      "rect": {
+        "x": 17,
+        "y": 2262,
+        "width": 650,
+        "height": 41,
+        "top": 2262,
+        "right": 667,
+        "bottom": 2303,
+        "left": 17
+      }
+    },
+    {
+      "tag": "THEAD",
+      "class": "",
+      "text": "WhenSettingPreviousNewByReason",
+      "rect": {
+        "x": 17,
+        "y": 2262,
+        "width": 650,
+        "height": 40.5,
+        "top": 2262,
+        "right": 667,
+        "bottom": 2302.5,
+        "left": 17
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "WhenSettingPreviousNewByReason",
+      "rect": {
+        "x": 17,
+        "y": 2262,
+        "width": 650,
+        "height": 40.5,
+        "top": 2262,
+        "right": 667,
+        "bottom": 2302.5,
+        "left": 17
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "New",
+      "rect": {
+        "x": 377.21875,
+        "y": 2262,
+        "width": 93.5,
+        "height": 40.5,
+        "top": 2262,
+        "right": 470.71875,
+        "bottom": 2302.5,
+        "left": 377.21875
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "By",
+      "rect": {
+        "x": 470.71875,
+        "y": 2262,
+        "width": 73.578125,
+        "height": 40.5,
+        "top": 2262,
+        "right": 544.296875,
+        "bottom": 2302.5,
+        "left": 470.71875
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "Reason",
+      "rect": {
+        "x": 544.296875,
+        "y": 2262,
+        "width": 122.703125,
+        "height": 40.5,
+        "top": 2262,
+        "right": 667,
+        "bottom": 2302.5,
+        "left": 544.296875
+      }
+    },
+    {
+      "tag": "TBODY",
+      "class": "",
+      "text": "",
+      "rect": {
+        "x": 17,
+        "y": 2303,
+        "width": 650,
+        "height": 0,
+        "top": 2303,
+        "right": 667,
+        "bottom": 2303,
+        "left": 17
+      }
+    }
+  ],
+  "viewport": 390,
+  "document": 390,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "View giveaway settings",
+      "rect": {
+        "x": 37,
+        "y": 1294,
+        "width": 185,
+        "height": 48,
+        "top": 1294,
+        "right": 222,
+        "bottom": 1342,
+        "left": 37
+      }
+    },
+    {
+      "label": "Edit retention period",
+      "rect": {
+        "x": 37,
+        "y": 1666,
+        "width": 167,
+        "height": 48,
+        "top": 1666,
+        "right": 204,
+        "bottom": 1714,
+        "left": 37
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 16,
+      "y": 960,
+      "width": 358,
+      "height": 455,
+      "top": 960,
+      "right": 374,
+      "bottom": 1415,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 1439,
+      "width": 358,
+      "height": 348,
+      "top": 1439,
+      "right": 374,
+      "bottom": 1787,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 1811,
+      "width": 358,
+      "height": 362,
+      "top": 1811,
+      "right": 374,
+      "bottom": 2173,
+      "left": 16
+    }
+  ],
+  "tables": [
+    {
+      "width": 356,
+      "scrollWidth": 650
+    }
+  ]
+}
