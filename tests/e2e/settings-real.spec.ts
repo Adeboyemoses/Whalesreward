@@ -210,7 +210,7 @@ test("I-39 I-45 competing retention confirmation requires a fresh explicit revie
   }
 });
 
-test("I-40 I-45 committed response loss retries the identical frozen retention operation", async ({
+test("I-40 I-45 committed response loss and a rate-limited retry preserve the frozen retention operation", async ({
   page,
 }) => {
   const f = await settingsFixture(page);
@@ -220,16 +220,31 @@ test("I-40 I-45 committed response loss retries the identical frozen retention o
     await editIntent(page, days, "Fictional lost retention response");
     expect((await reviewIntent(page)).status()).toBe(200);
     const bodies: unknown[] = [];
-    let first = true;
+    let committed: unknown;
     await page.route(
       "**/api/admin/settings/retention/confirm",
       async (route) => {
         bodies.push(route.request().postDataJSON());
-        if (first) {
-          first = false;
+        if (bodies.length === 1) {
           const response = await route.fetch();
           expect(response.status()).toBe(201);
+          committed = (await response.json()).data;
           await route.abort("failed");
+        } else if (bodies.length === 2) {
+          // The receipt already exists. A limiter cannot prove the original failed.
+          await route.fulfill({
+            status: 429,
+            headers: { "Retry-After": "1" },
+            json: {
+              error: {
+                code: "rate_limited",
+                message: "Too many requests",
+                retryable: true,
+              },
+              serverTime: new Date().toISOString(),
+              requestId: "019a5000-0000-7000-8000-000000270429",
+            },
+          });
         } else await route.continue();
       },
     );
@@ -242,24 +257,60 @@ test("I-40 I-45 committed response loss retries the identical frozen retention o
     await expect(
       page.getByRole("button", { name: "Keep editing", exact: true }),
     ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Cancel", exact: true }),
+    ).toBeDisabled();
+    const limited = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/admin/settings/retention/confirm") &&
+        r.status() === 429,
+    );
     await page
       .getByRole("button", { name: "Retry confirmation", exact: true })
       .click();
+    await limited;
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      /Too many requests/,
+    );
+    await expect(
+      page.getByRole("button", { name: "Retry confirmation", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Keep editing", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Cancel", exact: true }),
+    ).toBeDisabled();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toEqual(bodies[0]);
+    const replayed = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/admin/settings/retention/confirm") &&
+        r.status() === 200,
+    );
+    await page
+      .getByRole("button", { name: "Retry confirmation", exact: true })
+      .click();
+    expect((await (await replayed).json()).data).toEqual(committed);
     await expect(
       page.getByRole("button", { name: "Retry confirmation", exact: true }),
     ).toHaveCount(0);
-    expect(bodies).toHaveLength(2);
-    expect(bodies[1]).toEqual(bodies[0]);
+    expect(bodies).toHaveLength(3);
+    expect(bodies[2]).toEqual(bodies[0]);
     expect((await readSettings(page)).version).toBe(before.version + 1);
     const operation = bodies[0] as { operationId: string };
     expect(
       (
         await f.db.query(
-          "SELECT count(*)::int n FROM settings_version WHERE operation_id=$1",
-          [operation.operationId],
+          `SELECT
+            (SELECT count(*)::int FROM settings_version WHERE operation_id=$1) AS versions,
+            (SELECT count(*)::int FROM settings_change WHERE settings_version_id IN
+              (SELECT id FROM settings_version WHERE operation_id=$1)) AS history,
+            (SELECT count(*)::int FROM mutation_receipt WHERE actor_user_id=$2 AND operation_id=$1) AS receipts`,
+          [operation.operationId, f.userId],
         )
-      ).rows[0].n,
-    ).toBe(1);
+      ).rows[0],
+    ).toEqual({ versions: 1, history: 1, receipts: 1 });
   } finally {
     await page.unrouteAll({ behavior: "wait" });
     await f.close();
