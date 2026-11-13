@@ -8,6 +8,7 @@ import {
   auditRules,
   auditChangeSchema,
   currentAuditEventSchema,
+  m4SettingsAuditSchema,
   historicalAuditEventSchema,
   type AuditAction,
   type AuditEvent,
@@ -246,11 +247,13 @@ export function projectAudit(
   row: AuditRow,
   stationId: string,
 ): AuditEvent | null {
-  if (row.schema_version === 1) {
-    const parsed = currentAuditEventSchema.safeParse({
+  if (row.schema_version === 1 || row.schema_version === 2) {
+    const parsed = (
+      row.schema_version === 2 ? m4SettingsAuditSchema : currentAuditEventSchema
+    ).safeParse({
       id: row.id,
       eventCode: row.event_code,
-      schemaVersion: 1,
+      schemaVersion: row.schema_version,
       stationId,
       occurredAt: row.occurred_at,
       area: row.area,
@@ -271,11 +274,38 @@ export function projectAudit(
       (parsed.data.actor.kind !== "system" &&
         parsed.data.actor.userId !== row.actor_user_id) ||
       (parsed.data.actor.kind === "system" && row.actor_user_id !== null)
-    )
-      return null;
+    ) {
+      if (row.schema_version === 1) return null;
+      // Unsupported M4 mappings remain visible as a minimal historical event.
+      // Reuse only independently validated envelope snapshots, never raw changes.
+      return projectAudit(
+        {
+          ...row,
+          schema_version: 0,
+          action: "unsupported_m4_event",
+          before: null,
+          after: null,
+          changes: [],
+          originating_seller_snapshot: null,
+        },
+        stationId,
+      );
+    }
     return parsed.data;
   }
-  if (row.schema_version !== null && row.schema_version !== 0) return null;
+  if (row.schema_version !== null && row.schema_version !== 0)
+    return projectAudit(
+      {
+        ...row,
+        schema_version: 0,
+        action: "unsupported_m4_event",
+        before: null,
+        after: null,
+        changes: [],
+        originating_seller_snapshot: null,
+      },
+      stationId,
+    );
   let action = knownAction(row);
   const targetKind = auditTargetKinds.includes(
     row.target_type as (typeof auditTargetKinds)[number],

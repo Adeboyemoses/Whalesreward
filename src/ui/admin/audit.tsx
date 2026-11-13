@@ -13,7 +13,6 @@ import {
   auditAreas,
   auditDate,
   type AuditEvent,
-  type AuditChange,
   type AuditSearch,
 } from "@/shared/contracts/audit";
 import { AdminError } from "@/client/admin-api";
@@ -22,6 +21,7 @@ import { Button, DataTable, KeyValueList, Notice, TextField } from "@/ui";
 import { PageHead, Sheet, SelectField } from "./station-common";
 import { useMemory } from "./customers-common";
 import { useAdminSession } from "./session";
+type AuditChange = AuditEvent["changes"][number];
 const areas: Record<string, string> = {
   sales: "Sales",
   customers: "Customers",

@@ -6,11 +6,11 @@ import {
   auditSearchSchema,
   type AuditSearch,
   type AuditEvent,
-  type AuditChange,
 } from "../shared/contracts/audit";
 import { formatNaira, parseKobo } from "../shared/money";
 import { formatQuantity } from "../shared/quantity";
 import { adminAction, adminTime } from "./admin-display";
+type AuditChange = AuditEvent["changes"][number];
 export class AdminAuditApi {
   constructor(private request: typeof adminRequest = adminRequest) {}
   private async read<T>(path: string, schema: z.ZodType<T>, body?: unknown) {
@@ -62,7 +62,17 @@ export function auditValue(
       ? formatQuantity(value, unit, 6).replace(/ kg$/, " kilograms")
       : `${value} (unit not recorded)`;
   }
-  if (["effectiveFrom", "effectiveUntil", "activatedAt"].includes(change.field))
+  if (
+    [
+      "effectiveFrom",
+      "effectiveUntil",
+      "activatedAt",
+      "launchAt",
+      "purchaseStart",
+      "purchaseCutoff",
+      "uploadDeadline",
+    ].includes(change.field)
+  )
     return adminTime(value);
   if (change.field === "verifiedSaleDate")
     return adminTime(`${value}T12:00:00+01:00`).split(" · ")[0] ?? value;

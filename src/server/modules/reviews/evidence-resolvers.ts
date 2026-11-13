@@ -1,3 +1,4 @@
+import { timingHistoryCte } from "../settings/timing-history";
 import { createHash } from "node:crypto";
 import type pg from "pg";
 import { authId } from "../../../shared/contracts/auth";
@@ -129,7 +130,21 @@ export async function resolveEvidenceSources(
   );
   const settings = await rows(
     db,
-    `SELECT to_jsonb(v)-'reason' fact FROM settings_version v WHERE station_id=$1 ORDER BY version LIMIT 2049`,
+    `${timingHistoryCte} SELECT
+     jsonb_build_object('id',v.id,'created_at',v.created_at,'station_id',v.station_id,
+       'campaign_id',v.campaign_id,'version',v.version,'purchase_start',v.purchase_start,
+       'purchase_cutoff',v.purchase_cutoff,'upload_deadline',v.upload_deadline,
+       'timezone',v.timezone,'retention_days',v.retention_days,
+       'retention_approved_by',v.retention_approved_by,'retention_approved_at',v.retention_approved_at,
+       'effective_from',v.effective_from,'actor_id',v.actor_id)
+     || CASE WHEN v.section='giveaway' THEN jsonb_build_object(
+       'section',v.section,'previous_version_id',v.previous_version_id,'grace_hours',v.grace_hours,
+       'launch_at',v.launch_at,'timing_policy_version',v.timing_policy_version,
+       'retention_policy_version',v.retention_policy_version,'stored_copy_policy',v.stored_copy_policy,
+       'operation_id',v.operation_id) ELSE '{}'::jsonb END
+     || jsonb_build_object('timing_history_version',v.timing_history_version,
+       'timing_history_complete',v.timing_history_complete) fact
+     FROM timing_history v ORDER BY version LIMIT 2049`,
     [original.station_id],
   );
   const links = await rows(
@@ -251,7 +266,19 @@ export async function resolveEvidenceSources(
   add("validated_photo", photo);
   for (const f of prices) add("price_history", f);
   for (const f of assignments) add("assignment_history", f);
-  for (const f of settings) add("campaign_history", f);
+  // Legacy campaign snapshots are a durable protocol, not the current table shape.
+  // Computed completeness/ordering metadata belongs only to this evaluation.
+  for (const f of settings)
+    add(
+      "campaign_history",
+      Object.fromEntries(
+        Object.entries(f).filter(
+          ([key]) =>
+            key !== "timing_history_version" &&
+            key !== "timing_history_complete",
+        ),
+      ) as Fact,
+    );
   for (const f of links) add("card_history", f);
   if (card) add("card_history", card);
   for (const f of audits) add("domain_audit", f);

@@ -300,7 +300,9 @@ function campaign(
   f: ResolvedEvidence,
   i: EvidenceInterval,
 ): TypedConclusion | null {
-  completeVersions(f.settings);
+  if (f.settings.some((v) => v.timing_history_complete !== true))
+    return insufficient();
+  completeVersions(f.settings, "timing_history_version");
   const at = (v: Fact) => BigInt(trustedMicros(v.effective_from));
   const history = f.settings.filter((v) => at(v) <= BigInt(i.U));
   const anchor = history.findLastIndex((v) => at(v) <= BigInt(i.L));

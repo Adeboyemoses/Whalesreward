@@ -1,3 +1,4 @@
+import { timingPolicyConfigured } from "../settings/policy";
 import { duplicateWindow } from "../duplicates/config";
 import { adminSessionConfig, requirePolicy } from "../admin-access/config";
 import { emailConfig, mailpitOrigin } from "../../adapters/email-config";
@@ -35,6 +36,7 @@ export function healthEnvironmentValid(env: Configuration): boolean {
   );
 }
 const evaluators: PolicyEvaluators = {
+  timing: timingPolicyConfigured,
   auth: (env) => {
     requirePolicy(adminSessionConfig(env));
     return true;

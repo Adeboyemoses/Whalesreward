@@ -766,7 +766,113 @@ export const historicalAuditEventSchema = z.strictObject({
   }),
   correlationId: auditId.nullable(),
 });
+// M4 settings events have their own closed schema; M3 remains version 1.
+const m4SettingsValues = {
+  settingsVersionId: auditId,
+  settingsVersion: positive,
+  campaignVersion: positive,
+  launchAt: instant,
+  purchaseStart: instant,
+  purchaseCutoff: instant,
+  uploadDeadline: instant,
+  graceHours: z
+    .string()
+    .regex(/^(0|[1-9][0-9]*)$/)
+    .refine((v) => BigInt(v) <= 2147483647n),
+  retentionDays: z
+    .string()
+    .regex(/^[1-9][0-9]*$/)
+    .refine((v) => BigInt(v) <= 36500n),
+  deletionEnabled: z.literal(false),
+  timezone: z.string().refine((v) => {
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: v });
+      return true;
+    } catch {
+      return false;
+    }
+  }),
+  timingPolicyVersion: text,
+} as const;
+const m4Changes = Object.entries(m4SettingsValues).map(([field, value]) =>
+  z.strictObject({
+    field: z.literal(field),
+    before: value.nullable(),
+    after: value.nullable(),
+  }),
+);
+export const m4SettingsAuditSchema = z
+  .strictObject({
+    ...base,
+    schemaVersion: z.literal(2),
+    area: z.literal("settings"),
+    action: z.enum(["giveaway_timing_changed", "retention_intent_changed"]),
+    actor: auditActorSchema,
+    originatingSeller: z.null(),
+    target: z.strictObject({
+      kind: z.literal("settings"),
+      id: auditId,
+      code,
+      subjectAtEvent: z.null(),
+    }),
+    correlationId: auditId,
+    changes: z
+      .array(
+        z.discriminatedUnion(
+          "field",
+          m4Changes as [(typeof m4Changes)[number], ...typeof m4Changes],
+        ),
+      )
+      .max(100),
+  })
+  .superRefine((v, ctx) => {
+    const required =
+      v.action === "retention_intent_changed"
+        ? [
+            "settingsVersionId",
+            "settingsVersion",
+            "retentionDays",
+            "deletionEnabled",
+          ]
+        : [
+            "settingsVersionId",
+            "settingsVersion",
+            "campaignVersion",
+            "launchAt",
+            "purchaseStart",
+            "purchaseCutoff",
+            "graceHours",
+            "uploadDeadline",
+            "timezone",
+            "timingPolicyVersion",
+          ];
+    const fields = v.changes.map((c) => c.field);
+    if (
+      v.actor.kind !== "admin" ||
+      !v.operationId ||
+      new Set(fields).size !== fields.length ||
+      fields.length !== required.length ||
+      required.some((f) => !fields.includes(f))
+    )
+      ctx.addIssue({ code: "custom", message: "Invalid M4 audit mapping" });
+    for (const c of v.changes) {
+      if (
+        ([
+          "settingsVersionId",
+          "settingsVersion",
+          "campaignVersion",
+          "timezone",
+        ].includes(c.field) &&
+          c.after === null) ||
+        (c.field === "deletionEnabled" &&
+          (c.before !== false || c.after !== false))
+      )
+        ctx.addIssue({ code: "custom", message: "Invalid M4 audit value" });
+    }
+  });
+export type M4SettingsAuditEvent = z.infer<typeof m4SettingsAuditSchema>;
 export const auditEventSchema = z.union([
+  m4SettingsAuditSchema,
   currentAuditEventSchema,
   historicalAuditEventSchema,
 ]);
