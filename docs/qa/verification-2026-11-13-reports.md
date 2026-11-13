@@ -4,7 +4,7 @@ WHR-24 / WO-core-13 implements the reports, overview and export sections of M4 a
 
 ## Named PostgreSQL coverage
 
-Run `pnpm exec vitest run --project integration tests/integration/reports-adversarial.test.ts tests/integration/reports-exports-adversarial.test.ts tests/integration/reports-http-adversarial.test.ts tests/integration/reports-meter-adversarial.test.ts --maxWorkers=2` against an isolated local PostgreSQL database.
+Run `pnpm exec vitest run --project integration tests/integration/reports-adversarial.test.ts tests/integration/reports-exports-adversarial.test.ts tests/integration/reports-http-adversarial.test.ts tests/integration/reports-meter-adversarial.test.ts tests/integration/reports-currency-adversarial.test.ts --maxWorkers=1` against an isolated local PostgreSQL database.
 
 - `I-42 one accepted predicate separates currencies and units, retains flags and matches customer totals`: shared operational inclusion, duplicate and late-proposal flags, exact currency and unit separation.
 - `I-42 exclusion precedence is cancelled, held or policy-blocked, incomplete, then ineligible`: mutually exclusive source buckets and excluded sums.
@@ -24,6 +24,8 @@ Run `pnpm exec vitest run --project integration tests/integration/reports-advers
 - `exact XLSX refuses unsafe precision, includes exclusions and never executes formula-like labels`: explicit precision failure and inert text cells.
 - `I-41 version-2 report audit validates fields at persistence and safely projects malformed historical payloads`: strict mappings and safe legacy fallback.
 - HTTP tests cover Origin, strict shapes, body bounds, invalid/range dates, first-password and disabled sessions. Report/source/export privacy assertions exclude customer phones, evidence credentials and raw provenance.
+
+The additional `reports-currency-adversarial.test.ts` proves production rejects USD, then widens only three currency CHECKs inside its disposable fixture schema to exercise future-compatible NGN/USD included and excluded grouping, stable ordering, frozen sources and numeric XLSX cells. All acceptance and immutability guards remain. This tests the report projection; it does not enable live USD purchases.
 
 ## Arithmetic and rendering coverage
 
