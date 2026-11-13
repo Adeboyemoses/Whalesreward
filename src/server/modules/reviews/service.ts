@@ -1,3 +1,6 @@
+import { validateMeterPair } from "./meter-math";
+import { pinMeterPolicy } from "./meter-config";
+import { evaluateMeter } from "./meter-evaluator";
 import {
   pinReviewEvidencePolicy,
   reviewEvidenceApprovalValid,
@@ -192,7 +195,7 @@ async function accept(
     OR NOT EXISTS(SELECT 1 FROM sync_validation WHERE purchase_id=$1)
     OR EXISTS(SELECT 1 FROM sync_validation v CROSS JOIN LATERAL jsonb_array_elements_text(v.reasons) reason(code) WHERE v.purchase_id=$1 AND NOT (
       (reason.code IN ('price_uncertain','replaced_card','capture_date_uncertain') AND EXISTS(SELECT 1 FROM purchase_hold h WHERE h.purchase_id=$1 AND h.state='resolved' AND h.reason_code=reason.code))
-      OR (reason.code IN ('capture_authorization_unresolved','capture_time_unresolved') AND EXISTS(SELECT 1 FROM purchase_validation_block b WHERE b.purchase_id=$1 AND b.code=reason.code AND b.resolved_at IS NOT NULL AND b.closure_kind='confirmed'))
+      OR (reason.code IN ('capture_authorization_unresolved','capture_time_unresolved','meter_reconciliation_policy_unset') AND EXISTS(SELECT 1 FROM purchase_validation_block b WHERE b.purchase_id=$1 AND b.code=reason.code AND b.resolved_at IS NOT NULL AND b.closure_kind='confirmed'))
     )) AS blocked`,
       [p.id, p.customer_id, r.evidence_asset_id],
     )
@@ -268,6 +271,8 @@ async function record(
     evidence?: ReviewEvidence;
     conclusion?: ReviewConclusion;
     evaluation?: Record<string, unknown>;
+    meter?: Record<string, unknown>;
+    resultingMeterRevisionId?: string;
     replay?: (response: wire.Decision) => Promise<unknown>;
   } = {},
 ) {
@@ -450,7 +455,7 @@ async function record(
         : [],
     ],
   );
-  if (extra.evaluation) {
+  if (extra.evaluation && !extra.meter) {
     await db.query(
       "INSERT INTO review_evaluation(decision_id,purchase_id,provenance) VALUES($1,$2,$3)",
       [
@@ -470,6 +475,47 @@ async function record(
             remainingBlocks: blocks,
             credited: response.creditedAfter,
             closure: outcome === "cancel" ? "cancelled" : "confirmed",
+          },
+        }),
+      ],
+    );
+  }
+  if (extra.meter) {
+    await db.query(
+      "INSERT INTO meter_evaluation(decision_id,purchase_id,revision_id,provenance) VALUES($1,$2,$3,$4)",
+      [
+        did,
+        p.id,
+        extra.resultingMeterRevisionId,
+        JSON.stringify({
+          ...extra.evaluation,
+          ...extra.meter,
+          before,
+          after,
+          target: {
+            ...(extra.evaluation!.target as Record<string, unknown>),
+            predecessorRevisionId: (
+              extra.evaluation!.target as Record<string, unknown>
+            ).evaluatedRevisionId,
+            resultRevisionId: extra.resultingMeterRevisionId,
+          },
+          result: {
+            actorId: a.user_id,
+            reason: body.reason,
+            decidedAt: now.toISOString(),
+            evidenceAssetId: extra.evidence!.assetId,
+            notes: extra.evidence!.notes,
+            resultingRevisionId: extra.resultingMeterRevisionId,
+            acceptedRevisionId: current.current_revision_id,
+            appliedPurchaseVersion: current.version,
+            appliedHoldVersion:
+              (extra.evaluation!.target as { hold: { version: number } }).hold
+                .version + 1,
+            remainingHolds: holds,
+            remainingBlocks: blocks,
+            credited: response.creditedAfter,
+            resolvedHoldId: extra.holdId,
+            removedBlock: "meter_reconciliation_policy_unset",
           },
         }),
       ],
@@ -527,7 +573,7 @@ export function createReviewsService({
       const p = await purchase(db, purchaseId, a.stationId);
       guard(p, body);
       if (outcome === "correct_meter")
-        throw new AuthError("meter_policy_unconfigured", 409);
+        await pinMeterPolicy(db, a.stationId, env);
       if (kind === "date" && "verifiedSaleDate" in body) {
         if (!wire.saleDateSchema.safeParse(body.verifiedSaleDate).success)
           throw new AuthError("date_invalid", 422);
@@ -580,8 +626,6 @@ export function createReviewsService({
       const captureBlocks = captureRows.map((x) => x.code);
       if (kind === "capture" && !captureBlocks.length)
         throw new AuthError("review_closed", 409);
-      if (outcome === "correct_meter")
-        throw new AuthError("meter_policy_unconfigured", 409);
       let r = await candidate(db, p);
       const before = r.values,
         did = newId();
@@ -592,20 +636,53 @@ export function createReviewsService({
       if (!bound.rowCount) throw new AuthError("evidence_unavailable", 422);
       if (!reviewEvidenceV1Installed())
         throw new AuthError("evidence_insufficient", 422);
-      const policy = await pinReviewEvidencePolicy(db, a.stationId, env);
+      const meterDecision =
+        "decision" in body && body.decision.outcome === "correct_meter"
+          ? body.decision
+          : null;
+      const meterPair = meterDecision
+        ? validateMeterPair(
+            meterDecision.amountKobo,
+            meterDecision.quantity,
+            r.values.quantityPrecision,
+          )
+        : null;
+      if (
+        meterPair &&
+        meterPair.amount === BigInt(r.values.amountKobo) &&
+        meterPair.quantity === parseQuantity(r.values.quantity)
+      )
+        throw new AuthError("no_change", 409);
+      const meter = meterDecision
+        ? await evaluateMeter(
+            db,
+            {
+              purchaseId: p.id,
+              stationId: a.stationId,
+              decisionId: did,
+              evidence: body.evidence,
+              ...meterDecision,
+            },
+            env,
+          )
+        : null;
+      const policy =
+        meter?.policy ?? (await pinReviewEvidencePolicy(db, a.stationId, env));
       if (kind === "card" && hold!.reason_code !== "replaced_card")
         throw new AuthError("policy_review_required", 422);
-      const conclusion = await evaluateEvidenceV1(db, {
-        purchaseId: p.id,
-        kind,
-        outcome,
-        evidence: body.evidence,
-        decisionId: did,
-        policy,
-        ...("verifiedSaleDate" in body
-          ? { verifiedSaleDate: body.verifiedSaleDate }
-          : {}),
-      });
+      const conclusion =
+        meter?.conclusion ??
+        (await evaluateEvidenceV1(db, {
+          purchaseId: p.id,
+          kind,
+          outcome,
+          evidence: body.evidence,
+          decisionId: did,
+          policy,
+          ...("verifiedSaleDate" in body
+            ? { verifiedSaleDate: body.verifiedSaleDate }
+            : {}),
+        }));
       const evaluatedRevisionId = r.id;
       const originalRevision = (
         await db.query<{ id: string }>(
@@ -640,7 +717,7 @@ export function createReviewsService({
           body.operationId,
         );
       } else {
-        if (kind === "price") {
+        if (kind === "price" && !meterDecision) {
           if (conclusion.validPrice !== true)
             throw new AuthError("evidence_insufficient", 422);
           const original = (
@@ -656,6 +733,43 @@ export function createReviewsService({
             r.values.calculation !== "captured_rate"
           )
             throw new AuthError("no_change", 409);
+        }
+        if (meterDecision) {
+          const id = newId();
+          await db.query(
+            `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,based_on_revision_id,kind,state,reason,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,entered_quantity,rate_kobo,price_version_id,medium,verified_sale_date,evidence_asset_id,calculation_mode,resolution_id)
+            SELECT $1,p.id,(SELECT max(revision_number)+1 FROM purchase_revision WHERE purchase_id=p.id),$3,$4,$5,$6,'price_resolution','proposed',$7,clock_timestamp(),$8,$9,p.currency,p.unit,p.quantity_precision,p.basis,p.entered_amount_kobo,p.entered_quantity,p.rate_kobo,p.price_version_id,p.medium,$10,$11,'meter_evidence',$12 FROM purchase p WHERE p.id=$2`,
+            [
+              id,
+              p.id,
+              body.operationId,
+              a.user_id,
+              hash,
+              r.id,
+              body.reason,
+              meterDecision.amountKobo,
+              meterDecision.quantity,
+              r.values.verifiedSaleDate,
+              body.evidence.assetId,
+              did,
+            ],
+          );
+          const values = (
+            await db.query<{ values: wire.SaleValues }>(
+              `SELECT ${sql.values("r")} values FROM purchase_revision r WHERE id=$1`,
+              [id],
+            )
+          ).rows[0]!.values;
+          r = {
+            id,
+            state: "proposed",
+            evidence_asset_id: body.evidence.assetId,
+            values: wire.saleValuesSchema.parse(values),
+          };
+          await db.query(
+            "UPDATE purchase_validation_block SET resolved_at=clock_timestamp(),resolution_reference=$2,closure_kind='confirmed',version=version+1 WHERE purchase_id=$1 AND code='meter_reconciliation_policy_unset' AND resolved_at IS NULL",
+            [p.id, did],
+          );
         }
         if (kind === "card") {
           if (hold!.reason_code !== "replaced_card")
@@ -735,6 +849,8 @@ export function createReviewsService({
         did,
         {
           holdId,
+          meter: meter?.meter,
+          resultingMeterRevisionId: meter ? r.id : undefined,
           evidence: body.evidence,
           conclusion,
           evaluation: {

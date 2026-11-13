@@ -3,6 +3,7 @@ import type pg from "pg";
 import { evaluateReviewEvidence } from "./evidence";
 import {
   priceDecisionSchema,
+  numericEditSchema,
   captureDecisionSchema,
   duplicateDecisionSchema,
 } from "../../../shared/contracts/sales";
@@ -51,8 +52,51 @@ describe("review request boundaries", () => {
     expect(value.decision).toEqual({
       outcome: "correct_meter",
       amountKobo: "9007199254740993",
-      quantity: "1.23",
+      quantity: "1.230000",
     });
+  });
+  it.each([
+    { amountKobo: "0" },
+    { amountKobo: "-1" },
+    { amountKobo: "9223372036854775808" },
+    { quantity: "0" },
+    { quantity: "-1" },
+    { quantity: "100000000000000" },
+    { quantity: "1.0000001" },
+  ])(
+    "preserves well-formed meter scalars for domain validation %j",
+    (patch) => {
+      const decision = {
+        outcome: "correct_meter",
+        amountKobo: "100",
+        quantity: "1.000",
+        ...patch,
+      };
+      expect(
+        priceDecisionSchema.parse({
+          ...guard,
+          expectedHoldVersion: 1,
+          evidence,
+          decision,
+        }).decision,
+      ).toEqual(decision);
+    },
+  );
+  it("keeps ordinary correction numeric inputs positive and bounded", () => {
+    for (const amount of ["0", "-1", "9223372036854775808"])
+      expect(
+        numericEditSchema.safeParse({
+          basis: "amount",
+          enteredAmountKobo: amount,
+        }).success,
+      ).toBe(false);
+    for (const quantity of ["0", "-1", "100000000000000", "1.0000001"])
+      expect(
+        numericEditSchema.safeParse({
+          basis: "quantity",
+          enteredQuantity: quantity,
+        }).success,
+      ).toBe(false);
   });
   it("requires precisely two purchase guards", () => {
     expect(
