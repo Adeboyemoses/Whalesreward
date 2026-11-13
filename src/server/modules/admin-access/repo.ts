@@ -1,4 +1,14 @@
-import { auditText } from "./privacy";
+import {
+  writeAudit,
+  auditActor,
+  auditTarget,
+  auditSystem,
+} from "../audit/write";
+import {
+  safeAuditText,
+  type AuditAction,
+} from "../../../shared/contracts/audit";
+import { stationId } from "../station/repo";
 import type pg from "pg";
 import { AuthError } from "../auth/errors";
 import { digest, hmac } from "../auth/crypto";
@@ -153,34 +163,32 @@ export async function audit(
   actor: string | null,
   type: "admin" | "role",
   target: string,
-  action: string,
+  action: AuditAction,
   reason: string,
   before: unknown,
   after: unknown,
+  operationId?: string,
 ) {
   const clean = (value: unknown) => {
     if (value === null) return null;
     const parsed = accessValuesSchema.parse(value);
-    if (parsed.roleName) parsed.roleName = auditText(parsed.roleName);
+    if (parsed.roleName && !safeAuditText(parsed.roleName))
+      parsed.roleName = "Private value omitted";
     return parsed;
   };
   const a = clean(before),
     b = clean(after);
-  reason = auditText(reason);
-  await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,clock_timestamp())`,
-    [
-      newId(),
-      actor,
-      actor ? "user" : "system",
-      action,
-      type,
-      target,
-      JSON.stringify(a),
-      JSON.stringify(b),
-      reason,
-    ],
-  );
+  const station = await stationId(db);
+  await writeAudit(db, {
+    stationId: station,
+    action,
+    actor: actor ? await auditActor(db, actor) : auditSystem("access"),
+    target: await auditTarget(db, type, target, station),
+    reason,
+    before: a,
+    after: b,
+    operationId,
+  });
   await db.query(
     "INSERT INTO admin_access_event(id,actor_user_id,target_type,target_id,action,reason,before_values,after_values) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
     [newId(), actor, type, target, action, reason, a, b],

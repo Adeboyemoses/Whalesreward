@@ -1,3 +1,4 @@
+import { acceptedContribution as contribution } from "../reports/contribution";
 import {
   lookupReceiptConfig,
   type LookupReceiptKeys,
@@ -144,14 +145,13 @@ export async function registerCustomer(
             "Customer registration",
             null,
             {
-              customerCode,
-              category: parsed.category,
+              customerCategory: parsed.category,
               cardId: card.id,
-              stationId: actor.station_id,
             },
             {
               operationId: parsed.operationId,
               occurredAt: r.created_at.toISOString(),
+              stationId: actor.station_id,
             },
           );
           return registrationReceiptWithLookupSchema.parse({
@@ -240,7 +240,7 @@ export async function lookupCustomer(
   });
 }
 // All-time credit is current accepted revision, independent of campaign eligibility.
-const contribution = `p.status='credited' AND r.state='accepted' AND NOT EXISTS(SELECT 1 FROM purchase_hold h WHERE h.purchase_id=p.id AND h.state='open')`;
+
 async function summary(db: pg.PoolClient, id: string, station: string) {
   const r = (
     await db.query(

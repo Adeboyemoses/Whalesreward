@@ -367,6 +367,7 @@ export async function confirmToken(
         "Verified-email password reset",
         null,
         null,
+        c.operation_id,
       );
     } else {
       await db.query(
@@ -382,6 +383,7 @@ export async function confirmToken(
         "Recipient confirmed email ownership",
         { emailVerified: false },
         { emailVerified: true },
+        c.operation_id,
       );
     }
     await db.query(

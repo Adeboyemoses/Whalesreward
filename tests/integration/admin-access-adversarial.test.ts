@@ -994,14 +994,15 @@ describe("independent M2 admin access adversarial checks", () => {
       permissions: [],
       reason: `Review ${email} https://example.com/#token=${token} password=${privatePassword}`,
     };
-    const created = await adminWrite(
-      pool,
-      adminConfig(),
-      actor.cookie.split("=")[1],
-      "roles-create",
-      input,
-    );
-    expect(created).toBeTruthy();
+    await expect(
+      adminWrite(
+        pool,
+        adminConfig(),
+        actor.cookie.split("=")[1],
+        "roles-create",
+        input,
+      ),
+    ).rejects.toThrow();
     const rows = JSON.stringify(
       (
         await pool.query(

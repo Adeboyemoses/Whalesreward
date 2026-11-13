@@ -164,6 +164,7 @@ export async function adminWrite(
               parsed.reason,
               old ? { roleName: old.name, permissions: old.permissions } : null,
               { roleName: result.name, permissions: result.permissions },
+              parsed.operationId,
             );
             return result;
           },
@@ -205,6 +206,7 @@ export async function adminWrite(
             p.reason,
             null,
             values(user),
+            p.operationId,
           );
           return {
             user,
@@ -260,6 +262,7 @@ export async function adminWrite(
               p.reason,
               values(old),
               values(user),
+              p.operationId,
             );
             return user;
           },
@@ -289,6 +292,7 @@ export async function adminWrite(
               "Verification requested",
               null,
               { emailVerified: false },
+              p.operationId,
             );
             return { delivery: "queued", emailVerified: false };
           },

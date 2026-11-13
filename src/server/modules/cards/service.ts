@@ -173,10 +173,9 @@ export async function cardsWrite(
             "batch_generated",
             "Batch generated",
             null,
-            { status: "generated", version: 1 },
+            { batchStatus: "generated", batchVersion: "1" },
             {
               operationId: body.operationId,
-              occurredAt: new Date().toISOString(),
             },
           );
           return batchView(db, id);
@@ -250,14 +249,15 @@ export async function cardsWrite(
             actor.user_id,
             "card_batch",
             targetId!,
-            "batch_export_requested",
+            "export_requested",
             "Batch export requested",
             null,
             {
               exportId: id,
-              format: body.format,
-              cardCount: String(cards.length),
+              exportFormat: body.format,
+              recordCount: String(cards.length),
             },
+            { operationId: body.operationId },
           );
           return exportView(db, targetId!, id);
         }
@@ -277,13 +277,12 @@ export async function cardsWrite(
           actor.user_id,
           "card_batch",
           targetId!,
-          "batch_status_changed",
+          to === "printed" ? "batch_printed" : "batch_activated",
           body.reason,
-          { status: from, version: batch.version },
-          { status: to, version: batch.version + 1 },
+          { batchStatus: from, batchVersion: String(batch.version) },
+          { batchStatus: to, batchVersion: String(batch.version + 1) },
           {
             operationId: body.operationId,
-            occurredAt: new Date().toISOString(),
           },
         );
         return batchView(db, targetId!);
@@ -350,7 +349,7 @@ export async function cardsRead(
     else if (action === "history")
       rows = (
         await db.query(
-          `SELECT e.*,ad.id AS admin_id,ad.admin_code,u.display_name FROM audit_event e JOIN admin ad ON ad.user_id=e.actor_user_id JOIN auth_user u ON u.id=ad.user_id WHERE e.target_type='card_batch' AND e.target_id=$1 AND e.action IN('batch_generated','batch_status_changed') AND($2::uuid IS NULL OR(e.occurred_at,e.id)<(SELECT occurred_at,id FROM audit_event WHERE id=$2)) ORDER BY e.occurred_at DESC,e.id DESC LIMIT $3`,
+          `SELECT e.*,ad.id AS admin_id,ad.admin_code,u.display_name FROM audit_event e JOIN admin ad ON ad.user_id=e.actor_user_id JOIN auth_user u ON u.id=ad.user_id WHERE e.target_type='card_batch' AND e.target_id=$1 AND e.action IN('batch_generated','batch_status_changed','batch_printed','batch_activated') AND($2::uuid IS NULL OR(e.occurred_at,e.id)<(SELECT occurred_at,id FROM audit_event WHERE id=$2)) ORDER BY e.occurred_at DESC,e.id DESC LIMIT $3`,
           [batchId, cursor, limit + 1],
         )
       ).rows;
@@ -394,8 +393,14 @@ export async function cardsRead(
         items.push(
           batchEventSchema.parse({
             id: r.id,
-            from: (r.before as { status?: string })?.status ?? null,
-            to: (r.after as { status: string }).status,
+            from:
+              (r.before as { batchStatus?: string; status?: string })
+                ?.batchStatus ??
+              (r.before as { status?: string })?.status ??
+              null,
+            to:
+              (r.after as { batchStatus?: string; status?: string })
+                .batchStatus ?? (r.after as { status?: string }).status,
             actor: { id: r.admin_id, code: r.admin_code, name: r.display_name },
             reason: r.reason,
             occurredAt: (r.occurred_at as Date).toISOString(),

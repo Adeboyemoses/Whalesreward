@@ -71,6 +71,7 @@ model Attendant {
 }
 
 model Admin {
+ report_exports ReportExport[]
   customer_recovery_case                                                     customer_recovery_case[]
   phone_verification_delivery                                                phone_verification_delivery[]
   verification_challenge                                                     VerificationChallenge[]
@@ -164,6 +165,7 @@ model AuthSession {
   rel_user_id            AuthUser        @relation("auth_session_user_id", fields: [user_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   rel_assignment_id      Assignment?     @relation("auth_session_assignment_id", fields: [assignment_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   rel_capture_context_id CaptureContext? @relation("auth_session_capture_context_id", fields: [capture_context_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  back_attendant_sign_in_request AttendantSignInRequest[]
 
   @@unique([secret_verifier], map: "uq_auth_session_secret_verifier")
   @@index([user_id])
@@ -171,7 +173,6 @@ model AuthSession {
   @@index([capture_context_id])
   @@index([user_id, revoked_at, expires_at])
   @@map("auth_session")
-  back_attendant_sign_in_request AttendantSignInRequest[]
 }
 
 model VerificationChallenge {
@@ -257,6 +258,9 @@ model RecoveryGrantItem {
 }
 
 model Station {
+ report_exports ReportExport[]
+  reporting_state                       StationReportingState?
+  settings_changes                      SettingsChange[]
  duplicate_reporting_state DuplicateReportingState?
   id                                    String                @id @db.Uuid
   created_at                            DateTime              @default(now()) @db.Timestamptz(6)
@@ -721,6 +725,11 @@ model DuplicateFlag {
 }
 
 model Campaign {
+  current_timing_version_id          String?            @db.Uuid
+  current_timing_version             SettingsVersion?   @relation("campaign_timing", fields: [current_timing_version_id], references: [id], onDelete: Restrict)
+  latest_snapshot_id                 String?            @db.Uuid
+  latest_snapshot                    GiveawaySnapshot?  @relation("campaign_latest_snapshot", fields: [latest_snapshot_id], references: [id], onDelete: Restrict)
+  reconciled_data_version            BigInt?
   id                                 String             @id @db.Uuid
   created_at                         DateTime           @default(now()) @db.Timestamptz(6)
   station_id                         String             @db.Uuid
@@ -736,6 +745,20 @@ model Campaign {
 }
 
 model SettingsVersion {
+  full_snapshot                              Json?
+  previous_version_id                        String?                 @db.Uuid
+  previous_version                           SettingsVersion?        @relation("settings_predecessor", fields: [previous_version_id], references: [id], onDelete: Restrict)
+  next_versions                              SettingsVersion[]       @relation("settings_predecessor")
+  reporting_state                            StationReportingState[]
+  timing_campaigns                           Campaign[]              @relation("campaign_timing")
+  section                                    String?
+  grace_hours                                Int?
+  launch_at                                  DateTime?               @db.Timestamptz(6)
+  timing_policy_version                      String?
+  retention_policy_version                   String?
+  stored_copy_policy                         String                  @default("unconfigured")
+  operation_id                               String?                 @db.Uuid
+  change                                     SettingsChange?
   id                                         String             @id @db.Uuid
   created_at                                 DateTime           @default(now()) @db.Timestamptz(6)
   station_id                                 String             @db.Uuid
@@ -757,6 +780,8 @@ model SettingsVersion {
   rel_actor_id                               Admin              @relation("settings_version_actor_id", fields: [actor_id], references: [id], onDelete: Restrict, onUpdate: Restrict)
   back_giveaway_snapshot_settings_version_id GiveawaySnapshot[] @relation("giveaway_snapshot_settings_version_id")
 
+  @@unique([actor_id, operation_id], map: "uq_settings_actor_operation")
+  @@unique([station_id, id], map: "uq_settings_station_identity")
   @@unique([station_id, version], map: "uq_settings_version_station_id_version")
   @@index([station_id])
   @@index([campaign_id])
@@ -766,6 +791,7 @@ model SettingsVersion {
 }
 
 model GiveawaySnapshot {
+  latest_for_campaign                         Campaign[]               @relation("campaign_latest_snapshot")
   id                                          String                   @id @db.Uuid
   created_at                                  DateTime                 @default(now()) @db.Timestamptz(6)
   campaign_id                                 String                   @db.Uuid
@@ -834,6 +860,16 @@ model GiveawaySnapshotSource {
 }
 
 model AuditEvent {
+  settings_change   SettingsChange?
+  schema_version Int? @db.SmallInt
+  station_id String? @db.Uuid
+  event_code String?
+  area String?
+  target_snapshot Json? @db.JsonB
+  correlation_id String? @db.Uuid
+  changes Json? @db.JsonB
+  related_event_ids String[] @db.Uuid
+
   customer_identity_change    CustomerIdentityChange[]
   customer_recovery_case      customer_recovery_case[]
   id                String    @id @db.Uuid
@@ -887,6 +923,7 @@ model AttendantSignInRequest {
   expires_at DateTime @db.Timestamptz(6)
   tombstone_until DateTime @db.Timestamptz(6)
   rel_session_id AuthSession @relation(fields: [session_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
   @@index([tombstone_until], map: "attendant_sign_in_request_expiry")
   @@map("attendant_sign_in_request")
 }
@@ -895,6 +932,7 @@ model AuthRateBucket {
   key_digest String @id
   tokens Decimal @db.Decimal(30, 15)
   updated_at DateTime @db.Timestamptz(6)
+
   @@index([updated_at], map: "auth_rate_bucket_updated")
   @@map("auth_rate_bucket")
 }
@@ -908,9 +946,11 @@ model SyncFinalizeOperation {
   expectedVersion Int @map("expected_version")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
   @@id([purchaseId, operationId])
   @@map("sync_finalize_operation")
 }
+
 model SyncValidation {
   captureEvidence Json? @map("capture_evidence")
   purchaseId String @id @map("purchase_id") @db.Uuid
@@ -918,9 +958,9 @@ model SyncValidation {
   reasons Json
   campaignEligible Boolean @map("campaign_eligible")
   evaluatedAt DateTime @default(now()) @map("evaluated_at") @db.Timestamptz(6)
+
   @@map("sync_validation")
 }
-
 
 model admin_access_event {
   id            String    @id @db.Uuid
@@ -935,7 +975,6 @@ model admin_access_event {
   auth_user     AuthUser? @relation(fields: [actor_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
-
 model admin_reset_work {
   id            String   @id @db.Uuid
   created_at    DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
@@ -943,7 +982,6 @@ model admin_reset_work {
   cursor_id     String?  @db.Uuid
   completed     Boolean  @default(false)
 }
-
 
 model auth_request_dedup {
   scope_digest    String
@@ -958,7 +996,6 @@ model auth_request_dedup {
 
   @@id([scope_digest, operation_kind, request_key])
 }
-
 
 model mail_request {
   id                                                                          String                  @id @db.Uuid
@@ -986,7 +1023,6 @@ model mail_request {
   @@index([status, created_at], map: "mail_request_work")
 }
 
-
 model mutation_receipt {
   actor_user_id      String   @db.Uuid
   operation_kind     String
@@ -999,7 +1035,6 @@ model mutation_receipt {
 
   @@id([actor_user_id, operation_kind, operation_id])
 }
-
 
 model security_state {
   id      Boolean @id @default(true)
@@ -1031,10 +1066,12 @@ model CardExport {
  fencing_version BigInt @default(0)
  attempts Int @default(0)
  next_attempt_at DateTime? @db.Timestamptz(6)
- @@unique([created_by,operation_id])
- @@index([status,next_attempt_at])
+
+  @@unique([created_by, operation_id])
+  @@index([status, next_attempt_at])
  @@map("card_export")
 }
+
 model CardExportItem {
  export_id String @db.Uuid
  card_id String @db.Uuid
@@ -1043,8 +1080,9 @@ model CardExportItem {
  qr_payload String
  card_state String
  assignment_eligible Boolean
- @@id([export_id,card_id])
- @@unique([export_id,ordinal])
+
+  @@id([export_id, card_id])
+  @@unique([export_id, ordinal])
  @@map("card_export_item")
 }
 
@@ -1083,10 +1121,12 @@ model CorrectionRequest {
  decision_reason String?
  decided_by_user_id String? @db.Uuid
  receipt Json @db.JsonB
- @@unique([originating_attendant_id,operation_id])
- @@unique([purchase_id,id])
+
+  @@unique([originating_attendant_id, operation_id])
+  @@unique([purchase_id, id])
  @@map("correction_request")
 }
+
 model SaleDecision {
  capture_evaluation Json? @db.JsonB
  resolved_capture_block_ids String[] @default([]) @db.Uuid
@@ -1113,10 +1153,12 @@ model SaleDecision {
  decided_at DateTime @db.Timestamptz(6)
  audit_event_id String @db.Uuid
  response Json @db.JsonB
- @@unique([actor_user_id,operation_id])
- @@unique([purchase_id,id])
+
+  @@unique([actor_user_id, operation_id])
+  @@unique([purchase_id, id])
  @@map("sale_decision")
 }
+
 model PurchaseValidationBlock {
  closure_kind String?
  id String @id @db.Uuid
@@ -1127,6 +1169,7 @@ model PurchaseValidationBlock {
  resolved_at DateTime? @db.Timestamptz(6)
  resolution_reference String? @db.Uuid
  version Int
+
  @@map("purchase_validation_block")
 }
 
@@ -1138,13 +1181,16 @@ model DuplicateDetectionIntent {
  done Boolean @default(false)
  created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
  purchase Purchase @relation(fields: [purchase_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
  @@index([purchase_id], map: "duplicate_detection_purchase")
  @@map("duplicate_detection_intent")
 }
+
 model DuplicateReportingState {
  station_id String @id @db.Uuid
  generation BigInt @default(0)
  station Station @relation(fields: [station_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
  @@map("duplicate_reporting_state")
 }
 
@@ -1159,9 +1205,11 @@ model ReviewEvidenceApproval {
  activated_at DateTime @db.Timestamptz(6)
  authorization_reference String
  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
- @@unique([station_id,environment,revision])
+
+  @@unique([station_id, environment, revision])
  @@map("review_evidence_approval")
 }
+
 model ReviewEvidenceConfiguration {
  id String @id @db.Uuid
  station_id String @db.Uuid
@@ -1170,14 +1218,17 @@ model ReviewEvidenceConfiguration {
  configuration Json @db.JsonB
  authorization_reference String
  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
- @@unique([station_id,environment,revision])
+
+  @@unique([station_id, environment, revision])
  @@map("review_evidence_configuration")
 }
+
 model ReviewEvaluation {
  decision_id String @id @db.Uuid
  purchase_id String @db.Uuid
  provenance Json @db.JsonB
  created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+
  @@map("review_evaluation")
 }
 
@@ -1249,8 +1300,10 @@ model MeterVerification {
  content Json @db.JsonB
  authorization_reference String
  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+
  @@map("meter_verification")
 }
+
 model MeterProfileApproval {
  id String @id @db.Uuid
  station_id String @db.Uuid
@@ -1260,9 +1313,11 @@ model MeterProfileApproval {
  profile_content Json @db.JsonB
  authorization_reference String
  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
- @@unique([profile_id,profile_version])
+
+  @@unique([profile_id, profile_version])
  @@map("meter_profile_approval")
 }
+
 model MeterPolicyApproval {
  id String @id @db.Uuid
  station_id String @db.Uuid
@@ -1273,9 +1328,11 @@ model MeterPolicyApproval {
  resolver_artifact String
  authorization_reference String
  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
- @@unique([station_id,environment,revision])
+
+  @@unique([station_id, environment, revision])
  @@map("meter_policy_approval")
 }
+
 model MeterConfiguration {
  id String @id @db.Uuid
  station_id String @db.Uuid
@@ -1284,14 +1341,80 @@ model MeterConfiguration {
  configuration Json @db.JsonB
  authorization_reference String
  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
- @@unique([station_id,environment,revision])
+
+  @@unique([station_id, environment, revision])
  @@map("meter_configuration")
 }
+
 model MeterEvaluation {
  decision_id String @id @db.Uuid
  purchase_id String @db.Uuid
  revision_id String @unique @db.Uuid
  provenance Json @db.JsonB
  created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+
  @@map("meter_evaluation")
+}
+
+model SettingsChange {
+  id                  String          @id @db.Uuid
+  station_id          String          @db.Uuid
+  settings_version_id String          @unique @db.Uuid
+  version             Int
+  section             String
+  applied_at          DateTime        @db.Timestamptz(6)
+  snapshot            Json
+  before_values       Json
+  after_values        Json
+  audit_event_id      String          @unique @db.Uuid
+  station             Station         @relation(fields: [station_id], references: [id], onDelete: Restrict)
+  settings_version    SettingsVersion @relation(fields: [settings_version_id], references: [id], onDelete: Restrict)
+  audit_event         AuditEvent      @relation(fields: [audit_event_id], references: [id], onDelete: Restrict)
+
+  @@unique([station_id, version])
+  @@index([station_id, version(sort: Desc)], map: "settings_change_history")
+  @@map("settings_change")
+}
+
+model StationReportingState {
+  station_id                  String           @id @db.Uuid
+  data_version                BigInt           @default(0)
+  settings_version            Int              @default(1)
+  current_settings_version_id String?          @db.Uuid
+  launch_at                   DateTime?        @db.Timestamptz(6)
+  station                     Station          @relation(fields: [station_id], references: [id], onDelete: Restrict)
+  current_settings_version    SettingsVersion? @relation(fields: [station_id, current_settings_version_id], references: [station_id, id], onDelete: Restrict)
+
+  @@map("station_reporting_state")
+}
+
+/// Private immutable report source, with fenced rendering state.
+model ReportExport {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ created_by String @db.Uuid
+ operation_id String @db.Uuid
+ format String
+ filters Json
+ source_data_version BigInt
+ snapshot_at DateTime @db.Timestamptz(6)
+ creator_snapshot Json
+ frozen_snapshot Json
+ status String @default("pending")
+ prepared_at DateTime? @db.Timestamptz(6)
+ expires_at DateTime? @db.Timestamptz(6)
+ object_key String?
+ sha256 String?
+ byte_size BigInt?
+ failure_code String?
+ lease_nonce String?
+ lease_until DateTime? @db.Timestamptz(6)
+ fencing_version BigInt @default(0)
+ attempts Int @default(0)
+ next_attempt_at DateTime? @db.Timestamptz(6)
+ station Station @relation(fields: [station_id], references: [id], onDelete: Restrict)
+ creator Admin @relation(fields: [created_by], references: [id], onDelete: Restrict)
+ @@unique([created_by,operation_id])
+ @@index([status,next_attempt_at,lease_until],map:"report_export_work")
+ @@map("report_export")
 }

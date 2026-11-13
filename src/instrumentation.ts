@@ -12,6 +12,9 @@ export async function register() {
       const { startAutomaticCardExports } =
         await import("./server/modules/cards/runtime");
       startAutomaticCardExports();
+      const { startAutomaticReportExports } =
+        await import("./server/modules/reports/runtime");
+      startAutomaticReportExports();
       const { startAutomaticCorrections } =
         await import("./server/modules/corrections/runtime");
       startAutomaticCorrections();

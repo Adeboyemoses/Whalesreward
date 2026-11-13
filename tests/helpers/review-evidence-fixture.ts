@@ -78,6 +78,16 @@ export async function sourceAudit(
   );
   return id;
 }
+
+/** Reset fictional rows only in a disposable suite schema; production guards remain enabled. */
+export async function resetReviewFixture(pool: pg.Pool) {
+  const schema = (
+    await pool.query<{ schema: string }>("SELECT current_schema() AS schema")
+  ).rows[0]!.schema;
+  if (!/^(?:evidence|reviews|review_adversaries)_[0-9a-f]+$/.test(schema))
+    throw new Error("Review fixture reset requires its isolated test schema");
+  await seedHistorical(pool, "audit_event", "TRUNCATE station,card CASCADE");
+}
 export async function activate(
   pool: pg.Pool,
   stationId: string,
@@ -110,7 +120,7 @@ export async function evidenceFixture(
   kind: Kind = "price",
 ) {
   const { pool, fixtures } = db;
-  await pool.query("TRUNCATE station,card CASCADE");
+  await resetReviewFixture(pool);
   await pool.query(
     fixtures
       .split("\n")

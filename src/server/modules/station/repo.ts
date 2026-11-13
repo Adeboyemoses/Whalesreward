@@ -1,9 +1,12 @@
 import type pg from "pg";
 import { timingSafeEqual } from "node:crypto";
-import { newId } from "../../lib/ids";
 import { hmac } from "../auth/crypto";
 import { AuthError } from "../auth/errors";
-import { auditText } from "../admin-access/privacy";
+import { writeAudit, auditActor, auditTarget } from "../audit/write";
+import type {
+  AuditAction,
+  AuditTargetKind,
+} from "../../../shared/contracts/audit";
 import {
   assignmentSchema,
   attendantSchema,
@@ -166,29 +169,26 @@ export async function priceEventView(
 export async function audit(
   db: pg.PoolClient,
   actor: string,
-  type: string,
+  type: AuditTargetKind,
   target: string,
-  action: string,
+  action: AuditAction,
   reason: string,
-  before: unknown,
-  after: unknown,
-  boundary?: { operationId: string; occurredAt: string },
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+  boundary?: { operationId: string; occurredAt?: string; stationId?: string },
 ) {
-  await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,"before","after",reason,operation_id,occurred_at) VALUES($1,$2,'user',$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,coalesce($10::timestamptz,clock_timestamp()))`,
-    [
-      newId(),
-      actor,
-      action,
-      type,
-      target,
-      JSON.stringify(before),
-      JSON.stringify(after),
-      auditText(reason),
-      boundary?.operationId ?? null,
-      boundary?.occurredAt ?? null,
-    ],
-  );
+  const station = boundary?.stationId ?? (await stationId(db));
+  return writeAudit(db, {
+    stationId: station,
+    action,
+    actor: await auditActor(db, actor),
+    target: await auditTarget(db, type, target, station),
+    reason,
+    before,
+    after,
+    operationId: boundary?.operationId,
+    occurredAt: boundary?.occurredAt,
+  });
 }
 export function cursorId(secret: string, scope: string, cursor?: string) {
   if (!cursor) return null;

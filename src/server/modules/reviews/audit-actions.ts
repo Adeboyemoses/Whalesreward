@@ -26,11 +26,14 @@ const actions = {
   capture: { confirm: "capture_confirmed", cancel: "capture_cancelled" },
   duplicate: { keep_both: "duplicate_cleared", cancel: "duplicate_cancelled" },
 } as const satisfies { [K in keyof Outcomes]: Record<Outcomes[K], string> };
+type ReviewAuditAction = {
+  [K in keyof typeof actions]: (typeof actions)[K][keyof (typeof actions)[K]];
+}[keyof typeof actions];
 export function reviewAuditAction(
   kind: keyof Outcomes,
   outcome: string,
-): string {
-  const byOutcome: Readonly<Record<string, string>> = actions[kind];
+): ReviewAuditAction {
+  const byOutcome: Readonly<Record<string, ReviewAuditAction>> = actions[kind];
   const action = Object.hasOwn(byOutcome, outcome)
     ? byOutcome[outcome]
     : undefined;

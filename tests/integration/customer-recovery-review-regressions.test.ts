@@ -224,7 +224,7 @@ it("replacement produces authoritative evidence that resolves a queued old-card 
   expect(audit).toMatchObject({
     target_type: "card",
     target_id: s.c.card.id,
-    after: { customerId: s.c.id, replacementCardId: change.next.id },
+    after: { customerId: s.c.id, newCardId: change.next.id },
   });
   const policy = await activate(f.pool, fixtureId(8));
   const reviews = createReviewsService({

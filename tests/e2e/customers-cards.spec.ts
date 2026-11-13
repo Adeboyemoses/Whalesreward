@@ -742,7 +742,7 @@ test("I-18 I-20 lost transition and export responses retry the frozen operation 
     expect(
       (
         await f.db.query(
-          "SELECT count(*)::int n FROM audit_event WHERE target_id=$1 AND action='batch_status_changed'",
+          "SELECT count(*)::int n FROM audit_event WHERE target_id=$1 AND action='batch_printed'",
           [b.id],
         )
       ).rows[0].n,

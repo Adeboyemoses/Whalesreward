@@ -184,6 +184,16 @@ async function register(
     normalizer,
     { receiptCapable: capable, lookupReceiptKeys: () => ring },
   );
+  const audit = (
+    await pool.query(
+      "SELECT station_id,after FROM audit_event WHERE action='customer_registered' AND operation_id=$1",
+      [body.operationId],
+    )
+  ).rows;
+  if (!input) {
+    expect(audit).toHaveLength(1);
+    expect(audit[0].station_id).toBe(f.stationId);
+  }
   return { ...result, body };
 }
 function registration(code: string) {
