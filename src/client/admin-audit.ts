@@ -62,7 +62,17 @@ export function auditValue(
       ? formatQuantity(value, unit, 6).replace(/ kg$/, " kilograms")
       : `${value} (unit not recorded)`;
   }
-  if (["effectiveFrom", "effectiveUntil", "activatedAt"].includes(change.field))
+  if (
+    [
+      "effectiveFrom",
+      "effectiveUntil",
+      "activatedAt",
+      "launchAt",
+      "purchaseStart",
+      "purchaseCutoff",
+      "uploadDeadline",
+    ].includes(change.field)
+  )
     return adminTime(value);
   if (change.field === "verifiedSaleDate")
     return adminTime(`${value}T12:00:00+01:00`).split(" · ")[0] ?? value;

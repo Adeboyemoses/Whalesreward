@@ -78,7 +78,7 @@ export const timingConfirmSchema = timingReviewSchema.extend({
 });
 export const settingsHistorySchema = z.strictObject({
   section: z.enum(["giveaway", "retention"]).optional(),
-  cursor: z.string().max(4096).optional(),
+  cursor: z.string().max(512).optional(),
   limit: z.number().int().min(1).max(100).default(25),
 });
 const commonChange = {
