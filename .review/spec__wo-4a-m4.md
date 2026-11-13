@@ -2,12 +2,15 @@
 branch: spec/wo-4a-m4
 linear: WHR-133
 tier: high
-reviewed_head: pending
+reviewed_head: e45542defae1fe7930339df35fc77a9b3310e2a2
 rounds: 1
 builder: spec-em
-reviewers: {}
+reviewers:
+  code-reviewer: PASS
+  security-reviewer: PASS
+  integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 0
+dispatches: 3
 plan:
   goal: Reconcile M4 through P-27 and prepare client decisions without activating policy
   files: docs/engineering/contracts/m4.md, docs/engineering/proposals/m4-client-decisions.md
@@ -19,3 +22,8 @@ p1: []
 tickets: []
 ---
 Plan committed before drafting. Specification only; no runtime or policy activation claim.
+
+All three independent reviewers PASS in round 1, no findings.
+EM typecheck, lint (two inherited image warnings), 834 unit tests and production build PASS.
+Relative links, prose paragraphs <=120 words and diff whitespace PASS.
+No code, policy activation, runtime M4 coverage or board parity claimed.
