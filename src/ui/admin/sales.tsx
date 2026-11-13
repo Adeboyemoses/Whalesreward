@@ -56,6 +56,7 @@ import {
   AdminSalePhoto,
   AdminSaleHistory,
 } from "./sales-common";
+import { ReviewQueue, ReviewPage, ReviewLinks, reviewKind } from "./reviews";
 const statusOptions = {
   all: "All records",
   completed: "Completed",
@@ -93,7 +94,18 @@ export function SalesPortal({
     );
   return (
     <div className="wr-sales">
-      {path[1] ? (
+      {path[1] === "reviews" ? (
+        <ReviewQueue customer={customer} suffix={suffix} />
+      ) : path[1] && reviewKind(path[2] ?? "") ? (
+        <ReviewPage
+          key={path.slice(1).join(":")}
+          id={path[1]}
+          kind={reviewKind(path[2] ?? "")!}
+          unavailable={path[3] === "correct"}
+          session={session}
+          suffix={suffix}
+        />
+      ) : path[1] ? (
         <SaleDetail
           key={path[1] + ":" + (path[2] ?? "")}
           id={path[1]}
@@ -127,6 +139,15 @@ function SalesList({
         eyebrow={session.station?.name ?? "Station"}
         subtitle="Purchase records and exceptions"
       />
+      <Link
+        className="wr-btn wr-btn-secondary"
+        href={
+          "/admin/sales/reviews" +
+          (customer ? "?customer=" + encodeURIComponent(customer) : "")
+        }
+      >
+        Review queue
+      </Link>
       {customer && (
         <Notice>
           <b>Customer filter applied</b>
@@ -455,6 +476,7 @@ function SaleDetail({
             </p>
           </Sheet>
         )}
+      <ReviewLinks sale={sale} suffix={suffix} />
       {reviewing ? (
         <LateReview
           sale={sale}

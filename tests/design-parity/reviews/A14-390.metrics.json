@@ -1,0 +1,52 @@
+{
+  "width": 390,
+  "scroll": 390,
+  "wordmarkLineBoxes": [
+    [
+      {
+        "x": 52,
+        "y": 16.5,
+        "width": 118.90625,
+        "height": 21
+      }
+    ]
+  ],
+  "loyaltyFooters": 0,
+  "controls": [
+    {
+      "name": "View details",
+      "width": 90,
+      "height": 48
+    },
+    {
+      "name": "Refresh sale",
+      "width": 358,
+      "height": 48
+    },
+    {
+      "name": "Sale",
+      "width": 76.390625,
+      "height": 52
+    },
+    {
+      "name": "Register",
+      "width": 76.40625,
+      "height": 52
+    },
+    {
+      "name": "History",
+      "width": 76.390625,
+      "height": 52
+    },
+    {
+      "name": "Uploads",
+      "width": 76.40625,
+      "height": 52
+    },
+    {
+      "name": "Account",
+      "width": 76.40625,
+      "height": 52
+    }
+  ]
+}

@@ -41,7 +41,10 @@ export function salePresentation(row: OutboxRow): {
       tone: "held",
       holds,
       description:
-        "Uploaded: details and photo received. Not counted toward loyalty until an admin reviews it.",
+        (status.photoValidated
+          ? "Uploaded: details and photo received. "
+          : "Sale details received. ") +
+        "Not counted toward loyalty until an admin reviews it.",
     };
   }
   if (status?.state === "cancelled")

@@ -1,0 +1,107 @@
+{
+  "width": 1440,
+  "scroll": 1440,
+  "wordmarkLineBoxes": [
+    [
+      {
+        "x": 68,
+        "y": 19,
+        "width": 128.765625,
+        "height": 22
+      }
+    ]
+  ],
+  "loyaltyFooters": 0,
+  "controls": [
+    {
+      "name": "Sales",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Attendants",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Station pumps",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Product prices",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Customers",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Loyalty cards",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Admin users",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Roles & permissions",
+      "width": 223,
+      "height": 40
+    },
+    {
+      "name": "Sign out",
+      "width": 199,
+      "height": 20
+    },
+    {
+      "name": "Back to reviews",
+      "width": 136,
+      "height": 40
+    },
+    {
+      "name": "",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "name": "",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "name": "",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "name": "",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "name": "",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "name": "Confirm valid earlier purchase",
+      "width": 230,
+      "height": 48
+    },
+    {
+      "name": "Cancel invalid sale",
+      "width": 154,
+      "height": 48
+    },
+    {
+      "name": "Keep reviewing",
+      "width": 134,
+      "height": 48
+    }
+  ]
+}

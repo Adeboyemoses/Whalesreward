@@ -714,6 +714,23 @@ body {
 .wr-attendant-shell .wr-kv-row dd { overflow-wrap: anywhere; }
 .wr-attendant-shell textarea.wr-input { min-height: var(--control-h); height: auto; padding: var(--space-3); }
 
+/* Review references are server-offered choices, not free-form evidence. */
+.wr-review-references { border: 0; padding: 0; margin: var(--space-4) 0; min-width: 0; }
+.wr-review-reference { display: flex; gap: var(--space-3); align-items: center; min-height: var(--control-h); }
+.wr-review-reference input { width: var(--space-5); height: var(--space-5); }
+
+.wr-review-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* Review actions can include two full sale references. Keep each action in
+   the sheet at phone widths instead of expanding the document viewport. */
+.wr-sales .wr-sheet { min-width: 0; }
+.wr-sales .wr-row { flex-wrap: wrap; }
+.wr-sales .wr-row > .wr-btn {
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  min-height: var(--control-h);
+}
 /* Audit row 13: board filter proportions; target UUID adds a second row. */
 .wr-audit-toolbar { display: grid; grid-template-columns: minmax(0, 2.5fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, .9fr) minmax(0, .9fr); margin-bottom: var(--space-3); }
 .wr-audit-toolbar .wr-field { min-width: 0; }
