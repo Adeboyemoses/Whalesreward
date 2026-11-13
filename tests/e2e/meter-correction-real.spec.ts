@@ -69,7 +69,7 @@ test("I-26 I-31 I-35 exact meter pair records one revision and preserves another
     expect(
       (
         await f.db.query(
-          "SELECT calculation,amount_kobo::text,quantity::text FROM purchase_revision WHERE purchase_id=$1 AND kind='price_resolution'",
+          "SELECT calculation_mode AS calculation,amount_kobo::text,quantity::text FROM purchase_revision WHERE purchase_id=$1 AND kind='price_resolution'",
           [sale.id],
         )
       ).rows,

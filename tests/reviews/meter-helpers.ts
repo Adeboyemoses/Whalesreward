@@ -49,7 +49,7 @@ export async function installBrowserMeter(db: pg.Client) {
       ],
     );
     await db.query(
-      "INSERT INTO meter_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,$3,$4,$5,'Fictional browser policy') ON CONFLICT DO NOTHING",
+      "INSERT INTO meter_configuration(id,station_id,environment,revision,configuration,authorization_reference) SELECT $1,$2,$3,$4,$5,'Fictional browser policy' WHERE NOT EXISTS(SELECT 1 FROM meter_configuration WHERE id=$1)",
       [seedId(9351), p.scope.stationId, p.scope.environment, p.revision, p],
     );
     await db.query("COMMIT");
