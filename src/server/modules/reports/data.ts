@@ -37,6 +37,8 @@ export async function reportAuthority(
 }
 export function validateFilter(f: ReportFilter) {
   if (
+    f.from.startsWith("0000-") ||
+    f.to.startsWith("0000-") ||
     !saleDateSchema.safeParse(f.from).success ||
     !saleDateSchema.safeParse(f.to).success
   )

@@ -951,6 +951,14 @@ export const m4ReportAuditSchema = z
       ctx.addIssue({ code: "custom", message: "Invalid report audit mapping" });
     for (const c of v.changes) {
       if (
+        (requested && c.before !== null) ||
+        (!requested && c.field === "creatorAdminId" && c.before !== c.after)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid report event context",
+        });
+      if (
         c.after === null &&
         !["reportProduct", "failureCode"].includes(c.field)
       )

@@ -191,6 +191,7 @@ export async function renderReportExport(
     `Product: ${r.filters.product ?? "All"}; group: ${r.filters.groupBy}`,
     `Snapshot: ${r.asOf}; generation: ${r.dataVersion}`,
     `Date basis: ${r.dateBasis}`,
+    `Included duplicate flags: ${sources.filter((s) => s.included && s.duplicateFlag).length}; pending corrections: ${sources.filter((s) => s.included && s.correctionPending).length}`,
     ...totalsLines("Totals", r.totals),
     ...r.excluded.flatMap((e) => [
       `Excluded ${e.state}: ${e.records} records`,

@@ -1,4 +1,10 @@
 import { describe, it, expect } from "vitest";
+import {
+  m4ReportAuditSchema,
+  type M4ReportAuditEvent,
+} from "../../../shared/contracts/audit";
+import { writeReportAudit } from "../audit/write-reports";
+import type pg from "pg";
 import ExcelJS from "exceljs";
 import { PDFDocument } from "pdf-lib";
 import {
@@ -168,5 +174,78 @@ describe("reports strict bounds and exact arithmetic", () => {
     const pdf = await PDFDocument.load(out.bytes);
     expect(pdf.getPageCount()).toBeGreaterThan(3);
     expect(out.contentType).toBe("application/pdf");
+  });
+});
+
+describe("report audit closed version-2 mapping", () => {
+  const event: M4ReportAuditEvent = {
+    id,
+    eventCode: `AUD-${id}`,
+    schemaVersion: 2,
+    stationId: id,
+    occurredAt: "2026-11-13T12:00:00Z",
+    area: "reports",
+    action: "report_export_prepared",
+    actor: { kind: "system", service: "export", nameAtEvent: "Export service" },
+    originatingSeller: null,
+    target: {
+      kind: "report_export",
+      id,
+      code: `REPORT-${id}`,
+      subjectAtEvent: null,
+    },
+    operationId: null,
+    correlationId: id,
+    reason: "Report export prepared",
+    relatedEventIds: [],
+    changes: [
+      { field: "creatorAdminId", before: id, after: id },
+      { field: "exportState", before: "pending", after: "ready" },
+      { field: "failureCode", before: null, after: null },
+    ],
+  };
+  it("accepts only exact worker/action/target/field combinations", () => {
+    expect(m4ReportAuditSchema.safeParse(event).success).toBe(true);
+    for (const changed of [
+      { ...event, schemaVersion: 1 },
+      { ...event, action: "export_prepared" },
+      { ...event, area: "cards" },
+      { ...event, target: { ...event.target, kind: "card_batch" } },
+      { ...event, actor: { ...event.actor, service: "sync" } },
+      { ...event, changes: event.changes.slice(1) },
+      { ...event, changes: [...event.changes, event.changes[0]] },
+      {
+        ...event,
+        changes: [
+          ...event.changes,
+          { field: "privatePath", before: null, after: "private" },
+        ],
+      },
+      {
+        ...event,
+        changes: event.changes.map((c) =>
+          c.field === "creatorAdminId" ? { ...c, before: null } : c,
+        ),
+      },
+    ])
+      expect(m4ReportAuditSchema.safeParse(changed).success).toBe(false);
+  });
+  it("rejects invalid fields before the persistence query", async () => {
+    let queries = 0;
+    const db = {
+      query: async () => {
+        queries++;
+      },
+    } as unknown as pg.PoolClient;
+    await expect(
+      writeReportAudit(db, {
+        ...event,
+        changes: [
+          ...event.changes,
+          { field: "privatePath", before: null, after: "private" },
+        ],
+      } as unknown as M4ReportAuditEvent),
+    ).rejects.toThrow();
+    expect(queries).toBe(0);
   });
 });
