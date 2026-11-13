@@ -158,3 +158,64 @@ test("I-39 stale meter confirmation cannot overwrite a newer sale version", asyn
     await f.close();
   }
 });
+
+test("I-22 I-31 unchanged pair is refused and lost meter response replays one exact operation", async ({
+  page,
+  browser,
+}) => {
+  const f = await reviewFixture(page, browser);
+  try {
+    await installBrowserMeter(f.db);
+    const sale = await heldSale(f, ["price"]);
+    await edit(page, sale.id, "10000.00", "10.00");
+    await confirm(page, "Review correction", 409);
+    await expect(page.getByRole("alert")).toContainText(
+      /same|match|unchanged/i,
+    );
+    await page.reload();
+    await edit(page, sale.id);
+    const bodies: unknown[] = [];
+    let first = true;
+    await page.route(
+      "**/api/admin/sales/*/holds/*/price-decision",
+      async (route) => {
+        bodies.push(route.request().postDataJSON());
+        if (first) {
+          first = false;
+          const response = await route.fetch();
+          expect(response.status()).toBe(200);
+          await route.abort("failed");
+        } else await route.continue();
+      },
+    );
+    await page
+      .getByRole("button", { name: "Review correction", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm decision", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Retry same decision", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel("Meter amount (₦)", { exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Retry same decision", exact: true })
+      .click();
+    await expect(page.getByText(/Decision recorded\./).first()).toBeVisible();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM meter_evaluation WHERE purchase_id=$1",
+          [sale.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+  } finally {
+    await page.unrouteAll({ behavior: "wait" });
+    await f.close();
+  }
+});
