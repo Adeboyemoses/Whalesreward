@@ -250,6 +250,7 @@ export const meterFields = [
   "meterConclusion",
 ] as const;
 export const auditAreas = [
+  "reports",
   "sales",
   "customers",
   "cards",
@@ -871,8 +872,123 @@ export const m4SettingsAuditSchema = z
     }
   });
 export type M4SettingsAuditEvent = z.infer<typeof m4SettingsAuditSchema>;
-export const auditEventSchema = z.union([
+const reportAuditValues = {
+  creatorAdminId: auditId,
+  sourceDataVersion: z
+    .string()
+    .regex(/^(0|[1-9][0-9]{0,18})$/)
+    .refine((v) => BigInt(v) <= 9223372036854775807n),
+  reportFrom: auditDate,
+  reportTo: auditDate,
+  reportProduct: z.enum(["pms", "diesel", "kerosene", "cooking_gas"]),
+  reportGroupBy: z.enum(["product", "attendant", "pump"]),
+  exportFormat: z.enum(["pdf", "xlsx"]),
+  exportState: z.enum(["pending", "ready", "failed", "expired"]),
+  failureCode: z.enum(["preparation_failed", "precision_not_representable"]),
+};
+const reportAuditChanges = Object.entries(reportAuditValues).map(
+  ([field, value]) =>
+    z.strictObject({
+      field: z.literal(field),
+      before: value.nullable(),
+      after: value.nullable(),
+    }),
+);
+export const m4ReportAuditSchema = z
+  .strictObject({
+    ...base,
+    schemaVersion: z.literal(2),
+    area: z.literal("reports"),
+    action: z.enum([
+      "report_export_requested",
+      "report_export_prepared",
+      "report_export_failed",
+    ]),
+    actor: auditActorSchema,
+    originatingSeller: z.null(),
+    target: z.strictObject({
+      kind: z.literal("report_export"),
+      id: auditId,
+      code,
+      subjectAtEvent: z.null(),
+    }),
+    correlationId: auditId,
+    changes: z
+      .array(
+        z.discriminatedUnion(
+          "field",
+          reportAuditChanges as [
+            (typeof reportAuditChanges)[number],
+            ...typeof reportAuditChanges,
+          ],
+        ),
+      )
+      .max(100),
+  })
+  .superRefine((v, ctx) => {
+    const requested = v.action === "report_export_requested",
+      required = requested
+        ? [
+            "creatorAdminId",
+            "sourceDataVersion",
+            "reportFrom",
+            "reportTo",
+            "reportProduct",
+            "reportGroupBy",
+            "exportFormat",
+            "exportState",
+          ]
+        : ["creatorAdminId", "exportState", "failureCode"],
+      fields = v.changes.map((c) => c.field);
+    if (
+      new Set(fields).size !== fields.length ||
+      fields.length !== required.length ||
+      required.some((f) => !fields.includes(f)) ||
+      (requested
+        ? v.actor.kind !== "admin" || !v.operationId
+        : v.actor.kind !== "system" || v.actor.service !== "export")
+    )
+      ctx.addIssue({ code: "custom", message: "Invalid report audit mapping" });
+    for (const c of v.changes) {
+      if (
+        (requested && c.before !== null) ||
+        (!requested && c.field === "creatorAdminId" && c.before !== c.after)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid report event context",
+        });
+      if (
+        c.after === null &&
+        !["reportProduct", "failureCode"].includes(c.field)
+      )
+        ctx.addIssue({ code: "custom", message: "Invalid null report value" });
+      if (
+        c.field === "exportState" &&
+        (c.after !==
+          (requested
+            ? "pending"
+            : v.action === "report_export_prepared"
+              ? "ready"
+              : "failed") ||
+          c.before !== (requested ? null : "pending"))
+      )
+        ctx.addIssue({ code: "custom", message: "Invalid export transition" });
+      if (
+        c.field === "failureCode" &&
+        ((v.action === "report_export_failed") !== (c.after !== null) ||
+          c.before !== null)
+      )
+        ctx.addIssue({ code: "custom", message: "Invalid export failure" });
+    }
+  });
+export type M4ReportAuditEvent = z.infer<typeof m4ReportAuditSchema>;
+export const m4AuditSchema = z.union([
   m4SettingsAuditSchema,
+  m4ReportAuditSchema,
+]);
+export const auditEventSchema = z.union([
+  m4AuditSchema,
   currentAuditEventSchema,
   historicalAuditEventSchema,
 ]);

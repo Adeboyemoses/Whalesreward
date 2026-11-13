@@ -71,6 +71,7 @@ model Attendant {
 }
 
 model Admin {
+ report_exports ReportExport[]
   customer_recovery_case                                                     customer_recovery_case[]
   phone_verification_delivery                                                phone_verification_delivery[]
   verification_challenge                                                     VerificationChallenge[]
@@ -257,6 +258,7 @@ model RecoveryGrantItem {
 }
 
 model Station {
+ report_exports ReportExport[]
   reporting_state                       StationReportingState?
   settings_changes                      SettingsChange[]
  duplicate_reporting_state DuplicateReportingState?
@@ -1384,4 +1386,35 @@ model StationReportingState {
   current_settings_version    SettingsVersion? @relation(fields: [station_id, current_settings_version_id], references: [station_id, id], onDelete: Restrict)
 
   @@map("station_reporting_state")
+}
+
+/// Private immutable report source, with fenced rendering state.
+model ReportExport {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ created_by String @db.Uuid
+ operation_id String @db.Uuid
+ format String
+ filters Json
+ source_data_version BigInt
+ snapshot_at DateTime @db.Timestamptz(6)
+ creator_snapshot Json
+ frozen_snapshot Json
+ status String @default("pending")
+ prepared_at DateTime? @db.Timestamptz(6)
+ expires_at DateTime? @db.Timestamptz(6)
+ object_key String?
+ sha256 String?
+ byte_size BigInt?
+ failure_code String?
+ lease_nonce String?
+ lease_until DateTime? @db.Timestamptz(6)
+ fencing_version BigInt @default(0)
+ attempts Int @default(0)
+ next_attempt_at DateTime? @db.Timestamptz(6)
+ station Station @relation(fields: [station_id], references: [id], onDelete: Restrict)
+ creator Admin @relation(fields: [created_by], references: [id], onDelete: Restrict)
+ @@unique([created_by,operation_id])
+ @@index([status,next_attempt_at,lease_until],map:"report_export_work")
+ @@map("report_export")
 }
