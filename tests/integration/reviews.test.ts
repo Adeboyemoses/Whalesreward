@@ -3,7 +3,10 @@ import {
   earlierReplacement,
   unauthorizedCapture,
 } from "../helpers/legacy-review-evidence-fixture";
-import { seedHistorical } from "../helpers/review-evidence-fixture";
+import {
+  seedHistorical,
+  resetReviewFixture,
+} from "../helpers/review-evidence-fixture";
 import { runDuplicateBatch } from "../../src/server/modules/duplicates/service";
 import { readFile, readdir } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
@@ -340,7 +343,7 @@ describe("M3 real-Postgres independent review decisions", () => {
     ).toBe("cancelled");
   });
   async function pair() {
-    await pool.query("TRUNCATE station,card CASCADE");
+    await resetReviewFixture(pool);
     await pool.query(
       (
         await readFile(
@@ -401,6 +404,29 @@ describe("M3 real-Postgres independent review decisions", () => {
     ).rows;
     const result = await svc.decideDuplicate(token, flag.id, body);
     expect(await svc.decideDuplicate(token, flag.id, body)).toEqual(result);
+    const audit = (
+      await pool.query("SELECT * FROM audit_event WHERE id=$1", [
+        result.decision.auditEventId,
+      ])
+    ).rows[0];
+    expect(audit.before).toMatchObject({
+      flagId: flag.id,
+      duplicateState: "open",
+      credited: true,
+      creditedSpendKobo: "2000000",
+    });
+    expect(audit.after).toMatchObject({
+      flagId: flag.id,
+      duplicateState: "cleared",
+      credited: true,
+      creditedSpendKobo: "2000000",
+      decisionId: result.decision.id,
+      outcome: "keep_both",
+    });
+    expect(audit.after.purchaseIds).toEqual(
+      [a.purchaseId, b.purchaseId].sort(),
+    );
+    expect(audit.after).not.toHaveProperty("reviewPolicyRelease");
     expect(
       (
         await pool.query(
@@ -433,6 +459,25 @@ describe("M3 real-Postgres independent review decisions", () => {
       }),
     ]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const events = (
+      await pool.query(
+        "SELECT * FROM audit_event WHERE action='duplicate_cancelled' AND target_id=ANY($1::uuid[])",
+        [[a.purchaseId, b.purchaseId]],
+      )
+    ).rows;
+    expect(events).toHaveLength(1);
+    expect(events[0].before).toMatchObject({
+      state: "credited",
+      creditedSpendKobo: "2000000",
+      duplicateState: "open",
+    });
+    expect(events[0].after).toMatchObject({
+      state: "cancelled",
+      credited: false,
+      creditedSpendKobo: "0",
+      duplicateState: "cancelled",
+      outcome: "cancel",
+    });
     expect(
       (
         await pool.query(

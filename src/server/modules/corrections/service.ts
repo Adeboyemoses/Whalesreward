@@ -1,3 +1,9 @@
+import {
+  writeAudit,
+  auditActor,
+  auditTarget,
+  auditSeller,
+} from "../audit/write";
 import { z } from "zod";
 import { enqueueDuplicateDetection } from "../duplicates/service";
 import type pg from "pg";
@@ -309,22 +315,8 @@ async function apply(
   await enqueueDuplicateDetection(db, p.id);
   await markCampaigns(db, p.id);
 }
-const auditHumanSchema = z.strictObject({
-  kind: z.enum(["admin", "attendant"]),
-  userId: z.uuid(),
-  code: z.string().max(120),
-  nameAtEvent: z.string().max(120),
-  usernameAtEvent: z.string().max(120),
-  roleAtEvent: z.string().max(120).nullable(),
-});
-const auditSellerSchema = z.strictObject({
-  attendantId: z.uuid(),
-  accountId: z.uuid(),
-  staffCode: z.string().max(120),
-  name: z.string().max(120),
-  username: z.string().max(120),
-});
 const auditValuesSchema = z.strictObject({
+  calculation: z.enum(["captured_rate", "meter_evidence"]),
   amountKobo: z.string().regex(/^[1-9][0-9]*$/),
   quantity: z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/),
   currency: z.literal("NGN"),
@@ -351,6 +343,7 @@ async function auditEffective(
   const r = await revision(db, p.id, p.current_revision_id!);
   const values = revisionValues(r);
   return auditValuesSchema.parse({
+    calculation: values.calculation,
     amountKobo: values.amountKobo,
     quantity: values.quantity,
     currency: values.currency,
@@ -377,82 +370,40 @@ async function correctionAudit(
   operationId: string,
   reason: string,
   beforeState: Correction["state"] | null,
+  decision?: { id: string; outcome: "approve" | "reject"; occurredAt: string },
 ) {
   safeReason(reason);
   const current = await purchase(db, p.id);
   const before = await auditEffective(db, p, beforeState),
     after = await auditEffective(db, current, c.state);
-  let actorSnapshot:
-    | z.infer<typeof auditHumanSchema>
-    | { kind: "system"; service: "validation"; nameAtEvent: string };
-  if (actor) {
-    const user = (
-      await db.query<{
-        kind: "admin" | "attendant";
-        user_id: string;
-        code: string;
-        display_name: string;
-        username: string;
-        role_name: string | null;
-      }>(
-        `SELECT u.kind,u.id AS user_id,coalesce(a.admin_code,t.staff_code) AS code,u.display_name,u.username,r.name AS role_name FROM auth_user u LEFT JOIN admin a ON a.user_id=u.id LEFT JOIN role r ON r.id=a.role_id LEFT JOIN attendant t ON t.user_id=u.id WHERE u.id=$1`,
-        [actor],
-      )
-    ).rows[0];
-    if (!user) throw new AuthError("temporarily_unavailable", 503);
-    actorSnapshot = auditHumanSchema.parse({
-      kind: user.kind,
-      userId: user.user_id,
-      code: snapshotText(user.code),
-      nameAtEvent: snapshotText(user.display_name),
-      usernameAtEvent: snapshotText(user.username),
-      roleAtEvent:
-        user.role_name === null ? null : snapshotText(user.role_name),
-    });
-  } else
-    actorSnapshot = {
-      kind: "system",
-      service: "validation",
-      nameAtEvent: "Correction validation",
-    };
-  const seller = (
-    await db.query<{
-      attendant_id: string;
-      account_id: string;
-      staff_code: string;
-      seller_name: string;
-      seller_username: string;
-    }>(
-      `SELECT a.id AS attendant_id,a.user_id AS account_id,a.staff_code,p.seller_name,p.seller_username FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id WHERE p.id=$1`,
-      [p.id],
-    )
-  ).rows[0]!;
-  const sellerSnapshot = auditSellerSchema.parse({
-    attendantId: seller.attendant_id,
-    accountId: seller.account_id,
-    staffCode: snapshotText(seller.staff_code),
-    name: snapshotText(seller.seller_name),
-    username: snapshotText(seller.seller_username),
+  return writeAudit(db, {
+    stationId: p.station_id,
+    action,
+    actor: actor
+      ? await auditActor(db, actor)
+      : {
+          kind: "system",
+          service: "validation",
+          nameAtEvent: "Correction validation",
+        },
+    target: await auditTarget(db, "purchase", p.id, p.station_id),
+    originatingSeller: await auditSeller(db, p.id),
+    operationId,
+    reason,
+    before: {
+      ...before,
+      ...(decision ? { decisionId: null, outcome: null } : {}),
+    },
+    after: {
+      ...after,
+      ...(decision
+        ? { decisionId: decision.id, outcome: decision.outcome }
+        : {}),
+    },
+    ...(decision ? { occurredAt: decision.occurredAt } : {}),
   });
-  const id = newId();
-  await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at,actor_snapshot,originating_seller_snapshot) VALUES($1,$2,$3,$4,'purchase',$5,$6,$7,$8,$9,clock_timestamp(),$10,$11)`,
-    [
-      id,
-      actor,
-      actor ? "user" : "system",
-      action,
-      p.id,
-      operationId,
-      JSON.stringify(before),
-      JSON.stringify(after),
-      reason,
-      JSON.stringify(actorSnapshot),
-      JSON.stringify(sellerSnapshot),
-    ],
-  );
-  return id;
 }
+
 export function createCorrectionsService({
   pool,
   storage,
@@ -979,6 +930,7 @@ export function createCorrectionsService({
           body.operationId,
           body.reason,
           c.state,
+          { id: did, outcome: body.outcome, occurredAt: now.toISOString() },
         );
         const current = await purchase(db, p.id);
         const holds = (

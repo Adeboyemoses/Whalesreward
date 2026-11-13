@@ -8,7 +8,14 @@ import {
   type CampaignHistory,
   type PriceHistory,
 } from "./capture-policy";
-import { audit, type Purchase } from "./repo";
+import { type Purchase } from "./repo";
+import {
+  writeAudit,
+  auditTarget,
+  auditSeller,
+  auditSystem,
+} from "../audit/write";
+import { settlementAuditValues } from "./audit";
 /** Called only under the scoped purchase row lock, after evidence and live authority. */
 export async function settle(
   db: pg.PoolClient,
@@ -17,6 +24,12 @@ export async function settle(
   operationId: string,
   assetId: string,
 ) {
+  // finalize has staged its in-transaction validation state already. Keep the
+  // locked, previously committed state in the audit before-image.
+  const beforeAudit = {
+    ...(await settlementAuditValues(db, p.id, null)),
+    state: p.status,
+  };
   // A price activation may already have sampled an in-interval effective time
   // while still uncommitted. Wait before opening the history query snapshot.
   await lockPriceHistory(db, p.station_id, p.product_id, "read");
@@ -179,17 +192,23 @@ export async function settle(
     [p.id, held ? "held" : "credited", held ? null : revisionId],
   );
   await enqueueDuplicateDetection(db, p.id);
-  await audit(
-    db,
-    userId,
-    p.id,
+  await writeAudit(db, {
+    stationId: p.station_id,
+    action: held ? "sale_held" : "sale_credited",
+    actor: auditSystem("validation"),
+    target: await auditTarget(db, "purchase", p.id, p.station_id),
+    originatingSeller: await auditSeller(db, p.id),
     operationId,
-    held ? "purchase.held" : "purchase.credited",
-    {
-      revisionId,
-      assetId,
-      reasons,
-      campaignEligible: policy.campaignEligible && !held,
+    reason: held ? "Sale held for review" : "Sale credited",
+    before: {
+      ...beforeAudit,
+      photoAssetId: null,
+      candidateRevisionId: null,
     },
-  );
+    after: {
+      ...(await settlementAuditValues(db, p.id, revisionId)),
+      photoAssetId: assetId,
+      candidateRevisionId: revisionId,
+    },
+  });
 }

@@ -1,3 +1,10 @@
+import {
+  writeAudit,
+  auditActor,
+  auditTarget,
+  auditSeller,
+} from "../audit/write";
+import { saleAuditGates, saleAuditValues } from "../sync/audit";
 import { validateMeterPair } from "./meter-math";
 import { pinMeterPolicy } from "./meter-config";
 import { evaluateMeter } from "./meter-evaluator";
@@ -27,7 +34,7 @@ import { AuthError } from "../auth/errors";
 import { transaction } from "../sync/repo";
 import { payloadDigest } from "../sync/canonical";
 import { reviewAuditAction } from "./audit-actions";
-import { safeReason, snapshotText } from "../corrections/service";
+import { safeReason } from "../corrections/service";
 import { enqueueDuplicateDetection } from "../duplicates/service";
 import * as sql from "../sales/projections";
 import {
@@ -40,6 +47,7 @@ import {
 type Kind = "price" | "card" | "date" | "capture" | "duplicate";
 type Guard = { expectedVersion: number; expectedRevisionId: string | null };
 type Purchase = {
+  auditGates: Awaited<ReturnType<typeof saleAuditGates>>;
   id: string;
   station_id: string;
   status: string;
@@ -91,6 +99,7 @@ async function purchase(db: pg.PoolClient, id: string, station: string) {
     )
   ).rows[0];
   if (!p) throw new AuthError("not_found", 404);
+  p.auditGates = await saleAuditGates(db, id);
   return p;
 }
 function guard(p: Purchase, g: Guard) {
@@ -267,6 +276,7 @@ async function record(
   did: string,
   extra: {
     holdId?: string;
+    beforeCandidateId?: string;
     flagId?: string;
     evidence?: ReviewEvidence;
     conclusion?: ReviewConclusion;
@@ -307,93 +317,118 @@ async function record(
   const auditId = newId(),
     now = (await db.query<{ now: Date }>("SELECT clock_timestamp() now"))
       .rows[0]!.now;
-  const auditValue = (
-    values: wire.SaleValues,
-    revision: string | null,
-    credited: boolean,
-  ) => ({
-    amountKobo: values.amountKobo,
-    quantity: values.quantity,
-    currency: values.currency,
-    unit: values.unit,
-    basis: values.basis,
-    medium: values.medium,
-    rateKobo: values.rateKobo,
-    priceVersionId: values.priceVersionId,
-    revisionId: revision,
-    credited,
-    correctionState: null,
-  });
-  const seller = (
-    await db.query<{
-      attendantId: string;
-      accountId: string;
-      staffCode: string;
-      name: string;
-      username: string;
-    }>(
-      `SELECT t.id AS "attendantId",t.user_id AS "accountId",t.staff_code AS "staffCode",p.seller_name AS name,p.seller_username AS username FROM purchase p JOIN attendant t ON t.id=p.originating_attendant_id WHERE p.id=$1`,
-      [p.id],
-    )
-  ).rows[0]!;
-  const sellerSnapshot = {
-    ...seller,
-    staffCode: snapshotText(seller.staffCode),
-    name: snapshotText(seller.name),
-    username: snapshotText(seller.username),
+  // An accepted revision remains the effective value while a candidate is held.
+  const effective = async (
+    pointer: string | null,
+    fallback: wire.SaleValues,
+  ) => {
+    if (!pointer) return fallback;
+    const row = (
+      await db.query<{ value: unknown }>(
+        `SELECT ${sql.values("r")} AS value FROM purchase_revision r WHERE id=$1 AND purchase_id=$2`,
+        [pointer, p.id],
+      )
+    ).rows[0]!;
+    return wire.saleValuesSchema.parse(row.value);
   };
-  await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at,actor_snapshot,originating_seller_snapshot)
-  SELECT $1,$2,'user',$3,'purchase',p.id,$4,$5,$6,$7,$8,$9,$11 FROM purchase p JOIN attendant t ON t.id=p.originating_attendant_id WHERE p.id=$10`,
-    [
-      auditId,
-      a.user_id,
-      reviewAuditAction(kind, outcome),
-      body.operationId,
-      JSON.stringify(
-        auditValue(before, p.current_revision_id, p.status === "credited"),
-      ),
-      JSON.stringify({
-        ...auditValue(
-          after,
-          current.current_revision_id,
-          current.status === "credited",
+  const beforeFields: Record<string, unknown> = {
+    ...saleAuditValues(
+      await effective(p.current_revision_id, before),
+      p.current_revision_id,
+      p.auditGates.creditedSpendKobo !== "0",
+    ),
+    ...p.auditGates,
+    decisionId: null,
+    outcome: null,
+  };
+  const afterFields: Record<string, unknown> = {
+    ...saleAuditValues(
+      await effective(current.current_revision_id, after),
+      current.current_revision_id,
+      current.auditGates.creditedSpendKobo !== "0",
+    ),
+    ...current.auditGates,
+    decisionId: did,
+    outcome,
+  };
+  if (kind === "price") {
+    beforeFields.candidateRevisionId = extra.beforeCandidateId ?? null;
+    afterFields.candidateRevisionId =
+      current.resolution_candidate_revision_id ?? current.current_revision_id;
+  }
+  if (kind === "date") {
+    beforeFields.verifiedSaleDate = before.verifiedSaleDate;
+    afterFields.verifiedSaleDate = after.verifiedSaleDate;
+  }
+  if (extra.flagId) {
+    const flag = (
+      await db.query<{
+        purchase_id: string;
+        other_purchase_id: string;
+        state: string;
+      }>(
+        "SELECT purchase_id,other_purchase_id,state FROM duplicate_flag WHERE id=$1",
+        [extra.flagId],
+      )
+    ).rows[0]!;
+    const pair = [flag.purchase_id, flag.other_purchase_id].sort();
+    Object.assign(beforeFields, {
+      flagId: extra.flagId,
+      purchaseIds: pair,
+      duplicateState: "open",
+    });
+    Object.assign(afterFields, {
+      flagId: extra.flagId,
+      purchaseIds: pair,
+      duplicateState: flag.state,
+    });
+  }
+  if (extra.evaluation) {
+    const policy = extra.evaluation.policy as {
+      release: string;
+      revision: number;
+    };
+    const projected = {
+      reviewPolicyRelease: policy.release,
+      reviewPolicyRevision: String(policy.revision),
+      reviewEvaluationId: did,
+      reviewConclusions: [
+        ...new Set(
+          (extra.evaluation.conclusions as { tag: string }[]).map((c) => c.tag),
         ),
-        ...(extra.evaluation
-          ? {
-              reviewPolicy: (() => {
-                const policy = extra.evaluation.policy as {
-                  release: string;
-                  digest: string;
-                  revision: number;
-                };
-                return {
-                  release: policy.release,
-                  digest: policy.digest,
-                  revision: policy.revision,
-                };
-              })(),
-              reviewConclusions: (
-                extra.evaluation.conclusions as { tag: string }[]
-              ).map((c) => c.tag),
-              reviewEvaluationId: did,
-            }
-          : {}),
-      }),
-      body.reason,
-      now,
-      JSON.stringify({
-        kind: "admin",
-        userId: a.user_id,
-        code: snapshotText(actor.code),
-        nameAtEvent: snapshotText(actor.name),
-        usernameAtEvent: snapshotText(actor.username),
-        roleAtEvent: snapshotText(actor.role),
-      }),
-      p.id,
-      JSON.stringify(sellerSnapshot),
-    ],
-  );
+      ],
+    };
+    Object.assign(afterFields, projected);
+    for (const key of Object.keys(projected)) beforeFields[key] = null;
+  }
+  if (extra.meter) {
+    const policy = extra.meter.policy as { release: string; revision: number };
+    const reconciliation = extra.meter.reconciliation as {
+      profile: { id: string };
+    };
+    const projected = {
+      meterPolicyRelease: policy.release,
+      meterPolicyRevision: String(policy.revision),
+      meterProfileId: reconciliation.profile.id,
+      meterEvaluationId: did,
+      meterConclusion: "meter_reconciled",
+    };
+    Object.assign(afterFields, projected);
+    for (const key of Object.keys(projected)) beforeFields[key] = null;
+  }
+  await writeAudit(db, {
+    id: auditId,
+    stationId: p.station_id,
+    action: reviewAuditAction(kind, outcome),
+    actor: await auditActor(db, a.user_id),
+    target: await auditTarget(db, "purchase", p.id, p.station_id),
+    originatingSeller: await auditSeller(db, p.id),
+    operationId: body.operationId,
+    reason: body.reason,
+    occurredAt: now.toISOString(),
+    before: beforeFields,
+    after: afterFields,
+  });
   const response = wire.decisionSchema.parse({
     id: did,
     operationId: body.operationId,
@@ -849,6 +884,7 @@ export function createReviewsService({
         did,
         {
           holdId,
+          beforeCandidateId: evaluatedRevisionId,
           meter: meter?.meter,
           resultingMeterRevisionId: meter ? r.id : undefined,
           evidence: body.evidence,

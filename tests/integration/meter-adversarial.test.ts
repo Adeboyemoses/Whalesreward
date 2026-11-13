@@ -685,6 +685,37 @@ describe("P-26 PostgreSQL adversarial bounds, authority and independent gates", 
         corrected ||= kind === "price";
         expect(result.remainingHolds).toHaveLength(--remaining);
         expect(result.creditedAfter).toBe(false);
+        const audit = (
+          await db.pool.query("SELECT * FROM audit_event WHERE id=$1", [
+            result.auditEventId,
+          ])
+        ).rows[0];
+        expect(audit.after).toMatchObject({
+          decisionId: result.id,
+          state: "held",
+          revisionId: null,
+          credited: false,
+          creditedSpendKobo: "0",
+          amountKobo: "1100000",
+          quantity: corrected ? "10" : "11",
+          calculation: corrected ? "meter_evidence" : "captured_rate",
+          reviewPolicyRelease: "review-evidence-v1",
+          reviewEvaluationId: result.id,
+        });
+        expect(audit.after.holdKinds).toHaveLength(remaining);
+        expect(audit.after.policyBlocks).toContain(
+          "eligibility_configuration_unset",
+        );
+        if (kind === "price") {
+          expect(audit.after).toMatchObject({
+            meterPolicyRelease: "meter-reconciliation-v1",
+            meterEvaluationId: result.id,
+            meterConclusion: "meter_reconciled",
+          });
+          expect(audit.after.candidateRevisionId).not.toBeNull();
+        }
+        expect(JSON.stringify(audit)).not.toContain(x.config.digest);
+        expect(audit.after).not.toHaveProperty("reviewPolicy");
         expect(result.after.amountKobo).toBe("1100000");
         expect(result.after.quantity).toBe(corrected ? "10" : "11");
         expect(result.policyBlocks).toContain(

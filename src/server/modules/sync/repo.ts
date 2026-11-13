@@ -127,17 +127,3 @@ export async function view(
     serverReceivedAt: p.server_received_at.toISOString(),
   };
 }
-export async function audit(
-  db: pg.PoolClient,
-  userId: string,
-  purchaseId: string,
-  operationId: string,
-  action: string,
-  after: unknown,
-) {
-  const { newId } = await import("../../lib/ids");
-  await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,before,after,reason,occurred_at) VALUES($1,$2,'user',$3,'purchase',$4,$5,'{}',$6,$3,clock_timestamp())`,
-    [newId(), userId, action, purchaseId, operationId, JSON.stringify(after)],
-  );
-}

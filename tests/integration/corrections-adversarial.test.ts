@@ -79,6 +79,40 @@ describe("M3 independent PostgreSQL correction adversaries", () => {
       );
       expect(replay.replayed).toBe(true);
       expect(replay.data).toEqual(receipt.data);
+      const events = (
+        await f.pool.query(
+          "SELECT * FROM audit_event WHERE target_id=$1 AND action LIKE 'correction_%' ORDER BY occurred_at,id",
+          [sale.purchaseId],
+        )
+      ).rows;
+      expect(events.map((e) => e.action)).toEqual(
+        state === "accepted"
+          ? ["correction_received", "correction_applied"]
+          : ["correction_received"],
+      );
+      expect(events[0].before).toMatchObject({
+        amountKobo: "2000000",
+        calculation: "captured_rate",
+        credited: true,
+        correctionState: null,
+      });
+      expect(events[0].after).toMatchObject({
+        amountKobo: "2000000",
+        calculation: "captured_rate",
+        credited: true,
+        correctionState: "pending_validation",
+      });
+      if (state === "accepted") {
+        expect(events[1].actor_snapshot).toMatchObject({
+          kind: "system",
+          service: "validation",
+        });
+        expect(events[1].after).toMatchObject({
+          amountKobo: amount,
+          calculation: "captured_rate",
+          credited: true,
+        });
+      }
       expect(
         (
           await service.byOperation(
