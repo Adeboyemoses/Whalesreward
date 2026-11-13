@@ -756,5 +756,5 @@ body {
 .wr-settings-editor { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
 @media (max-width: 900px) {
   .wr-settings-editor { grid-template-columns: minmax(0, 1fr); }
-  .wr-settings .wr-btn, .wr-settings .wr-input { min-height: var(--control-h); }
+  .wr-settings .wr-row > .wr-btn, .wr-settings .wr-btn, .wr-settings .wr-input { min-height: var(--control-h); }
 }
