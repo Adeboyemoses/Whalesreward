@@ -103,7 +103,9 @@ test("S03 S04 S09 and A14 at 1440px 390px 360px", async ({ page, browser }) => {
     await openReview(page, sale.id, "price");
     await capture(page, "S03-1440");
     await page.goto(`/admin/sales/${sale.id}/price-review/correct`);
-    await expect(page.getByText(/Not available yet/).first()).toBeVisible();
+    await expect(
+      page.getByLabel("Meter amount (₦)", { exact: true }),
+    ).toBeVisible();
     await capture(page, "S04-1440");
     for (const width of [390, 360]) {
       await f.phone.setViewportSize({ width, height: 844 });

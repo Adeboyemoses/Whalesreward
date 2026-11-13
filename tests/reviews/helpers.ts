@@ -105,8 +105,16 @@ export async function heldSale(
   kinds: ReviewKind[],
   value = "1000000",
   cardOutcome: "before" | "after" | "ambiguous" = "before",
+  meterDisplay?: { amount: string; quantity: string },
 ) {
-  const sale = await acceptedSale(f.phone, "amount", value, f.cardCode);
+  const sale = await acceptedSale(
+    f.phone,
+    "amount",
+    value,
+    f.cardCode,
+    "vehicle",
+    meterDisplay,
+  );
   const id = sale.detail.id;
   // Frozen original interval is wholly on 10 November; card-before uses late receipt
   // after the original expiry to establish U < E <= R without trusting the phone.

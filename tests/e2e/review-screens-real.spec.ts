@@ -240,8 +240,8 @@ test("I-31 I-34 price decision keeps independent date hold and date verification
     await openReview(page, sale.id, "price");
     await expect(page.getByText(/Not available yet/i).first()).toBeVisible();
     await expect(
-      page.getByRole("button", { name: /Correct from meter/ }),
-    ).toBeDisabled();
+      page.getByRole("link", { name: /Correct from meter/ }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Cancel invalid sale/ }),
     ).toBeDisabled();

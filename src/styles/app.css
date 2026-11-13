@@ -741,3 +741,6 @@ body {
 }
 .wr-audit-context { display: flex; flex-direction: column; gap: var(--space-6); }
 .wr-audit-reason { background: var(--whale-050); border-color: transparent; }
+
+/* S04 keeps evidence beside the compact meter editor, above full-width review. */
+.wr-meter-editor-row { align-items: start; }
