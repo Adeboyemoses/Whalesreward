@@ -1,3 +1,4 @@
+import { timingHistoryCte } from "../settings/timing-history";
 import { createHash } from "node:crypto";
 import type pg from "pg";
 import { authId } from "../../../shared/contracts/auth";
@@ -129,7 +130,7 @@ export async function resolveEvidenceSources(
   );
   const settings = await rows(
     db,
-    `SELECT to_jsonb(v)-'reason' fact FROM settings_version v WHERE station_id=$1 ORDER BY version LIMIT 2049`,
+    `${timingHistoryCte} SELECT to_jsonb(v)-'reason' fact FROM timing_history v ORDER BY version LIMIT 2049`,
     [original.station_id],
   );
   const links = await rows(

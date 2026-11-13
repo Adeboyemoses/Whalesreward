@@ -1,3 +1,4 @@
+import { timingHistoryCte } from "../settings/timing-history";
 import { enqueueDuplicateDetection } from "../duplicates/service";
 import type pg from "pg";
 import { lockPriceHistory } from "../../lib/price-history-lock";
@@ -62,8 +63,8 @@ export async function settle(
     )
   ).rows;
   const settings = (
-    await db.query<CampaignHistory>(
-      `SELECT (EXTRACT(EPOCH FROM effective_from)*1000000)::bigint::text AS "effectiveFrom",(EXTRACT(EPOCH FROM purchase_start)*1000000)::bigint::text AS "purchaseStart",(EXTRACT(EPOCH FROM purchase_cutoff)*1000000)::bigint::text AS "purchaseCutoff",(EXTRACT(EPOCH FROM upload_deadline)*1000000)::bigint::text AS "uploadDeadline",campaign_id AS "campaignId" FROM settings_version WHERE station_id=$1 AND effective_from<=(SELECT server_received_at FROM purchase WHERE id=$2) ORDER BY effective_from`,
+    await db.query<CampaignHistory & { historyComplete: boolean }>(
+      ` ${timingHistoryCte} SELECT timing_history_complete AS "historyComplete",(EXTRACT(EPOCH FROM effective_from)*1000000)::bigint::text AS "effectiveFrom",(EXTRACT(EPOCH FROM purchase_start)*1000000)::bigint::text AS "purchaseStart",(EXTRACT(EPOCH FROM purchase_cutoff)*1000000)::bigint::text AS "purchaseCutoff",(EXTRACT(EPOCH FROM upload_deadline)*1000000)::bigint::text AS "uploadDeadline",campaign_id AS "campaignId" FROM timing_history WHERE effective_from<=(SELECT server_received_at FROM purchase WHERE id=$2) ORDER BY effective_from`,
       [p.station_id, p.id],
     )
   ).rows;
@@ -123,6 +124,10 @@ export async function settle(
     prices,
     settings,
   });
+  if (settings.some((v) => !v.historyComplete)) {
+    policy.reasons.push("capture_history_incomplete");
+    policy.campaignEligible = false;
+  }
   if (card?.state === "retired" && card.retired_at_receipt)
     policy.reasons.push(
       card.replaced_by_card_id ? "replaced_card" : "card_policy_unresolved",
