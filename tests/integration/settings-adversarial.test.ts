@@ -26,6 +26,9 @@ import {
 import { settingsSchema } from "../../src/shared/contracts/settings";
 import { COOKIE } from "../../src/server/modules/admin-access/http";
 import { readAudit } from "../../src/server/modules/audit/service";
+import { writeSettingsAudit } from "../../src/server/modules/audit/write-settings";
+import { transaction } from "../../src/server/modules/admin-access/repo";
+import { healthResponse } from "../../src/server/modules/health/service";
 import {
   auditEventSchema,
   auditPageSchema,
@@ -254,6 +257,12 @@ describe("WHR-26 independent settings transaction verification", () => {
   });
 
   it("I-45 history is immutable, version-descending and cursor-bound to its section", async () => {
+    for (let index = 0; index < 2; index++) {
+      const p = await proposal();
+      expect((await call(confirmRetention, p.confirm)).response.status).toBe(
+        201,
+      );
+    }
     const first = await call(getHistory, undefined, {
       query: "?section=retention&limit=1",
     });
@@ -558,6 +567,100 @@ describe("WHR-26 independent settings transaction verification", () => {
     });
     expect(unchanged.response.status).toBe(409);
     expect(unchanged.body.error.code).toBe("no_change");
+    expect(await domainRows()).toEqual(before);
+  });
+
+  it("I-41 version-two persistence rejects mismatched action fields and serialization safely rejects malformed historical envelopes", async () => {
+    const p = await proposal();
+    const saved = await call(confirmRetention, p.confirm);
+    expect(saved.response.status).toBe(201);
+    const event = auditEventSchema.parse(
+      await readAudit(
+        f.pool,
+        config,
+        token,
+        "detail",
+        {},
+        saved.body.data.auditEventId,
+      ),
+    );
+    const before = await domainRows();
+    const badEvents = [
+      { ...event, action: "giveaway_timing_changed" },
+      { ...event, target: { ...event.target, kind: "campaign" } },
+      {
+        ...event,
+        changes: event.changes.filter(
+          (change) => change.field !== "deletionEnabled",
+        ),
+      },
+      {
+        ...event,
+        changes: event.changes.map((change) =>
+          change.field === "deletionEnabled"
+            ? { ...change, after: true }
+            : change,
+        ),
+      },
+      {
+        ...event,
+        changes: event.changes.map((change) =>
+          change.field === "retentionDays" ? { ...change, after: 30 } : change,
+        ),
+      },
+      { ...event, changes: [...event.changes, event.changes[0]] },
+      {
+        ...event,
+        changes: [
+          ...event.changes,
+          { field: "privateNote", before: null, after: "private-canary-value" },
+        ],
+      },
+    ];
+    for (const candidate of badEvents)
+      await expect(
+        transaction(f.pool, (db) =>
+          writeSettingsAudit(
+            db,
+            candidate as Parameters<typeof writeSettingsAudit>[1],
+          ),
+        ),
+      ).rejects.toThrow();
+    expect(await domainRows()).toEqual(before);
+    const malformedId = newId();
+    await f.pool.query(
+      `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,actor_snapshot,originating_seller_snapshot,"before","after",reason,occurred_at,schema_version,station_id,event_code,area,target_snapshot,correlation_id,changes,related_event_ids)
+      SELECT $1,actor_user_id,actor_kind,'giveaway_timing_changed',target_type,target_id,operation_id,actor_snapshot,originating_seller_snapshot,'{}'::jsonb,'{"privateNote":"private-canary-value"}'::jsonb,reason,occurred_at,schema_version,station_id,$2,area,target_snapshot,correlation_id,changes,related_event_ids FROM audit_event WHERE id=$3`,
+      [malformedId, `AUD-${malformedId}`, event.id],
+    );
+    const projected = auditEventSchema.parse(
+      await readAudit(f.pool, config, token, "detail", {}, malformedId),
+    );
+    expect(projected.schemaVersion).toBe(0);
+    expect(JSON.stringify(projected)).not.toContain("private-canary-value");
+    expect(projected.changes).toEqual([]);
+  });
+
+  it("I-07 timing health remains unconfigured and only current settings admins can see the named status", async () => {
+    const before = await domainRows();
+    const protectedResult = await call(healthResponse);
+    expect(protectedResult.response.status).toBe(200);
+    expect(protectedResult.body.policies.timing).toBe("unconfigured");
+    expect(protectedResult.body.policies.reconciliation).toBe("unconfigured");
+    expect(protectedResult.body.fullyConfigured).toBe(false);
+    expect(protectedResult.body.policies).not.toHaveProperty("retention");
+    expect(protectedResult.body.policies).not.toHaveProperty("timingPolicy");
+    const withoutSettings = await f.actor(["audit"]);
+    const publicResult = await call(healthResponse, undefined, {
+      token: withoutSettings.token,
+    });
+    expect(publicResult.response.status).toBe(200);
+    expect(publicResult.body).not.toHaveProperty("policies");
+    expect(publicResult.body.fullyConfigured).toBe(false);
+    expect(protectedResult.response.headers.get("cache-control")).toBe(
+      "no-store",
+    );
+    expect(protectedResult.response.headers.get("vary")).toBe("Cookie");
     expect(await domainRows()).toEqual(before);
   });
 
