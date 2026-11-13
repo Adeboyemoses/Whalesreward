@@ -1,13 +1,13 @@
 # Admin row 14: Settings
-Boards: B07, T01, T03, T02, T04   Feature: F11   Invariants: I-07, I-11, I-45, I-51
+Boards: B07, T01, T03, T02, T04   Feature: F11   Invariants: I-07, I-09, I-41, I-45, I-51
 Decision note: product-docs/04 UI Design/Admin Portal/Admin Settings Decisions.md
 
 | Board | Route | Components (src/ui) | Reads (contract) | Writes (contract) | States | Permission |
 |---|---|---|---|---|---|---|
 | B07 | /admin/settings | existing admin shell, Notice, KeyValueList, DataTable | Settings, Page<SettingsChange> | none | loading, denied, error/retry, null/configured, empty/history, more history | settings |
-| T01/T03 | /admin/settings/giveaway | sheet, notice, key values | Settings.timing | none until WHR-55 | locked, read-only values, loading/denied/error | settings |
+| T01/T03 | /admin/settings/giveaway and /admin/settings/giveaway/confirm | sheet, notice, key values | Settings.timing | none until WHR-55 | locked, read-only values, loading/denied/error | settings |
 | T02 | /admin/settings/retention | sheet, TextField, Button, Notice | Settings.retention | side-effect-free retention review | editing, invalid days/reason, busy, no_change, version_conflict, error | settings |
-| T04 | /admin/settings/retention | comparison table, key values, notice, buttons | SettingsReview | retention confirm | reviewed, keep editing, cancel, confirming, uncertain/retry same operation, review_stale, version_conflict, success | settings |
+| T04 | /admin/settings/retention/confirm | comparison table, key values, notice, buttons | SettingsReview | retention confirm | reviewed, keep editing, cancel, confirming, uncertain/retry same operation, review_stale, version_conflict, success | settings |
 
 ## Behaviour
 - Consume existing WO-core-14 routes and strict shared schemas without changing server or contract code.
