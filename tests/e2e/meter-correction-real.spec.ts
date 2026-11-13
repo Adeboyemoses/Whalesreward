@@ -219,3 +219,40 @@ test("I-22 I-31 unchanged pair is refused and lost meter response replays one ex
     await f.close();
   }
 });
+
+test("I-29 meter transcription requires reason and rejects invalid precision without sending a decision", async ({
+  page,
+  browser,
+}) => {
+  const f = await reviewFixture(page, browser);
+  try {
+    const sale = await heldSale(f, ["price"]);
+    await edit(page, sale.id);
+    const review = page.getByRole("button", {
+      name: "Review correction",
+      exact: true,
+    });
+    await page.getByLabel("Decision reason", { exact: true }).fill("   ");
+    await expect(review).toBeDisabled();
+    await explain(page);
+    for (const invalid of ["0", "-1", "1e3", "11000.001"]) {
+      await page.getByLabel("Meter amount (₦)", { exact: true }).fill(invalid);
+      await expect(review).toBeDisabled();
+    }
+    await page.getByLabel("Meter amount (₦)", { exact: true }).fill("11000.00");
+    await page
+      .getByLabel("Meter quantity (litres)", { exact: true })
+      .fill("11.0000001");
+    await expect(review).toBeDisabled();
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+          [sale.id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  } finally {
+    await f.close();
+  }
+});
