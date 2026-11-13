@@ -1,3 +1,4 @@
+import { redactAuditText } from "../../../shared/contracts/audit-privacy.ts";
 import type pg from "pg";
 import { v7 as newId } from "uuid";
 import {
@@ -44,8 +45,10 @@ export function auditSystem(
     nameAtEvent: `${service[0]!.toUpperCase()}${service.slice(1)} service`,
   };
 }
-const display = (v: string) =>
-  safeAuditText(v) ? v.slice(0, 120) : "Private value omitted";
+const display = (v: string) => {
+  const redacted = redactAuditText(v).slice(0, 120);
+  return safeAuditText(redacted) ? redacted : "Private value omitted";
+};
 export async function auditActor(
   db: pg.PoolClient,
   userId: string,

@@ -3,14 +3,8 @@ import { z } from "zod";
 // Kept self-contained so the operator command uses the same validation under
 // Node's type stripping, without loading the application or its configuration.
 export const auditId = z.uuid().refine((v) => v === v.toLowerCase());
-// Printed card detection is case-sensitive: ordinary words are not card codes.
-export function safeAuditText(v: string): boolean {
-  return (
-    !/[\u0000-\u001f\u007f@/\\]|https?:|\b(?:password|token|secret|otp|code)\s*[:=]|\b[a-f0-9]{32,}\b|\b[A-Za-z0-9_-]{24,}\b|(?:\+?\d[ ()*-]*){6,}/i.test(
-      v,
-    ) && !/\b[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}\b/.test(v)
-  );
-}
+import { safeAuditText } from "./audit-privacy.ts";
+export { safeAuditText } from "./audit-privacy.ts";
 const text = z.string().trim().min(1).max(120).refine(safeAuditText);
 const reason = z.string().trim().min(1).max(1000).refine(safeAuditText);
 const code = z

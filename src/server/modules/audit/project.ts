@@ -43,7 +43,7 @@ const object = (value: unknown): Record<string, unknown> =>
     : {};
 const nullableId = (v: unknown) => (auditId.safeParse(v).success ? v : null);
 /** Scope is proved from persisted station identity or a station-owned target.
- * Global historical access/role/batch/product rows have no station proof and are
+ * Global historical access/role/batch rows without immutable station proof are
  * excluded, even when only one station currently exists. */
 export async function eventStation(
   db: pg.PoolClient,
@@ -51,6 +51,87 @@ export async function eventStation(
 ): Promise<string | null> {
   if (row.station_id)
     return auditId.safeParse(row.station_id).success ? row.station_id : null;
+  // Historical writer references prove scope only when every supplied reference
+  // belongs to this event's immutable target and all agree on one station.
+  if (row.target_type === "product" && row.action === "price_activated") {
+    const after = object(row.after),
+      before = object(row.before);
+    if (!auditId.safeParse(after.priceVersionId).success) return null;
+    const stations = new Set<string>();
+    for (const side of [before, after]) {
+      if (side.priceVersionId === undefined || side.priceVersionId === null)
+        continue;
+      if (!auditId.safeParse(side.priceVersionId).success) return null;
+      const ref = (
+        await db.query(
+          "SELECT station_id FROM product_price_version WHERE id=$1 AND product_id=$2",
+          [side.priceVersionId, row.target_id],
+        )
+      ).rows[0];
+      if (!ref) return null;
+      stations.add(ref.station_id);
+    }
+    return stations.size === 1 ? [...stations][0]! : null;
+  }
+  if (
+    row.target_type === "attendant" &&
+    ["assignment_changed", "assignment_ended"].includes(row.action)
+  ) {
+    const sides = [object(row.before), object(row.after)],
+      stations = new Set<string>();
+    if (
+      !auditId.safeParse(
+        (row.action === "assignment_ended" ? sides[0] : sides[1])?.assignmentId,
+      ).success
+    )
+      return null;
+    for (const side of sides) {
+      if (side.assignmentId === undefined || side.assignmentId === null)
+        continue;
+      if (!auditId.safeParse(side.assignmentId).success) return null;
+      const ref = (
+        await db.query(
+          "SELECT p.station_id,a.pump_id FROM assignment a JOIN pump p ON p.id=a.pump_id WHERE a.id=$1 AND a.attendant_id=$2",
+          [side.assignmentId, row.target_id],
+        )
+      ).rows[0];
+      if (
+        !ref ||
+        (side.pumpId !== undefined &&
+          side.pumpId !== null &&
+          side.pumpId !== ref.pump_id)
+      )
+        return null;
+      stations.add(ref.station_id);
+    }
+    return stations.size === 1 ? [...stations][0]! : null;
+  }
+  if (row.target_type === "card" && row.action === "card_replaced") {
+    const refs = (
+      await db.query(
+        `SELECT c.registered_station_id AS station_id,x.id,x.customer_id,x.old_card_id,x.new_card_id FROM customer_identity_change x JOIN customer c ON c.id=x.customer_id WHERE x.audit_event_id=$1 AND x.kind='card_replacement' AND x.old_card_id=$2`,
+        [row.id, row.target_id],
+      )
+    ).rows;
+    if (refs.length !== 1 || !refs[0].station_id) return null;
+    const ref = refs[0];
+    const expected: Record<string, unknown> = {
+      customerId: ref.customer_id,
+      oldCardId: ref.old_card_id,
+      newCardId: ref.new_card_id,
+      replacementCardId: ref.new_card_id,
+      identityChangeId: ref.id,
+    };
+    for (const side of [object(row.before), object(row.after)])
+      for (const [key, value] of Object.entries(expected))
+        if (
+          side[key] !== undefined &&
+          side[key] !== null &&
+          side[key] !== value
+        )
+          return null;
+    return ref.station_id;
+  }
   const queries: Record<string, string> = {
     purchase: "SELECT station_id FROM purchase WHERE id=$1",
     customer:
@@ -64,13 +145,15 @@ export async function eventStation(
     review_evidence_configuration:
       "SELECT station_id FROM review_evidence_configuration WHERE id=$1",
   };
-  const sql = queries[row.target_type];
+  const sql = Object.hasOwn(queries, row.target_type)
+    ? queries[row.target_type]
+    : undefined;
   if (!sql) return null;
   const r = (await db.query(sql, [row.target_id])).rows[0];
   return r?.station_id ?? null;
 }
 function knownAction(row: AuditRow): AuditAction | null {
-  if (row.action in auditRules) return row.action as AuditAction;
+  if (Object.hasOwn(auditRules, row.action)) return row.action as AuditAction;
   if (row.target_type === "purchase") {
     if (
       row.action === "purchase.cancelled" &&
@@ -281,7 +364,9 @@ export function projectAudit(
     "recovery",
   ].includes(row.area ?? "")
     ? row.area
-    : areas[row.target_type];
+    : Object.hasOwn(areas, row.target_type)
+      ? areas[row.target_type]
+      : undefined;
   if (!action && !historicalArea) return null;
   const result = historicalAuditEventSchema.safeParse({
     id: row.id,

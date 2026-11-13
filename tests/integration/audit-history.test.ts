@@ -30,6 +30,12 @@ const config = {
 };
 const canaries = {
   phone: "08012345678",
+  dottedPhone: "0803.555.0199",
+  maskedPhone: "••••0199",
+  partialPhone: "0803****0199",
+  ellipsisPhone: "0803…0199",
+  labelledPassword: "Password fictional-passphrase",
+  international: "+234.800.000.0099",
   otp: "794826",
   password: "password=CanaryPass-DoNotPersist!",
   token: "token=AuditCanaryBearerValueNeverPersist",

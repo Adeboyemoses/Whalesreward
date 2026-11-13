@@ -175,9 +175,9 @@ export async function audit(
   reason: string,
   before: Record<string, unknown> | null,
   after: Record<string, unknown> | null,
-  boundary?: { operationId: string; occurredAt?: string },
+  boundary?: { operationId: string; occurredAt?: string; stationId?: string },
 ) {
-  const station = await stationId(db);
+  const station = boundary?.stationId ?? (await stationId(db));
   return writeAudit(db, {
     stationId: station,
     action,

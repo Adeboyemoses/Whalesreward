@@ -150,6 +150,7 @@ export async function registerCustomer(
             {
               operationId: parsed.operationId,
               occurredAt: r.created_at.toISOString(),
+              stationId: actor.station_id,
             },
           );
           return registrationReceiptWithLookupSchema.parse({

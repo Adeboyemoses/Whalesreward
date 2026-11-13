@@ -46,6 +46,12 @@ const canaries = [
   "https://private.example.test/asset?sig=canary",
   "bd".repeat(32),
   "A7K3M9Q",
+  "0803.555.0199",
+  "••••0199",
+  "0803****0199",
+  "0803…0199",
+  "Password fictional-passphrase",
+  "+234.800.000.0099",
 ];
 beforeAll(async () => {
   f = await cardsFixture();
