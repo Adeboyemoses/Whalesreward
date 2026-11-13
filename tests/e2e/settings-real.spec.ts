@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { randomBytes } from "node:crypto";
+import { v7 } from "uuid";
 import { stationFixture } from "../station/helpers";
 import {
   settingsFixture,
@@ -190,12 +191,15 @@ test("I-39 I-45 competing retention confirmation requires a fresh explicit revie
       days = nextDays(before, 51);
     await editIntent(page, days, "Fictional earlier retention review");
     expect((await reviewIntent(page)).status()).toBe(200);
-    const competingDays = days + 3;
-    await saveIntent(
-      page,
-      competingDays,
-      "Fictional competing retention intent",
-    );
+    const competingDays =
+      before.retention.days === days + 3 ? days + 4 : days + 3;
+    expect(
+      await saveIntent(
+        page,
+        competingDays,
+        "Fictional competing retention intent",
+      ),
+    ).not.toBeNull();
     await confirmIntent(page, 409);
     await expect(page.getByRole("main")).toContainText(
       /changed|stale|review.*again|latest/i,
@@ -269,12 +273,15 @@ test("I-40 I-45 committed response loss and a rate-limited retry preserve the fr
       .getByRole("button", { name: "Retry confirmation", exact: true })
       .click();
     await limited;
-    await expect(page.getByRole("main").getByRole("alert")).toContainText(
-      /Too many requests/,
-    );
+    await expect(
+      page.getByRole("main").locator('[aria-busy="true"]'),
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Retry confirmation", exact: true }),
-    ).toBeVisible();
+    ).toBeEnabled();
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      /confirmation result is uncertain/,
+    );
     await expect(
       page.getByRole("button", { name: "Keep editing", exact: true }),
     ).toBeDisabled();
@@ -464,6 +471,7 @@ test("I-45 settings history is newest first and continues without duplicating en
         firstDays + (i % 2),
         `Fictional history ${historyTag} change ${String.fromCharCode(97 + i)}`,
         current,
+        f.db,
       );
       if (!result || result.section !== "retention")
         throw new Error("Expected new retention history");
@@ -503,6 +511,68 @@ test("I-45 settings history is newest first and continues without duplicating en
   } finally {
     await closeOther();
     await otherContext.close();
+    await f.close();
+  }
+});
+
+test("I-45 real catalog metadata change refuses the old review and requires an explicit fresh UI review", async ({
+  page,
+}) => {
+  const f = await settingsFixture(page, ["settings", "prices"]);
+  await f.db.query("SELECT pg_advisory_lock(80511)");
+  try {
+    const before = await readSettings(page);
+    await editIntent(
+      page,
+      nextDays(before, 121),
+      "Fictional concurrent catalog metadata review",
+    );
+    expect((await reviewIntent(page)).status()).toBe(200);
+    const price = (
+      await f.db.query(
+        `SELECT v.version, v.rate_kobo::text, v.quantity_precision
+      FROM product_price_version v JOIN product p ON p.id=v.product_id
+      WHERE p.code='kerosene' AND v.station_id=$1 ORDER BY v.version DESC LIMIT 1`,
+        [before.station.id],
+      )
+    ).rows[0];
+    const changed = await page.request.post(
+      "/api/admin/prices/kerosene/activate",
+      {
+        headers: { Origin: "http://127.0.0.1:3000" },
+        data: {
+          operationId: v7(),
+          expectedVersion: price.version,
+          rateKobo: price.rate_kobo,
+          currency: "NGN",
+          quantityPrecision: price.quantity_precision === 5 ? 6 : 5,
+          reason: "Fictional concurrent quantity precision change",
+        },
+      },
+    );
+    expect(changed.status()).toBe(201);
+    const confirmations: import("@playwright/test").Response[] = [];
+    page.on("response", (response) => {
+      if (
+        response.url().endsWith("/api/admin/settings/retention/confirm") &&
+        response.request().method() === "POST"
+      )
+        confirmations.push(response);
+    });
+    await confirmIntent(page);
+    expect(confirmations.map((response) => response.status())).toEqual([
+      409, 201,
+    ]);
+    expect((await confirmations[0]!.json()).error.code).toBe("review_stale");
+    const first = confirmations[0]!.request().postDataJSON();
+    const second = confirmations[1]!.request().postDataJSON();
+    expect(first.expectedVersion).toBe(before.version);
+    expect(second.expectedVersion).toBe(before.version);
+    expect(second.operationId).not.toBe(first.operationId);
+    expect(second.reviewDigest).not.toBe(first.reviewDigest);
+    expect((await readSettings(page)).version).toBe(before.version + 1);
+  } finally {
+    await f.db.query("SELECT pg_advisory_unlock(80511)");
     await f.close();
   }
 });

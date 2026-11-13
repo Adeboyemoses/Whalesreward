@@ -30,14 +30,27 @@ Use a fresh local fixture database with migrations applied. Run `pnpm exec playw
 
 On this host a matching Playwright v1.64.1 Linux container ran the actual production build. Temporary runtime-only configs reused that just-built artifact for focused browser/capture runs; the tracked configs build normally. Trace, video and automatic failure screenshots are disabled for credential-bearing sessions. Only explicit sanitized settings screenshots are committed.
 
-Final production candidate: `214f432`. The test commit contains this report and all 12 PNGs / 12 metric files. No unresolved blocking or visible-fix finding remains; the contract and inherited-shell notes above are explicit comparison limits.
+Visual production candidate: `214f432`. The later `74dbcf2` transport fix retains frozen confirmation identity after a 429; it does not change the captured markup or styling. The test commit contains this report and all 12 PNGs / 12 metric files. No unresolved blocking or visible-fix finding remains; the contract and inherited-shell notes above are explicit comparison limits.
 
 ```text
-Focused real-stack browser suite: 20 passed (22.6s), 0 failed, 0 skipped.
+Final focused real-stack browser suite: 22 passed (15.3s), 0 failed, 0 skipped.
+Cross-file settings + station + review suite: 68 passed (51.6s), 0 failed, 0 skipped.
 Independent fidelity: 1 passed (20.6s including clean production rebuild), 0 failed, 0 skipped.
-Desktop + attendant projects; one worker; zero retries.
+Desktop + attendant projects; two workers for final browser suites; zero retries.
+Focused client boundary tests: 8 passed.
 Targeted ESLint: exit 0.
 pnpm typecheck: exit 0.
 ```
 
 The final full-repository gates are run independently by the EM after this commit; those counts belong in the PR evidence and smoke runbook.
+
+
+## Review follow-up regressions
+
+The committed-response-loss case now executes a real successful confirmation, discards its response, returns one 429 on the next attempt, and then permits the same request to reach the real replay endpoint. The old client failed because Retry confirmation disappeared. The fixed client retains that control, keeps Keep editing and Cancel disabled, returns the original receipt, and leaves exactly one settings version, history entry and mutation receipt. The test waits for the busy state to end and checks the generic uncertainty message. Browser RED evidence was one failing case on the old client; both projects pass with the fix.
+
+Parallel station/review tests can legitimately change the canonical settings comparison through product quantity precision or campaign reporting generation. Ordinary success helpers accept a 409 only when its exact code is review_stale, settings version/pointer and retention are unchanged, all station identity/timezone and campaign identity/timing fields remain unchanged, and a permitted metadata field actually differs. They also prove that the rejected operation wrote no settings version or receipt. They then explicitly use Reload settings, Review changes and Confirm changes with a new reviewed digest/operation; after three refusals they fail. Expected-refusal cases never use this recovery. The history setup applies the same checks before preparing a fresh side-effect-free proposal. No production lock, rate limit, worker count or timeout was changed.
+
+A deterministic real price activation changes only kerosene quantity precision between retention review and confirmation. It asserts the first confirmation returns review_stale, the fresh explicit review uses a new digest/operation, and only the later confirmation advances the settings version. The competing-retention fixture also requires its competing value to differ from both the proposed and current values, and asserts a change was saved.
+
+The cross-file stress database was freshly migrated and populated by one existing M3 real-flow preflight (1 passed, 3.8s) before the 68-case run. A settings-only reused database exposed an inherited M3 helper assumption: it creates historical campaign fixtures only while no settings version exists. That separate issue is tracked as WHR-140; the M3 fixture was left unchanged. The EM's final standard full-suite gate uses its own fresh database and ordinary complete-suite order.
