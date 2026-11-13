@@ -38,3 +38,6 @@ No STATUS, coverage-map or lane-file edits in this feature diff, per WHR-63 and 
 12 Nov refresh: merged staging baeb4c5 at 63ac7c7 without conflicts; app/client/UI/browser-test files are unchanged by the merge, so no new review round per Earl.
 EM reran typecheck, lint, 705 unit tests, build and the full browser gate on 63ac7c7: 296 passed, four existing staging-only skips, zero failures/retries (10.4 minutes).
 Earl merges PR #116 manually after required checks are green; no automatic merge is authorized for this refresh.
+13 Nov refresh: merged six staging commits through 59ce756 at bd8a3d6 without conflicts or manual code changes; remerge-diff is empty, so round 3 was not needed per Earl.
+EM reran typecheck, lint, 839 unit tests and production build on bd8a3d6: all pass, with only the same two existing image warnings.
+EM full real-stack Linux browser gate on bd8a3d6: 322 passed, four existing skips, zero failures/retries (8.1 minutes); additional browser signed-upload storage gate: one passed. Fresh fictional local database; no deployed policy activation.
