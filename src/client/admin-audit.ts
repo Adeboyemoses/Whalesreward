@@ -6,11 +6,11 @@ import {
   auditSearchSchema,
   type AuditSearch,
   type AuditEvent,
-  type AuditChange,
 } from "../shared/contracts/audit";
 import { formatNaira, parseKobo } from "../shared/money";
 import { formatQuantity } from "../shared/quantity";
 import { adminAction, adminTime } from "./admin-display";
+type AuditChange = AuditEvent["changes"][number];
 export class AdminAuditApi {
   constructor(private request: typeof adminRequest = adminRequest) {}
   private async read<T>(path: string, schema: z.ZodType<T>, body?: unknown) {
