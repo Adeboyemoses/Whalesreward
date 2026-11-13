@@ -133,6 +133,7 @@ export function settingsUncertain(error: unknown) {
   return (
     !(error instanceof AdminError) ||
     error.status === 0 ||
+    error.status === 429 ||
     error.code === "invalid_response" ||
     error.code === "unavailable" ||
     error.status >= 500

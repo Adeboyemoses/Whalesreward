@@ -92,16 +92,48 @@ describe("admin settings boundary", () => {
     expect(Object.isFrozen(frozen)).toBe(true);
     expect(Object.isFrozen(frozen.body)).toBe(true);
   });
-  it("rejects a review that changes an untouched settings section", async () => {
+  it("preserves a lost-response confirmation identity when its retry is rate limited", async () => {
     const request = vi
       .fn()
-      .mockResolvedValue({
-        ...review,
-        after: {
-          ...review.after,
-          station: { ...settings.station, name: "Unexpected station" },
-        },
+      .mockResolvedValueOnce(review)
+      .mockRejectedValueOnce(new AdminError("network"))
+      .mockRejectedValueOnce(new AdminError("rate_limited", 429))
+      .mockResolvedValueOnce({
+        id,
+        section: "retention",
+        version: 2,
+        previousVersionId: null,
+        appliedAt: review.asOf,
+        actor: { id, code: "ADMIN001", name: "Ada Williams" },
+        reason: proposal.reason,
+        before: settings.retention,
+        after: review.after.retention,
+        auditEventId: id,
       });
+    const api = new AdminSettingsApi(request as typeof adminRequest);
+    const frozen = api.freeze(await api.review(proposal));
+    for (const code of ["network", "rate_limited"]) {
+      let error: unknown;
+      try {
+        await api.confirm(frozen);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toMatchObject({ code });
+      expect(settingsUncertain(error)).toBe(true);
+    }
+    await api.confirm(frozen);
+    expect(request.mock.calls[2]).toEqual(request.mock.calls[1]);
+    expect(request.mock.calls[3]).toEqual(request.mock.calls[1]);
+  });
+  it("rejects a review that changes an untouched settings section", async () => {
+    const request = vi.fn().mockResolvedValue({
+      ...review,
+      after: {
+        ...review.after,
+        station: { ...settings.station, name: "Unexpected station" },
+      },
+    });
     await expect(
       new AdminSettingsApi(request as typeof adminRequest).review(proposal),
     ).rejects.toMatchObject({ code: "invalid_response" });
