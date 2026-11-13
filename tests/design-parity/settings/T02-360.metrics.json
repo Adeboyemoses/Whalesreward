@@ -1,0 +1,96 @@
+{
+  "overflow": [],
+  "viewport": 360,
+  "document": 360,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "Back to settings",
+      "rect": {
+        "x": 16,
+        "y": -14,
+        "width": 137,
+        "height": 48,
+        "top": -14,
+        "right": 153,
+        "bottom": 34,
+        "left": 16
+      }
+    },
+    {
+      "label": "",
+      "rect": {
+        "x": 37,
+        "y": 147,
+        "width": 223,
+        "height": 48,
+        "top": 147,
+        "right": 260,
+        "bottom": 195,
+        "left": 37
+      }
+    },
+    {
+      "label": "Reason for change",
+      "rect": {
+        "x": 37,
+        "y": 399,
+        "width": 286,
+        "height": 96,
+        "top": 399,
+        "right": 323,
+        "bottom": 495,
+        "left": 37
+      }
+    },
+    {
+      "label": "Review changes",
+      "rect": {
+        "x": 37,
+        "y": 555,
+        "width": 138,
+        "height": 48,
+        "top": 555,
+        "right": 175,
+        "bottom": 603,
+        "left": 37
+      }
+    },
+    {
+      "label": "Cancel",
+      "rect": {
+        "x": 183,
+        "y": 555,
+        "width": 78,
+        "height": 48,
+        "top": 555,
+        "right": 261,
+        "bottom": 603,
+        "left": 183
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 16,
+      "y": 58,
+      "width": 328,
+      "height": 566,
+      "top": 58,
+      "right": 344,
+      "bottom": 624,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 648,
+      "width": 328,
+      "height": 258,
+      "top": 648,
+      "right": 344,
+      "bottom": 906,
+      "left": 16
+    }
+  ],
+  "tables": []
+}

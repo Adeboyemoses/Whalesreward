@@ -1,0 +1,72 @@
+{
+  "overflow": [],
+  "viewport": 1440,
+  "document": 1440,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "View giveaway settings",
+      "rect": {
+        "x": 309,
+        "y": 537,
+        "width": 185,
+        "height": 40,
+        "top": 537,
+        "right": 494,
+        "bottom": 577,
+        "left": 309
+      }
+    },
+    {
+      "label": "Edit retention period",
+      "rect": {
+        "x": 967.65625,
+        "y": 408,
+        "width": 167,
+        "height": 40,
+        "top": 408,
+        "right": 1134.65625,
+        "bottom": 448,
+        "left": 967.65625
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 288,
+      "y": 203,
+      "width": 634.65625,
+      "height": 429,
+      "top": 203,
+      "right": 922.65625,
+      "bottom": 632,
+      "left": 288
+    },
+    {
+      "x": 946.65625,
+      "y": 203,
+      "width": 453.328125,
+      "height": 429,
+      "top": 203,
+      "right": 1399.984375,
+      "bottom": 632,
+      "left": 946.65625
+    },
+    {
+      "x": 288,
+      "y": 656,
+      "width": 1112,
+      "height": 296,
+      "top": 656,
+      "right": 1400,
+      "bottom": 952,
+      "left": 288
+    }
+  ],
+  "tables": [
+    {
+      "width": 1110,
+      "scrollWidth": 1110
+    }
+  ]
+}

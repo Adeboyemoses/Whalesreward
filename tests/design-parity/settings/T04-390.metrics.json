@@ -1,0 +1,269 @@
+{
+  "overflow": [
+    {
+      "tag": "TABLE",
+      "class": "wr-table",
+      "text": "Previous and proposed valuesSettingPreviousProposedPhoto retention periodNot set",
+      "rect": {
+        "x": 38,
+        "y": 1002,
+        "width": 650,
+        "height": 130,
+        "top": 1002,
+        "right": 688,
+        "bottom": 1132,
+        "left": 38
+      }
+    },
+    {
+      "tag": "THEAD",
+      "class": "",
+      "text": "SettingPreviousProposed",
+      "rect": {
+        "x": 38,
+        "y": 1002,
+        "width": 650,
+        "height": 40.5,
+        "top": 1002,
+        "right": 688,
+        "bottom": 1042.5,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "SettingPreviousProposed",
+      "rect": {
+        "x": 38,
+        "y": 1002,
+        "width": 650,
+        "height": 40.5,
+        "top": 1002,
+        "right": 688,
+        "bottom": 1042.5,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "Previous",
+      "rect": {
+        "x": 302.53125,
+        "y": 1002,
+        "width": 133.015625,
+        "height": 40.5,
+        "top": 1002,
+        "right": 435.546875,
+        "bottom": 1042.5,
+        "left": 302.53125
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "Proposed",
+      "rect": {
+        "x": 435.546875,
+        "y": 1002,
+        "width": 252.453125,
+        "height": 40.5,
+        "top": 1002,
+        "right": 688,
+        "bottom": 1042.5,
+        "left": 435.546875
+      }
+    },
+    {
+      "tag": "TBODY",
+      "class": "",
+      "text": "Photo retention periodNot set37 daysAutomatic deletionDisabledDisabled · unchang",
+      "rect": {
+        "x": 38,
+        "y": 1043,
+        "width": 650,
+        "height": 89,
+        "top": 1043,
+        "right": 688,
+        "bottom": 1132,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "Photo retention periodNot set37 days",
+      "rect": {
+        "x": 38,
+        "y": 1043,
+        "width": 650,
+        "height": 44.5,
+        "top": 1043,
+        "right": 688,
+        "bottom": 1087.5,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "Not set",
+      "rect": {
+        "x": 302.53125,
+        "y": 1043,
+        "width": 133.015625,
+        "height": 44.5,
+        "top": 1043,
+        "right": 435.546875,
+        "bottom": 1087.5,
+        "left": 302.53125
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "37 days",
+      "rect": {
+        "x": 435.546875,
+        "y": 1043,
+        "width": 252.453125,
+        "height": 44.5,
+        "top": 1043,
+        "right": 688,
+        "bottom": 1087.5,
+        "left": 435.546875
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "Automatic deletionDisabledDisabled · unchanged",
+      "rect": {
+        "x": 38,
+        "y": 1087.5,
+        "width": 650,
+        "height": 44.5,
+        "top": 1087.5,
+        "right": 688,
+        "bottom": 1132,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "Disabled",
+      "rect": {
+        "x": 302.53125,
+        "y": 1087.5,
+        "width": 133.015625,
+        "height": 44.5,
+        "top": 1087.5,
+        "right": 435.546875,
+        "bottom": 1132,
+        "left": 302.53125
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "Disabled · unchanged",
+      "rect": {
+        "x": 435.546875,
+        "y": 1087.5,
+        "width": 252.453125,
+        "height": 44.5,
+        "top": 1087.5,
+        "right": 688,
+        "bottom": 1132,
+        "left": 435.546875
+      }
+    }
+  ],
+  "viewport": 390,
+  "document": 390,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "Back to settings",
+      "rect": {
+        "x": 16,
+        "y": 844,
+        "width": 137,
+        "height": 48,
+        "top": 844,
+        "right": 153,
+        "bottom": 892,
+        "left": 16
+      }
+    },
+    {
+      "label": "Confirm changes",
+      "rect": {
+        "x": 37,
+        "y": 1350,
+        "width": 143,
+        "height": 48,
+        "top": 1350,
+        "right": 180,
+        "bottom": 1398,
+        "left": 37
+      }
+    },
+    {
+      "label": "Keep editing",
+      "rect": {
+        "x": 188,
+        "y": 1350,
+        "width": 115,
+        "height": 48,
+        "top": 1350,
+        "right": 303,
+        "bottom": 1398,
+        "left": 188
+      }
+    },
+    {
+      "label": "Cancel",
+      "rect": {
+        "x": 37,
+        "y": 1406,
+        "width": 78,
+        "height": 48,
+        "top": 1406,
+        "right": 115,
+        "bottom": 1454,
+        "left": 37
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 16,
+      "y": 916,
+      "width": 358,
+      "height": 559,
+      "top": 916,
+      "right": 374,
+      "bottom": 1475,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 1499,
+      "width": 358,
+      "height": 198,
+      "top": 1499,
+      "right": 374,
+      "bottom": 1697,
+      "left": 16
+    }
+  ],
+  "tables": [
+    {
+      "width": 314,
+      "scrollWidth": 650
+    }
+  ]
+}

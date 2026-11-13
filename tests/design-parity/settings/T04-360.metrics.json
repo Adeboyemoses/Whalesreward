@@ -1,0 +1,269 @@
+{
+  "overflow": [
+    {
+      "tag": "TABLE",
+      "class": "wr-table",
+      "text": "Previous and proposed valuesSettingPreviousProposedPhoto retention periodNot set",
+      "rect": {
+        "x": 38,
+        "y": 144,
+        "width": 650,
+        "height": 130,
+        "top": 144,
+        "right": 688,
+        "bottom": 274,
+        "left": 38
+      }
+    },
+    {
+      "tag": "THEAD",
+      "class": "",
+      "text": "SettingPreviousProposed",
+      "rect": {
+        "x": 38,
+        "y": 144,
+        "width": 650,
+        "height": 40.5,
+        "top": 144,
+        "right": 688,
+        "bottom": 184.5,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "SettingPreviousProposed",
+      "rect": {
+        "x": 38,
+        "y": 144,
+        "width": 650,
+        "height": 40.5,
+        "top": 144,
+        "right": 688,
+        "bottom": 184.5,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "Previous",
+      "rect": {
+        "x": 302.53125,
+        "y": 144,
+        "width": 133.015625,
+        "height": 40.5,
+        "top": 144,
+        "right": 435.546875,
+        "bottom": 184.5,
+        "left": 302.53125
+      }
+    },
+    {
+      "tag": "TH",
+      "class": "",
+      "text": "Proposed",
+      "rect": {
+        "x": 435.546875,
+        "y": 144,
+        "width": 252.453125,
+        "height": 40.5,
+        "top": 144,
+        "right": 688,
+        "bottom": 184.5,
+        "left": 435.546875
+      }
+    },
+    {
+      "tag": "TBODY",
+      "class": "",
+      "text": "Photo retention periodNot set37 daysAutomatic deletionDisabledDisabled · unchang",
+      "rect": {
+        "x": 38,
+        "y": 185,
+        "width": 650,
+        "height": 89,
+        "top": 185,
+        "right": 688,
+        "bottom": 274,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "Photo retention periodNot set37 days",
+      "rect": {
+        "x": 38,
+        "y": 185,
+        "width": 650,
+        "height": 44.5,
+        "top": 185,
+        "right": 688,
+        "bottom": 229.5,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "Not set",
+      "rect": {
+        "x": 302.53125,
+        "y": 185,
+        "width": 133.015625,
+        "height": 44.5,
+        "top": 185,
+        "right": 435.546875,
+        "bottom": 229.5,
+        "left": 302.53125
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "37 days",
+      "rect": {
+        "x": 435.546875,
+        "y": 185,
+        "width": 252.453125,
+        "height": 44.5,
+        "top": 185,
+        "right": 688,
+        "bottom": 229.5,
+        "left": 435.546875
+      }
+    },
+    {
+      "tag": "TR",
+      "class": "",
+      "text": "Automatic deletionDisabledDisabled · unchanged",
+      "rect": {
+        "x": 38,
+        "y": 229.5,
+        "width": 650,
+        "height": 44.5,
+        "top": 229.5,
+        "right": 688,
+        "bottom": 274,
+        "left": 38
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "Disabled",
+      "rect": {
+        "x": 302.53125,
+        "y": 229.5,
+        "width": 133.015625,
+        "height": 44.5,
+        "top": 229.5,
+        "right": 435.546875,
+        "bottom": 274,
+        "left": 302.53125
+      }
+    },
+    {
+      "tag": "TD",
+      "class": "",
+      "text": "Disabled · unchanged",
+      "rect": {
+        "x": 435.546875,
+        "y": 229.5,
+        "width": 252.453125,
+        "height": 44.5,
+        "top": 229.5,
+        "right": 688,
+        "bottom": 274,
+        "left": 435.546875
+      }
+    }
+  ],
+  "viewport": 360,
+  "document": 360,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "Back to settings",
+      "rect": {
+        "x": 16,
+        "y": -14,
+        "width": 137,
+        "height": 48,
+        "top": -14,
+        "right": 153,
+        "bottom": 34,
+        "left": 16
+      }
+    },
+    {
+      "label": "Confirm changes",
+      "rect": {
+        "x": 37,
+        "y": 514,
+        "width": 143,
+        "height": 48,
+        "top": 514,
+        "right": 180,
+        "bottom": 562,
+        "left": 37
+      }
+    },
+    {
+      "label": "Keep editing",
+      "rect": {
+        "x": 188,
+        "y": 514,
+        "width": 115,
+        "height": 48,
+        "top": 514,
+        "right": 303,
+        "bottom": 562,
+        "left": 188
+      }
+    },
+    {
+      "label": "Cancel",
+      "rect": {
+        "x": 37,
+        "y": 570,
+        "width": 78,
+        "height": 48,
+        "top": 570,
+        "right": 115,
+        "bottom": 618,
+        "left": 37
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 16,
+      "y": 58,
+      "width": 328,
+      "height": 581,
+      "top": 58,
+      "right": 344,
+      "bottom": 639,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 663,
+      "width": 328,
+      "height": 218,
+      "top": 663,
+      "right": 344,
+      "bottom": 881,
+      "left": 16
+    }
+  ],
+  "tables": [
+    {
+      "width": 284,
+      "scrollWidth": 650
+    }
+  ]
+}
