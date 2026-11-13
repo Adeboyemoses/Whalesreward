@@ -17,7 +17,7 @@ const code = z
   .string()
   .max(80)
   .regex(
-    /^(?:(?:AUD|CARD|ROLE|SETTINGS|GRANT|CASE|APPROVAL|CONFIG)-[0-9a-f-]{36}|(?:ADMIN|STAFF|PUMP|CUST|BATCH|SALE|S|B)[0-9]{1,15}|pms|diesel|kerosene|cooking_gas)$/,
+    /^(?:(?:[A-Z][A-Z_]{1,20})-[0-9a-f-]{36}|(?:ADMIN|STAFF|PUMP|CUST|BATCH|SALE|S|B)[0-9]{1,15}|pms|diesel|kerosene|cooking_gas)$/,
   );
 const instant = z.iso.datetime({ offset: true });
 export const auditDate = z
@@ -711,6 +711,20 @@ export const currentAuditEventSchema = z
   })
   .superRefine((v, ctx) => {
     const r: Rule = auditRules[v.action];
+    const nullableAfter: AuditField[] = [
+      "revisionId",
+      "candidateRevisionId",
+      "photoAssetId",
+      "verifiedSaleDate",
+      "correctionState",
+    ];
+    if (v.action === "assignment_ended")
+      nullableAfter.push("assignmentId", "pumpId");
+    if (v.action === "review_evidence_deactivated")
+      nullableAfter.push("approvalId", "activatedAt");
+    for (const c of v.changes)
+      if (c.after === null && !nullableAfter.includes(c.field))
+        ctx.addIssue({ code: "custom", message: "Missing committed value" });
     const fields = v.changes.map((c) => c.field);
     const allowed = [...r.fields, ...(r.optional ?? [])];
     const actor =
