@@ -758,3 +758,15 @@ body {
   .wr-settings-editor { grid-template-columns: minmax(0, 1fr); }
   .wr-settings .wr-row > .wr-btn, .wr-settings .wr-btn, .wr-settings .wr-input { min-height: var(--control-h); }
 }
+/* Keep table names accessible without repeating the review sheet title. */
+.wr-settings-comparison .wr-table-cap { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.wr-settings-days-field .wr-row { max-width: 360px; flex-wrap: nowrap; }
+.wr-settings-days-field .wr-input { min-width: 0; }
+.wr-settings-days { border-left: 0; border-right: 1px solid var(--line-300); border-radius: 0 var(--radius-md) var(--radius-md) 0; height: var(--control-h-desktop); }
+.wr-settings-deletion { flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: var(--space-3) var(--space-4); }
+.wr-settings-deletion .wr-label { margin: 0; }
+.wr-settings-deletion .wr-pill { white-space: normal; }
+.wr-settings .wr-settings-inline-action { align-self: flex-start; }
+@media (max-width: 900px) {
+  .wr-settings-days { height: var(--control-h); }
+}

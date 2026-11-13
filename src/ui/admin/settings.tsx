@@ -386,7 +386,7 @@ function SettingsContent({
                     timezone={settings.station.timezone}
                   />
                   <Link
-                    className="wr-btn wr-btn-secondary"
+                    className="wr-btn wr-btn-secondary wr-settings-inline-action"
                     href="/admin/settings/giveaway"
                   >
                     View giveaway settings
@@ -416,7 +416,7 @@ function SettingsContent({
                     ]}
                   />
                   <Link
-                    className="wr-btn wr-btn-secondary"
+                    className="wr-btn wr-btn-secondary wr-settings-inline-action"
                     href={
                       draft?.pending
                         ? "/admin/settings/retention/confirm"
@@ -460,7 +460,6 @@ function SettingsContent({
                   ]}
                 />
               </Sheet>
-              <h2>Settings history</h2>
               {historyError && (
                 <Notice role="alert" tone="danger">
                   {historyError}
@@ -474,7 +473,8 @@ function SettingsContent({
               )}
               {history && (
                 <DataTable
-                  caption="Every change keeps the previous value"
+                  caption="Settings history"
+                  summary="Every change keeps the previous value"
                   columns={[
                     { key: "when", label: "When" },
                     { key: "setting", label: "Setting" },
@@ -548,7 +548,11 @@ function SettingsContent({
                     confirming ? "Confirm settings change" : "Retention period"
                   }
                   badge={
-                    <span className="wr-pill wr-sm">
+                    <span
+                      className={
+                        confirming ? "wr-pill wr-sm wr-held" : "wr-pill wr-sm"
+                      }
+                    >
                       {confirming ? "Not saved yet" : "Deletion off"}
                     </span>
                   }
@@ -580,36 +584,38 @@ function SettingsContent({
                   {confirming ? (
                     draft.review ? (
                       <>
-                        <DataTable
-                          caption="Previous and proposed values"
-                          columns={[
-                            { key: "setting", label: "Setting" },
-                            { key: "before", label: "Previous" },
-                            { key: "after", label: "Proposed" },
-                          ]}
-                          rows={[
-                            {
-                              id: "days",
-                              cells: {
-                                setting: "Photo retention period",
-                                before: daysText(
-                                  draft.review.before.retention.days,
-                                ),
-                                after: daysText(
-                                  draft.review.after.retention.days,
-                                ),
+                        <div className="wr-settings-comparison">
+                          <DataTable
+                            caption="Previous and proposed values"
+                            columns={[
+                              { key: "setting", label: "Setting" },
+                              { key: "before", label: "Previous" },
+                              { key: "after", label: "Proposed" },
+                            ]}
+                            rows={[
+                              {
+                                id: "days",
+                                cells: {
+                                  setting: "Photo retention period",
+                                  before: daysText(
+                                    draft.review.before.retention.days,
+                                  ),
+                                  after: daysText(
+                                    draft.review.after.retention.days,
+                                  ),
+                                },
                               },
-                            },
-                            {
-                              id: "deletion",
-                              cells: {
-                                setting: "Automatic deletion",
-                                before: "Disabled",
-                                after: "Disabled · unchanged",
+                              {
+                                id: "deletion",
+                                cells: {
+                                  setting: "Automatic deletion",
+                                  before: "Disabled",
+                                  after: "Disabled · unchanged",
+                                },
                               },
-                            },
-                          ]}
-                        />
+                            ]}
+                          />
+                        </div>
                         <KeyValueList
                           items={[
                             {
@@ -670,30 +676,38 @@ function SettingsContent({
                         void review();
                       }}
                     >
-                      <TextField
-                        label="Photo retention period (days)"
-                        inputMode="numeric"
-                        value={draft.days}
-                        disabled={busy || !!draft.pending || draft.stale}
-                        onChange={(e) =>
-                          save({
-                            ...draft,
-                            days: e.target.value,
-                            error: "",
-                            review: null,
-                          })
-                        }
-                        helper="Positive whole days. Leave blank for Not set. A configured period records the intended policy and does not enable automatic deletion."
-                        error={daysError || undefined}
-                      />
-                      <KeyValueList
-                        items={[
-                          {
-                            label: "Automatic deletion",
-                            value: "Disabled · policy approval pending",
-                          },
-                        ]}
-                      />
+                      <div className="wr-settings-days-field">
+                        <TextField
+                          label="Photo retention period (days)"
+                          action={
+                            <span
+                              className="wr-prefix wr-settings-days"
+                              aria-hidden="true"
+                            >
+                              days
+                            </span>
+                          }
+                          inputMode="numeric"
+                          value={draft.days}
+                          disabled={busy || !!draft.pending || draft.stale}
+                          onChange={(e) =>
+                            save({
+                              ...draft,
+                              days: e.target.value,
+                              error: "",
+                              review: null,
+                            })
+                          }
+                          helper="Positive whole days. Leave blank for Not set. A configured period records the intended policy and does not enable automatic deletion."
+                          error={daysError || undefined}
+                        />
+                      </div>
+                      <div className="wr-card wr-quiet wr-settings-deletion">
+                        <span className="wr-label">Automatic deletion</span>
+                        <span className="wr-pill wr-sm wr-failed">
+                          Disabled · policy approval pending
+                        </span>
+                      </div>
                       <label className="wr-field">
                         <span className="wr-label">Reason for change</span>
                         <textarea
