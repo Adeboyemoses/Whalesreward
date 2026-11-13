@@ -201,7 +201,16 @@ test("I-22 I-31 unchanged pair is refused and lost meter response replays one ex
     ).toBeVisible();
     await expect(
       page.getByLabel("Meter amount (₦)", { exact: true }),
-    ).toHaveCount(0);
+    ).toBeDisabled();
+    await expect(
+      page.getByLabel("Meter amount (₦)", { exact: true }),
+    ).toHaveValue("11000.00");
+    await expect(
+      page.getByLabel("Meter quantity (litres)", { exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByLabel("Meter quantity (litres)", { exact: true }),
+    ).toHaveValue("11.00");
     await page
       .getByRole("button", { name: "Retry same decision", exact: true })
       .click();
