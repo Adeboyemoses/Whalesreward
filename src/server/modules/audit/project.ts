@@ -274,11 +274,38 @@ export function projectAudit(
       (parsed.data.actor.kind !== "system" &&
         parsed.data.actor.userId !== row.actor_user_id) ||
       (parsed.data.actor.kind === "system" && row.actor_user_id !== null)
-    )
-      return null;
+    ) {
+      if (row.schema_version === 1) return null;
+      // Unsupported M4 mappings remain visible as a minimal historical event.
+      // Reuse only independently validated envelope snapshots, never raw changes.
+      return projectAudit(
+        {
+          ...row,
+          schema_version: 0,
+          action: "unsupported_m4_event",
+          before: null,
+          after: null,
+          changes: [],
+          originating_seller_snapshot: null,
+        },
+        stationId,
+      );
+    }
     return parsed.data;
   }
-  if (row.schema_version !== null && row.schema_version !== 0) return null;
+  if (row.schema_version !== null && row.schema_version !== 0)
+    return projectAudit(
+      {
+        ...row,
+        schema_version: 0,
+        action: "unsupported_m4_event",
+        before: null,
+        after: null,
+        changes: [],
+        originating_seller_snapshot: null,
+      },
+      stationId,
+    );
   let action = knownAction(row);
   const targetKind = auditTargetKinds.includes(
     row.target_type as (typeof auditTargetKinds)[number],
