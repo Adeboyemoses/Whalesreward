@@ -60,7 +60,7 @@ describe("guarded admin review decisions", () => {
     ).toMatchObject({ expectedVersion: 8, expectedHoldVersion: 4 });
     expect(request.body.expectedVersion).toBe(7);
   });
-  it("never prepares unavailable meter correction or price cancellation", () => {
+  it("never prepares price cancellation or meter correction without readings", () => {
     const api = new AdminReviewApi();
     for (const choice of ["cancel", "correct_meter"] as const)
       expect(() =>
@@ -226,4 +226,36 @@ describe("guarded admin review decisions", () => {
     ])
       expect(reviewUncertain(new AdminError(code, 409))).toBe(false);
   });
+});
+
+it("P-26 transcribes both exact independent displays without deriving either", () => {
+  const a = sale();
+  a.original.quantityPrecision = 3;
+  const api = new AdminReviewApi();
+  const make = (amountNaira: string, quantity: string) =>
+    api.prepare(a, "price", "correct_meter", "Reason", "Explanation", [], "", {
+      amountNaira,
+      quantity,
+    });
+  expect(make("90071992547409.93", "1.123").body.decision).toEqual({
+    outcome: "correct_meter",
+    amountKobo: "9007199254740993",
+    quantity: "1.123",
+  });
+  expect(make("10.01", "9.001").body.decision).toMatchObject({
+    amountKobo: "1001",
+    quantity: "9.001",
+  });
+  for (const [a, q] of [
+    ["0", "1"],
+    ["1.001", "1"],
+    ["1e3", "1"],
+    ["1", "0"],
+    ["1", "1.0001"],
+    ["1", "-2"],
+  ])
+    expect(() => make(a!, q!)).toThrow();
+  const frozen = make("10.01", "9.001");
+  a.version++;
+  expect(frozen.body.expectedVersion).toBe(7);
 });

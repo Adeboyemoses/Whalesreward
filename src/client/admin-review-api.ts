@@ -1,3 +1,5 @@
+import { parseNaira, assertMoney } from "../shared/money";
+import { parseQuantity } from "../shared/quantity";
 import { z } from "zod";
 import { adminRequest, AdminError, adminOperationId } from "./admin-api";
 import { AdminSalesApi, type AdminSaleDetail } from "./admin-sales-api";
@@ -13,6 +15,7 @@ import {
 } from "../shared/contracts/sales";
 export type ReviewKind = "duplicate" | "price" | "card" | "date" | "capture";
 export type ReviewChoice =
+  | "correct_meter"
   | "keep_both"
   | "cancel"
   | "accept_captured"
@@ -60,6 +63,12 @@ export function reviewMessage(error: unknown): string {
       {
         evidence_insufficient:
           "The records don't settle this yet. Leave this sale held while the records are investigated. Notes cannot replace proof.",
+        meter_policy_unconfigured:
+          "Meter checks aren't set up for this pump yet. This sale remains held.",
+        no_change:
+          "Both values match the latest recorded pair. Change a value only when the meter photo supports it.",
+        calculation_invalid:
+          "Enter a positive meter amount with at most two decimals and a positive quantity within the captured precision. Values are never rounded to fit.",
         evidence_unavailable:
           "The required evidence is unavailable. This review has not cleared the sale.",
         version_conflict:
@@ -95,6 +104,19 @@ export function reviewMessage(error: unknown): string {
         : "This review could not be completed.")
   );
 }
+export function meterTranscription(
+  sale: AdminSaleDetail,
+  amountNaira: string,
+  quantity: string,
+) {
+  try {
+    const amountKobo = assertMoney(parseNaira(amountNaira), true).toString();
+    parseQuantity(quantity, sale.original.quantityPrecision);
+    return { outcome: "correct_meter" as const, amountKobo, quantity };
+  } catch {
+    throw new AdminError("calculation_invalid", 422);
+  }
+}
 export class AdminReviewApi extends AdminSalesApi {
   constructor(
     read: typeof adminRequest = adminRequest,
@@ -110,6 +132,7 @@ export class AdminReviewApi extends AdminSalesApi {
     notes: string,
     referenceIds: string[],
     verifiedSaleDate = "",
+    meter?: { amountNaira: string; quantity: string },
   ): FrozenReview {
     const allowed = reviewReferences(sale).map((r) => r.id);
     if (referenceIds.some((id) => !allowed.includes(id)))
@@ -141,11 +164,18 @@ export class AdminReviewApi extends AdminSalesApi {
     const guarded = { ...base, expectedHoldVersion: hold?.version };
     let body;
     if (kind === "price") {
-      if (choice !== "accept_captured")
+      if (choice !== "accept_captured" && choice !== "correct_meter")
         throw new AdminError("invalid_request", 400);
       body = priceDecisionSchema.parse({
         ...guarded,
-        decision: { outcome: choice },
+        decision:
+          choice === "correct_meter"
+            ? meterTranscription(
+                sale,
+                meter?.amountNaira ?? "",
+                meter?.quantity ?? "",
+              )
+            : { outcome: choice },
       });
     } else if (kind === "card")
       body = cardDecisionSchema.parse({ ...guarded, outcome: choice });
@@ -160,15 +190,17 @@ export class AdminReviewApi extends AdminSalesApi {
           ? `sales/${sale.id}/capture-decision`
           : `sales/${sale.id}/holds/${hold!.id}/${kind}-decision`,
       label:
-        choice === "cancel"
-          ? `Cancel sale ${sale.saleCode}`
-          : choice === "verify_date"
-            ? `Verify sale date · ${verifiedSaleDate}`
-            : choice === "accept_captured"
-              ? "Confirm captured values"
-              : choice === "confirm_earlier"
-                ? "Confirm valid earlier purchase"
-                : "Confirm capture",
+        choice === "correct_meter"
+          ? "Correct from meter evidence"
+          : choice === "cancel"
+            ? `Cancel sale ${sale.saleCode}`
+            : choice === "verify_date"
+              ? `Verify sale date · ${verifiedSaleDate}`
+              : choice === "accept_captured"
+                ? "Confirm captured values"
+                : choice === "confirm_earlier"
+                  ? "Confirm valid earlier purchase"
+                  : "Confirm capture",
     };
   }
   prepareDuplicate(

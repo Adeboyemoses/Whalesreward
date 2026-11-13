@@ -14,12 +14,15 @@ import { correctionDecisionRequest } from "@/client/admin-sales-api";
 import {
   AdminReviewApi,
   reviewMessage,
+  meterTranscription,
   reviewReferences,
   reviewUncertain,
   type FrozenReview,
   type ReviewKind,
   type ReviewChoice,
 } from "@/client/admin-review-api";
+import { formatNaira, parseKobo } from "@/shared/money";
+import { formatQuantity } from "@/shared/quantity";
 import type { Decision, SaleFilter } from "@/shared/contracts/sales";
 import { adminTime, adminAction } from "@/client/admin-display";
 import {
@@ -427,7 +430,28 @@ function ReviewRecord({
       )}
       {current ? (
         <div className="wr-two-col">
-          <Original sale={current} />
+          {unavailable && !outcome ? (
+            pending ||
+            (sale.state !== "cancelled" &&
+              sale.holds.some(
+                (h) => h.kind === "price" && h.state === "open",
+              )) ? (
+              <DecisionForm
+                sale={sale}
+                kind="price"
+                meter
+                session={session}
+                reload={reload}
+              />
+            ) : (
+              <Notice>
+                This review is closed. Original values and history remain
+                available.
+              </Notice>
+            )
+          ) : (
+            <Original sale={current} />
+          )}
           <AdminSalePhoto sale={current} />
         </div>
       ) : (
@@ -443,26 +467,13 @@ function ReviewRecord({
           recordedLabel={outcome.label}
           reload={reload}
         />
-      ) : pending ? (
+      ) : unavailable ? null : pending ? (
         <DecisionForm
           sale={sale}
           kind={pending.kind}
           session={session}
           reload={reload}
         />
-      ) : unavailable ? (
-        <Sheet title="Correct from meter evidence">
-          <Notice>
-            Not available yet. Meter correction needs a separately approved
-            reconciliation policy. Original values remain unchanged.
-          </Notice>
-          <Link
-            className="wr-btn wr-btn-secondary"
-            href={`/admin/sales/${sale.id}/price-review${suffix}`}
-          >
-            Back to price review
-          </Link>
-        </Sheet>
       ) : kind === "duplicate" ? (
         <DuplicateReview
           sale={sale}
@@ -678,16 +689,19 @@ function HoldReview({
               possible capture interval.
             </p>
             <div className="wr-row">
-              <Button variant="secondary" disabled>
-                Correct from meter evidence · Not available yet
-              </Button>
+              <Link
+                className="wr-btn wr-btn-secondary"
+                href={`/admin/sales/${sale.id}/price-review/correct`}
+              >
+                Correct from meter evidence
+              </Link>
               <Button variant="secondary" disabled>
                 Cancel invalid sale · Not available yet
               </Button>
             </div>
             <p className="wr-help">
-              Meter correction and price cancellation are not available under
-              the current review policy.
+              Price cancellation is not available under the current review
+              policy.
             </p>
           </>
         )}
@@ -777,6 +791,7 @@ function DecisionForm({
   reload,
   pair,
   flagId,
+  meter = false,
 }: {
   sale: AdminSaleDetail;
   kind: ReviewKind;
@@ -784,6 +799,7 @@ function DecisionForm({
   reload: () => void;
   pair?: AdminSaleDetail;
   flagId?: string;
+  meter?: boolean;
 }) {
   const api = useReviewApi(),
     { store } = useAdminSession(),
@@ -793,6 +809,10 @@ function DecisionForm({
   const [frozen, setFrozen] = useState<FrozenReview | null>(
     () => (store.lists.get(memoryKey) as FrozenReview | undefined) ?? null,
   );
+  meter =
+    meter ||
+    (frozen?.body.decision as { outcome?: string } | undefined)?.outcome ===
+      "correct_meter";
   const [reason, setReason] = useState(""),
     [notes, setNotes] = useState(""),
     [date, setDate] = useState(""),
@@ -803,12 +823,28 @@ function DecisionForm({
     [blocked, setBlocked] = useState(false),
     [receipt, setReceipt] = useState<Decision | null>(null),
     [recordedLabel, setRecordedLabel] = useState("");
+  const initialAmount = formatNaira(parseKobo(sale.displayedValues.amountKobo))
+    .replace("₦", "")
+    .replaceAll(",", "");
+  const [meterAmount, setMeterAmount] = useState(initialAmount);
+  const [meterQuantity, setMeterQuantity] = useState(
+    sale.displayedValues.quantity,
+  );
+  let meterValid = true;
+  if (meter) {
+    try {
+      meterTranscription(sale, meterAmount, meterQuantity);
+    } catch {
+      meterValid = false;
+    }
+  }
   const flight = useRef(false);
   const effectiveKind = frozen?.kind ?? kind;
   const allowed =
     session.permissions?.includes("sales") &&
     session.permissions.includes(permissions[effectiveKind]);
   const ready =
+    meterValid &&
     !!reason.trim() &&
     (kind === "duplicate" ||
       (!!notes.trim() &&
@@ -820,7 +856,18 @@ function DecisionForm({
       const request =
         kind === "duplicate"
           ? api.prepareDuplicate(sale, pair!, flagId!, cancelId, reason)
-          : api.prepare(sale, kind, choice, reason, notes, references, date);
+          : api.prepare(
+              sale,
+              kind,
+              choice,
+              reason,
+              notes,
+              references,
+              date,
+              meter
+                ? { amountNaira: meterAmount, quantity: meterQuantity }
+                : undefined,
+            );
       setFrozen(request);
       setError("");
     } catch (e) {
@@ -848,7 +895,14 @@ function DecisionForm({
         if (key.includes("sales:page")) store.lists.delete(key);
     } catch (e) {
       if (!current()) return;
-      setError(reviewMessage(e));
+      setError(
+        meter &&
+          e instanceof Error &&
+          "code" in e &&
+          e.code === "evidence_insufficient"
+          ? "The records don't settle this yet. A single rate must apply throughout the possible capture period, and both readings must fit the meter's allowed rounding difference. The rate may not be uniform or the readings may be outside that allowance. Leave this sale held; do not change readings just to make them fit."
+          : reviewMessage(e),
+      );
       const retry = reviewUncertain(e);
       setUncertain(retry);
       setBlocked(!retry);
@@ -889,10 +943,14 @@ function DecisionForm({
     <Sheet
       title={
         frozen
-          ? "Review decision"
+          ? meter
+            ? "Review correction"
+            : "Review decision"
           : kind === "date"
             ? "Record a verified date"
-            : "Resolve this review"
+            : meter
+              ? "Correct from meter evidence"
+              : "Resolve this review"
       }
       badge={
         <StatusPill small tone="held">
@@ -921,6 +979,24 @@ function DecisionForm({
             </p>
           </Notice>
           <div className="wr-card wr-quiet">
+            {!!frozen.body.decision &&
+              (frozen.body.decision as { outcome: string }).outcome ===
+                "correct_meter" && (
+                <p className="wr-amount-md">
+                  {formatNaira(
+                    parseKobo(
+                      (frozen.body.decision as { amountKobo: string })
+                        .amountKobo,
+                    ),
+                  )}{" "}
+                  ·{" "}
+                  {formatQuantity(
+                    (frozen.body.decision as { quantity: string }).quantity,
+                    sale.original.unit,
+                    sale.original.quantityPrecision,
+                  )}
+                </p>
+              )}
             <b>Impact if confirmed</b>
             <p>
               {frozen.label.startsWith("Cancel sale")
@@ -947,6 +1023,65 @@ function DecisionForm({
         </>
       ) : (
         <>
+          {meter && (
+            <>
+              <p>
+                Enter both readings exactly as shown in the validated photo for
+                this sale. Do not use a totalizer or unit-price display. Either
+                or both values may change; no value is calculated from the
+                other.
+              </p>
+              <div className="wr-sales-pair">
+                <TextField
+                  label="Meter amount (₦)"
+                  inputMode="decimal"
+                  value={meterAmount}
+                  onChange={(e) => setMeterAmount(e.target.value)}
+                  helper="Two decimals maximum."
+                />
+                <TextField
+                  label={`Meter quantity (${sale.original.unit === "litre" ? "litres" : "kilograms"})`}
+                  inputMode="decimal"
+                  value={meterQuantity}
+                  onChange={(e) => setMeterQuantity(e.target.value)}
+                  helper={`Up to ${sale.original.quantityPrecision} decimals, as captured.`}
+                />
+              </div>
+              {!meterValid && (
+                <Notice tone="warning">
+                  Enter positive readings within the amount and captured
+                  quantity precision. Values are never rounded to fit.
+                </Notice>
+              )}
+              <div className="wr-sales-pair">
+                <div className="wr-card wr-quiet">
+                  <span>Originally captured</span>
+                  <b className="wr-amount-md">{valuePair(sale.original)}</b>
+                  <p>{saleRate(sale.original)} · original entry retained</p>
+                </div>
+                <div className="wr-card wr-quiet">
+                  <span>Corrected values</span>
+                  {meterValid && (
+                    <b className="wr-amount-md">
+                      {formatNaira(
+                        parseKobo(
+                          meterTranscription(sale, meterAmount, meterQuantity)
+                            .amountKobo,
+                        ),
+                      )}{" "}
+                      ·{" "}
+                      {formatQuantity(
+                        meterQuantity,
+                        sale.original.unit,
+                        sale.original.quantityPrecision,
+                      )}
+                    </b>
+                  )}
+                  <p>From meter evidence</p>
+                </div>
+              </div>
+            </>
+          )}
           {kind !== "duplicate" && (
             <>
               <div className="wr-field">
@@ -1012,6 +1147,20 @@ function DecisionForm({
             />
           )}
           <Reason label="Decision reason" value={reason} onChange={setReason} />
+          {meter && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setMeterAmount(initialAmount);
+                setMeterQuantity(sale.displayedValues.quantity);
+                setReason("");
+                setNotes("");
+                setReferences([]);
+              }}
+            >
+              Discard changes
+            </Button>
+          )}
           <div className="wr-row">
             {kind === "duplicate" ? (
               <>
@@ -1042,7 +1191,9 @@ function DecisionForm({
                   onClick={() =>
                     prepare(
                       kind === "price"
-                        ? "accept_captured"
+                        ? meter
+                          ? "correct_meter"
+                          : "accept_captured"
                         : kind === "card"
                           ? "confirm_earlier"
                           : kind === "date"
@@ -1052,7 +1203,9 @@ function DecisionForm({
                   }
                 >
                   {kind === "price"
-                    ? "Confirm captured values"
+                    ? meter
+                      ? "Review correction"
+                      : "Confirm captured values"
                     : kind === "card"
                       ? "Confirm valid earlier purchase"
                       : kind === "date"
