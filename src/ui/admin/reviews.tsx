@@ -408,6 +408,10 @@ function ReviewRecord({
   };
   const pending = store.lists.get("reviews:pending:" + sale.id) as
     FrozenReview | undefined;
+  const meterView =
+    unavailable ||
+    (pending?.body.decision as { outcome?: string } | undefined)?.outcome ===
+      "correct_meter";
   return (
     <RecordedContext.Provider value={recorded}>
       {outcome ? (
@@ -429,31 +433,31 @@ function ReviewRecord({
         </Notice>
       )}
       {current ? (
-        <div className="wr-two-col">
-          {unavailable && !outcome ? (
-            pending ||
-            (sale.state !== "cancelled" &&
-              sale.holds.some(
-                (h) => h.kind === "price" && h.state === "open",
-              )) ? (
-              <DecisionForm
-                sale={sale}
-                kind="price"
-                meter
-                session={session}
-                reload={reload}
-              />
-            ) : (
-              <Notice>
-                This review is closed. Original values and history remain
-                available.
-              </Notice>
-            )
+        meterView && !outcome ? (
+          pending ||
+          (sale.state !== "cancelled" &&
+            sale.holds.some(
+              (h) => h.kind === "price" && h.state === "open",
+            )) ? (
+            <DecisionForm
+              sale={sale}
+              kind="price"
+              meter
+              session={session}
+              reload={reload}
+            />
           ) : (
+            <Notice>
+              This review is closed. Original values and history remain
+              available.
+            </Notice>
+          )
+        ) : (
+          <div className="wr-two-col">
             <Original sale={current} />
-          )}
-          <AdminSalePhoto sale={current} />
-        </div>
+            <AdminSalePhoto sale={current} />
+          </div>
+        )
       ) : (
         <Notice role="status">
           {currentError
@@ -467,7 +471,7 @@ function ReviewRecord({
           recordedLabel={outcome.label}
           reload={reload}
         />
-      ) : unavailable ? null : pending ? (
+      ) : meterView ? null : pending ? (
         <DecisionForm
           sale={sale}
           kind={pending.kind}
@@ -939,303 +943,338 @@ function DecisionForm({
         can be made for this pair. Both records remain available.
       </Notice>
     );
-  return (
-    <Sheet
-      title={
-        frozen
-          ? meter
-            ? "Review correction"
-            : "Review decision"
-          : kind === "date"
-            ? "Record a verified date"
-            : meter
-              ? "Correct from meter evidence"
-              : "Resolve this review"
-      }
-      badge={
-        <StatusPill small tone="held">
-          Admin decision required
-        </StatusPill>
-      }
-    >
-      {error && (
-        <Notice tone="danger" role="alert">
-          {error}
+  const frozenMeter = frozen?.body.decision as
+    { outcome?: string; amountKobo?: string; quantity?: string } | undefined;
+  const shownAmount =
+    frozenMeter?.outcome === "correct_meter"
+      ? formatNaira(parseKobo(frozenMeter.amountKobo!))
+          .replace("₦", "")
+          .replaceAll(",", "")
+      : meterAmount;
+  const shownQuantity =
+    frozenMeter?.outcome === "correct_meter"
+      ? frozenMeter.quantity!
+      : meterQuantity;
+  const editor = (
+    <>
+      <p>
+        Enter both readings exactly as shown in the validated photo for this
+        sale. Do not use a totalizer or unit-price display. Either or both
+        values may change; no value is calculated from the other.
+      </p>
+      <div className="wr-sales-pair">
+        <TextField
+          label="Meter amount (₦)"
+          inputMode="decimal"
+          value={shownAmount}
+          disabled={!!frozen || blocked || busy}
+          onChange={(e) => setMeterAmount(e.target.value)}
+          helper="Two decimals maximum."
+        />
+        <TextField
+          label={`Meter quantity (${sale.original.unit === "litre" ? "litres" : "kilograms"})`}
+          inputMode="decimal"
+          value={shownQuantity}
+          disabled={!!frozen || blocked || busy}
+          onChange={(e) => setMeterQuantity(e.target.value)}
+          helper={`Up to ${sale.original.quantityPrecision} decimals, as captured.`}
+        />
+      </div>
+      {!meterValid && (
+        <Notice tone="warning">
+          Enter positive readings within the amount and captured quantity
+          precision. Values are never rounded to fit.
         </Notice>
       )}
-      {blocked ? (
-        <Button variant="secondary" onClick={reload}>
-          Reload and review current record
-        </Button>
-      ) : frozen ? (
-        <>
-          <Notice tone="warning">
-            <b>{frozen.label}</b>
-            <p>{frozen.body.reason}</p>
-            <p>
-              {uncertain
-                ? "The result is uncertain. Retry this same decision with its original details to retrieve the recorded outcome."
-                : "Confirm the decision reviewed here. Originals and history are retained."}
-            </p>
+      <div className="wr-sales-pair">
+        <div className="wr-card wr-quiet">
+          <span>Originally captured</span>
+          <b className="wr-amount-md">{valuePair(sale.original)}</b>
+          <p>{saleRate(sale.original)} · original entry retained</p>
+        </div>
+        <div className="wr-card wr-quiet">
+          <span>Corrected values</span>
+          {meterValid && (
+            <b className="wr-amount-md">
+              {formatNaira(
+                parseKobo(
+                  meterTranscription(sale, shownAmount, shownQuantity)
+                    .amountKobo,
+                ),
+              )}{" "}
+              ·{" "}
+              {formatQuantity(
+                shownQuantity,
+                sale.original.unit,
+                sale.original.quantityPrecision,
+              )}
+            </b>
+          )}
+          <p>From meter evidence</p>
+        </div>
+      </div>
+    </>
+  );
+  return (
+    <>
+      {meter && (
+        <div className="wr-two-col wr-meter-editor-row">
+          <Sheet
+            title="Correct from meter evidence"
+            badge={
+              <StatusPill small tone="held">
+                Editor
+              </StatusPill>
+            }
+          >
+            {editor}
+          </Sheet>
+          <AdminSalePhoto sale={sale} />
+        </div>
+      )}
+      <Sheet
+        title={
+          frozen
+            ? meter
+              ? "Review correction"
+              : "Review decision"
+            : kind === "date"
+              ? "Record a verified date"
+              : meter
+                ? "Review correction"
+                : "Resolve this review"
+        }
+        badge={
+          <StatusPill small tone="held">
+            Admin decision required
+          </StatusPill>
+        }
+      >
+        {error && (
+          <Notice tone="danger" role="alert">
+            {error}
           </Notice>
-          <div className="wr-card wr-quiet">
-            {!!frozen.body.decision &&
-              (frozen.body.decision as { outcome: string }).outcome ===
-                "correct_meter" && (
-                <p className="wr-amount-md">
-                  {formatNaira(
-                    parseKobo(
-                      (frozen.body.decision as { amountKobo: string })
-                        .amountKobo,
-                    ),
-                  )}{" "}
-                  ·{" "}
-                  {formatQuantity(
-                    (frozen.body.decision as { quantity: string }).quantity,
-                    sale.original.unit,
-                    sale.original.quantityPrecision,
-                  )}
-                </p>
-              )}
-            <b>Impact if confirmed</b>
-            <p>
-              {frozen.label.startsWith("Cancel sale")
-                ? "Only the named sale is cancelled and contributes zero. Other purchase records remain unchanged."
-                : effectiveKind === "duplicate"
-                  ? "Clear this duplicate flag and keep both sales. Their credit status stays unchanged."
-                  : "Resolve this review only. Loyalty credit depends on every remaining check; no current price is substituted."}
-            </p>
-          </div>
-          <div className="wr-row">
-            <Button loading={busy} onClick={() => void confirm()}>
-              {uncertain ? "Retry same decision" : "Confirm decision"}
-            </Button>
-            {!uncertain && (
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={() => setFrozen(null)}
-              >
-                Keep reviewing
-              </Button>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          {meter && (
-            <>
+        )}
+        {blocked ? (
+          <Button variant="secondary" onClick={reload}>
+            Reload and review current record
+          </Button>
+        ) : frozen ? (
+          <>
+            <Notice tone="warning">
+              <b>{frozen.label}</b>
+              <p>{frozen.body.reason}</p>
               <p>
-                Enter both readings exactly as shown in the validated photo for
-                this sale. Do not use a totalizer or unit-price display. Either
-                or both values may change; no value is calculated from the
-                other.
+                {uncertain
+                  ? "The result is uncertain. Retry this same decision with its original details to retrieve the recorded outcome."
+                  : "Confirm the decision reviewed here. Originals and history are retained."}
               </p>
-              <div className="wr-sales-pair">
-                <TextField
-                  label="Meter amount (₦)"
-                  inputMode="decimal"
-                  value={meterAmount}
-                  onChange={(e) => setMeterAmount(e.target.value)}
-                  helper="Two decimals maximum."
-                />
-                <TextField
-                  label={`Meter quantity (${sale.original.unit === "litre" ? "litres" : "kilograms"})`}
-                  inputMode="decimal"
-                  value={meterQuantity}
-                  onChange={(e) => setMeterQuantity(e.target.value)}
-                  helper={`Up to ${sale.original.quantityPrecision} decimals, as captured.`}
-                />
-              </div>
-              {!meterValid && (
-                <Notice tone="warning">
-                  Enter positive readings within the amount and captured
-                  quantity precision. Values are never rounded to fit.
-                </Notice>
+            </Notice>
+            <div className="wr-card wr-quiet">
+              {!!frozen.body.decision &&
+                (frozen.body.decision as { outcome: string }).outcome ===
+                  "correct_meter" && (
+                  <p className="wr-amount-md">
+                    {formatNaira(
+                      parseKobo(
+                        (frozen.body.decision as { amountKobo: string })
+                          .amountKobo,
+                      ),
+                    )}{" "}
+                    ·{" "}
+                    {formatQuantity(
+                      (frozen.body.decision as { quantity: string }).quantity,
+                      sale.original.unit,
+                      sale.original.quantityPrecision,
+                    )}
+                  </p>
+                )}
+              <b>Impact if confirmed</b>
+              <p>
+                {frozen.label.startsWith("Cancel sale")
+                  ? "Only the named sale is cancelled and contributes zero. Other purchase records remain unchanged."
+                  : effectiveKind === "duplicate"
+                    ? "Clear this duplicate flag and keep both sales. Their credit status stays unchanged."
+                    : "Resolve this review only. Loyalty credit depends on every remaining check; no current price is substituted."}
+              </p>
+            </div>
+            <div className="wr-row">
+              <Button loading={busy} onClick={() => void confirm()}>
+                {uncertain ? "Retry same decision" : "Confirm decision"}
+              </Button>
+              {!uncertain && (
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setFrozen(null)}
+                >
+                  Keep reviewing
+                </Button>
               )}
-              <div className="wr-sales-pair">
-                <div className="wr-card wr-quiet">
-                  <span>Originally captured</span>
-                  <b className="wr-amount-md">{valuePair(sale.original)}</b>
-                  <p>{saleRate(sale.original)} · original entry retained</p>
-                </div>
-                <div className="wr-card wr-quiet">
-                  <span>Corrected values</span>
-                  {meterValid && (
-                    <b className="wr-amount-md">
-                      {formatNaira(
-                        parseKobo(
-                          meterTranscription(sale, meterAmount, meterQuantity)
-                            .amountKobo,
-                        ),
-                      )}{" "}
-                      ·{" "}
-                      {formatQuantity(
-                        meterQuantity,
-                        sale.original.unit,
-                        sale.original.quantityPrecision,
-                      )}
-                    </b>
-                  )}
-                  <p>From meter evidence</p>
-                </div>
-              </div>
-            </>
-          )}
-          {kind !== "duplicate" && (
-            <>
-              <div className="wr-field">
-                <label className="wr-label" htmlFor="review-notes">
-                  Evidence notes · explanation, not proof
-                </label>
-                <textarea
-                  id="review-notes"
-                  className="wr-input"
-                  rows={3}
-                  maxLength={1000}
-                  required
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  aria-describedby="review-notes-help"
-                />
-                <p id="review-notes-help" className="wr-help">
-                  Explain your decision. Notes are not proof and cannot replace
-                  missing records. Do not include phone numbers or secrets.
-                </p>
-              </div>
-              <fieldset className="wr-review-references">
-                <legend className="wr-label">
-                  Server records offered with this sale
-                </legend>
-                <p className="wr-help">
-                  Optional supporting references from the latest sale read. The
-                  server checks the complete history even when none are
-                  selected.
-                </p>
-                {reviewReferences(sale).map((r) => (
-                  <label key={r.id} className="wr-review-reference">
-                    <input
-                      type="checkbox"
-                      checked={references.includes(r.id)}
-                      onChange={(e) =>
-                        setReferences(
-                          e.target.checked
-                            ? [...references, r.id]
-                            : references.filter((id) => id !== r.id),
-                        )
-                      }
-                    />
-                    <span>{r.label}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {kind !== "duplicate" && (
+              <>
+                <div className="wr-field">
+                  <label className="wr-label" htmlFor="review-notes">
+                    Evidence notes · explanation, not proof
                   </label>
-                ))}
-              </fieldset>
-              {sale.evidence.state !== "validated" && (
-                <Notice tone="warning">
-                  The validated meter photo is unavailable. A decision cannot be
-                  prepared.
-                </Notice>
-              )}
-            </>
-          )}
-          {kind === "date" && (
-            <TextField
-              label="Verified sale date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              helper="Calendar date · Africa/Lagos. The records must establish one day; the date cannot be after server receipt."
-            />
-          )}
-          <Reason label="Decision reason" value={reason} onChange={setReason} />
-          {meter && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setMeterAmount(initialAmount);
-                setMeterQuantity(sale.displayedValues.quantity);
-                setReason("");
-                setNotes("");
-                setReferences([]);
-              }}
-            >
-              Discard changes
-            </Button>
-          )}
-          <div className="wr-row">
-            {kind === "duplicate" ? (
-              <>
-                <Button
-                  variant="secondary"
-                  disabled={!ready || !pair}
-                  onClick={() => prepare("keep_both")}
-                >
-                  Clear the flag · keep both
-                </Button>
-                {[sale, pair]
-                  .filter((s): s is AdminSaleDetail => !!s)
-                  .map((s) => (
-                    <Button
-                      key={s.id}
-                      variant="danger"
-                      disabled={!ready || !pair || s.state === "cancelled"}
-                      onClick={() => prepare("cancel", s.id)}
-                    >
-                      Cancel sale {s.saleCode}
-                    </Button>
+                  <textarea
+                    id="review-notes"
+                    className="wr-input"
+                    rows={3}
+                    maxLength={1000}
+                    required
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    aria-describedby="review-notes-help"
+                  />
+                  <p id="review-notes-help" className="wr-help">
+                    Explain your decision. Notes are not proof and cannot
+                    replace missing records. Do not include phone numbers or
+                    secrets.
+                  </p>
+                </div>
+                <fieldset className="wr-review-references">
+                  <legend className="wr-label">
+                    Server records offered with this sale
+                  </legend>
+                  <p className="wr-help">
+                    Optional supporting references from the latest sale read.
+                    The server checks the complete history even when none are
+                    selected.
+                  </p>
+                  {reviewReferences(sale).map((r) => (
+                    <label key={r.id} className="wr-review-reference">
+                      <input
+                        type="checkbox"
+                        checked={references.includes(r.id)}
+                        onChange={(e) =>
+                          setReferences(
+                            e.target.checked
+                              ? [...references, r.id]
+                              : references.filter((id) => id !== r.id),
+                          )
+                        }
+                      />
+                      <span>{r.label}</span>
+                    </label>
                   ))}
-              </>
-            ) : (
-              <>
-                <Button
-                  disabled={!ready}
-                  onClick={() =>
-                    prepare(
-                      kind === "price"
-                        ? meter
-                          ? "correct_meter"
-                          : "accept_captured"
-                        : kind === "card"
-                          ? "confirm_earlier"
-                          : kind === "date"
-                            ? "verify_date"
-                            : "confirm",
-                    )
-                  }
-                >
-                  {kind === "price"
-                    ? meter
-                      ? "Review correction"
-                      : "Confirm captured values"
-                    : kind === "card"
-                      ? "Confirm valid earlier purchase"
-                      : kind === "date"
-                        ? "Review verified date"
-                        : "Confirm capture"}
-                </Button>
-                {(kind === "card" || kind === "capture") && (
-                  <Button
-                    variant="danger"
-                    disabled={!ready}
-                    onClick={() => prepare("cancel")}
-                  >
-                    Cancel invalid sale
-                  </Button>
+                </fieldset>
+                {sale.evidence.state !== "validated" && (
+                  <Notice tone="warning">
+                    The validated meter photo is unavailable. A decision cannot
+                    be prepared.
+                  </Notice>
                 )}
               </>
             )}
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setReason("");
-                setError("");
-              }}
-            >
-              Keep reviewing
-            </Button>
-          </div>
-        </>
-      )}
-    </Sheet>
+            {kind === "date" && (
+              <TextField
+                label="Verified sale date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                helper="Calendar date · Africa/Lagos. The records must establish one day; the date cannot be after server receipt."
+              />
+            )}
+            <Reason
+              label="Decision reason"
+              value={reason}
+              onChange={setReason}
+            />
+            {meter && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setMeterAmount(initialAmount);
+                  setMeterQuantity(sale.displayedValues.quantity);
+                  setReason("");
+                  setNotes("");
+                  setReferences([]);
+                }}
+              >
+                Discard changes
+              </Button>
+            )}
+            <div className="wr-row">
+              {kind === "duplicate" ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    disabled={!ready || !pair}
+                    onClick={() => prepare("keep_both")}
+                  >
+                    Clear the flag · keep both
+                  </Button>
+                  {[sale, pair]
+                    .filter((s): s is AdminSaleDetail => !!s)
+                    .map((s) => (
+                      <Button
+                        key={s.id}
+                        variant="danger"
+                        disabled={!ready || !pair || s.state === "cancelled"}
+                        onClick={() => prepare("cancel", s.id)}
+                      >
+                        Cancel sale {s.saleCode}
+                      </Button>
+                    ))}
+                </>
+              ) : (
+                <>
+                  <Button
+                    disabled={!ready}
+                    onClick={() =>
+                      prepare(
+                        kind === "price"
+                          ? meter
+                            ? "correct_meter"
+                            : "accept_captured"
+                          : kind === "card"
+                            ? "confirm_earlier"
+                            : kind === "date"
+                              ? "verify_date"
+                              : "confirm",
+                      )
+                    }
+                  >
+                    {kind === "price"
+                      ? meter
+                        ? "Review correction"
+                        : "Confirm captured values"
+                      : kind === "card"
+                        ? "Confirm valid earlier purchase"
+                        : kind === "date"
+                          ? "Review verified date"
+                          : "Confirm capture"}
+                  </Button>
+                  {(kind === "card" || kind === "capture") && (
+                    <Button
+                      variant="danger"
+                      disabled={!ready}
+                      onClick={() => prepare("cancel")}
+                    >
+                      Cancel invalid sale
+                    </Button>
+                  )}
+                </>
+              )}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setReason("");
+                  setError("");
+                }}
+              >
+                Keep reviewing
+              </Button>
+            </div>
+          </>
+        )}
+      </Sheet>
+    </>
   );
 }
 
