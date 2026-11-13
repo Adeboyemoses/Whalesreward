@@ -1242,3 +1242,56 @@ model phone_verification_delivery {
 
   @@unique([customer_id, generation])
 }
+
+model MeterVerification {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ content Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@map("meter_verification")
+}
+model MeterProfileApproval {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ profile_id String @db.Uuid
+ profile_version BigInt
+ digest String
+ profile_content Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@unique([profile_id,profile_version])
+ @@map("meter_profile_approval")
+}
+model MeterPolicyApproval {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ environment String
+ revision BigInt
+ configuration Json @db.JsonB
+ artifact String
+ resolver_artifact String
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@unique([station_id,environment,revision])
+ @@map("meter_policy_approval")
+}
+model MeterConfiguration {
+ id String @id @db.Uuid
+ station_id String @db.Uuid
+ environment String
+ revision BigInt
+ configuration Json @db.JsonB
+ authorization_reference String
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@unique([station_id,environment,revision])
+ @@map("meter_configuration")
+}
+model MeterEvaluation {
+ decision_id String @id @db.Uuid
+ purchase_id String @db.Uuid
+ revision_id String @unique @db.Uuid
+ provenance Json @db.JsonB
+ created_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ @@map("meter_evaluation")
+}

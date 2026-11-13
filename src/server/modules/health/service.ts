@@ -1,3 +1,4 @@
+import { meterHealth } from "../reviews/meter-config";
 import {
   reviewEvidenceConfiguration,
   reviewEvidenceApprovalValid,
@@ -59,6 +60,17 @@ export async function getHealth(
     }
   } catch {
     ok = false; // Approval storage is part of database readiness.
+  }
+  try {
+    if (healthEnvironmentValid(env) && env.WHR_METER_POLICY)
+      configuration.policies.meter = (await transaction(
+        configurationPool ?? database(),
+        async (db) => await meterHealth(db, env),
+      ))
+        ? "configured"
+        : "unconfigured";
+  } catch {
+    ok = false;
   }
   const { policies } = configuration;
   const fullyConfigured = Object.values(policies).every(

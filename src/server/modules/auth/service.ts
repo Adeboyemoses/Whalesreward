@@ -276,7 +276,7 @@ export async function getSession(
     const live = await requireSession(db, digest(token), restricted);
     return live.must_change_password || live.access_scope !== "full"
       ? restrictedSessionView(db, live)
-      : sessionView(db, live);
+      : sessionView(db, live, true);
   });
 }
 export async function signOut(

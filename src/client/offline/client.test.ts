@@ -318,6 +318,7 @@ describe("durable account partition", () => {
         ...api.current.price,
         rateKobo: "200000",
         priceVersionId: uuidv7(),
+        version: api.current.price.version + 1,
       },
     };
     await client.refresh();
@@ -526,7 +527,10 @@ describe("durable account partition", () => {
         throw new ClientError(code, "Access denied");
       };
       const pending = client.lookup("A7K3M9X");
-      const rejected = expect(pending).rejects.toMatchObject({ code });
+      // Stale denials must not be re-observed as authority failures of the new sign-in.
+      const rejected = expect(pending).rejects.toMatchObject({
+        code: "account_changed",
+      });
       await entered.promise;
       if (differentAccount) await client.signOut();
       api.current = differentAccount
@@ -662,6 +666,7 @@ describe("P-23 immutable composition evidence", () => {
       await client.beginCapture(),
       form.cardCode,
       found,
+      { receiptAtComposition: true },
     );
     return { form, draft };
   }

@@ -1,0 +1,48 @@
+{
+  "viewport": 390,
+  "document": 390,
+  "forms": [
+    {
+      "tag": "A",
+      "type": null,
+      "width": 128,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "tag": "INPUT",
+      "type": null,
+      "width": 212,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 96,
+      "height": 48
+    },
+    {
+      "tag": "TEXTAREA",
+      "type": null,
+      "width": 316,
+      "height": 62
+    },
+    {
+      "tag": "BUTTON",
+      "type": "submit",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "tag": "A",
+      "type": null,
+      "width": 316,
+      "height": 48
+    }
+  ]
+}

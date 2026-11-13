@@ -1,0 +1,66 @@
+{
+  "viewport": 390,
+  "document": 390,
+  "forms": [
+    {
+      "tag": "A",
+      "type": null,
+      "width": 153,
+      "height": 48
+    },
+    {
+      "tag": "A",
+      "type": null,
+      "width": 316,
+      "height": 48
+    },
+    {
+      "tag": "A",
+      "type": null,
+      "width": 316,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 91,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 65,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 91,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 65,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 91,
+      "height": 48
+    },
+    {
+      "tag": "BUTTON",
+      "type": "button",
+      "width": 65,
+      "height": 48
+    },
+    {
+      "tag": "A",
+      "type": null,
+      "width": 358,
+      "height": 48
+    }
+  ]
+}

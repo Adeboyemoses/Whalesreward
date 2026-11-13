@@ -4,6 +4,18 @@ Where each requirement stands. The EM updates the rows its work order touched at
 
 
 
+
+## WO-spec-3m audit catalogue reconciliation (WHR-130)
+
+[M3](contracts/m3.md#audit-queries-and-safe-event-shapes--g01g05-i-41) and the [writer inventory](contracts/m3-audit-inventory.md) reconcile the source at fdcf789 with closed actions/fields, privacy and historical mapping. [Spec PR #127](https://github.com/Adeboyemoses/Whalesreward/pull/127) merged at f7b5d18 with five green checks and code/security/integrity PASS round 2. READY completes on this separate reviewed green records merge. AU-01–AU-10 are downstream obligations for WO-core-11 and its dependencies, not passing implementation tests.
+
+| Invariants / boards | Specification verification | Status |
+|---|---|---|
+| I-41 / G01–G05 | Every audit insert/caller inventoried; exact action, actor, target and fields; missing writers and safe legacy_event mapping | Specification only; no runtime coverage or UI parity advance |
+| I-07/I-21a/I-48 | No phones, verification/card codes, digests, URLs or notes; live audit permission and private evidence boundaries | AU-01/AU-04/AU-08 future verification |
+| I-05/I-22/I-26/I-31/I-32/I-35/I-40/I-46 | Assignment end, replay, duplicate flags, guarded decisions, immutable prices/snapshots and operational activation separation | AU-02/AU-03/AU-05/AU-06/AU-09/AU-10 future verification |
+
+
 ## WO-core-9b review-evidence operator READY (WHR-114)
 
 Feature [#119](https://github.com/Adeboyemoses/Whalesreward/pull/119) merged at `ace2f43` with five green checks; T-19 decision [#117](https://github.com/Adeboyemoses/Whalesreward/pull/117) records Earl's WHR-116 Option A. READY is completed by this separate records merge. [Named verification](../qa/verification-2026-11-12-review-evidence-operator.md) reports 11 unit and 11 PostgreSQL operator tests; full EM suites passed 689 unit and 699 integration tests. No deployed activation or new screen parity is claimed.

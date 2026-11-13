@@ -1,6 +1,6 @@
 import { lookupReceiptSchema } from "./lookup-receipt";
 import { z } from "zod";
-import { authId } from "./auth";
+import { authId, priceSnapshotSchema } from "./auth";
 import { MAX_KOBO } from "../money";
 export const SYNC_LIMITS = Object.freeze({
   maxBytes: 8 * 1024 * 1024,
@@ -100,18 +100,61 @@ export const legacyLookupResponseSchema = z.strictObject({
   customer: z.strictObject({
     id: authId,
     name: z.string(),
-    category: z.string(),
+    category: z.enum([
+      "car_owner",
+      "commercial_bus_driver",
+      "three_wheeler_user",
+      "bike_user",
+      "keg_buyer",
+      "cooking_gas_customer",
+    ]),
   }),
-  lookedUpAt: instant,
+  lookedUpAt: z.iso.datetime(),
 });
 export const lookupReceiptResponseSchema = legacyLookupResponseSchema
   .extend({ lookupReceipt: lookupReceiptSchema.nullable() })
   .strict();
+export const priceRefreshSchema = z.strictObject({
+  captureContextId: authId,
+  originatingAccountId: authId,
+  stationId: authId,
+  assignmentId: authId,
+  pumpId: authId,
+  productId: authId,
+  price: priceSnapshotSchema,
+});
+export type PriceRefresh = z.infer<typeof priceRefreshSchema>;
+export const priceRefreshLookupResponseSchema =
+  legacyLookupResponseSchema.extend({
+    priceRefresh: priceRefreshSchema.nullable(),
+  });
+export const extendedLookupResponseSchema = lookupReceiptResponseSchema.extend({
+  priceRefresh: priceRefreshSchema.nullable(),
+});
+export const lookupWireResponseSchema = z.union([
+  legacyLookupResponseSchema,
+  lookupReceiptResponseSchema,
+  priceRefreshLookupResponseSchema,
+  extendedLookupResponseSchema,
+]);
+// Explicit strict alternatives permit deployment rollback without stripping fields.
+export const normalizedLookupResponseSchema =
+  lookupWireResponseSchema.transform((value) => ({
+    ...value,
+    lookupReceipt: "lookupReceipt" in value ? value.lookupReceipt : null,
+    priceRefresh: "priceRefresh" in value ? value.priceRefresh : null,
+  }));
+export const lookupResponseEnvelopeSchema = z.strictObject({
+  data: lookupWireResponseSchema,
+  serverTime: z.iso.datetime(),
+  requestId: authId,
+});
 export type Lookup = {
   cardCode: string;
   customer: { id: string; name: string; category: string };
   lookedUpAt: string;
   lookupReceipt?: string | null;
+  priceRefresh?: PriceRefresh | null;
 };
 export type Hold = { kind: "price" | "card" | "date"; reasonCode: string };
 export type SaleStatus = {

@@ -137,7 +137,11 @@ function intervalFor(f: ResolvedEvidence): {
           },
   };
 }
-function price(f: ResolvedEvidence, i: EvidenceInterval): TypedConclusion {
+function price(
+  f: ResolvedEvidence,
+  i: EvidenceInterval,
+  requireCaptured = true,
+): TypedConclusion {
   const p = f.original;
   completeVersions(f.prices);
   const captured = f.prices.find((v) => v.id === p.price_version_id);
@@ -156,7 +160,12 @@ function price(f: ResolvedEvidence, i: EvidenceInterval): TypedConclusion {
     i.L,
     i.U,
   );
-  if (!value || value[0] !== p.rate_kobo || value[1] !== p.currency)
+  if (
+    !value ||
+    (requireCaptured && value[0] !== p.rate_kobo) ||
+    value[1] !== p.currency ||
+    BigInt(String(value[0])) <= 0n
+  )
     return insufficient();
   const active = f.prices.filter(
     (v) => BigInt(trustedMicros(v.effective_from)) <= BigInt(i.U),
@@ -183,7 +192,7 @@ function price(f: ResolvedEvidence, i: EvidenceInterval): TypedConclusion {
   }
   return {
     tag: "price_valid_throughout",
-    rateKobo: String(p.rate_kobo),
+    rateKobo: String(value[0]),
     currency: String(p.currency),
     priceSegments: segments.map((v) => v.id),
     precision: "microsecond",
@@ -374,7 +383,21 @@ export async function evaluateEvidenceV1(
   db: pg.PoolClient,
   request: EvidenceRequest,
 ): Promise<EvidenceEvaluation> {
-  if (request.outcome === "correct_meter")
+  return evaluate(db, request, false);
+}
+/** P-26 reuses the unchanged P-25 source closure and bounds, but proves a uniform historical rate. */
+export async function evaluateMeterHistory(
+  db: pg.PoolClient,
+  request: EvidenceRequest,
+): Promise<EvidenceEvaluation> {
+  return evaluate(db, request, true);
+}
+async function evaluate(
+  db: pg.PoolClient,
+  request: EvidenceRequest,
+  meter: boolean,
+): Promise<EvidenceEvaluation> {
+  if (request.outcome === "correct_meter" && !meter)
     throw new AuthError("meter_policy_unconfigured", 409);
   if (request.kind === "price" && request.outcome === "cancel")
     return insufficient();
@@ -403,7 +426,7 @@ export async function evaluateEvidenceV1(
     historyGeneration: f.historyGeneration,
   };
   if (request.kind === "price") {
-    conclusions.push(price(f, interval));
+    conclusions.push(price(f, interval, !meter));
     result.validPrice = true;
   } else if (request.kind === "card") {
     const c = card(f, interval, request.outcome);
