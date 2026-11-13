@@ -33,8 +33,27 @@ export function redactAuditText(value: string): string {
     .replace(/\b[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{7}\b/g, "[code removed]");
   if (!categorical.test(safe))
     safe = safe.replace(
-      /\b(?:otp|password|token|secret)\s*(?:[:=]\s*|\s+)\S+/gi,
-      "[secret removed]",
+      /\b(otp|password|token|secret)(\s*(?:[:=]\s*|\s+))(\S+)/gi,
+      (
+        candidate,
+        label: string,
+        delimiter: string,
+        next: string,
+        offset: number,
+        source: string,
+      ) => {
+        // A preposition plus a closed lifecycle noun describes an operation,
+        // not a supplied password. The noun must end the phrase; the remainder
+        // of the text still passes through every privacy check independently.
+        const lifecycle =
+          label.toLowerCase() === "password" &&
+          /^\s+$/.test(delimiter) &&
+          /\b(?:before|after|following)\s+$/i.test(source.slice(0, offset)) &&
+          /^(?:completion|change|reset)[.,;!?]?$/i.test(next) &&
+          (/[.,;!?]$/.test(next) ||
+            /^\s*$/.test(source.slice(offset + candidate.length)));
+        return lifecycle ? candidate : "[secret removed]";
+      },
     );
   safe = safe.replace(
     /\b(?:verification code|one[- ]time code|code)\s*(?::|=|is)?\s*\d{4,8}\b/gi,
