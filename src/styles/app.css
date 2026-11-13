@@ -744,3 +744,17 @@ body {
 
 /* S04 keeps evidence beside the compact meter editor, above full-width review. */
 .wr-meter-editor-row { align-items: start; }
+
+/* Settings row 14 keeps board sheets and review controls within narrow screens. */
+.wr-settings { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.wr-settings .wr-sheet { min-width: 0; }
+.wr-settings form { display: flex; flex-direction: column; gap: var(--space-4); }
+.wr-settings textarea.wr-input { height: auto; min-height: calc(var(--control-h) * 2); padding: var(--space-3) var(--space-4); resize: vertical; }
+.wr-settings .wr-row { flex-wrap: wrap; }
+.wr-settings .wr-row > .wr-btn { flex: none; max-width: 100%; white-space: normal; height: auto; min-height: var(--control-h-desktop); }
+.wr-settings .wr-kv-row dd { overflow-wrap: anywhere; min-width: 0; }
+.wr-settings-editor { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+@media (max-width: 900px) {
+  .wr-settings-editor { grid-template-columns: minmax(0, 1fr); }
+  .wr-settings .wr-btn, .wr-settings .wr-input { min-height: var(--control-h); }
+}
