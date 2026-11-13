@@ -167,7 +167,7 @@ test("I-22 I-31 unchanged pair is refused and lost meter response replays one ex
   try {
     await installBrowserMeter(f.db);
     const sale = await heldSale(f, ["price"]);
-    await edit(page, sale.id, "10000.00", "10.00");
+    await edit(page, sale.id, "10000.00", sale.original.entry.quantity);
     await confirm(page, "Review correction", 409);
     await expect(page.getByRole("alert")).toContainText(
       /same|match|unchanged/i,
