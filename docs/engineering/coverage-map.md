@@ -779,3 +779,18 @@ Q-559 measured profiles/verification and separate implementation/activation rema
 EM typecheck, lint (two inherited image warnings), 689 unit tests, production build, local links, paragraph limit (maximum 120 words) and evidence validation PASS. Existing repository tests confirm the docs change did not break the build; they do not implement P-27.
 
 Rook should draft/number the listed high-tier core snapshot and app adoption/notice work orders, in that order, and mirror P-27 in product docs. Q-528 and Q-559 remain separate pending inputs. No runtime price refresh, meter activation or cloud change is claimed. WHR-125 stays In Review at READY; the session stops here.
+
+
+## WO-spec-4a / WHR-133 M4 reconciliation READY — 13 Nov 2026
+
+[Spec PR #133](https://github.com/Adeboyemoses/Whalesreward/pull/133) merged at 527bd45 with five green checks. Code/security/integrity PASS, round 1, no findings. EM final combined head: typecheck/lint, 841 unit tests, build and evidence PASS; source cross-checks, local links and paragraphs ≤120 words PASS. This separate records merge completes READY. Documentation verification does not add runtime test coverage or screen parity.
+
+| Invariants / boards | Specification verification and downstream obligation | Status |
+|---|---|---|
+| I-22, I-28, I-28a, I-35, I-37, I-40, I-42, I-45a, I-45b | M4 P-23 bounds, P-24 contribution/readiness, P-25 typed campaign provenance, P-26 accepted effective pairs; original receipts and candidate separation preserved | Spec on staging; WO-core-12 tests pending |
+| I-29, I-43, I-44, I-46 | Exact spend, separate units/currencies, frozen lineage and reports independent of campaign qualification; P-27 never reprices history | Spec on staging; WO-core-12/13 tests pending |
+| I-07, I-09, I-41 | Audit v2 inherits CurrentAuditEvent, strict action mapping, historical safe projection and protected provenance; WHR-100 errors and health disclosure | Spec on staging; WO-core-12/13/14 tests pending |
+| I-45, I-51 | WHR-54/55/56 and D09 proposal keeps unknown values unset and deletion disabled | Policy/client answers and downstream implementation pending |
+| E01–E07, B02, B07, T01–T04 | Existing M4 screen scope only; no UI implementation or screenshot comparison in this work order | Board parity unchanged |
+
+Register-ready questions are in [the PROPOSAL](proposals/m4-client-decisions.md) and on existing WHR-54/55/56; D09 values are attached to WHR-55. Q-528/Q-555–Q-559 retain their independent gates. M4's implementation-gap table is the handoff to WO-core-12/13/14, not permission to start them or activate policy.

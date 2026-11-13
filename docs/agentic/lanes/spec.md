@@ -1,21 +1,20 @@
 # lane:spec
-WO-spec-3m (WHR-130) audit catalogue reconciliation: READY on reviewed green records merge, 2026-11-13
+WO-spec-4a (WHR-133) M4 reconciliation and client decision pack: READY on reviewed green records merge, 2026-11-13
 
 ## In flight
-- [Spec PR #127](https://github.com/Adeboyemoses/Whalesreward/pull/127) merged into staging at f7b5d18 with all five CI checks green. Code/security/integrity PASS at 1700951, round 2. Evidence: .review/spec__wo-3m-audit-catalogue.md.
-- This separate reviewed green records merge completes READY; WHR-130 then stays In Review for Earl, not accepted. EM typecheck/lint, 802 unit tests, build, links, paragraph limit and evidence PASS; two inherited image warnings.
-- No runtime audit coverage, UI parity, policy activation or cloud change is claimed.
+- [Spec PR #133](https://github.com/Adeboyemoses/Whalesreward/pull/133) merged at 527bd45 with all five CI checks green. Code/security/integrity PASS at e45542d, round 1, no findings. Base integration left both reviewed documents unchanged.
+- EM final combined head: typecheck, lint, 841 unit tests, build and evidence PASS; two inherited image warnings. Relative links and paragraphs ≤120 words PASS. This separate reviewed records merge completes READY; WHR-133 remains In Review.
+- No application code, runtime M4 coverage, board parity or policy activation claimed.
 
 ## Next
-- Stop at READY. Rook folds AU-01–AU-09 into WO-core-11 / WHR-20; AU-10 tracks unbuilt recovery/meter hooks. Neither implementation is started here.
-- Historical aliases use safe schemaVersion=0 projection, never row rewrites or invented event-time values.
+- Stop at READY. Rook takes the PROPOSAL's register-ready WHR-54/55/56 and D09 questions to Whales; questions are attached to the existing Linear issues.
+- WO-core-12/13/14 receive the gaps listed in m4.md. No next work order started.
 
 ## Earl's gos
-- 2026-11-13: “Start WHR-130 (WO-spec-3m).” “Spec only.” “Code, security and integrity verdicts.” “Stop when merged and report READY.”
+- 2026-11-13: “Start WHR-133 (WO-spec-4a).” “No code.” “Code, security and integrity verdicts.” “Stop when merged and report READY with the questions.”
 
 ## Risks
-- Existing writer omissions and privacy/shape gaps are inventoried for implementation, not fixed by a spec merge.
-- P-25/P-26 activation and pending client confirmations stay separate. No main promotion or deployment authorized.
-- Full runtime model ID unavailable.
+- WHR-54/55/56, actual D09 values and Q-528/Q-555–Q-559 remain pending; recommendations are not approvals. Deletion stays disabled.
+- No main promotion, client messages or cloud action authorized. Full runtime model ID unavailable.
 
-dispatches=7 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=4 prs=2 rounds_max=1 escalations=0 model=unavailable
