@@ -135,7 +135,10 @@ async function snapshot(
         [station.id],
       )
     ).rows[0];
-    if (pin.section === "retention" || history?.complete !== true)
+    if (
+      pin.section === "retention" ||
+      (pin.purchase_start === null && history?.complete !== true)
+    )
       throw new AuthError("temporarily_unavailable", 503);
   }
   const timing = c
@@ -358,6 +361,16 @@ async function timingReview(
       p.expectedCampaignVersion !== before.campaign?.version)
   )
     throw new AuthError("version_conflict", 409);
+  if (before.campaign?.settingsVersionId) {
+    const history = (
+      await db.query(
+        `${timingHistoryCte} SELECT bool_and(timing_history_complete) AS complete FROM timing_history`,
+        [before.station.id],
+      )
+    ).rows[0];
+    if (history?.complete !== true)
+      throw new AuthError("temporarily_unavailable", 503);
+  }
   const policy = await requireTimingPolicy(db, before.station.id);
   if (
     !Number.isSafeInteger(p.graceHours) ||
