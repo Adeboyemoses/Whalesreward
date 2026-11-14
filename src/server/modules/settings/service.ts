@@ -464,8 +464,8 @@ async function commitTiming(
   const at = final.at;
   if (p.kind === "create")
     await db.query(
-      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,$3,1,true)",
-      [campaignId, station.id, review.after.campaign!.name],
+      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required,current_timing_version_id) VALUES($1,$2,$3,1,true,$4)",
+      [campaignId, station.id, review.after.campaign!.name, id],
     );
   const after = settingsSchema.parse({
     ...review.after,
@@ -519,16 +519,19 @@ async function commitTiming(
     ],
   );
   if (result.rowCount !== 1) throw new AuthError("version_conflict", 409);
-  const campaignResult = await db.query(
-    "UPDATE campaign SET current_timing_version_id=$2,version=$3,reconciliation_required=true,reconciled_data_version=NULL WHERE id=$1 AND station_id=$4 AND version=$5",
-    [
-      campaignId,
-      id,
-      campaignVersion,
-      station.id,
-      p.kind === "create" ? 1 : p.expectedCampaignVersion,
-    ],
-  );
+  const campaignResult =
+    p.kind === "create"
+      ? { rowCount: 1 }
+      : await db.query(
+          "UPDATE campaign SET current_timing_version_id=$2,version=$3,reconciliation_required=true,reconciled_data_version=NULL WHERE id=$1 AND station_id=$4 AND version=$5",
+          [
+            campaignId,
+            id,
+            campaignVersion,
+            station.id,
+            p.kind === "create" ? 1 : p.expectedCampaignVersion,
+          ],
+        );
   if (campaignResult.rowCount !== 1)
     throw new AuthError("version_conflict", 409);
   const change = settingsChangeSchema.parse({

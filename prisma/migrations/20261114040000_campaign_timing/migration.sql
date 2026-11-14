@@ -49,3 +49,6 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER station_timing_bootstrap_validate BEFORE INSERT ON station FOR EACH ROW EXECUTE FUNCTION validate_station_timing_bootstrap();
+
+-- Create pins its immutable version at insert and remains campaign version 1.
+ALTER TABLE campaign ALTER CONSTRAINT campaign_current_timing_version_id_fkey DEFERRABLE INITIALLY DEFERRED;
