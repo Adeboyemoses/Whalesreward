@@ -143,6 +143,25 @@ it("P-28 audit requires complete creation values and an exact campaign target", 
     ],
   };
   expect(m4SettingsAuditSchema.safeParse(creation).success).toBe(true);
+  for (const timezone of ["+01:00", "-04:00"])
+    expect(
+      m4SettingsAuditSchema.safeParse({
+        ...creation,
+        changes: creation.changes.map((c) =>
+          c.field === "timezone" ? { ...c, after: timezone } : c,
+        ),
+      }).success,
+    ).toBe(false);
+  for (const timezone of ["UTC", "US/Eastern", "Europe/London"])
+    expect(
+      m4SettingsAuditSchema.safeParse({
+        ...creation,
+        changes: creation.changes.map((c) =>
+          c.field === "timezone" ? { ...c, after: timezone } : c,
+        ),
+      }).success,
+    ).toBe(true);
+
   for (const field of [
     "campaignId",
     "launchAt",

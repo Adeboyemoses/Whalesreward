@@ -91,6 +91,10 @@ export async function resetReviewFixture(pool: pg.Pool) {
   const db = await pool.connect();
   try {
     await db.query("BEGIN");
+    // Health reads station before its policy binding. Take that same order
+    // before suspending fixture-only guards, so a prior read can finish.
+    await db.query("LOCK TABLE station IN ACCESS EXCLUSIVE MODE");
+
     await db.query("ALTER TABLE audit_event DISABLE TRIGGER USER");
     await db.query("ALTER TABLE station_timing_policy DISABLE TRIGGER USER");
     await db.query("TRUNCATE station,card CASCADE");

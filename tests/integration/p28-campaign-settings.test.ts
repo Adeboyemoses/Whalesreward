@@ -1217,3 +1217,69 @@ it("I-45 existing-station upgrade binds the registered policy without inventing 
     await root.end();
   }
 });
+
+describe("P-28 review round 1 regressions", () => {
+  it.each(["+01:00", "-04:00"])(
+    "I-45 rejects offset-only timezone %s on review and confirm without effects",
+    async (timezone) => {
+      const proposal = await input({ timezone }),
+        before = await rows();
+      await expect(
+        reviewSettings(db(), config, token, "giveaway", proposal),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      await expect(
+        confirmSettings(db(), config, token, "giveaway", {
+          ...proposal,
+          operationId: newId(),
+          reviewDigest: "0".repeat(64),
+        }),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      expect(await rows()).toEqual(before);
+    },
+  );
+  it.each(["launchAt", "purchaseStart", "purchaseCutoff"] as const)(
+    "I-22 rejects fresh excess precision and conflicts with successful receipt for changed %s",
+    async (field) => {
+      const proposal = await input(),
+        before = await rows(),
+        invalid = {
+          ...proposal,
+          [field]: String(proposal[field]).replace(/(\.\d{6})Z$/, "$11Z"),
+        };
+      await expect(
+        reviewSettings(db(), config, token, "giveaway", invalid),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      await expect(
+        confirmSettings(db(), config, token, "giveaway", {
+          ...invalid,
+          operationId: newId(),
+          reviewDigest: "0".repeat(64),
+        }),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      expect(await rows()).toEqual(before);
+      const saved = await create(),
+        after = await rows();
+      await expect(
+        confirmSettings(db(), config, token, "giveaway", {
+          ...saved.confirmation,
+          [field]: String(saved.confirmation[field]).replace(
+            /(\.\d{6})Z$/,
+            "$11Z",
+          ),
+        }),
+      ).rejects.toMatchObject({ code: "operation_conflict", status: 409 });
+      expect(await rows()).toEqual(after);
+    },
+  );
+  it("I-22 representable equivalent UTC offsets still replay the canonical successful receipt", async () => {
+    const saved = await create();
+    expect(
+      await confirmSettings(db(), config, token, "giveaway", {
+        ...saved.confirmation,
+        launchAt: "2035-03-01T01:00:00.123456+01:00",
+        purchaseStart: "2035-03-02T01:00:00.123456+01:00",
+        purchaseCutoff: "2035-03-09T02:59:59.654321+01:00",
+      }),
+    ).toEqual({ ...saved.result, replayed: true });
+  });
+});

@@ -1,3 +1,4 @@
+import { isSupportedIanaTimezone } from "../../../shared/contracts/timezone";
 import { m4SettingsAuditSchema } from "../../../shared/contracts/audit";
 import { createHash } from "node:crypto";
 import type pg from "pg";
@@ -335,6 +336,14 @@ function retentionReview(
 async function normalizeTimingRequest<
   T extends { launchAt: string; purchaseStart: string; purchaseCutoff: string },
 >(db: pg.PoolClient, p: T): Promise<T> {
+  // No successful request can carry unsupported precision. Preserve its raw
+  // content for receipt comparison so an added digit can never alias a success.
+  if (
+    [p.launchAt, p.purchaseStart, p.purchaseCutoff].some((value) =>
+      /\.\d{7,}/.test(value),
+    )
+  )
+    return p;
   const normalized = (
     await db.query(
       `SELECT to_char($1::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "launchAt",to_char($2::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "purchaseStart",to_char($3::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "purchaseCutoff"`,
@@ -378,11 +387,8 @@ async function timingReview(
     p.graceHours > 2147483647
   )
     throw new AuthError("timing_invalid", 422);
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: p.timezone });
-  } catch {
+  if (!isSupportedIanaTimezone(p.timezone))
     throw new AuthError("timing_invalid", 422);
-  }
   // PostgreSQL preserves the supported microsecond precision; no JS date rounding.
   if (
     [p.launchAt, p.purchaseStart, p.purchaseCutoff].some((v) =>

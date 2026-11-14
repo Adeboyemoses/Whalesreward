@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSupportedIanaTimezone } from "./timezone.ts";
 
 // Kept self-contained so the operator command uses the same validation under
 // Node's type stripping, without loading the application or its configuration.
@@ -786,14 +787,7 @@ const m4SettingsValues = {
     .regex(/^[1-9][0-9]*$/)
     .refine((v) => BigInt(v) <= 36500n),
   deletionEnabled: z.literal(false),
-  timezone: z.string().refine((v) => {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: v });
-      return true;
-    } catch {
-      return false;
-    }
-  }),
+  timezone: z.string().refine(isSupportedIanaTimezone),
   timingPolicyVersion: text,
 } as const;
 const m4Changes = Object.entries(m4SettingsValues).map(([field, value]) =>
