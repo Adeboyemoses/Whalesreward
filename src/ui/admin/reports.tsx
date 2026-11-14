@@ -5,6 +5,7 @@ import { AdminError } from "@/client/admin-api";
 import {
   AdminReportsApi,
   reportFile,
+  reportChartCeiling,
   reportMessage,
   reportMoney,
   reportUncertain,
@@ -72,10 +73,7 @@ function DailyChart({ report }: { report: Report }) {
             BigInt(p.spend.amountKobo) > m ? BigInt(p.spend.amountKobo) : m,
           0n,
         );
-        // Round the axis to an exact power-of-ten tick, retaining exact bar labels.
-        const power = 10n ** BigInt(Math.max(0, max.toString().length - 1));
-        const tick = ((max + power * 4n - 1n) / (power * 4n) || 1n) * power;
-        const ceiling = tick * 4n;
+        const ceiling = reportChartCeiling(max.toString());
         const width = Math.max(1040, points.length * 135 + 100);
         const step = (width - 100) / Math.max(1, points.length);
         return (
@@ -108,7 +106,10 @@ function DailyChart({ report }: { report: Report }) {
                     className="wr-report-axis"
                   >
                     {reportMoney([
-                      { currency, amountKobo: (tick * BigInt(i)).toString() },
+                      {
+                        currency,
+                        amountKobo: ((ceiling * BigInt(i)) / 4n).toString(),
+                      },
                     ])}
                   </text>
                 </g>

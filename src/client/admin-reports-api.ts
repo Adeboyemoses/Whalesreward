@@ -238,3 +238,14 @@ export async function reportFile(
   if (!live()) throw new AdminError("obsolete");
   return blob;
 }
+
+/** Exact drawing scale only. Values/labels remain the server's original kobo. */
+export function reportChartCeiling(maximumKobo: string): bigint {
+  // Validate using the shared aggregate boundary, including the 30-digit limit.
+  formatAggregateNaira(maximumKobo);
+  const maximum = BigInt(maximumKobo);
+  const power = 10n ** BigInt(Math.max(0, maximumKobo.length - 1));
+  const tick = ((maximum + power * 4n - 1n) / (power * 4n) || 1n) * power;
+  const proposed = tick * 4n;
+  return proposed.toString().length > 30 ? maximum : proposed;
+}

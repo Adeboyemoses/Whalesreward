@@ -4,6 +4,7 @@ import {
   validateReportDates,
   reportUncertain,
   reportMoney,
+  reportChartCeiling,
 } from "./admin-reports-api";
 import { AdminError, type adminRequest } from "./admin-api";
 const filters = {
@@ -57,12 +58,10 @@ describe("admin report boundary", () => {
       expect(validateReportDates(from!, to!)).not.toBe("");
   });
   it("rejects a report with different filters or data generation", async () => {
-    const request = vi
-      .fn()
-      .mockResolvedValue({
-        ...report,
-        filters: { ...filters, product: "pms" },
-      });
+    const request = vi.fn().mockResolvedValue({
+      ...report,
+      filters: { ...filters, product: "pms" },
+    });
     const api = new AdminReportsApi(request as typeof adminRequest);
     await expect(api.query(filters)).rejects.toMatchObject({
       code: "invalid_response",
@@ -74,14 +73,12 @@ describe("admin report boundary", () => {
   });
   it("rejects wrong source generation without exposing mixed rows", async () => {
     const api = new AdminReportsApi(
-      vi
-        .fn()
-        .mockResolvedValue({
-          items: [],
-          nextCursor: null,
-          asOf: report.asOf,
-          dataVersion: "43",
-        }) as typeof adminRequest,
+      vi.fn().mockResolvedValue({
+        items: [],
+        nextCursor: null,
+        asOf: report.asOf,
+        dataVersion: "43",
+      }) as typeof adminRequest,
     );
     await expect(api.sources(filters, "42")).rejects.toMatchObject({
       code: "invalid_response",
@@ -134,4 +131,13 @@ describe("admin report boundary", () => {
     ).toBe("₦9,999,999,999,999,999,999,999,999,999.99 · USD 1.23");
     expect(reportMoney([])).toBe("No recorded spend");
   });
+});
+
+it("keeps chart axes in the aggregate bound at maximum precision", () => {
+  expect(reportChartCeiling("3400000")).toBe(4000000n);
+  expect(reportChartCeiling("0")).toBe(4n);
+  expect(reportChartCeiling("999999999999999999999999999999")).toBe(
+    999999999999999999999999999999n,
+  );
+  expect(() => reportChartCeiling("1000000000000000000000000000000")).toThrow();
 });
