@@ -8,11 +8,15 @@ import { CardsPortal } from "./cards";
 import { AuditPortal } from "./audit";
 import { SalesPortal } from "./sales";
 import { SettingsPortal } from "./settings";
+import { ReportsPortal } from "./reports";
+import { OverviewPortal } from "./overview";
 const customerSections = [
   { grant: "customers", label: "Customers", href: "/admin/customers" },
   { grant: "cards", label: "Loyalty cards", href: "/admin/cards" },
 ] as const;
 const portalSections = [
+  { grant: "overview", label: "Overview", href: "/admin" } as const,
+  { grant: "reports", label: "Reports", href: "/admin/reports" } as const,
   { grant: "audit", label: "Audit history", href: "/admin/audit" } as const,
   { grant: "sales", label: "Sales", href: "/admin/sales" } as const,
   ...stationSections,
@@ -68,6 +72,8 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
     path[0] ?? "",
   );
   const settingsRoute = path[0] === "settings";
+  const overviewRoute = !route || path[0] === "overview";
+  const reportsRoute = path[0] === "reports";
   const stationRoute = ["pumps", "prices", "attendants"].includes(
     path[0] ?? "",
   );
@@ -103,6 +109,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
     else if (
       !route &&
       session?.state === "ready" &&
+      !session.permissions?.includes("overview") &&
       !session.permissions?.includes("users") &&
       !session.permissions?.includes("roles")
     ) {
@@ -133,7 +140,12 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
         </div>
       );
     const grants = session.permissions ?? [];
-    if (!route && grants.includes("roles") && !grants.includes("users")) {
+    if (
+      !route &&
+      !grants.includes("overview") &&
+      grants.includes("roles") &&
+      !grants.includes("users")
+    ) {
       return (
         <div className="wr-root wr-admin">
           {link("roles", "Roles & permissions")}
@@ -171,23 +183,27 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
       <AdminShell
         station={session.station?.name ?? ""}
         active={
-          settingsRoute
-            ? "Settings"
-            : customerRoute
-              ? path[0] === "audit"
-                ? "Audit history"
-                : path[0] === "sales"
-                  ? "Sales"
-                  : path[0] === "cards"
-                    ? "Loyalty cards"
-                    : "Customers"
-              : stationRoute
-                ? (stationSections.find(
-                    (item) => item.href === "/admin/" + path[0],
-                  )?.label ?? "Station pumps")
-                : path[0] === "roles"
-                  ? "Roles & permissions"
-                  : "Admin users"
+          reportsRoute
+            ? "Reports"
+            : overviewRoute && grants.includes("overview")
+              ? "Overview"
+              : settingsRoute
+                ? "Settings"
+                : customerRoute
+                  ? path[0] === "audit"
+                    ? "Audit history"
+                    : path[0] === "sales"
+                      ? "Sales"
+                      : path[0] === "cards"
+                        ? "Loyalty cards"
+                        : "Customers"
+                  : stationRoute
+                    ? (stationSections.find(
+                        (item) => item.href === "/admin/" + path[0],
+                      )?.label ?? "Station pumps")
+                    : path[0] === "roles"
+                      ? "Roles & permissions"
+                      : "Admin users"
         }
         items={[
           ...portalSections
@@ -213,26 +229,34 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           </>
         }
       >
-        {!stationRoute && !customerRoute && !settingsRoute && (
-          <div className="wr-pagehead">
-            <div>
-              <div className="wr-eyebrow">Access management</div>
-              <h1 className="wr-page-title">Admin users & roles</h1>
-              <p className="wr-secondary">
-                Named portal accounts and permissions
-              </p>
+        {!stationRoute &&
+          !customerRoute &&
+          !settingsRoute &&
+          !reportsRoute &&
+          !(overviewRoute && grants.includes("overview")) && (
+            <div className="wr-pagehead">
+              <div>
+                <div className="wr-eyebrow">Access management</div>
+                <h1 className="wr-page-title">Admin users & roles</h1>
+                <p className="wr-secondary">
+                  Named portal accounts and permissions
+                </p>
+              </div>
+              <span className="wr-secondary">
+                {session.account.name} · {session.role?.name}
+              </span>
             </div>
-            <span className="wr-secondary">
-              {session.account.name} · {session.role?.name}
-            </span>
-          </div>
-        )}
+          )}
         {error && (
           <p role="alert" className="wr-notice">
             {error}
           </p>
         )}
-        {settingsRoute ? (
+        {reportsRoute ? (
+          <ReportsPortal key={epoch} session={session} />
+        ) : overviewRoute && grants.includes("overview") ? (
+          <OverviewPortal key={epoch} session={session} />
+        ) : settingsRoute ? (
           <SettingsPortal key={epoch} path={path} session={session} />
         ) : customerRoute ? (
           path[0] === "audit" ? (
@@ -246,6 +270,8 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           )
         ) : stationRoute ? (
           <StationPortal key={epoch} path={path} session={session} />
+        ) : path[0] === "overview" ? (
+          <OverviewPortal key={epoch} session={session} />
         ) : !route && !grants.includes("users") && !grants.includes("roles") ? (
           <p role="status">Opening your portal section…</p>
         ) : (
