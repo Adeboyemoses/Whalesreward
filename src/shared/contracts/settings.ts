@@ -119,14 +119,19 @@ export const settingsChangeSchema = z.discriminatedUnion("section", [
     before: retentionSchema,
     after: retentionSchema,
   }),
-  z.strictObject({
-    ...commonChange,
-    section: z.literal("giveaway"),
-    kind: z.enum(["create", "update"]),
-    campaignId: authId,
-    before: timingSchema.nullable(),
-    after: timingSchema,
-  }),
+  z
+    .strictObject({
+      ...commonChange,
+      section: z.literal("giveaway"),
+      kind: z.enum(["create", "update"]),
+      campaignId: authId,
+      before: timingSchema.nullable(),
+      after: timingSchema,
+    })
+    .superRefine((v, ctx) => {
+      if ((v.kind === "create") !== (v.before === null))
+        ctx.addIssue({ code: "custom", message: "Invalid creation history" });
+    }),
 ]);
 export type Settings = z.infer<typeof settingsSchema>;
 export type SettingsChange = z.infer<typeof settingsChangeSchema>;

@@ -32,7 +32,16 @@ CREATE TRIGGER station_timing_bootstrap AFTER INSERT ON station FOR EACH ROW EXE
 ALTER TABLE campaign ADD CONSTRAINT uq_campaign_station UNIQUE(station_id);
 ALTER TABLE campaign ADD CONSTRAINT uq_campaign_station_identity UNIQUE(station_id,id);
 ALTER TABLE settings_version ADD CONSTRAINT settings_campaign_station FOREIGN KEY(station_id,campaign_id) REFERENCES campaign(station_id,id);
-ALTER TABLE settings_version ADD CONSTRAINT settings_policy_station FOREIGN KEY(station_id,timing_policy_version) REFERENCES station_timing_policy(station_id,policy_version) NOT VALID;
+-- Only this approved identity is registered by P-28. Retention may copy an
+-- unsupported historical pin without relabelling it as approved.
+CREATE FUNCTION guard_settings_timing_policy() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.timing_policy_version='campaign-timing-v1' AND NOT EXISTS(
+ SELECT 1 FROM station_timing_policy WHERE station_id=NEW.station_id AND policy_version=NEW.timing_policy_version
+ ) THEN RAISE EXCEPTION 'timing policy is not bound to station' USING ERRCODE='23503'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER settings_policy_station BEFORE INSERT ON settings_version FOR EACH ROW EXECUTE FUNCTION guard_settings_timing_policy();
 ALTER TABLE settings_version ADD CONSTRAINT settings_p28_complete CHECK(section IS DISTINCT FROM 'giveaway' OR timing_policy_version IS DISTINCT FROM 'campaign-timing-v1' OR
  (campaign_id IS NOT NULL AND launch_at IS NOT NULL AND purchase_start IS NOT NULL AND purchase_cutoff IS NOT NULL AND grace_hours IS NOT NULL AND upload_deadline IS NOT NULL AND launch_at<=purchase_start AND purchase_start<purchase_cutoff AND purchase_cutoff<=upload_deadline));
 -- Settings insertion advances generation once; launch is part of that same write.

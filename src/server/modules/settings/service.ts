@@ -78,6 +78,16 @@ async function snapshot(
   // An untracked legacy settings row cannot silently become approved current state.
   if (state?.current_settings_version_id && !saved)
     throw new AuthError("temporarily_unavailable", 503);
+  if (
+    !state?.current_settings_version_id &&
+    (
+      await db.query(
+        "SELECT 1 FROM settings_version WHERE station_id=$1 LIMIT 1",
+        [station.id],
+      )
+    ).rowCount
+  )
+    throw new AuthError("temporarily_unavailable", 503);
   const products = (
     await db.query(
       `SELECT p.code AS product,(SELECT quantity_precision FROM product_price_version v WHERE v.product_id=p.id AND v.station_id=$1 ORDER BY v.effective_from DESC,v.id DESC LIMIT 1) AS "quantityPrecision" FROM product p ORDER BY p.code`,
@@ -176,6 +186,39 @@ async function snapshot(
     },
   });
 }
+/** Legacy giveaway snapshots predate explicit kind/target fields. Add only the
+ * campaign identity retained on that same immutable settings version. */
+async function changeProjection(
+  db: pg.PoolClient,
+  stationId: string,
+  value: unknown,
+) {
+  const parsed = settingsChangeSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  if (
+    value &&
+    typeof value === "object" &&
+    "section" in value &&
+    value.section === "giveaway" &&
+    "id" in value &&
+    typeof value.id === "string"
+  ) {
+    const row = (
+      await db.query(
+        `SELECT v.campaign_id FROM settings_change c JOIN settings_version v ON v.id=c.settings_version_id AND v.station_id=c.station_id WHERE c.id=$1 AND c.station_id=$2`,
+        [value.id, stationId],
+      )
+    ).rows[0];
+    if (row?.campaign_id && !("kind" in value) && !("campaignId" in value)) {
+      return settingsChangeSchema.parse({
+        ...value,
+        kind: "update",
+        campaignId: row.campaign_id,
+      });
+    }
+  }
+  throw new AuthError("temporarily_unavailable", 503);
+}
 const now = async (db: pg.PoolClient) =>
   (
     await db.query<{ at: string }>(
@@ -217,9 +260,11 @@ export async function readSettings(
         [station.id, query.section ?? null, beforeVersion, query.limit + 1],
       )
     ).rows;
-    const items = rows
-      .slice(0, query.limit)
-      .map((r) => settingsChangeSchema.parse(r.snapshot));
+    const items = await Promise.all(
+      rows
+        .slice(0, query.limit)
+        .map((r) => changeProjection(db, station.id, r.snapshot)),
+    );
     const last = items.at(-1);
     return {
       items,
@@ -529,7 +574,7 @@ async function commitTiming(
             id,
             campaignVersion,
             station.id,
-            p.kind === "create" ? 1 : p.expectedCampaignVersion,
+            p.expectedCampaignVersion,
           ],
         );
   if (campaignResult.rowCount !== 1)
@@ -841,6 +886,6 @@ export async function confirmSettings(
         return change;
       },
     );
-    return { data: settingsChangeSchema.parse(data), replayed };
+    return { data: await changeProjection(db, station.id, data), replayed };
   });
 }
