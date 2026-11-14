@@ -51,10 +51,14 @@ type HealthPolicies = {
 | `phoneVerification` | M3 phone verification delivery, expiry and attempt policy; `phone_verification_unconfigured` |
 | `recovery` | M3 recovery session/grant expiry and device-binding policy; `recovery_policy_unconfigured` |
 | `reconciliation` | M4 reconciliation checklist and complete-photo receipt evidence policy; `reconciliation_policy_unconfigured` |
-| `timing` | M4 approved timing/provisioning/change-window policy; `timing_policy_unconfigured` |
+| `timing` | M4 P-28 recorded approved campaign-timing-v1 policy with station binding and matching installed evaluator; `timing_policy_unconfigured` |
 | `cardPrint` | Valid PDF layout under the existing card print validator; `print_layout_unconfigured` |
 | `duplicateWindow` | M3 P-24 valid, active duplicate window policy; missing configuration disables time-based detection only, never photo-digest detection or credit |
 | `reviewEvidence` | M3 P-25 active, approved review-evidence-v1 policy with matching digest/scope and all four installed evaluators; unsupported outcomes retain explicit denials |
+
+**Amended by WO-spec-4b / WHR-138, 14 Nov 2026.** `policies.timing` becomes configured when the immutable approved P-28 policy version `campaign-timing-v1` and station binding are recorded and its matching evaluator is installed, as specified in [M4 Settings](m4.md#policy-review-commit-and-replay). The follow-up core migration records this already approved policy without campaign values; no timing environment variable or manual ops activation is required. Missing/unsupported policy, invalid binding or missing evaluator stays unconfigured. Read policy storage with bounded database access; storage failure preserves the existing 503 database semantics. Recording policy is not an effect of health or a Settings request.
+
+Campaign values may still be null and campaign absent while timing health is configured: those are campaign readiness blockers. An Owner later supplies all values through reviewed Settings. Timing health neither approves reconciliation/complete-photo proof nor permits finalization or evidence deletion. Preserve the twelve-key allowlist, full-live-settings-admin projection and aggregate public fallback; expose no policy identity, approval source, version, digest or client values through health. This specification does not change the currently hard-coded unconfigured runtime evaluator.
 
 **Amended by WO-spec-3k, 12 Nov 2026.** [P-26](m3.md#meter-reconciliation--p-26) defines `meter` readiness. All deployment-supported current pump/product/precision combinations need valid approved profiles; gaps or missing evaluators/dependencies report unconfigured. Health checks configuration only, not historical sale/photo sufficiency. A configured policy can still reject an older sale without full interval coverage. Specification approval does not activate runtime policy. Existing settings-only projection, aggregate public response and redaction apply; expose no profile, step, approval, version or digest. `reviewEvidence` alone never enables meter correction.
 
