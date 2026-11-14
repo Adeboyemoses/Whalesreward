@@ -248,7 +248,7 @@ Earl accepted WO-core-2 on 4 November 2026. Database constraints and pure helper
 | Admin 1 · Sign in, first password, sign out | B01 B08 B09 B18 | WO-app-4 | tests/design-parity/admin-access/REPORT.md (32 sanitized screenshots; limitations below) | accepted WO-app-4 implemented states; M01/M02 fidelity follow-up WHR-70; H07 reference-only |
 | Admin 2 · Password recovery | B10 B11 M02 B12 B13 | WO-app-4 | tests/design-parity/admin-access/REPORT.md (32 sanitized screenshots; limitations below) | accepted WO-app-4 implemented states; M01/M02 fidelity follow-up WHR-70; H07 reference-only |
 | Admin 3 · Email verification | B14 M01 B15 B16 B17 | WO-app-4 | tests/design-parity/admin-access/REPORT.md (32 sanitized screenshots; limitations below) | accepted WO-app-4 implemented states; M01/M02 fidelity follow-up WHR-70; H07 reference-only |
-| Admin 4 · Overview | B02 | WO-app-12, WO-spec-4 (spec only) |  | todo |
+| Admin 4 · Overview | B02 | WO-app-12 (WHR-25), WO-spec-4 | tests/design-parity/reports/REPORT.md (1440/390 px; runtime-data/contract differences documented) | on-staging; Earl M4 smoke pending |
 | Admin 5 · Sales and exception reviews | B03 B04 S01 S02 S03 S04 S06 S07 S09 | WO-app-7, WO-app-8 | | todo |
 | Admin 6 · Customers and account changes | C01 B05 S08 C02 C03 C04 C05 | WO-app-6, WO-app-9 | tests/design-parity/customers-cards/REPORT.md (C01/B05/S08 only,1440/390) | M2 read slice C01/B05/S08 on-staging, acceptance pending; C02–C05 remain todo/M3 |
 | Admin 7 · Loyalty cards | B06 K01 K04 K02 K05 K06 K03 | WO-app-6 | tests/design-parity/customers-cards/REPORT.md (1440/390; actual protected PDF/QR; native interior limitation below) | on-staging; Earl combined smoke/physical-print acceptance pending |
@@ -256,7 +256,7 @@ Earl accepted WO-core-2 on 4 November 2026. Database constraints and pure helper
 | Admin 9 · Station pumps | F01 F02 F03 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
 | Admin 10 · Product prices | F05 F06 F07 F08 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
 | Admin 11 · Leaderboards and finalization | E01 E02 E04 E03 | WO-app-11, WO-spec-4 (spec only) |  | todo |
-| Admin 12 · Reports | E05 E06 E07 | WO-app-12, WO-spec-4 (spec only) |  | todo |
+| Admin 12 · Reports | E05 E06 E07 | WO-app-12 (WHR-25), WO-spec-4 | tests/design-parity/reports/REPORT.md (1440/390 px; runtime-data/contract differences documented) | on-staging; Earl M4 smoke pending |
 | Admin 13 · Audit history | G01 G02 G03 G04 G05 | WO-app-10 | | todo |
 | Admin 14 · Settings | B07 T01 T03 T02 T04 | WO-app-13, WO-spec-4 (spec only) |  | todo |
 | Admin 15 · Admin users | H01 H02 H09 H03 H04 | WO-app-4; WO-app-4a | tests/design-parity/admin-access/REPORT.md (32 sanitized screenshots; limitations below); tests/design-parity/admin-navigation/REPORT.md (H01/H04/H05/H08 only, eight captures) | accepted WO-app-4 implemented states; M01/M02 fidelity follow-up WHR-70; H07 reference-only; WO-app-4a focused regression accepted 9 Nov 2026 |
@@ -812,3 +812,19 @@ Rook should draft/number the listed high-tier core snapshot and app adoption/not
 | E01–E07, B02, B07, T01–T04 | Existing M4 screen scope only; no UI implementation or screenshot comparison in this work order | Board parity unchanged |
 
 Register-ready questions are in [the PROPOSAL](proposals/m4-client-decisions.md) and on existing WHR-54/55/56; D09 values are attached to WHR-55. Q-528/Q-555–Q-559 retain their independent gates. M4's implementation-gap table is the handoff to WO-core-12/13/14, not permission to start them or activate policy.
+
+
+## WO-app-12 / WHR-25 overview and reports READY — 14 Nov 2026
+
+[Feature PR #141](https://github.com/Adeboyemoses/Whalesreward/pull/141) merged green at `44c2690`; reviewed source `8766e2d`. Earl approved test-only round 4, with fresh code/security/integrity PASS and no new findings or product changes. This separate records PR completes READY. Evidence: `.review/app__wo-12-admin-reports.md`; smoke: `docs/qa/smoke-2026-11-14-admin-reports.md`.
+
+| Invariants / boards | Named tests and independent evidence | Status |
+|---|---|---|
+| I-07, I-09 | `reports-real.spec.ts`: overview unavailable projections, live permission revocation fences late report responses, matching attention destinations, protected exports | on-staging UI/API integration; server authority unchanged |
+| I-29, I-40, I-42, I-44 | `reports-real.spec.ts`: accepted values and exclusions/source date evidence; exact viewed-generation PDF/Excel checksums; same-operation uncertain replay; unit-separated totals; `admin-reports-api.test.ts` exact parsing and 30-digit chart boundary | on-staging operational reports only; no prize ranking or credit policy change |
+| I-42 | `reports-real.spec.ts`: stale source generation requires refresh; delayed old filters cannot publish; pending source/group refresh cannot publish or unlock a newer pager | on-staging generation consistency |
+| I-45 | `reports-real.spec.ts`: null launch/unavailable projections never become sample totals | on-staging honest configuration display; no campaign setting changed |
+| B02, E05, E06, E07 | `tests/design-parity/reports/REPORT.md`: six PNGs/six metrics, 1440/390 px, four presentation findings resolved; explicit fixture/contract differences | on-staging; Earl M4 smoke pending |
+| Test infrastructure | `tests/unit/reports-database.test.ts`: six no-network WHR-149 guard cases; worker-specific real Next/schema fixtures keep parallel report prices/generations separate | on-staging supporting tests; no production change |
+
+EM combined-head typecheck/lint/build, 885 unit and serial browser 384/four existing skips PASS. CI: 1,154 PostgreSQL, timezone 5+5, browser 384/four skips/zero retries and storage 1 PASS. Focused reports 24 PASS; fidelity capture 1 PASS. WHR-142 remains the inherited Settings fixture coupling: two local parallel metadata-stale refusals exhausted bounds, four isolated reruns and full CI/serial verification passed unchanged. No assertion, retry/timeout bound or production guard was weakened. WHR-149 is fixed; WHR-151 starts in a new session.
