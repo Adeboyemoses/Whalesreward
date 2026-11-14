@@ -1,13 +1,13 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../reports/test";
 import { createHash } from "node:crypto";
 import {
   reportsBrowserFixture,
   viewedReport,
   prepareExport,
   origin,
+  api,
 } from "../reports/helpers";
 import type { ReportSource } from "../../src/shared/contracts/reports";
-import { api } from "../station/helpers";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
 test.setTimeout(60000);
