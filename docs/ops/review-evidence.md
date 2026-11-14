@@ -14,27 +14,24 @@ Run `pnpm ops:review-evidence --help` from the reviewed checkout using the pinne
 
 ### One-time database identity (Earl only)
 
-WHR-116 Option A requires Earl to set `whr.environment` once per database with his admin database user. This is separate from the operator command and application environment. Connect through Earl's secured PostgreSQL client workflow to the intended database and verify its identity privately. **Before changing anything**, inspect the persisted value with this query inside psql, not `SHOW` or `current_setting()`:
+WHR-143 stores the environment label in an owner-written **database comment**. Earl sets it once per database as the database owner (including a non-superuser owner such as managed PostgreSQL's `doadmin`). This is separate from the operator command and application environment. Connect through Earl's secured PostgreSQL client workflow to the intended database and verify its identity privately. **Before changing anything**, inspect the persisted comment with this query inside psql, not `SHOW` or `current_setting()`:
 
 ```sql
-SELECT database.datname, entries.setting
-FROM pg_catalog.pg_db_role_setting AS settings
-JOIN pg_catalog.pg_database AS database ON database.oid = settings.setdatabase
-CROSS JOIN LATERAL pg_catalog.unnest(settings.setconfig) AS entries(setting)
-WHERE database.datname = pg_catalog.current_database()
-  AND settings.setrole = 0
-  AND pg_catalog.split_part(entries.setting, '=', 1) = 'whr.environment';
+SELECT database.datname,
+       pg_catalog.shobj_description(database.oid, 'pg_database') AS environment_identity
+FROM pg_catalog.pg_database AS database
+WHERE database.datname = pg_catalog.current_database();
 ```
 
-If exactly one matching value already exists, leave it unchanged. If an existing value differs, is malformed or appears more than once, stop; do not relabel the database to make a command pass. **Only when the query returns no rows**, Earl performs the one-time initial setup below inside psql for staging. For another environment, replace `staging` with exactly `development`, `test` or `production` as appropriate. The identifier is quoted from the actual connected database name; no connection string appears in the SQL.
+If the comment already exactly matches the deliberately selected `whr.environment=<environment>`, leave it unchanged. If an existing non-null comment differs, is malformed or contains extra text, stop; do not overwrite it or relabel the database to make a command pass. `COMMENT ON DATABASE` replaces the whole database comment, so it is reserved for this exact label; never append other descriptions or put secrets in it. **Only when the query returns one row with a null comment**, Earl performs the one-time initial setup below inside psql for staging. For another environment, replace `staging` with exactly `development`, `test` or `production` as appropriate. The identifier and label are safely quoted from the actual connected database name and deliberate environment; no connection string appears in the SQL.
 
 ```sql
-SELECT pg_catalog.format('ALTER DATABASE %I SET whr.environment = %L', pg_catalog.current_database(), 'staging') \gexec
+SELECT pg_catalog.format('COMMENT ON DATABASE %I IS %L', pg_catalog.current_database(), 'whr.environment=staging') \gexec
 ```
 
-Run the same persisted-value SELECT again. Expect exactly one row with `whr.environment=staging` (or the deliberately selected environment). Database ownership/admin privileges control this setting: restrict those privileges to authorized operators. The operator command never provisions, repairs or changes the setting. No agent or test runs this setup against managed infrastructure.
+Run the same persisted-comment SELECT again. Expect exactly one row with `whr.environment=staging` (or the deliberately selected environment). Database ownership controls this comment; a superuser can also change it. Restrict those privileges to authorized operators. No superuser parameter privilege is needed for the owner to set the comment. The operator command never provisions, repairs or changes it. No agent or test runs this setup against managed infrastructure.
 
-Every preview and apply compares the explicit `--environment` with this exact database-level catalog entry. Missing, malformed, duplicate or mismatched entries refuse the operation. `WHR_ENV`, `NODE_ENV`, session `SET`, connection-string `options`, role settings and role-in-database settings cannot establish or override database identity. A runtime application setting still needs to match the applied policy as described below.
+Every preview and apply compares the explicit `--environment` with this exact current-database comment. Missing, malformed, extra-text or mismatched labels refuse the operation. A legacy persisted `whr.environment` custom parameter is not identity authority. `WHR_ENV`, `NODE_ENV`, session `SET`, startup `-c` connection options, role settings and role-in-database settings cannot establish or override database identity. A runtime application setting still needs to match the applied policy as described below.
 
 ### Preview and apply
 

@@ -24,13 +24,20 @@ import {
 
 const name = `meter_operator_${randomUUID().replaceAll("-", "")}`;
 const identifier = pg.escapeIdentifier(name);
+const ownerName = `meter_owner_${randomUUID().replaceAll("-", "")}`;
+const ownerIdentifier = pg.escapeIdentifier(ownerName);
 let root: pg.Pool, pool: pg.Pool, databaseUrl: string, directory: string;
 beforeAll(async () => {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL required");
   root = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-  await root.query(`CREATE DATABASE ${identifier}`);
+  await root.query(
+    `CREATE ROLE ${ownerIdentifier} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'meter-operator-fixture'`,
+  );
+  await root.query(`CREATE DATABASE ${identifier} OWNER ${ownerIdentifier}`);
   const url = new URL(process.env.DATABASE_URL);
   url.pathname = `/${name}`;
+  url.username = ownerName;
+  url.password = "meter-operator-fixture";
   databaseUrl = url.toString();
   pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
   const migrations = new URL("../../prisma/migrations/", import.meta.url);
@@ -43,8 +50,9 @@ beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "meter-operator-"));
 }, 30000);
 beforeEach(async () => {
-  await root.query(`ALTER DATABASE ${identifier} RESET ALL`);
-  await root.query(`ALTER DATABASE ${identifier} SET whr.environment='test'`);
+  await pool.query(
+    `COMMENT ON DATABASE ${identifier} IS 'whr.environment=test'`,
+  );
 });
 afterAll(async () => {
   await pool?.end();
@@ -62,6 +70,7 @@ afterAll(async () => {
       await new Promise((r) => setTimeout(r, 20));
     }
     await root.query(`DROP DATABASE IF EXISTS ${identifier}`);
+    await root.query(`DROP ROLE IF EXISTS ${ownerIdentifier}`);
     await root.end();
   }
   if (directory) await rm(directory, { recursive: true, force: true });
@@ -176,6 +185,17 @@ async function counts(station: string) {
     ),
   );
 }
+it("runs meter operations as a non-superuser database owner", async () => {
+  const identity = await pool.query(
+    `SELECT role.rolsuper, database.datdba = role.oid AS owns_database
+     FROM pg_catalog.pg_roles AS role
+     JOIN pg_catalog.pg_database AS database ON database.datname = pg_catalog.current_database()
+     WHERE role.rolname = CURRENT_USER`,
+  );
+  expect(identity.rows).toEqual([{ rolsuper: false, owns_database: true }]);
+  const { input } = await fixture();
+  await expect(operate(pool, input)).resolves.toMatchObject({ applied: false });
+});
 it("previews exact approved rows in a read-only transaction without writes", async () => {
   const { input, bundle } = await fixture();
   const result = await operate(pool, input);
@@ -273,7 +293,7 @@ it("requires recorded matching database identity even for preview and production
   await expect(
     operate(pool, { ...input, environment: "production" }),
   ).rejects.toThrow("environment");
-  await root.query(`ALTER DATABASE ${identifier} RESET ALL`);
+  await pool.query(`COMMENT ON DATABASE ${identifier} IS NULL`);
   await expect(operate(pool, input)).rejects.toThrow("environment");
   expect(await counts(input.stationId)).toEqual([0, 0, 0, 0]);
 });
