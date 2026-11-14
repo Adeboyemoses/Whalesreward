@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Download } from "lucide-react";
+import { ChevronDown, Download } from "lucide-react";
 import { AdminError } from "@/client/admin-api";
 import {
   AdminReportsApi,
@@ -599,24 +599,27 @@ function ReportsContent({ session }: { session: AdminSession }) {
           <label className="wr-label" htmlFor="report-product">
             Product
           </label>
-          <select
-            className="wr-input wr-select"
-            id="report-product"
-            value={filters.product ?? ""}
-            onChange={(e) =>
-              change({
-                ...filters,
-                product: (e.target.value as ReportFilter["product"]) || null,
-              })
-            }
-          >
-            <option value="">All products</option>
-            {Object.entries(productNames).map(([code, name]) => (
-              <option key={code} value={code}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <div className="wr-select-wrap">
+            <select
+              className="wr-input wr-select"
+              id="report-product"
+              value={filters.product ?? ""}
+              onChange={(e) =>
+                change({
+                  ...filters,
+                  product: (e.target.value as ReportFilter["product"]) || null,
+                })
+              }
+            >
+              <option value="">All products</option>
+              {Object.entries(productNames).map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={18} aria-hidden="true" />
+          </div>
         </div>
         <p className="wr-help" id="report-date-help">
           Both dates are required and inclusive. An inverted range blocks the
