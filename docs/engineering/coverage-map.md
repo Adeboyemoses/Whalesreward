@@ -2,6 +2,24 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-core-14b Owner campaign setup READY (WHR-150)
+
+[Feature PR #143](https://github.com/Adeboyemoses/Whalesreward/pull/143) merged at `36f1210` with five green PR checks. Code/security/integrity PASS round 3 at `9780c30`; evidence-only PR head `b42ecd4`. EM typecheck/lint/build/Prisma, unit 871, PostgreSQL 1,154, timezone 5+5 and Linux browser 360/four existing skips PASS. This separate records merge completes READY; Earl's end-of-M4 smoke remains pending.
+
+[The named acceptance map](../../tests/integration/p28-acceptance.md) covers the core P-28 list. The following entries add server coverage; WHR-151 owns the setup screens and their parity checks.
+
+| Invariants / boundary | Named verification | Status |
+|---|---|---|
+| I-07/I-08/I-09/I-11 live authority | `p28-campaign-settings.test.ts`: settings-only non-Owner denied on review, confirmation and historical replay; Owner demotion, settings removal, disable and session revocation between review and confirm | on-staging; Owner-only server setup |
+| I-22 exactly-once confirmation | Different create keys racing produce exactly one campaign/settings version/audit/receipt; lost-response replay after start and snapshot; changed content, kind, precision or unsupported timestamp representation conflicts | on-staging; immutable Domain receipt |
+| I-41 immutable audit and configuration | Create/update audit search/detail exact fields; safe historical version-two fallback; receipt failure rolls back all effects; non-superuser registry update/delete/truncate denial; fresh and repeated station bootstrap and existing-station migration | on-staging; policy registry and timing history |
+| I-45/I-45a timing inputs and trusted boundaries | All five inputs; zero/invalid/overflow grace; named IANA timezone; exact old/proposed start equality; waiting confirmation crosses start; launch-before-now allowed; inclusive microsecond cutoff/deadline; PostgreSQL-invalid and UTC year-boundary representation cases | on-staging; campaign timing only, complete-photo proof remains separate |
+| I-45/I-46 locks and lineage | Any saved snapshot locks despite null latest pointer; explicit legacy null start versus broken history; retention races require fresh review; first giveaway version two and genuine history gaps; generation invalidates stale comparisons | on-staging; existing snapshots stay immutable |
+| I-28/I-45a/I-51 preservation | `settings-timing-lineage.test.ts`: real non-Lagos P-28 sync across retention versions and retained pre-upgrade P-25 provenance. P-28 tests preserve accepted amounts, capture facts, held sales and evidence; retention never moves the timing pin | on-staging; no new credit, hold-clearing or deletion authority |
+| I-07/I-45 protected health | Recorded supported policy without campaign; absent definition/binding/evaluator; mismatch and storage outage; non-superuser outage retains 503 and public redaction | on-staging; configuration status only |
+
+No campaign values were seeded, and no managed database or cloud operation was performed. Reconciliation/complete-photo proof and retention deletion remain separate gates. Feature PR #143 changed no STATUS, coverage-map or lane files. No B07/T01/T03 parity advance is claimed.
+
 
 
 

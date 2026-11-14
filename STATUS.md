@@ -1,9 +1,12 @@
 # STATUS.md
-Updated: 2026-11-13
+Updated: 2026-11-14
 
 ## Milestone: M1 phone exit accepted; last M2 registration/customer/card screens READY; batched M2 staging smoke pending (docs/engineering/roadmap.md); M3 corrections backend READY; review-evidence-v1 specification READY; P-26 meter reconciliation specification READY; P-27 online price refresh specification READY; audit catalogue reconciliation READY; M4 reconciliation and client decision pack READY on reviewed green records merge
 
+M4 update: P-28 Owner campaign setup backend is READY on staging; WHR-151 supplies the separate T2 screens.
+
 ## Done this week
+- WO-core-14b (WHR-150): Owner campaign setup and timing merged in [feature PR #143](https://github.com/Adeboyemoses/Whalesreward/pull/143) at `36f1210`, with all five PR checks green. Reviewed source `9780c30`; PR head `b42ecd4`; code/security/integrity PASS round 3. EM typecheck/lint/build/Prisma, 871 unit, 1,154 PostgreSQL, timezone 5+5 and Linux browser 360/four existing skips PASS. The approved immutable timing registry, station binding, Owner review/confirm, audit and health are implemented; campaign values remain Owner-entered. [Named acceptance evidence](tests/integration/p28-acceptance.md). This separate records PR completes READY; WHR-150 stays In Review for Earl's end-of-M4 smoke.
 - WO-spec-4a (WHR-133): [Spec PR #133](https://github.com/Adeboyemoses/Whalesreward/pull/133) merged at 527bd45 with five green checks. M4 reconciles P-20–P-27, typed campaign provenance, WHR-100 status/health and audit v2 against WO-spec-3m. Separate client PROPOSAL covers WHR-54/55/56 and D09 values. Code/security/integrity PASS, round 1, no findings. After a clean base update, EM typecheck/lint, 841 unit tests, build and evidence PASS. READY completes on this reviewed records merge; no runtime coverage or policy activation claimed.
 - WO-spec-3m (WHR-130): [Spec PR #127](https://github.com/Adeboyemoses/Whalesreward/pull/127) merged at f7b5d18 with five green checks. M3 audit catalogue and source writer inventory cover 50 actions through P-27. Exact action/actor/target/field tables cover duplicates, review-evidence operations, meter decisions, card verification, price activation and assignment end. Privacy excludes phones, verification/card codes, digests, URLs and notes; historical rows use safe projection without rewriting. AU-01–AU-10 hand off writer/query fixes and dependencies to WO-core-11. Code/security/integrity PASS round 2; EM typecheck/lint, 802 unit tests, build, paragraphs, links and evidence PASS. READY completes on this separate records merge. No implementation, runtime activation or board parity claimed.
 - WO-spec-3l (WHR-125): [P-27 spec PR #122](https://github.com/Adeboyemoses/Whalesreward/pull/122) merged at 237a6d6 with five green checks. M1/M2 specify strict legacy-tolerant prices on existing online calls, atomic adoption for new drafts and keep-and-warn for composed drafts. Saved/queued/settled sales, P-20/P-23 bounds and offline behavior are unchanged; no polling. Code/security/integrity PASS round 1, no findings. EM typecheck/lint, 689 unit tests, build, links, paragraph limit and evidence PASS. READY completes on this separate records merge. Core/app follow-ons and PR-T1-01–12 are listed for Rook; no runtime implementation or parity claimed.
@@ -56,6 +59,7 @@ Updated: 2026-11-13
 - WO-core-3 (WHR-4): READY on reviewed green staging merge of [PR #30](https://github.com/Adeboyemoses/Whalesreward/pull/30). Better Auth username sign-in, revocable database sessions, immutable capture contexts, strict M1 wrappers, durable replay/throttling and safe fixture seeding. EM typecheck/lint/unit 77/build, fresh PostgreSQL integration 65, time 3 per timezone and real HTTP Playwright 1 passed; full browser CI required before merge because local Chromium startup is sandbox-blocked. Independent verdicts are in `.review/core__wo-3-attendant-auth.md`. Runbook: `docs/qa/smoke-2026-11-05-attendant-auth.md`. Stop at READY; Earl's acceptance and real-phone checks remain pending.
 
 ## In progress
+- WHR-150 is READY for end-of-M4 smoke after this records merge. WHR-151 / WO-app-13b is the separate T2 screen follow-up; no screen parity is claimed here.
 - lane:spec: WHR-130 stops at READY after its reviewed green staging merge; keep In Review for Earl. No WO-core-11 implementation starts in this session. Prior work-order acceptance states are unchanged.
 - WHR-99 remains open: WO-spec-3e is READY; WO-core-7c implementation is still pending. This spec session stops without starting it.
 
@@ -67,6 +71,7 @@ Updated: 2026-11-13
 - WO-app-0 (WHR-33): ACCEPTED by Earl on 5 November 2026 (“Accept WO-app-0 (WHR-33)”). Six briefs and three draft phone runbooks merged in PRs #2 and #9; documentation closeout takes effect on green staging merge. No app implementation or device verification claimed.
 
 ## Blocked / decisions needed
+- Remaining M4 gates include Owner-entered campaign values, the separate reconciliation/complete-photo proof work and approved retention deletion. P-28 timing configuration does not activate those policies.
 - P-26: WHR-118–122 are decided as recommended. Q-559 measured display steps and verified meter behaviour remain required for approved profiles. Rook should mirror P-26 in product docs; specification approval does not activate meter reconciliation.
 - P-25: Q-556 client confirmation and existing Q-528 remain pending. Rook must mirror the approved build policy in product docs. Q-557 two-person attestation is undecided and supplies no implementation authority.
 - P-24: client Q-555 confirmation remains pending; Rook must mirror the decision in product docs. This does not block the approved specification handoff.
@@ -84,6 +89,7 @@ Updated: 2026-11-13
 - Launch date versus the December campaign start.
 
 ## Next up
+- T2 starts WHR-151 campaign setup screens in a fresh session. T1 stops after WHR-150 READY.
 - Rook: fold the [audit writer fixes AU-01–AU-10](docs/engineering/contracts/m3-audit-inventory.md#writer-fixes-handed-to-wo-core-11--whr-20) into WO-core-11 / WHR-20. Missing recovery/meter implementations remain explicit dependencies.
 - Core: after WHR-114 READY records merge, start WHR-18 (WO-core-10) in a fresh session, as Earl instructed on 12 Nov. WHR-114 remains In Review for Earl’s operational verification. This supersedes older core next-session notes below.
 - lane:spec: stop at WHR-125 READY. Rook should draft/number Core P-27 online price snapshots, then App P-27 price adoption and draft notices, as listed in M1; mirror P-27 in product docs. No next work order is started. Meter implementation and profile activation remain separate.
@@ -97,6 +103,7 @@ Updated: 2026-11-13
 - WO-core-15 stops at READY for Earl’s provisioning, provider spec validation, private bucket/CORS and three secret settings, HTTPS health/gallery checks and next-merge redeployment proof. WHR-41 is closed. WHR-4 attendant sign-in stops at READY after PR #30 merges with green CI; Earl reads verification and runs the phone checks; WO-spec-4 (WHR-51) is accepted; lane:spec stops after closing accepted WO-spec-3b (WHR-61); no new work order is authorized.
 
 ## Known risks
+- WHR-150 seeds no campaign values and enables no evidence deletion or reconciliation/photo-proof policy. Verification used disposable local PostgreSQL with fictional data. Feature dispatch count 13 exceeds the high-tier flag of eight; review stayed within three rounds, with no escalation or open findings.
 - WHR-130 is spec only: current writer omissions/nonconforming shapes remain until WO-core-11 and the named dependencies implement them. General audit queries must not expose raw historical payloads.
 - P-27 is specification only. Refresh preserves the original P-20/P-23 interval and cannot eliminate every price hold. Idle/offline phones learn on the next ordinary successful call; no polling or extra price-only requests.
 - WHR-114 prepares the operator command only. Earl must set database-level `whr.environment` once, supply his own secured connection, approve the concrete revision/digest/scope/time, and manually set the policy plus check protected health. No managed environment has been activated by this work.
