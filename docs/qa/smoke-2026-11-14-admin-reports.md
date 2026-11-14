@@ -15,4 +15,4 @@ Use fictional local fixtures for automated checks. Earl may repeat the read/expo
 11. At 390 px and keyboard-only, check readable controls, visible focus and contained table scrolling. Confirm no board sample values, campaign totals or invented configured dates appear.
 
 ## Execution evidence
-Pending final local gates, real-stack Playwright and independent fidelity report.
+EM typecheck, lint, production build and 878 unit tests passed. Focused real-stack Playwright: 20 passed, zero failures/skips; actual PDF/XLSX bytes match server checksums. Independent fidelity: one capture test passed, six screenshots and six geometry records at 1440/390 px; all four presentation findings resolved. See `tests/design-parity/reports/REPORT.md`. Full serial regression results and final independent reviewer verdicts are recorded in `.review/app__wo-12-admin-reports.md` and the feature PR. Native Chromium is sandbox-blocked on this host, so browser checks use the matching Playwright Linux container and disposable local databases. Campaign values remain unset; no staging data or configuration was changed.
