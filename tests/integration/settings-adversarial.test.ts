@@ -409,7 +409,7 @@ describe("WHR-26 independent settings transaction verification", () => {
     ).toBe(401);
   });
 
-  it("I-45 unapproved timing fails closed with a non-retryable domain conflict and no writes", async () => {
+  it("I-45 legacy incomplete timing payloads fail strict P-28 validation without writes", async () => {
     const current = await settings();
     const campaign = newId();
     await f.pool.query(
@@ -433,9 +433,9 @@ describe("WHR-26 independent settings transaction verification", () => {
       ],
     ] as const) {
       const result = await call(route, body);
-      expect(result.response.status, JSON.stringify(result.body)).toBe(409);
+      expect(result.response.status, JSON.stringify(result.body)).toBe(400);
       expect(result.body.error).toMatchObject({
-        code: "timing_policy_unconfigured",
+        code: "invalid_request",
         retryable: false,
       });
     }
@@ -641,11 +641,11 @@ describe("WHR-26 independent settings transaction verification", () => {
     expect(projected.changes).toEqual([]);
   });
 
-  it("I-07 timing health remains unconfigured and only current settings admins can see the named status", async () => {
+  it("I-07 registered timing health is configured and only current settings admins can see the named status", async () => {
     const before = await domainRows();
     const protectedResult = await call(healthResponse);
     expect(protectedResult.response.status).toBe(200);
-    expect(protectedResult.body.policies.timing).toBe("unconfigured");
+    expect(protectedResult.body.policies.timing).toBe("configured");
     expect(protectedResult.body.policies.reconciliation).toBe("unconfigured");
     expect(protectedResult.body.fullyConfigured).toBe(false);
     expect(protectedResult.body.policies).not.toHaveProperty("retention");

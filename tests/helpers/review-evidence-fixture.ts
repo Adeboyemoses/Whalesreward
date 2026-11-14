@@ -86,7 +86,23 @@ export async function resetReviewFixture(pool: pg.Pool) {
   ).rows[0]!.schema;
   if (!/^(?:evidence|reviews|review_adversaries)_[0-9a-f]+$/.test(schema))
     throw new Error("Review fixture reset requires its isolated test schema");
-  await seedHistorical(pool, "audit_event", "TRUNCATE station,card CASCADE");
+  // The P-28 binding is immutable, including TRUNCATE. Only this explicitly
+  // disposable fixture reset suspends its guard, in the same transaction.
+  const db = await pool.connect();
+  try {
+    await db.query("BEGIN");
+    await db.query("ALTER TABLE audit_event DISABLE TRIGGER USER");
+    await db.query("ALTER TABLE station_timing_policy DISABLE TRIGGER USER");
+    await db.query("TRUNCATE station,card CASCADE");
+    await db.query("ALTER TABLE station_timing_policy ENABLE TRIGGER USER");
+    await db.query("ALTER TABLE audit_event ENABLE TRIGGER USER");
+    await db.query("COMMIT");
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  } finally {
+    db.release();
+  }
 }
 export async function activate(
   pool: pg.Pool,
