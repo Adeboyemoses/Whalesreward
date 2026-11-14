@@ -1,20 +1,20 @@
 # lane:app
-WO-app-6 (WHR-13) Registration, customers and loyalty cards: READY since 2026-11-09
+WO-app-12 (WHR-25) Overview and reports: READY since 2026-11-14
 
 ## In flight
-- Feature [#86](https://github.com/Adeboyemoses/Whalesreward/pull/86) merged green at ffb18b7; this separate records PR completes READY. Code/security/integrity PASS round 3 at b04c9fb. Core independently reviewed the WHR-85 shared aggregate proposal/local fixture scope and owned the merge. Server authority and original capture bounds/queues remain unchanged.
-- Online registration, canonical duplicate handling and fresh-card sale handoff; masked customers and scoped purchase reads; reviewed Generated/Printed/Active lifecycle, protected immutable PDF/XLSX preparation/preview/download. No M3 recovery or account-change controls.
-- EM typecheck/lint/build and 413 unit tests PASS; Linux default 214 PASS/four existing staging-only skips, two workers/zero retries; actual policy 3 PASS. Independent parity 4 PASS, all 13 boards plus A24, 28 PNGs/28 metrics and two actual PDF/QR probes. Reports: tests/customers-cards/BASELINE.md, tests/design-parity/customers-cards/REPORT.md; evidence .review/app__wo-6-customers.md.
+- [Feature #141](https://github.com/Adeboyemoses/Whalesreward/pull/141) merged green at `44c2690`. PR head `66b32ef`; reviewed source `8766e2d`. This separate records PR completes READY. Code/security/integrity PASS round 4 with Earl's explicit exception; no new finding or product-code change in that round.
+- B02/E05–E07: honest launch nulls, scoped projections/attention, exact server totals/chart, unit/currency separation, reported/verified dates, generation-bound groups/sources and frozen PDF/Excel lifecycle/retries. WHR-149 guard fixed; reports server unchanged.
+- EM typecheck/lint/build, 885 unit tests and serial browser 384/four existing skips PASS. CI: 1,154 PostgreSQL, timezone 5+5, browser 384/four skips/zero retries and storage 1 PASS. Independent fidelity 1 PASS: six PNGs/metrics, 1440/390 px. Smoke: docs/qa/smoke-2026-11-14-admin-reports.md.
 
 ## Next
-- STOP at READY. WHR-13, WHR-11 and WHR-77 stay In Review for Earl's later consolidated staging smoke workbook. Scenarios: docs/qa/smoke-2026-11-09-customers-cards.md and smoke-2026-11-09-station.md. No next app work order started.
+- STOP at READY. WHR-25 remains In Review for Earl's M4 smoke. WHR-151 campaign setup screens follow in a new session; not started here.
 
 ## Earl's gos
-- 2026-11-09: “Earl approved WO-app-6 (WHR-13): registration, customers and loyalty card screens, the last M2 work order.” “Take WO-app-6 to READY and stop; keep WHR-11 and WHR-77 In Review.”
+- 2026-11-14: “Earl approves review round 4 for PR #141 (WHR-25), test-only: the prepared fixes at 8766e2d, with fresh code, security and integrity verdicts.” “If round 4 needs any product-code change, or a reviewer raises a new finding, stop, park #141 and report — no round 5.”
 
 ## Risks
-- D08 phone/print configuration and physical/native-PDF visual acceptance remain separate. Headless PDF interior is blank; actual protected bytes/filtering/QR equality passed. Declared contract/inherited navigation differences remain; WHR-81 pump-prefix follow-up is untouched.
-- WHR-83 inherited route-fake duplicate fulfilment occurred once; final full gate passed unchanged, cause unknown. A new test's cached-version precondition was corrected with a forced authoritative-read barrier, without relaxed assertions/timeouts/retries.
-- Formal reviews fixed one uncertainty boundary in two steps: malformed success JSON and unexpected/null decoding errors now retain the original operation; actual committed-response red/green regressions prove one batch/export. Dispatch flag exceeded (>8): builders, independent tests/fidelity, Core boundary review and three formal rounds. Runtime model ID unavailable. No live Owner, cloud/provider or staging-data action.
+- Campaign settings were not changed. Earl's M4 smoke remains acceptance.
+- WHR-142 remains the inherited parallel Settings fixture coupling; isolated reruns, final CI and full serial verification passed unchanged. No production guards or assertion/retry bounds weakened.
+- Feature dispatch flag exceeded: 19 calls (>8), including fidelity fixes, red/green regressions, isolation and four review rounds; one explicit exception. This records review adds one dispatch. Runtime model ID unavailable.
 
-dispatches=27 prs=2 rounds_max=3 escalations=0 model=unknown
+dispatches=20 prs=2 rounds_max=4 escalations=1 model=unknown
