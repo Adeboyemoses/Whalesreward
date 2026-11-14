@@ -727,6 +727,26 @@ describe("P-28 Owner campaign setup acceptance", () => {
     expect(await facts()).toEqual(before);
   });
 
+  it("I-41 historical version-two timing events missing campaignId use the safe legacy projection without fabricated current context", async () => {
+    await create();
+    const saved = await create({ graceHours: 1 });
+    const legacyId = newId();
+    await f.pool.query(
+      `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,actor_snapshot,originating_seller_snapshot,"before","after",reason,occurred_at,schema_version,station_id,event_code,area,target_snapshot,correlation_id,changes,related_event_ids)
+      SELECT $1,actor_user_id,actor_kind,action,target_type,target_id,$2,actor_snapshot,originating_seller_snapshot,"before","after",reason,occurred_at,schema_version,station_id,$3,area,target_snapshot,correlation_id,
+      (SELECT jsonb_agg(value) FROM jsonb_array_elements(changes) WHERE value->>'field'<>'campaignId'),related_event_ids FROM audit_event WHERE id=$4`,
+      [legacyId, newId(), `AUD-${legacyId}`, saved.result.data.auditEventId],
+    );
+    const projected = auditEventSchema.parse(
+      await readAudit(db(), config, token, "detail", {}, legacyId),
+    );
+    expect(projected.schemaVersion).toBe(0);
+    expect(projected.changes).toEqual([]);
+    expect(JSON.stringify(projected)).not.toContain(
+      saved.result.data.campaignId,
+    );
+  });
+
   it("I-45 explicitly unconfigured legacy start can be completed without approving the incomplete historical version", async () => {
     const campaignId = newId(),
       versionId = newId();
@@ -767,6 +787,55 @@ describe("P-28 Owner campaign setup acceptance", () => {
       "UPDATE campaign SET current_timing_version_id=NULL,version=version+1",
     );
     await expect(reviewed({ graceHours: 1 })).rejects.toThrow();
+  });
+
+  it("I-45 an explicit legacy null start with broken earlier timing history fails closed on read, review and confirm", async () => {
+    const campaignId = newId(),
+      versionId = newId();
+    await f.pool.query(
+      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional incomplete campaign',1,true)",
+      [campaignId, id(8)],
+    );
+    await f.pool.query(
+      "INSERT INTO settings_version(id,station_id,campaign_id,version,timezone,effective_from,actor_id,reason) VALUES($1,$2,$3,3,'Africa/Lagos',clock_timestamp(),$4,'Historical version with missing predecessors')",
+      [versionId, id(8), campaignId, id(5)],
+    );
+    await f.pool.query(
+      "INSERT INTO station_reporting_state(station_id,settings_version,current_settings_version_id) VALUES($1,3,$2) ON CONFLICT(station_id) DO UPDATE SET settings_version=3,current_settings_version_id=$2",
+      [id(8), versionId],
+    );
+    await f.pool.query(
+      "UPDATE campaign SET current_timing_version_id=$2,version=version+1 WHERE id=$1",
+      [campaignId, versionId],
+    );
+    const proposal = {
+      kind: "update",
+      campaignId,
+      expectedVersion: 3,
+      expectedCampaignVersion: 2,
+      launchAt: "2035-03-01T00:00:00Z",
+      purchaseStart: "2035-03-02T00:00:00Z",
+      purchaseCutoff: "2035-03-03T00:00:00Z",
+      timezone: "Africa/Lagos",
+      graceHours: 0,
+      reason: "Attempt to fill incomplete historical campaign",
+    };
+    const before = await rows();
+    for (const attempt of [
+      () => readSettings(db(), config, token, "get"),
+      () => reviewSettings(db(), config, token, "giveaway", proposal),
+      () =>
+        confirmSettings(db(), config, token, "giveaway", {
+          ...proposal,
+          operationId: newId(),
+          reviewDigest: "0".repeat(64),
+        }),
+    ])
+      await expect(attempt()).rejects.toMatchObject({
+        code: "temporarily_unavailable",
+        status: 503,
+      });
+    expect(await rows()).toEqual(before);
   });
 
   it("I-45 timing lineage accepts first giveaway version two and retention gaps but rejects a genuine missing station version", async () => {
@@ -853,13 +922,13 @@ describe("P-28 Owner campaign setup acceptance", () => {
 });
 
 describe("P-28 recorded policy and health acceptance", () => {
-  async function health(actor = token) {
+  async function health(actor = token, policyPool = f.pool) {
     const response = await healthResponse(
       new Request(`${config.origin}/api/health`, {
         headers: { cookie: `${COOKIE}=${actor}` },
       }),
       {
-        pool: f.pool,
+        pool: policyPool,
         probe: async () => {
           await f.pool.query("SELECT 1");
         },
@@ -921,6 +990,31 @@ describe("P-28 recorded policy and health acceptance", () => {
     expect(await rows()).toEqual(before);
   });
 
+  it("I-45 missing definition fails closed and repeated bootstrap never repairs an absent historical station binding", async () => {
+    await alterPolicy(
+      "DELETE FROM station_timing_policy; DELETE FROM timing_policy_definition",
+    );
+    const before = await rows();
+    expect((await health()).body.policies.timing).toBe("unconfigured");
+    await expect(reviewed()).rejects.toMatchObject({
+      code: "timing_policy_unconfigured",
+    });
+    await expect(
+      f.pool.query(
+        "INSERT INTO station(id,code,name,timezone,version) VALUES($1,'STATION01','Station 01','Africa/Lagos',1) ON CONFLICT DO NOTHING",
+        [id(8)],
+      ),
+    ).rejects.toThrow();
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int AS n FROM station_timing_policy",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(await rows()).toEqual(before);
+  });
+
   it("I-45 a recorded definition and binding without the matching installed evaluator remain unconfigured", async () => {
     vi.spyOn(timingEvaluator, "timingEvaluatorInstalled").mockReturnValue(
       false,
@@ -959,23 +1053,33 @@ describe("P-28 recorded policy and health acceptance", () => {
   });
 
   it("I-07 policy storage failure preserves 503 semantics and public health redaction", async () => {
+    const role = `p28_reader_${randomBytes(6).toString("hex")}`;
+    await f.pool.query(`CREATE ROLE ${role} NOLOGIN NOSUPERUSER`);
+    await f.pool.query(`GRANT USAGE ON SCHEMA ${f.schema} TO ${role}`);
     await f.pool.query(
-      "ALTER TABLE timing_policy_definition RENAME TO p28_unavailable_definition",
+      `GRANT ALL ON ALL TABLES IN SCHEMA ${f.schema} TO ${role}`,
     );
+    await f.pool.query(
+      `REVOKE SELECT ON timing_policy_definition FROM ${role}`,
+    );
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set(
+      "options",
+      `-c search_path=${f.schema},public -c role=${role}`,
+    );
+    const unavailable = new pg.Pool({ connectionString: url.toString() });
     try {
-      const result = await health();
+      const result = await health(token, unavailable);
       expect(result.response.status).toBe(503);
       expect(result.body.db).toBe("unavailable");
-      const publicResult = await health("invalid");
+      const publicResult = await health("invalid", unavailable);
       expect(publicResult.response.status).toBe(503);
       expect(publicResult.body).not.toHaveProperty("policies");
-      expect(JSON.stringify(result.body)).not.toContain(
-        "p28_unavailable_definition",
-      );
+      expect(JSON.stringify(result.body)).not.toContain(role);
     } finally {
-      await f.pool.query(
-        "ALTER TABLE p28_unavailable_definition RENAME TO timing_policy_definition",
-      );
+      await unavailable.end();
+      await f.pool.query(`DROP OWNED BY ${role}`);
+      await f.pool.query(`DROP ROLE ${role}`);
     }
   });
 
