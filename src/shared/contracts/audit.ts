@@ -867,6 +867,27 @@ export const m4SettingsAuditSchema = z
       required.some((f) => !fields.includes(f))
     )
       ctx.addIssue({ code: "custom", message: "Invalid M4 audit mapping" });
+    if (v.action !== "retention_intent_changed") {
+      const get = (field: string) => v.changes.find((c) => c.field === field);
+      if (
+        v.changes.some((c) => c.after === null) ||
+        (v.action === "campaign_created" &&
+          (get("campaignId")?.after !== v.target.id ||
+            get("campaignVersion")?.after !== "1" ||
+            v.changes.some(
+              (c) =>
+                !["settingsVersionId", "settingsVersion"].includes(c.field) &&
+                c.before !== null,
+            ))) ||
+        (v.action === "giveaway_timing_changed" &&
+          (get("settingsVersionId")?.after !== v.target.id ||
+            get("campaignId")?.before !== get("campaignId")?.after))
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid P-28 timing context",
+        });
+    }
     for (const c of v.changes) {
       if (
         ([

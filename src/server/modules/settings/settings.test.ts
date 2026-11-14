@@ -119,3 +119,53 @@ describe("M4 settings contracts", () => {
       ).toBe(false);
   });
 });
+
+it("P-28 audit requires complete creation values and an exact campaign target", () => {
+  const creation = {
+    ...event,
+    action: "campaign_created",
+    target: { ...event.target, kind: "campaign" },
+    changes: [
+      { field: "campaignId", before: null, after: id },
+      { field: "settingsVersionId", before: null, after: id },
+      { field: "settingsVersion", before: "1", after: "2" },
+      { field: "campaignVersion", before: null, after: "1" },
+      ...["launchAt", "purchaseStart", "purchaseCutoff", "uploadDeadline"].map(
+        (field) => ({ field, before: null, after: "2026-12-01T00:00:00Z" }),
+      ),
+      { field: "graceHours", before: null, after: "0" },
+      { field: "timezone", before: null, after: "Africa/Lagos" },
+      {
+        field: "timingPolicyVersion",
+        before: null,
+        after: "campaign-timing-v1",
+      },
+    ],
+  };
+  expect(m4SettingsAuditSchema.safeParse(creation).success).toBe(true);
+  for (const field of [
+    "campaignId",
+    "launchAt",
+    "purchaseStart",
+    "purchaseCutoff",
+    "uploadDeadline",
+    "timingPolicyVersion",
+  ])
+    expect(
+      m4SettingsAuditSchema.safeParse({
+        ...creation,
+        changes: creation.changes.map((c) =>
+          c.field === field ? { ...c, after: null } : c,
+        ),
+      }).success,
+    ).toBe(false);
+  expect(
+    m4SettingsAuditSchema.safeParse({
+      ...creation,
+      target: {
+        ...creation.target,
+        id: "019a5000-0000-7000-8000-000000000009",
+      },
+    }).success,
+  ).toBe(false);
+});

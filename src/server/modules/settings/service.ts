@@ -121,7 +121,7 @@ async function snapshot(
     !pin &&
     (
       await db.query(
-        "SELECT 1 FROM settings_version WHERE station_id=$1 AND campaign_id=$2 LIMIT 1",
+        "SELECT 1 FROM settings_version WHERE station_id=$1 AND campaign_id=$2 AND section IS DISTINCT FROM 'retention' LIMIT 1",
         [station.id, c.id],
       )
     ).rowCount
