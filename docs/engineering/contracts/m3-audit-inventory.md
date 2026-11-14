@@ -122,3 +122,19 @@ Rook should fold AU-01–AU-09 into WO-core-11's writer/query scope and record A
 ## Verification record
 
 Specification checks: exhaustive current writer/action comparison, exact field and alias tables, missing-writer classification, relative links and paragraph limit. Code/security/integrity verdicts and EM gates are recorded in the branch's `.review` file and WHR-130. No new runtime audit coverage, board parity, policy activation, export or retention behavior is claimed.
+
+## P-29 / WHR-139 two-person release inventory amendment — 14 Nov 2026
+
+This is an additive **specified writer gap**, not a claim that the historical inventory or current runtime already implements v2. The approved Q-557 principle and five pending recommendations are separated in [M3 P-29](m3.md#two-person-stuck-hold-release--p-29--wo-spec-3n--whr-139) and [the decision table](../proposals/evidence-policy.md#v2-recommendations-for-earl). No raw paper content enters general audit.
+
+| Specified action / owner | Current source status | Required writer and projection |
+|---|---|---|
+| held_release_proposed / future core reviews | No proposal, sheet-purpose upload or writer exists | One event with pending proposal/content commit; proposer is actor. M3's closed proposal/target/outcome/sheet/proposer/policy fields only |
+| held_release_approved / future core reviews | Existing reviews/service and audit contracts have no held_release kind or two-person provenance | Independent approver is actor; link immutable proposer event/decision, both actors in protected history. Atomically emit one approved event and V/G result, never a duplicate old-kind event or raw facts/reasons/digest |
+| held_release_rejected / future core reviews | No writer exists | Independent rejector is actor, append transition and receipt once; keep underlying holds/values/credit. No fabricated sale_decision or approved conclusion |
+| held_release_superseded / target-closing review/validation mutation | No supersession hook exists | system:validation, linked actual target-closing event; preserve proposer content and audit chain. Not a human rejection |
+| review_evidence_approved/configured/deactivated / future v2 operator | Current operator and policy schemas recognize only v1 | Accept exact v2 release in unchanged closed operational shapes; immutable higher revision/approval, correct persisted database-comment scope identity; no dry-run event or automatic activation |
+
+WO-core-11 / WHR-20 must extend strict action/field/filter serializers, Id links and safe v2 policy-release enum; it must not implement the missing release domain just to manufacture audit rows. Core release work supplies the atomic events and protected proposal/transition/review evaluation. `review_evaluation` retains full I/J distinction, source closure, v1 structural denial, guarded joint-consistency envelope and applied-decision generation, both persons/reasons/times/photo, pin and guarded result; general audit contains only M3's allowlisted projections and fixed reasons. Unknown legacy rows cannot be promoted to sheet-attested conclusions. Audit-only access confers no sheet/facts access; per-kind sales permission remains required.
+
+Readiness and preview invalidation require giveaway integration in the same activation package. Keep every proposal transition (including rejected/superseded) with retained meter/sheet assets under pilot keep-all policy; no new deletion writer/job is commissioned. Required downstream evidence is SR-01–SR-08 in M3; runtime coverage is not claimed by this spec.

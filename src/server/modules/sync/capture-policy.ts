@@ -13,6 +13,7 @@ export type PriceHistory = {
 export type CampaignHistory = {
   effectiveFrom: TrustedMicros;
   purchaseStart: TrustedMicros | null;
+  launchAt?: TrustedMicros | null;
   purchaseCutoff: TrustedMicros | null;
   uploadDeadline: TrustedMicros | null;
   campaignId: string | null;
@@ -101,10 +102,13 @@ export function evaluateCapturePolicy(
           v.purchaseStart,
           v.purchaseCutoff,
           v.uploadDeadline,
+          ...(v.launchAt ? [v.launchAt] : []),
         ]);
       if (applicable.some((v) => signature(v) !== signature(initial)))
         reasons.add("capture_time_unresolved");
       for (const v of applicable) {
+        if (v.launchAt && s < micros(v.launchAt) && micros(v.launchAt) <= u)
+          reasons.add("capture_time_unresolved");
         if (
           v.purchaseStart &&
           s < micros(v.purchaseStart) &&
@@ -125,6 +129,7 @@ export function evaluateCapturePolicy(
         !!initial.purchaseCutoff &&
         !!initial.uploadDeadline &&
         s >= micros(initial.purchaseStart) &&
+        (!initial.launchAt || s >= micros(initial.launchAt)) &&
         u <= micros(initial.purchaseCutoff) &&
         r <= micros(initial.uploadDeadline) &&
         reasons.size === 0;

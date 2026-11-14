@@ -1,24 +1,22 @@
 # lane:core
-WO-core-9b (WHR-114) review-evidence operator: READY since 2026-11-12
+WO-core-14b (WHR-150) Owner campaign setup and timing: READY since 2026-11-14
 
 ## In flight
-- Feature [#119](https://github.com/Adeboyemoses/Whalesreward/pull/119) merged into staging at `ace2f43`, all five checks green. Separate READY records complete this handoff; WHR-114 stays In Review.
-- Decision [#117](https://github.com/Adeboyemoses/Whalesreward/pull/117), `0b2fa7e`, records T-19/WHR-116: persisted database-level identity, no session/role override. Earl-only setup and read-back are in docs/ops/review-evidence.md.
-- Default read-only dry run; explicit apply plus expected revision; built-in digest, scope lock, exact next revision and bound atomic immutable writes. Activation writes both rows; inactive policy follows M3 null approval/time. Policy output gives manual steps; DATABASE_URL remains process-only.
-- Code/security/integrity PASS round 1 at `568c822`; later merge touched only unrelated decision docs and evidence still validates. EM typecheck/lint/build, unit689 and PostgreSQL699 PASS. CI matches plus timezone5+5, browser276/four existing skips and storage1.
-- Shared records preserve the concurrent P-26 handoff; the conflict resolution received a separate code-reviewer recheck. Feature review remains round 1.
-- Named verification: docs/qa/verification-2026-11-12-review-evidence-operator.md. No open findings or review escalation.
+- [Feature #143](https://github.com/Adeboyemoses/Whalesreward/pull/143) merged to staging at `36f1210`, all five PR checks green. This separate records PR completes READY; WHR-150 stays In Review for Earl's end-of-M4 smoke.
+- Reviewed source `9780c30ca45f2c712999efe8d9b34cbf8b9b382d`; evidence-only PR head `b42ecd43367c4e6fc03c2f8b32e5ffd4e65ac4e9`. Code/security/integrity PASS round 3; no open findings or escalation.
+- Owner-only create/update review and confirmation, append-only campaign-timing-v1 definition and station binding, exact audit, health, generation and retention-independent timing pins are implemented. No campaign values seeded.
+- EM final gates: typecheck/lint/build/Prisma PASS; 871 unit, 1,154 PostgreSQL, timezone 5+5 and Linux browser 360/four existing skips PASS. Local integration uses one worker; browser uses two workers and zero retries. No timeout or assertion weakened.
+- Named core acceptance evidence: tests/integration/p28-acceptance.md. Fresh/upgrade/repeated bootstrap, non-superuser registry guards, concurrent creation, post-start replay, locked-clock boundaries and pre-upgrade provenance are covered.
 
 ## Next
-- Earl performs managed-environment setup/activation at M3 smoke time using the runbook.
-- Start WHR-18 (WO-core-10) in a fresh session after these READY records merge, per Earl. Do not infer acceptance of WHR-114 or earlier work orders.
+- T2 starts WHR-151 / WO-app-13b campaign setup screens in a fresh session. T1 stops at READY; no screen parity or end-of-M4 acceptance is inferred.
 
 ## Earl's gos
-- 2026-11-12: “Earl approved WHR-116 Option A: a persisted database-level whr.environment, set once per database by Earl with the admin user. Read the persisted value, not a session override, and refuse when it is missing or mismatched.”
-- 2026-11-12: “Continue WHR-114 to READY, then start WHR-18 (WO-core-10) in a fresh session.”
+- 2026-11-14: “Start WHR-150 (WO-core-14b).” “open the PR to staging, merge when green, and report READY with PR, head SHA and test counts.”
+- “Then stop: WHR-151 (screens) follows on T2.”
 
 ## Risks
-- No public endpoint, cloud operation, managed data change, main promotion or deployed policy activation. Database identity setup is Earl-only and refuses relabelling an existing mismatched database.
-- Two inherited image lint warnings; four existing browser skips. No assertion, timeout or retry setting weakened.
+- Campaign values remain Owner-entered. Reconciliation/complete-photo proof and deletion policies remain separate gates; no cloud or managed database operation was performed.
+- Two inherited image lint warnings and four existing browser skips. Feature dispatch flag: 13 > 8, including two builder fix dispatches and three review rounds; records review adds one. No round-cap escalation.
 
-dispatches=9 prs=3 rounds_max=2 escalations=0 model=unavailable
+dispatches=14 prs=2 rounds_max=3 escalations=0 model=unavailable

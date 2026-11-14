@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSupportedIanaTimezone } from "./timezone.ts";
 
 // Kept self-contained so the operator command uses the same validation under
 // Node's type stripping, without loading the application or its configuration.
@@ -769,6 +770,7 @@ export const historicalAuditEventSchema = z.strictObject({
 });
 // M4 settings events have their own closed schema; M3 remains version 1.
 const m4SettingsValues = {
+  campaignId: auditId,
   settingsVersionId: auditId,
   settingsVersion: positive,
   campaignVersion: positive,
@@ -785,14 +787,7 @@ const m4SettingsValues = {
     .regex(/^[1-9][0-9]*$/)
     .refine((v) => BigInt(v) <= 36500n),
   deletionEnabled: z.literal(false),
-  timezone: z.string().refine((v) => {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone: v });
-      return true;
-    } catch {
-      return false;
-    }
-  }),
+  timezone: z.string().refine(isSupportedIanaTimezone),
   timingPolicyVersion: text,
 } as const;
 const m4Changes = Object.entries(m4SettingsValues).map(([field, value]) =>
@@ -807,11 +802,15 @@ export const m4SettingsAuditSchema = z
     ...base,
     schemaVersion: z.literal(2),
     area: z.literal("settings"),
-    action: z.enum(["giveaway_timing_changed", "retention_intent_changed"]),
+    action: z.enum([
+      "campaign_created",
+      "giveaway_timing_changed",
+      "retention_intent_changed",
+    ]),
     actor: auditActorSchema,
     originatingSeller: z.null(),
     target: z.strictObject({
-      kind: z.literal("settings"),
+      kind: z.enum(["settings", "campaign"]),
       id: auditId,
       code,
       subjectAtEvent: z.null(),
@@ -836,6 +835,7 @@ export const m4SettingsAuditSchema = z
             "deletionEnabled",
           ]
         : [
+            "campaignId",
             "settingsVersionId",
             "settingsVersion",
             "campaignVersion",
@@ -849,6 +849,11 @@ export const m4SettingsAuditSchema = z
           ];
     const fields = v.changes.map((c) => c.field);
     if (
+      v.target.kind !==
+      (v.action === "campaign_created" ? "campaign" : "settings")
+    )
+      ctx.addIssue({ code: "custom", message: "Invalid timing target" });
+    if (
       v.actor.kind !== "admin" ||
       !v.operationId ||
       new Set(fields).size !== fields.length ||
@@ -856,6 +861,27 @@ export const m4SettingsAuditSchema = z
       required.some((f) => !fields.includes(f))
     )
       ctx.addIssue({ code: "custom", message: "Invalid M4 audit mapping" });
+    if (v.action !== "retention_intent_changed") {
+      const get = (field: string) => v.changes.find((c) => c.field === field);
+      if (
+        v.changes.some((c) => c.after === null) ||
+        (v.action === "campaign_created" &&
+          (get("campaignId")?.after !== v.target.id ||
+            get("campaignVersion")?.after !== "1" ||
+            v.changes.some(
+              (c) =>
+                !["settingsVersionId", "settingsVersion"].includes(c.field) &&
+                c.before !== null,
+            ))) ||
+        (v.action === "giveaway_timing_changed" &&
+          (get("settingsVersionId")?.after !== v.target.id ||
+            get("campaignId")?.before !== get("campaignId")?.after))
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid P-28 timing context",
+        });
+    }
     for (const c of v.changes) {
       if (
         ([
