@@ -333,6 +333,10 @@ test("I-44 failed and expired exports require fresh preparation, with PDF offere
         timeout: 20000,
       })
       .toBe("ready");
+    // Wait for the UI to leave pending and finish its automatic status check.
+    await expect(
+      page.getByRole("button", { name: "Download Excel", exact: true }),
+    ).toBeEnabled();
     await f.db.query(
       "UPDATE report_export SET status='failed',failure_code='precision_not_representable' WHERE id=$1",
       [first.receipt.id],
@@ -371,6 +375,9 @@ test("I-44 failed and expired exports require fresh preparation, with PDF offere
         timeout: 20000,
       })
       .toBe("ready");
+    await expect(
+      page.getByRole("button", { name: "Download PDF", exact: true }),
+    ).toBeEnabled();
     await f.db.query(
       "UPDATE report_export SET prepared_at=statement_timestamp()-interval '25 hours',expires_at=statement_timestamp()-interval '1 hour' WHERE id=$1",
       [second.receipt.id],

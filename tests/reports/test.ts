@@ -5,26 +5,10 @@ import { readFile, readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import pg from "pg";
 import { origin, setReportsOrigin } from "./helpers";
+import { localTestDatabase } from "./local-database";
 
 const require = createRequire(import.meta.url);
 type ReportsStack = { origin: string; schema: string };
-
-function localTestDatabase(raw: string | undefined) {
-  if (!raw) throw new Error("Reports browser tests require DATABASE_URL");
-  const url = new URL(raw);
-  if (
-    !["postgres:", "postgresql:"].includes(url.protocol) ||
-    !["localhost", "127.0.0.1", "[::1]", "host.docker.internal"].includes(
-      url.hostname,
-    ) ||
-    !/(?:test|e2e|whr25)/i.test(url.pathname) ||
-    ["staging", "production"].includes(process.env.WHR_ENV ?? "")
-  )
-    throw new Error(
-      "Reports browser tests require an explicitly local test database",
-    );
-  return url;
-}
 
 async function stop(child: ChildProcess | undefined) {
   if (!child || child.exitCode !== null || child.signalCode !== null) return;
