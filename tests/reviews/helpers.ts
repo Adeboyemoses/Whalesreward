@@ -196,20 +196,49 @@ export async function heldSale(
     }
   }
   if (kinds.includes("capture") || kinds.includes("date")) {
-    const existing = await f.db.query(
-      "SELECT id FROM settings_version WHERE station_id=$1",
-      [seedId(8)],
-    );
-    if (!existing.rows.length) {
-      const campaign = v7();
+    await f.db.query("BEGIN");
+    try {
       await f.db.query(
-        "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional browser campaign',1,false)",
-        [campaign, seedId(8)],
+        "SELECT id FROM security_state WHERE id=true FOR UPDATE",
       );
       await f.db.query(
-        "INSERT INTO settings_version(id,station_id,campaign_id,version,purchase_start,purchase_cutoff,upload_deadline,timezone,effective_from,actor_id,reason) VALUES($1,$2,$3,1,'2026-11-01T00:00:00Z','2026-12-01T00:00:00Z','2026-12-02T00:00:00Z','Africa/Lagos','2026-11-01T00:00:00Z',$4,'Fictional browser campaign')",
-        [v7(), seedId(8), campaign, seedId(5)],
+        "INSERT INTO station_reporting_state(station_id) VALUES($1) ON CONFLICT DO NOTHING",
+        [seedId(8)],
       );
+      await f.db.query(
+        "SELECT station_id FROM station_reporting_state WHERE station_id=$1 FOR UPDATE",
+        [seedId(8)],
+      );
+      const existing = await f.db.query(
+        "SELECT id FROM settings_version WHERE station_id=$1",
+        [seedId(8)],
+      );
+      if (!existing.rows.length) {
+        const campaign = v7(),
+          timingVersion = v7();
+        await f.db.query(
+          "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional browser campaign',1,false)",
+          [campaign, seedId(8)],
+        );
+        await f.db.query(
+          "INSERT INTO settings_version(id,station_id,campaign_id,version,purchase_start,purchase_cutoff,upload_deadline,timezone,effective_from,actor_id,reason) VALUES($1,$2,$3,1,'2026-11-01T00:00:00Z','2026-12-01T00:00:00Z','2026-12-02T00:00:00Z','Africa/Lagos','2026-11-01T00:00:00Z',$4,'Fictional browser campaign')",
+          [timingVersion, seedId(8), campaign, seedId(5)],
+        );
+        // This is retained legacy timing, not a P-28 approval. Establish its
+        // coherent pointers atomically, as the legacy upgrade migration does.
+        await f.db.query(
+          "UPDATE station_reporting_state SET settings_version=1,current_settings_version_id=$2 WHERE station_id=$1",
+          [seedId(8), timingVersion],
+        );
+        await f.db.query(
+          "UPDATE campaign SET current_timing_version_id=$2,version=version+1 WHERE id=$1",
+          [campaign, timingVersion],
+        );
+      }
+      await f.db.query("COMMIT");
+    } catch (error) {
+      await f.db.query("ROLLBACK");
+      throw error;
     }
   }
   if (kinds.includes("card")) {

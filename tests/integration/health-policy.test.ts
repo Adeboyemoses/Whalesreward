@@ -193,7 +193,7 @@ describe("WHR-100 I-07/I-09 policy health authorization", () => {
         phoneVerification: "unconfigured",
         recovery: "unconfigured",
         reconciliation: "unconfigured",
-        timing: "unconfigured",
+        timing: "configured",
         cardPrint: "configured",
       });
       expect(

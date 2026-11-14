@@ -732,7 +732,7 @@ model Campaign {
   reconciled_data_version            BigInt?
   id                                 String             @id @db.Uuid
   created_at                         DateTime           @default(now()) @db.Timestamptz(6)
-  station_id                         String             @db.Uuid
+  station_id                         String             @unique(map: "uq_campaign_station") @db.Uuid
   name                               String
   version                            Int
   reconciliation_required            Boolean
@@ -1417,4 +1417,22 @@ model ReportExport {
  @@unique([created_by,operation_id])
  @@index([status,next_attempt_at,lease_until],map:"report_export_work")
  @@map("report_export")
+}
+
+model TimingPolicyDefinition {
+  policy_version String @id
+  evaluator_identity String
+  semantics_digest String
+  approval_reference String
+  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  bindings StationTimingPolicy[]
+  @@map("timing_policy_definition")
+}
+model StationTimingPolicy {
+  station_id String @db.Uuid
+  policy_version String
+  recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  definition TimingPolicyDefinition @relation(fields: [policy_version], references: [policy_version], onDelete: Restrict)
+  @@id([station_id,policy_version])
+  @@map("station_timing_policy")
 }

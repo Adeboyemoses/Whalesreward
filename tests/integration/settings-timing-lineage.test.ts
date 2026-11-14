@@ -19,6 +19,7 @@ import {
 } from "../../src/server/modules/reviews/evidence-resolvers";
 import { createReviewsService } from "../../src/server/modules/reviews/service";
 import { newId } from "../../src/server/lib/ids";
+import pg from "pg";
 let db: Awaited<ReturnType<typeof evidenceDatabase>>;
 const config = {
   secret: "fictional-settings-lineage-test-secret",
@@ -94,6 +95,74 @@ async function syncContext(configured: boolean) {
   return { h, bytes, f, token };
 }
 describe("retention never enters campaign timing lineage", () => {
+  it("P28 first giveaway version two with a non-Lagos campaign calendar qualifies real sync and retention leaves its immutable timing identity", async () => {
+    const x = await syncContext(false);
+    const schema = (await db.pool.query("SELECT current_schema() AS schema"))
+      .rows[0].schema;
+    const now = Date.now(),
+      configuredAt = new Date(now - 180000).toISOString();
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set(
+      "options",
+      `-c search_path=${schema},pg_catalog,public`,
+    );
+    const settingsPool = new pg.Pool({ connectionString: url.toString() });
+    await db.pool.query(
+      `CREATE FUNCTION clock_timestamp() RETURNS timestamptz LANGUAGE sql AS $clock$ SELECT '${configuredAt}'::timestamptz $clock$`,
+    );
+    try {
+      const current = await readSettings(settingsPool, config, x.token, "get");
+      if (!("version" in current)) throw new Error("Expected settings");
+      const proposal = {
+        kind: "create",
+        campaignId: null,
+        expectedCampaignVersion: null,
+        expectedVersion: current.version,
+        launchAt: new Date(now - 120000).toISOString(),
+        purchaseStart: new Date(now - 90000).toISOString(),
+        purchaseCutoff: new Date(now + 3600000).toISOString(),
+        timezone: "America/New_York",
+        graceHours: 0,
+        reason: "Set fictional campaign before trusted captures",
+      };
+      const review = await reviewSettings(
+        settingsPool,
+        config,
+        x.token,
+        "giveaway",
+        proposal,
+      );
+      await confirmSettings(settingsPool, config, x.token, "giveaway", {
+        ...proposal,
+        operationId: newId(),
+        reviewDigest: review.reviewDigest,
+      });
+    } finally {
+      await settingsPool.end();
+      await db.pool.query(`DROP FUNCTION ${schema}.clock_timestamp()`);
+    }
+    const before = await readSettings(db.pool, config, x.token, "get");
+    if (!("version" in before)) throw new Error("Expected settings");
+    expect(before.version).toBe(2);
+    expect(before.campaign?.timing.timezone).toBe("America/New_York");
+    await retain(x.token, 30);
+    await retain(x.token, 31);
+    const after = await readSettings(db.pool, config, x.token, "get");
+    if (!("version" in after)) throw new Error("Expected settings");
+    expect(after.campaign).toEqual(before.campaign);
+    const sale = await x.h.settle(x.f, x.bytes);
+    const row = (
+      await db.pool.query(
+        "SELECT p.status,v.reasons,v.campaign_eligible FROM purchase p JOIN sync_validation v ON v.purchase_id=p.id WHERE p.id=$1",
+        [sale.purchaseId],
+      )
+    ).rows[0];
+    expect(row).toEqual({
+      status: "credited",
+      reasons: [],
+      campaign_eligible: true,
+    });
+  });
   it.each([false, true])(
     "actual sync across retention confirmations preserves credit and campaign membership configured=%s",
     async (configured) => {

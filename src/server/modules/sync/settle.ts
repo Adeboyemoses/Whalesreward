@@ -64,7 +64,7 @@ export async function settle(
   ).rows;
   const settings = (
     await db.query<CampaignHistory & { historyComplete: boolean }>(
-      ` ${timingHistoryCte} SELECT timing_history_complete AS "historyComplete",(EXTRACT(EPOCH FROM effective_from)*1000000)::bigint::text AS "effectiveFrom",(EXTRACT(EPOCH FROM purchase_start)*1000000)::bigint::text AS "purchaseStart",(EXTRACT(EPOCH FROM purchase_cutoff)*1000000)::bigint::text AS "purchaseCutoff",(EXTRACT(EPOCH FROM upload_deadline)*1000000)::bigint::text AS "uploadDeadline",campaign_id AS "campaignId" FROM timing_history WHERE effective_from<=(SELECT server_received_at FROM purchase WHERE id=$2) ORDER BY effective_from`,
+      ` ${timingHistoryCte} SELECT timing_history_complete AS "historyComplete",(EXTRACT(EPOCH FROM effective_from)*1000000)::bigint::text AS "effectiveFrom",(EXTRACT(EPOCH FROM CASE WHEN timing_policy_version='campaign-timing-v1' THEN launch_at ELSE NULL END)*1000000)::bigint::text AS "launchAt",(EXTRACT(EPOCH FROM purchase_start)*1000000)::bigint::text AS "purchaseStart",(EXTRACT(EPOCH FROM purchase_cutoff)*1000000)::bigint::text AS "purchaseCutoff",(EXTRACT(EPOCH FROM upload_deadline)*1000000)::bigint::text AS "uploadDeadline",campaign_id AS "campaignId" FROM timing_history WHERE effective_from<=(SELECT server_received_at FROM purchase WHERE id=$2) ORDER BY effective_from`,
       [p.station_id, p.id],
     )
   ).rows;
