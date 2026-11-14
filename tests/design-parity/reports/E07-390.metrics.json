@@ -1,0 +1,56 @@
+{
+  "viewport": 390,
+  "document": 390,
+  "main": {
+    "x": 0,
+    "y": 430,
+    "width": 390,
+    "height": 2618,
+    "top": 430,
+    "right": 390,
+    "bottom": 3048,
+    "left": 0
+  },
+  "controls": [
+    {
+      "label": "Export PDF",
+      "height": 48
+    },
+    {
+      "label": "Export Excel",
+      "height": 48
+    },
+    {
+      "label": "_r_0_",
+      "height": 48
+    },
+    {
+      "label": "_r_1_",
+      "height": 48
+    },
+    {
+      "label": "All productsPMSDieselKeroseneCooking gas",
+      "height": 48
+    },
+    {
+      "label": "Refresh report",
+      "height": 48
+    },
+    {
+      "label": "By product",
+      "height": 48
+    },
+    {
+      "label": "By attendant",
+      "height": 48
+    },
+    {
+      "label": "By pump",
+      "height": 48
+    },
+    {
+      "label": "Show source sales",
+      "height": 48
+    }
+  ]
+}
