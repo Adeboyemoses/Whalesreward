@@ -92,20 +92,16 @@ export function parseArguments(args) {
 }
 
 /**
- * WHR-116: only Earl's persisted database-level setting establishes identity.
- * current_setting() is unsafe here: session, startup and role options override it.
+ * WHR-143: only Earl's owner-written database comment establishes identity.
+ * Custom GUCs are unsafe here: session, startup and role options override them.
  * @param {Pick<import('pg').PoolClient, 'query'>} db
  * @param {string} environment
  */
 export async function checkDatabaseEnvironment(db, environment) {
   const recorded = await db.query(
-    `SELECT setting
-     FROM pg_catalog.pg_db_role_setting AS settings
-     JOIN pg_catalog.pg_database AS database ON database.oid=settings.setdatabase
-     CROSS JOIN LATERAL pg_catalog.unnest(settings.setconfig) AS entries(setting)
-     WHERE database.datname=pg_catalog.current_database() AND settings.setrole=0
-       AND pg_catalog.split_part(setting,'=',1)=$1`,
-    ["whr.environment"],
+    `SELECT pg_catalog.shobj_description(database.oid, 'pg_database') AS setting
+     FROM pg_catalog.pg_database AS database
+     WHERE database.datname=pg_catalog.current_database()`,
   );
   const expected = `whr.environment=${environment}`;
   if (

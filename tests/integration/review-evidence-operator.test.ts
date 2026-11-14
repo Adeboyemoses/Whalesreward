@@ -14,6 +14,10 @@ import { randomUUID } from "node:crypto";
 
 const databaseName = `operator_${randomUUID().replaceAll("-", "")}`;
 const databaseIdentifier = pg.escapeIdentifier(databaseName);
+const ownerName = `operator_owner_${randomUUID().replaceAll("-", "")}`;
+const ownerIdentifier = pg.escapeIdentifier(ownerName);
+const refusal =
+  "Database environment identity is missing, invalid or does not match --environment. Ask Earl to verify the persisted database setting.";
 let root: pg.Pool;
 let databaseUrl: string;
 let db: { pool: pg.Pool };
@@ -21,9 +25,16 @@ beforeAll(async () => {
   if (!process.env.DATABASE_URL)
     throw new Error("DATABASE_URL required for integration tests");
   root = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-  await root.query(`CREATE DATABASE ${databaseIdentifier}`);
+  await root.query(
+    `CREATE ROLE ${ownerIdentifier} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'operator-fixture'`,
+  );
+  await root.query(
+    `CREATE DATABASE ${databaseIdentifier} OWNER ${ownerIdentifier}`,
+  );
   const url = new URL(process.env.DATABASE_URL);
   url.pathname = `/${databaseName}`;
+  url.username = ownerName;
+  url.password = "operator-fixture";
   databaseUrl = url.toString();
   db = { pool: new pg.Pool({ connectionString: databaseUrl, max: 10 }) };
   const migrations = new URL("../../prisma/migrations/", import.meta.url);
@@ -39,10 +50,7 @@ beforeAll(async () => {
   }
 }, 30000);
 beforeEach(async () => {
-  await root.query(`ALTER DATABASE ${databaseIdentifier} RESET ALL`);
-  await root.query(
-    `ALTER DATABASE ${databaseIdentifier} SET whr.environment = 'test'`,
-  );
+  await setComment("whr.environment=test");
 });
 afterAll(async () => {
   await db?.pool.end();
@@ -57,9 +65,15 @@ afterAll(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     await root.query(`DROP DATABASE IF EXISTS ${databaseIdentifier}`);
+    await root.query(`DROP ROLE IF EXISTS ${ownerIdentifier}`);
     await root.end();
   }
 });
+async function setComment(comment: string | null) {
+  await db.pool.query(
+    `COMMENT ON DATABASE ${databaseIdentifier} IS ${comment === null ? "NULL" : pg.escapeLiteral(comment)}`,
+  );
+}
 async function input(action = "activate", apply = false) {
   const station = randomUUID();
   await db.pool.query(
@@ -283,39 +297,85 @@ it("does not reserve preview revisions or IDs", async () => {
   expect(applied.configuration.id).not.toBe(preview.configuration.id);
 });
 
-it("refuses absent, malformed and duplicated persisted environment identities", async () => {
-  const request = await input("activate", true);
-  await root.query(
-    `ALTER DATABASE ${databaseIdentifier} RESET whr.environment`,
+it("runs as a non-superuser database owner who can comment but cannot persist a custom GUC", async () => {
+  const identity = await db.pool.query(
+    `SELECT role.rolsuper, database.datdba = role.oid AS owns_database
+     FROM pg_catalog.pg_roles AS role
+     JOIN pg_catalog.pg_database AS database ON database.datname = pg_catalog.current_database()
+     WHERE role.rolname = CURRENT_USER`,
   );
-  await expect(operate(db.pool, request)).rejects.toThrow("environment");
-  for (const value of ["", "TEST", "invalid", "test=production"]) {
-    await root.query(
-      `ALTER DATABASE ${databaseIdentifier} SET whr.environment = ${pg.escapeLiteral(value)}`,
-    );
-    await expect(operate(db.pool, request)).rejects.toThrow("environment");
-  }
-  await root.query(
-    "UPDATE pg_catalog.pg_db_role_setting SET setconfig=$1::text[] WHERE setdatabase=(SELECT oid FROM pg_catalog.pg_database WHERE datname=$2) AND setrole=0",
-    [["whr.environment=test", "whr.environment=production"], databaseName],
-  );
-  await expect(operate(db.pool, request)).rejects.toThrow("environment");
-  expect(await counts(request.stationId)).toEqual([0, 0]);
-  expect(await auditRows(request.stationId)).toEqual([]);
+  expect(identity.rows).toEqual([{ rolsuper: false, owns_database: true }]);
+  await expect(
+    db.pool.query(
+      `ALTER DATABASE ${databaseIdentifier} SET whr.environment = 'test'`,
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
+  await expect(
+    db.pool.query(`ALTER ROLE ${ownerIdentifier} SET whr.environment = 'test'`),
+  ).rejects.toMatchObject({ code: "42501" });
+  await setComment("whr.environment=test");
+  await expect(
+    checkDatabaseEnvironment(db.pool, "test"),
+  ).resolves.toBeUndefined();
 });
-it("ignores session SET and connection options when checking database identity", async () => {
+it.each(["development", "test", "staging", "production"])(
+  "accepts an owner-written exact %s comment",
+  async (environment) => {
+    await setComment(`whr.environment=${environment}`);
+    await expect(
+      checkDatabaseEnvironment(db.pool, environment),
+    ).resolves.toBeUndefined();
+    await expect(checkDatabaseEnvironment(db.pool, "invalid")).rejects.toThrow(
+      refusal,
+    );
+  },
+);
+it.each([
+  null,
+  "",
+  "test",
+  "whr.environment=TEST",
+  "whr.environment=invalid",
+  "whr.environment=production",
+  "whr.environment=test=production",
+  "whr.environment=test extra",
+  " whr.environment=test",
+  "whr.environment=test\n",
+  "whr.environment=test\nwhr.environment=production",
+])(
+  "refuses missing, wrong or extra-text database comment %j without writes",
+  async (comment) => {
+    const request = await input("activate", true);
+    await setComment(comment);
+    await expect(operate(db.pool, request)).rejects.toThrow(refusal);
+    expect(await counts(request.stationId)).toEqual([0, 0]);
+    expect(await auditRows(request.stationId)).toEqual([]);
+  },
+);
+it("ignores session SET with matching, wrong and missing comments", async () => {
   const client = await db.pool.connect();
   try {
     await client.query("SET whr.environment = 'production'");
+    expect(
+      (await client.query("SELECT current_setting('whr.environment') AS value"))
+        .rows[0].value,
+    ).toBe("production");
     await expect(
       checkDatabaseEnvironment(client, "test"),
     ).resolves.toBeUndefined();
     await expect(
       checkDatabaseEnvironment(client, "production"),
-    ).rejects.toThrow("environment");
+    ).rejects.toThrow(refusal);
+    await setComment(null);
+    await expect(
+      checkDatabaseEnvironment(client, "production"),
+    ).rejects.toThrow(refusal);
   } finally {
+    await client.query("RESET whr.environment");
     client.release();
   }
+});
+it("ignores startup -c connection options with matching, wrong and missing comments", async () => {
   const url = new URL(databaseUrl);
   url.searchParams.set("options", "-c whr.environment=production");
   const spoof = new pg.Client({ connectionString: url.toString() });
@@ -329,56 +389,68 @@ it("ignores session SET and connection options when checking database identity",
       checkDatabaseEnvironment(spoof, "test"),
     ).resolves.toBeUndefined();
     await expect(checkDatabaseEnvironment(spoof, "production")).rejects.toThrow(
-      "environment",
+      refusal,
     );
-    await root.query(
-      `ALTER DATABASE ${databaseIdentifier} RESET whr.environment`,
-    );
+    await setComment(null);
     await expect(checkDatabaseEnvironment(spoof, "production")).rejects.toThrow(
-      "environment",
+      refusal,
     );
   } finally {
     await spoof.end();
   }
 });
-it("ignores role-in-database override and refuses role-only identity", async () => {
-  const role = (await root.query("SELECT current_user AS name")).rows[0]
-    .name as string;
-  const roleIdentifier = pg.escapeIdentifier(role);
+it.each([false, true])(
+  "ignores ALTER ROLE settings (in database: %s) and refuses role-only identity",
+  async (inDatabase) => {
+    const scope = inDatabase ? ` IN DATABASE ${databaseIdentifier}` : "";
+    // PG15+ requires root to install this spoof fixture; checks still run as the non-superuser owner.
+    await root.query(
+      `ALTER ROLE ${ownerIdentifier}${scope} SET whr.environment = 'production'`,
+    );
+    const client = new pg.Client({ connectionString: databaseUrl });
+    try {
+      await client.connect();
+      expect(
+        (
+          await client.query(
+            "SELECT current_setting('whr.environment') AS value",
+          )
+        ).rows[0].value,
+      ).toBe("production");
+      await expect(
+        checkDatabaseEnvironment(client, "test"),
+      ).resolves.toBeUndefined();
+      await expect(
+        checkDatabaseEnvironment(client, "production"),
+      ).rejects.toThrow(refusal);
+      await setComment(null);
+      await expect(
+        checkDatabaseEnvironment(client, "production"),
+      ).rejects.toThrow(refusal);
+    } finally {
+      await client.end();
+      await root.query(`ALTER ROLE ${ownerIdentifier}${scope} RESET ALL`);
+    }
+  },
+);
+it("refuses a legacy database GUC without the database comment", async () => {
+  await setComment(null);
   await root.query(
-    `ALTER ROLE ${roleIdentifier} IN DATABASE ${databaseIdentifier} SET whr.environment = 'production'`,
+    `ALTER DATABASE ${databaseIdentifier} SET whr.environment = 'test'`,
   );
-  const client = new pg.Client({ connectionString: databaseUrl });
   try {
-    await client.connect();
-    expect(
-      (await client.query("SELECT current_setting('whr.environment') AS value"))
-        .rows[0].value,
-    ).toBe("production");
-    await expect(
-      checkDatabaseEnvironment(client, "test"),
-    ).resolves.toBeUndefined();
-    await expect(
-      checkDatabaseEnvironment(client, "production"),
-    ).rejects.toThrow("environment");
+    await expect(checkDatabaseEnvironment(db.pool, "test")).rejects.toThrow(
+      refusal,
+    );
+  } finally {
     await root.query(
       `ALTER DATABASE ${databaseIdentifier} RESET whr.environment`,
-    );
-    await expect(
-      checkDatabaseEnvironment(client, "production"),
-    ).rejects.toThrow("environment");
-  } finally {
-    await client.end();
-    await root.query(
-      `ALTER ROLE ${roleIdentifier} IN DATABASE ${databaseIdentifier} RESET ALL`,
     );
   }
 });
 it("runs real CLI dry run and guarded production apply against persisted identity", async () => {
   const request = await input();
-  await root.query(
-    `ALTER DATABASE ${databaseIdentifier} SET whr.environment = 'production'`,
-  );
+  await setComment("whr.environment=production");
   const args = [
     "activate",
     "--station",
