@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { isSupportedIanaTimezone } from "../../../shared/contracts/timezone";
 import { m4SettingsAuditSchema } from "../../../shared/contracts/audit";
 import { createHash } from "node:crypto";
@@ -333,24 +334,62 @@ function retentionReview(
     asOf,
   };
 }
-async function normalizeTimingRequest<
-  T extends { launchAt: string; purchaseStart: string; purchaseCutoff: string },
->(db: pg.PoolClient, p: T): Promise<T> {
-  // No successful request can carry unsupported precision. Preserve its raw
-  // content for receipt comparison so an added digit can never alias a success.
+type TimingInstants = {
+  launchAt: string;
+  purchaseStart: string;
+  purchaseCutoff: string;
+};
+/** Validate before casting: unsupported input must not abort the receipt's
+ * transaction, round a digit, or lose a BC/AD marker during UTC formatting. */
+async function canonicalTimingInstants(
+  db: pg.PoolClient,
+  p: TimingInstants,
+): Promise<TimingInstants | null> {
   if (
     [p.launchAt, p.purchaseStart, p.purchaseCutoff].some((value) =>
       /\.\d{7,}/.test(value),
     )
   )
-    return p;
-  const normalized = (
-    await db.query(
-      `SELECT to_char($1::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "launchAt",to_char($2::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "purchaseStart",to_char($3::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "purchaseCutoff"`,
+    return null;
+  const row = (
+    await db.query<{
+      launchAt: string | null;
+      purchaseStart: string | null;
+      purchaseCutoff: string | null;
+    }>(
+      `
+    WITH parsed AS (
+      SELECT CASE WHEN pg_catalog.pg_input_is_valid($1,'pg_catalog.timestamptz') THEN $1::timestamptz END AS launch,
+        CASE WHEN pg_catalog.pg_input_is_valid($2,'pg_catalog.timestamptz') THEN $2::timestamptz END AS start,
+        CASE WHEN pg_catalog.pg_input_is_valid($3,'pg_catalog.timestamptz') THEN $3::timestamptz END AS cutoff
+    ) SELECT
+      CASE WHEN EXTRACT(YEAR FROM launch AT TIME ZONE 'UTC') BETWEEN 1 AND 9999 THEN to_char(launch AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') END AS "launchAt",
+      CASE WHEN EXTRACT(YEAR FROM start AT TIME ZONE 'UTC') BETWEEN 1 AND 9999 THEN to_char(start AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') END AS "purchaseStart",
+      CASE WHEN EXTRACT(YEAR FROM cutoff AT TIME ZONE 'UTC') BETWEEN 1 AND 9999 THEN to_char(cutoff AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') END AS "purchaseCutoff"
+    FROM parsed`,
       [p.launchAt, p.purchaseStart, p.purchaseCutoff],
     )
-  ).rows[0];
-  return { ...p, ...normalized };
+  ).rows[0]!;
+  if (
+    row.launchAt === null ||
+    row.purchaseStart === null ||
+    row.purchaseCutoff === null
+  )
+    return null;
+  return {
+    launchAt: row.launchAt,
+    purchaseStart: row.purchaseStart,
+    purchaseCutoff: row.purchaseCutoff,
+  };
+}
+async function normalizeTimingRequest<T extends TimingInstants>(
+  db: pg.PoolClient,
+  p: T,
+): Promise<T> {
+  const normalized = await canonicalTimingInstants(db, p);
+  // An unsupported value has no successful canonical representation. Retain its
+  // exact content so a changed retained operation key still conflicts first.
+  return normalized ? { ...p, ...normalized } : p;
 }
 type TimingInput = ReturnType<typeof timingReviewSchema.parse>;
 async function timingReview(
@@ -389,13 +428,8 @@ async function timingReview(
     throw new AuthError("timing_invalid", 422);
   if (!isSupportedIanaTimezone(p.timezone))
     throw new AuthError("timing_invalid", 422);
-  // PostgreSQL preserves the supported microsecond precision; no JS date rounding.
-  if (
-    [p.launchAt, p.purchaseStart, p.purchaseCutoff].some((v) =>
-      /\.\d{7,}/.test(v),
-    )
-  )
-    throw new AuthError("timing_invalid", 422);
+  const normalized = await canonicalTimingInstants(db, p);
+  if (!normalized) throw new AuthError("timing_invalid", 422);
   let timing: ReturnType<typeof timingSchema.parse>;
   try {
     const row = (
@@ -406,10 +440,15 @@ async function timingReview(
       to_char($3::timestamptz AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "purchaseCutoff",
       to_char(($3::timestamptz+$4::integer*interval '1 hour') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "uploadDeadline",
       $1::timestamptz<=$2::timestamptz AND $2::timestamptz<$3::timestamptz AS valid`,
-        [p.launchAt, p.purchaseStart, p.purchaseCutoff, p.graceHours],
+        [
+          normalized.launchAt,
+          normalized.purchaseStart,
+          normalized.purchaseCutoff,
+          p.graceHours,
+        ],
       )
     ).rows[0];
-    if (!row.valid) throw new Error("ordering");
+    if (!row.valid) throw new AuthError("timing_invalid", 422);
     timing = timingSchema.parse({
       launchAt: row.launchAt,
       purchaseStart: row.purchaseStart,
@@ -419,8 +458,9 @@ async function timingReview(
       timezone: p.timezone,
       policyVersion: policy,
     });
-  } catch {
-    throw new AuthError("timing_invalid", 422);
+  } catch (error) {
+    if (error instanceof ZodError) throw new AuthError("timing_invalid", 422);
+    throw error;
   }
   if (
     before.timingLocked ||

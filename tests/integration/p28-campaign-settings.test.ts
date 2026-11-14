@@ -1283,3 +1283,64 @@ describe("P-28 review round 1 regressions", () => {
     ).toEqual({ ...saved.result, replayed: true });
   });
 });
+
+describe("P-28 timestamp representation regressions", () => {
+  const invalidInstants = [
+    "0000-01-01T00:00:00Z",
+    "2035-03-01T00:00:00+23:59",
+    "0001-01-01T00:00:00+01:00",
+    "9999-12-31T23:59:59-01:00",
+  ];
+  it.each(
+    (["launchAt", "purchaseStart", "purchaseCutoff"] as const).flatMap(
+      (field) => invalidInstants.map((value) => ({ field, value })),
+    ),
+  )(
+    "I-45 invalid representation $field=$value is a fresh timing_invalid and retained-key operation_conflict without effects",
+    async ({ field, value }) => {
+      const proposal = await input({ [field]: value }),
+        before = await rows();
+      await expect(
+        reviewSettings(db(), config, token, "giveaway", proposal),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      await expect(
+        confirmSettings(db(), config, token, "giveaway", {
+          ...proposal,
+          operationId: newId(),
+          reviewDigest: "0".repeat(64),
+        }),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      expect(await rows()).toEqual(before);
+      const saved = await create(),
+        after = await rows();
+      await expect(
+        confirmSettings(db(), config, token, "giveaway", {
+          ...saved.confirmation,
+          [field]: value,
+        }),
+      ).rejects.toMatchObject({ code: "operation_conflict", status: 409 });
+      expect(await rows()).toEqual(after);
+      const update = await input({ [field]: value });
+      await expect(
+        reviewSettings(db(), config, token, "giveaway", update),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      await expect(
+        confirmSettings(db(), config, token, "giveaway", {
+          ...update,
+          operationId: newId(),
+          reviewDigest: "0".repeat(64),
+        }),
+      ).rejects.toMatchObject({ code: "timing_invalid", status: 422 });
+      expect(await rows()).toEqual(after);
+      expect(
+        await confirmSettings(
+          db(),
+          config,
+          token,
+          "giveaway",
+          saved.confirmation,
+        ),
+      ).toEqual({ ...saved.result, replayed: true });
+    },
+  );
+});
