@@ -525,3 +525,126 @@ test("I-07 overview attention destinations preserve only the matching sales filt
     await f.close();
   }
 });
+
+for (const kind of ["sources", "groups"] as const) {
+  test(`I-42 refreshing during a pending ${kind} page releases only the new view pager`, async ({
+    page,
+  }) => {
+    const f = await reportsBrowserFixture(page);
+    let releaseOld = () => {},
+      releaseNew = () => {};
+    try {
+      for (let i = 0; i < 26; i++)
+        await f.sale({ product: "diesel", amount: "1000000" });
+      await viewedReport(page, f.filters);
+      if (kind === "groups") {
+        const grouped = page.waitForResponse(
+          (r) =>
+            r.url().endsWith("/api/admin/reports/query") &&
+            r.request().postDataJSON().groupBy === "attendant" &&
+            r.status() === 200,
+        );
+        await page
+          .getByRole("button", { name: "By attendant", exact: true })
+          .click();
+        await grouped;
+      } else
+        await page
+          .getByRole("button", { name: "Show source sales", exact: true })
+          .click();
+      const table = page.getByRole("table", {
+        name: kind === "groups" ? "Sales breakdown" : "Source sales",
+      });
+      await expect(table.locator("tbody tr")).toHaveCount(25);
+      let oldReached = () => {},
+        newReached = () => {};
+      const oldStarted = new Promise<void>((resolve) => {
+        oldReached = resolve;
+      });
+      const newStarted = new Promise<void>((resolve) => {
+        newReached = resolve;
+      });
+      const oldBlocked = new Promise<void>((resolve) => {
+        releaseOld = resolve;
+      });
+      const newBlocked = new Promise<void>((resolve) => {
+        releaseNew = resolve;
+      });
+      let calls = 0;
+      const endpoint = kind === "groups" ? "query" : "sources";
+      await page.route(`**/api/admin/reports/${endpoint}`, async (route) => {
+        const input = route.request().postDataJSON();
+        if (kind === "groups" && !input.cursor) {
+          await route.continue();
+          return;
+        }
+        const response = await route.fetch();
+        calls++;
+        if (calls === 1) {
+          oldReached();
+          await oldBlocked;
+        } else if (calls === 2) {
+          newReached();
+          await newBlocked;
+        }
+        await route.fulfill({ response });
+      });
+      const moreName = kind === "groups" ? "More groups" : "More source rows";
+      await page.getByRole("button", { name: moreName, exact: true }).click();
+      await oldStarted;
+      await expect(
+        page.getByRole("button", { name: moreName, exact: true }),
+      ).toBeDisabled();
+      const refreshed = page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/admin/reports/query") &&
+          !r.request().postDataJSON().cursor &&
+          r.status() === 200,
+      );
+      await page
+        .getByRole("button", { name: "Refresh report", exact: true })
+        .click();
+      await refreshed;
+      const newPager = page.getByRole("button", {
+        name: kind === "groups" ? "More groups" : "Show source sales",
+        exact: true,
+      });
+      // A refresh must detach the old in-flight page's lock before its response arrives.
+      await expect(newPager).toBeEnabled();
+      await newPager.click();
+      await newStarted;
+      await expect(newPager).toBeDisabled();
+      const oldResponse = page.waitForResponse((r) =>
+        r.url().endsWith(`/api/admin/reports/${endpoint}`),
+      );
+      releaseOld();
+      await (await oldResponse).finished();
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => resolve()),
+          ),
+      );
+      // The obsolete request cannot publish rows or unlock the newer pending request.
+      await expect(newPager).toBeDisabled();
+      if (kind === "sources") await expect(table).toHaveCount(0);
+      else await expect(table.locator("tbody tr")).toHaveCount(25);
+      releaseNew();
+      await expect(table.locator("tbody tr")).toHaveCount(
+        kind === "sources" ? 25 : 26,
+      );
+      if (kind === "sources") {
+        await expect(
+          page.getByRole("button", { name: moreName, exact: true }),
+        ).toBeEnabled();
+        await page.getByRole("button", { name: moreName, exact: true }).click();
+        await expect(table.locator("tbody tr")).toHaveCount(26);
+      }
+    } finally {
+      releaseOld();
+      releaseNew();
+      await page.unrouteAll({ behavior: "wait" });
+      await f.close();
+    }
+  });
+}
