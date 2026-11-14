@@ -27,6 +27,7 @@ import { auditActor } from "../audit/write";
 import { writeSettingsAudit } from "../audit/write-settings";
 import { requireTimingPolicy, recordedTimingPolicy } from "./policy";
 import { decodeCursor, encodeCursor } from "../sales/cursor";
+import { timingHistoryCte } from "./timing-history";
 const canonical = (value: unknown): unknown =>
   Array.isArray(value)
     ? value.map(canonical)
@@ -127,6 +128,16 @@ async function snapshot(
     ).rowCount
   )
     throw new AuthError("temporarily_unavailable", 503);
+  if (pin) {
+    const history = (
+      await db.query(
+        `${timingHistoryCte} SELECT bool_and(timing_history_complete) AS complete FROM timing_history`,
+        [station.id],
+      )
+    ).rows[0];
+    if (pin.section === "retention" || history?.complete !== true)
+      throw new AuthError("temporarily_unavailable", 503);
+  }
   const timing = c
     ? timingSchema.parse({
         launchAt: pin?.launch_text ?? null,
