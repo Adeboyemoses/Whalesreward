@@ -81,14 +81,13 @@ describe("M4 settings contracts", () => {
       }).success,
     ).toBe(false);
   });
-  it("keeps WHR-55 unconfigured with a nonretryable domain conflict", () => {
+  it("requires recorded P-28 approval rather than a synchronous environment flag", async () => {
     expect(timingPolicyConfigured()).toBe(false);
-    expect(requireTimingPolicy).toThrowError(
-      expect.objectContaining({
-        code: "timing_policy_unconfigured",
-        status: 409,
-      }),
-    );
+    const db = { query: async () => ({ rows: [] }) };
+    await expect(requireTimingPolicy(db as never, id)).rejects.toMatchObject({
+      code: "timing_policy_unconfigured",
+      status: 409,
+    });
   });
   it("validates the exact v2 settings mapping and typed values", () => {
     expect(m4SettingsAuditSchema.safeParse(event).success).toBe(true);

@@ -10,6 +10,8 @@ const settings = {
   version: 1,
   settingsVersionId: null,
   campaign: null,
+  timingPolicyVersion: null,
+  timingLocked: false,
   retention: {
     days: null,
     deletionEnabled: false,

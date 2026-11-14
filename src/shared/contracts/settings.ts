@@ -41,6 +41,8 @@ export const settingsSchema = z.strictObject({
   version,
   settingsVersionId: authId.nullable(),
   campaign: campaignSchema.nullable(),
+  timingPolicyVersion: z.string().max(120).nullable(),
+  timingLocked: z.boolean(),
   retention: retentionSchema,
   station: z.strictObject({
     id: authId,
@@ -60,21 +62,41 @@ export const retentionReviewSchema = z.strictObject({
   reason,
   expectedVersion: version,
 });
-export const timingReviewSchema = z.strictObject({
-  campaignId: authId,
+const timingInputs = {
+  launchAt: instant,
+  purchaseStart: instant,
   purchaseCutoff: instant,
+  timezone: z.string().min(1).max(120),
   graceHours: z.number(),
   reason,
   expectedVersion: version,
+};
+const timingCreate = z.strictObject({
+  ...timingInputs,
+  kind: z.literal("create"),
+  campaignId: z.null(),
+  expectedCampaignVersion: z.null(),
+});
+const timingUpdate = z.strictObject({
+  ...timingInputs,
+  kind: z.literal("update"),
+  campaignId: authId,
   expectedCampaignVersion: version,
 });
+export const timingReviewSchema = z.discriminatedUnion("kind", [
+  timingCreate,
+  timingUpdate,
+]);
 export const retentionConfirmSchema = retentionReviewSchema.extend({
   operationId: authId,
   reviewDigest: digest,
 });
-export const timingConfirmSchema = timingReviewSchema.extend({
-  operationId: authId,
-  reviewDigest: digest,
+export const timingConfirmSchema = z.discriminatedUnion("kind", [
+  timingCreate.extend({ operationId: authId, reviewDigest: digest }),
+  timingUpdate.extend({ operationId: authId, reviewDigest: digest }),
+]);
+export const reviewedSettingsSchema = settingsSchema.extend({
+  campaign: campaignSchema.extend({ id: authId.nullable() }).nullable(),
 });
 export const settingsHistorySchema = z.strictObject({
   section: z.enum(["giveaway", "retention"]).optional(),
@@ -100,7 +122,9 @@ export const settingsChangeSchema = z.discriminatedUnion("section", [
   z.strictObject({
     ...commonChange,
     section: z.literal("giveaway"),
-    before: timingSchema,
+    kind: z.enum(["create", "update"]),
+    campaignId: authId,
+    before: timingSchema.nullable(),
     after: timingSchema,
   }),
 ]);

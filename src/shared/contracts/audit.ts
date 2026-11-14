@@ -769,6 +769,7 @@ export const historicalAuditEventSchema = z.strictObject({
 });
 // M4 settings events have their own closed schema; M3 remains version 1.
 const m4SettingsValues = {
+  campaignId: auditId,
   settingsVersionId: auditId,
   settingsVersion: positive,
   campaignVersion: positive,
@@ -807,11 +808,15 @@ export const m4SettingsAuditSchema = z
     ...base,
     schemaVersion: z.literal(2),
     area: z.literal("settings"),
-    action: z.enum(["giveaway_timing_changed", "retention_intent_changed"]),
+    action: z.enum([
+      "campaign_created",
+      "giveaway_timing_changed",
+      "retention_intent_changed",
+    ]),
     actor: auditActorSchema,
     originatingSeller: z.null(),
     target: z.strictObject({
-      kind: z.literal("settings"),
+      kind: z.enum(["settings", "campaign"]),
       id: auditId,
       code,
       subjectAtEvent: z.null(),
@@ -836,6 +841,7 @@ export const m4SettingsAuditSchema = z
             "deletionEnabled",
           ]
         : [
+            "campaignId",
             "settingsVersionId",
             "settingsVersion",
             "campaignVersion",
@@ -848,6 +854,11 @@ export const m4SettingsAuditSchema = z
             "timingPolicyVersion",
           ];
     const fields = v.changes.map((c) => c.field);
+    if (
+      v.target.kind !==
+      (v.action === "campaign_created" ? "campaign" : "settings")
+    )
+      ctx.addIssue({ code: "custom", message: "Invalid timing target" });
     if (
       v.actor.kind !== "admin" ||
       !v.operationId ||

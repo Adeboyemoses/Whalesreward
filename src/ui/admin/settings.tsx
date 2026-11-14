@@ -801,6 +801,7 @@ function HistoryValue({
     );
   }
   const value = change[side];
+  if (value === null) return <span>Not set</span>;
   return (
     <span>
       Launch: {instantText(value.launchAt)}

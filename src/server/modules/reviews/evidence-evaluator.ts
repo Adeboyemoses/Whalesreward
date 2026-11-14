@@ -316,13 +316,19 @@ function campaign(
       !v.purchase_start ||
       !v.purchase_cutoff ||
       !v.upload_deadline ||
-      v.timezone !== "Africa/Lagos"
+      (v.timing_policy_version !== "campaign-timing-v1" &&
+        v.timezone !== "Africa/Lagos")
     )
       return null;
     const lo = at(v) > BigInt(i.L) ? at(v) : BigInt(i.L);
     const next = applicable[n + 1],
       hi = next ? at(next) - 1n : BigInt(i.U);
-    const start = BigInt(trustedMicros(v.purchase_start)),
+    const startValue = BigInt(trustedMicros(v.purchase_start)),
+      launch =
+        v.timing_policy_version === "campaign-timing-v1" && v.launch_at
+          ? BigInt(trustedMicros(v.launch_at))
+          : startValue,
+      start = launch > startValue ? launch : startValue,
       cutoff = BigInt(trustedMicros(v.purchase_cutoff));
     if (start > cutoff || BigInt(trustedMicros(v.upload_deadline)) < cutoff)
       return null;
@@ -354,7 +360,8 @@ function date(
     .at(-1);
   if (
     !configured ||
-    configured.timezone !== "Africa/Lagos" ||
+    (configured.timing_policy_version !== "campaign-timing-v1" &&
+      configured.timezone !== "Africa/Lagos") ||
     !actual ||
     day !== actual ||
     actual > intervalDay(i.R, i.R)!

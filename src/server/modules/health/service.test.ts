@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getHealth } from "./service";
+vi.mock("../settings/policy", () => ({
+  recordedTimingPolicy: vi.fn(async () => null),
+  timingPolicyConfigured: () => false,
+}));
+vi.mock("../../lib/db", () => ({ database: vi.fn(() => ({})) }));
+vi.mock("../../lib/transaction", () => ({
+  transaction: vi.fn(async (_pool, run) =>
+    run({ query: async () => ({ rows: [] }) }),
+  ),
+}));
 import {
   policyConfiguration,
   policyNames,

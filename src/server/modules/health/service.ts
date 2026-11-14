@@ -1,3 +1,4 @@
+import { recordedTimingPolicy } from "../settings/policy";
 import { meterHealth } from "../reviews/meter-config";
 import {
   reviewEvidenceConfiguration,
@@ -69,6 +70,19 @@ export async function getHealth(
       ))
         ? "configured"
         : "unconfigured";
+  } catch {
+    ok = false;
+  }
+  try {
+    if (healthEnvironmentValid(env)) {
+      const db = configurationPool ?? database();
+      configuration.policies.timing = await transaction(db, async (client) => {
+        await client.query("SET LOCAL statement_timeout='1000ms'");
+        return (await recordedTimingPolicy(client))
+          ? "configured"
+          : "unconfigured";
+      });
+    }
   } catch {
     ok = false;
   }

@@ -10,7 +10,7 @@ export async function writeSettingsAudit(
 ) {
   const e = m4SettingsAuditSchema.parse(input);
   await db.query(
-    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,actor_snapshot,originating_seller_snapshot,"before","after",reason,occurred_at,schema_version,station_id,event_code,area,target_snapshot,correlation_id,changes,related_event_ids) VALUES($1,$2,'user',$3,'settings',$4,$5,$6::jsonb,'null'::jsonb,$7::jsonb,$8::jsonb,$9,$10::timestamptz,2,$11,$12,'settings',$13::jsonb,$14,$15::jsonb,$16::uuid[])`,
+    `INSERT INTO audit_event(id,actor_user_id,actor_kind,action,target_type,target_id,operation_id,actor_snapshot,originating_seller_snapshot,"before","after",reason,occurred_at,schema_version,station_id,event_code,area,target_snapshot,correlation_id,changes,related_event_ids) VALUES($1,$2,'user',$3,$17,$4,$5,$6::jsonb,'null'::jsonb,$7::jsonb,$8::jsonb,$9,$10::timestamptz,2,$11,$12,'settings',$13::jsonb,$14,$15::jsonb,$16::uuid[])`,
     [
       e.id,
       e.actor.kind === "admin" ? e.actor.userId : null,
@@ -32,6 +32,7 @@ export async function writeSettingsAudit(
       e.correlationId,
       JSON.stringify(e.changes),
       e.relatedEventIds,
+      e.target.kind,
     ],
   );
 }
