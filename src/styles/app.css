@@ -921,3 +921,10 @@ body {
     width: 100%;
   }
 }
+
+/* Fidelity fixes: one visible grouping title and padded/stacked narrow states. */
+.wr-report-breakdown .wr-table-cap { display: none; }
+.wr-overview-customers > p { padding: var(--space-4); }
+@media (max-width: 900px) {
+  .wr-report-chart > h2 { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+}

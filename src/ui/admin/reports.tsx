@@ -717,52 +717,56 @@ function ReportsContent({ session }: { session: AdminSession }) {
       {report && (
         <>
           {report.groups.items.length ? (
-            <DataTable
-              caption="Sales breakdown"
-              columns={[
-                { key: "group", label: adminAction(report.filters.groupBy) },
-                { key: "count", label: "Purchases" },
-                { key: "spend", label: "Recorded spend", amount: true },
-                { key: "litres", label: "Litres" },
-                { key: "kilograms", label: "Kilograms" },
-              ]}
-              rows={report.groups.items.map((g) => ({
-                id: g.key,
-                cells: {
-                  group: g.attendant ? (
-                    <>
-                      <b>{g.attendant.name}</b>
-                      <span className="wr-sub">
-                        <span className="wr-mono">{g.attendant.staffCode}</span>{" "}
-                        · {g.attendant.username}
-                      </span>
-                    </>
-                  ) : g.pump ? (
-                    <>
-                      <b>{g.pump.name}</b>
-                      <span className="wr-sub">
-                        <span className="wr-mono">{g.pump.code}</span> ·{" "}
-                        {productNames[g.pump.product]}
-                      </span>
-                    </>
-                  ) : (
-                    <b>{g.product ? productNames[g.product] : g.key}</b>
-                  ),
-                  count: g.totals.purchases,
-                  spend: reportMoney(g.totals.spend),
-                  litres: /^0(?:\.0+)?$/.test(g.totals.litres) ? (
-                    <span className="wr-muted">none</span>
-                  ) : (
-                    formatAggregateQuantity(g.totals.litres, "litre")
-                  ),
-                  kilograms: /^0(?:\.0+)?$/.test(g.totals.kilograms) ? (
-                    <span className="wr-muted">none</span>
-                  ) : (
-                    formatAggregateQuantity(g.totals.kilograms, "kilogram")
-                  ),
-                },
-              }))}
-            />
+            <div className="wr-report-breakdown">
+              <DataTable
+                caption="Sales breakdown"
+                columns={[
+                  { key: "group", label: adminAction(report.filters.groupBy) },
+                  { key: "count", label: "Purchases" },
+                  { key: "spend", label: "Recorded spend", amount: true },
+                  { key: "litres", label: "Litres" },
+                  { key: "kilograms", label: "Kilograms" },
+                ]}
+                rows={report.groups.items.map((g) => ({
+                  id: g.key,
+                  cells: {
+                    group: g.attendant ? (
+                      <>
+                        <b>{g.attendant.name}</b>
+                        <span className="wr-sub">
+                          <span className="wr-mono">
+                            {g.attendant.staffCode}
+                          </span>{" "}
+                          · {g.attendant.username}
+                        </span>
+                      </>
+                    ) : g.pump ? (
+                      <>
+                        <b>{g.pump.name}</b>
+                        <span className="wr-sub">
+                          <span className="wr-mono">{g.pump.code}</span> ·{" "}
+                          {productNames[g.pump.product]}
+                        </span>
+                      </>
+                    ) : (
+                      <b>{g.product ? productNames[g.product] : g.key}</b>
+                    ),
+                    count: g.totals.purchases,
+                    spend: reportMoney(g.totals.spend),
+                    litres: /^0(?:\.0+)?$/.test(g.totals.litres) ? (
+                      <span className="wr-muted">none</span>
+                    ) : (
+                      formatAggregateQuantity(g.totals.litres, "litre")
+                    ),
+                    kilograms: /^0(?:\.0+)?$/.test(g.totals.kilograms) ? (
+                      <span className="wr-muted">none</span>
+                    ) : (
+                      formatAggregateQuantity(g.totals.kilograms, "kilogram")
+                    ),
+                  },
+                }))}
+              />
+            </div>
           ) : (
             <p>No completed purchases in this period.</p>
           )}
