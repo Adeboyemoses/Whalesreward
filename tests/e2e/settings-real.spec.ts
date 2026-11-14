@@ -21,7 +21,7 @@ import {
 test.use({ trace: "off", video: "off", screenshot: "off" });
 test.setTimeout(60000);
 
-test("I-45 I-51 settings show server nulls and timing remains locked without board defaults", async ({
+test("I-45 I-51 settings display explicit server timing and unset retention without board defaults", async ({
   page,
 }) => {
   const f = await settingsFixture(page);
@@ -39,8 +39,19 @@ test("I-45 I-51 settings show server nulls and timing remains locked without boa
     );
     await expect(page.getByRole("main")).toContainText(/Not set/);
     await expect(page.getByRole("main")).not.toContainText(
-      /180 days|20 Dec 2026|21 Dec 2026|24 hours/,
+      /180 days|20 Dec 2026|21 Dec 2026/,
     );
+    const grace = state.campaign?.timing.graceHours ?? null;
+    const graceValue = page
+      .locator(".wr-kv-row")
+      .filter({
+        has: page.getByText("Upload grace period", { exact: true }),
+      })
+      .locator("dd");
+    await expect(graceValue).toHaveText(
+      grace === null ? "Not set" : `${grace} hours`,
+    );
+    if (grace === null) await expect(graceValue).not.toHaveText("24 hours");
     for (const path of ["giveaway", "giveaway/confirm"]) {
       await page.goto(`/admin/settings/${path}`);
       await expect(page.getByRole("main")).toContainText(timingLocked);

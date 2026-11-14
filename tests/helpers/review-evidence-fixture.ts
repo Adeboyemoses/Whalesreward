@@ -91,8 +91,11 @@ export async function resetReviewFixture(pool: pg.Pool) {
   const db = await pool.connect();
   try {
     await db.query("BEGIN");
-    // Health reads station before its policy binding. Take that same order
-    // before suspending fixture-only guards, so a prior read can finish.
+    // Drain admin and sync transactions at their authority entry tables before
+    // taking station/audit/cascade locks. Timed-out callers may still be running.
+    await db.query("LOCK TABLE security_state IN ACCESS EXCLUSIVE MODE");
+    await db.query("LOCK TABLE auth_session IN ACCESS EXCLUSIVE MODE");
+    // Then keep health's station -> policy order before fixture-only guards.
     await db.query("LOCK TABLE station IN ACCESS EXCLUSIVE MODE");
 
     await db.query("ALTER TABLE audit_event DISABLE TRIGGER USER");
