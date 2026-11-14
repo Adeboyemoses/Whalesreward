@@ -2,7 +2,26 @@
 
 WHR-126 installs P-26 `meter-reconciliation-v1`. It stays unavailable until Q-559 supplies verified meter measurements and Earl approves the exact profile set and deployment activation. This repository provides no real profiles or production defaults. `reviewEvidence` alone does not enable meter correction.
 
-Run `pnpm ops:meter --help` from the reviewed checkout with the pinned Node version. Earl supplies `DATABASE_URL` in his own shell through his secure credential workflow; never put it in arguments, files, output or tickets. Use certificate-verified TLS for a managed database. The command uses the persisted database-level `whr.environment` identity described in [the WHR-114 runbook](review-evidence.md#one-time-database-identity-earl-only). It does not create or repair that identity. Both preview and apply require an explicit matching environment, including production.
+Run `pnpm ops:meter --help` from the reviewed checkout with the pinned Node version. Earl supplies `DATABASE_URL` in his own shell through his secure credential workflow; never put it in arguments, files, output or tickets. Use certificate-verified TLS for a managed database. The command uses the owner-written database comment identity described below and in [the review-evidence runbook](review-evidence.md#one-time-database-identity-earl-only). It does not create or repair that identity. Both preview and apply require an explicit matching environment, including production.
+
+## One-time database identity (Earl only)
+
+Both operator commands use the exact current-database comment `whr.environment=<environment>`, not a custom PostgreSQL parameter. The database owner, including a non-superuser managed PostgreSQL owner such as `doadmin`, can set the comment without superuser parameter privileges. Connect to the intended database using Earl's secured psql workflow and privately verify its identity. **Before changing anything**, read back the comment:
+
+```sql
+SELECT database.datname,
+       pg_catalog.shobj_description(database.oid, 'pg_database') AS environment_identity
+FROM pg_catalog.pg_database AS database
+WHERE database.datname = pg_catalog.current_database();
+```
+
+Leave an exact matching label unchanged. Stop on any existing non-null wrong, malformed or extra-text comment; do not overwrite it to make a command pass. This identity uses the whole database comment, replacing any description, and must contain no secrets. **Only when the query returns one row with a null comment**, Earl performs the one-time staging setup inside psql as database owner:
+
+```sql
+SELECT pg_catalog.format('COMMENT ON DATABASE %I IS %L', pg_catalog.current_database(), 'whr.environment=staging') \gexec
+```
+
+For another deliberately selected environment, replace `staging` with exactly `development`, `test` or `production`. Run the read-back query again and expect exactly `whr.environment=staging` (or that selected environment). Restrict database ownership and superuser authority to authorized operators. Missing, wrong or extra-text labels refuse both preview and apply. Session `SET`, startup `-c` connection options, `ALTER ROLE` settings and legacy database custom parameters cannot satisfy or override the comment check. The command does not provision or repair identity. No agent or test runs this setup against managed infrastructure.
 
 ## Prepare the approved bundle
 
