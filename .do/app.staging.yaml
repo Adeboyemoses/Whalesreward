@@ -78,6 +78,15 @@ services:
       - key: WHR_CARD_PRINT_LAYOUT
         scope: RUN_TIME
         value: '{"pageWidthMm":210,"pageHeightMm":297,"cardWidthMm":85.6,"cardHeightMm":54,"marginMm":10,"gapMm":2}'
+      # P-24 time-based duplicate flags; fictional staging station, WHR-152.
+      - key: DUPLICATE_WINDOW_STATION_ID
+        scope: RUN_TIME
+        type: GENERAL
+        value: 019a5000-0000-7000-8000-000000000008
+      - key: DUPLICATE_WINDOW_POLICY
+        scope: RUN_TIME
+        type: GENERAL
+        value: '{"version":1,"windowSeconds":600}'
     health_check:
       http_path: /api/health
       initial_delay_seconds: 15
