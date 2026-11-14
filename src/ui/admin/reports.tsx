@@ -643,6 +643,8 @@ function ReportsContent({ session }: { session: AdminSession }) {
           disabled={busy}
           onClick={() => {
             generation.current++;
+            pagingLock.current = false;
+            setPaging(false);
             setReport(null);
             setSources(null);
             setBusy(true);
