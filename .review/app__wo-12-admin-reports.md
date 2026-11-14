@@ -1,5 +1,5 @@
 ---
-branch: app/WHR-25-admin-reports
+branch: app/wo-12-admin-reports
 linear: WHR-25
 tier: high
 reviewed_head: 7521d68
