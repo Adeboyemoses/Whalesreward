@@ -31,3 +31,13 @@ ALTER TABLE photo_receipt_observation ADD CONSTRAINT receipt_observation_purchas
  ADD CONSTRAINT receipt_observation_asset_purchase FOREIGN KEY(purchase_id,asset_id) REFERENCES photo_asset(purchase_id,id),
  ADD CONSTRAINT receipt_observation_fact_identity UNIQUE(id,purchase_id,asset_id,receipt_at);
 ALTER TABLE photo_receipt_fact ADD CONSTRAINT receipt_fact_exact_observation FOREIGN KEY(observation_id,purchase_id,asset_id,receipt_at) REFERENCES photo_receipt_observation(id,purchase_id,asset_id,receipt_at);
+CREATE FUNCTION validate_photo_receipt_fact() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM photo_receipt_observation o JOIN photo_asset a ON a.id=o.asset_id AND a.purchase_id=o.purchase_id
+ WHERE o.id=NEW.observation_id AND a.id=NEW.asset_id AND a.state='validated'
+ AND o.observed_digest=a.validated_digest AND o.observed_bytes=a.validated_bytes
+ AND o.declared_digest=a.expected_digest AND o.observed_digest=o.declared_digest) THEN
+ RAISE EXCEPTION 'receipt fact requires exact validated bytes' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER photo_receipt_validated_bytes BEFORE INSERT ON photo_receipt_fact FOR EACH ROW EXECUTE FUNCTION validate_photo_receipt_fact();

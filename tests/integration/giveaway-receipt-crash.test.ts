@@ -57,6 +57,25 @@ it("P-30 crash before durable observation cannot backdate a retry received after
         [purchaseId],
       )
     ).rows[0];
+    const invalid = newId();
+    await db.pool.query(
+      "INSERT INTO photo_receipt_observation(id,station_id,purchase_id,asset_id,declared_digest,observed_digest,observed_bytes,sealed_key,receipt_at) SELECT $1,p.station_id,p.id,a.id,a.expected_digest,$2,a.expected_bytes,$3,clock_timestamp() FROM purchase p JOIN photo_asset a ON a.purchase_id=p.id WHERE a.id=$4",
+      [
+        invalid,
+        "0".repeat(64),
+        `fictional/invalid/${invalid}`,
+        upload.uploadId,
+      ],
+    );
+    await expect(
+      db.pool.query(
+        "INSERT INTO photo_receipt_fact(asset_id,observation_id,purchase_id,receipt_at) SELECT asset_id,id,purchase_id,receipt_at FROM photo_receipt_observation WHERE id=$1",
+        [invalid],
+      ),
+    ).rejects.toMatchObject({
+      code: "23514",
+      message: "receipt fact requires exact validated bytes",
+    });
     expect(BigInt(fact.photo)).toBeGreaterThan(BigInt(deadline));
     expect(BigInt(fact.details)).toBeLessThanOrEqual(BigInt(deadline));
     expect(
