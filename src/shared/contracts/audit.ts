@@ -814,7 +814,17 @@ export const currentAuditEventSchema = z
       ctx.addIssue({ code: "custom", message: "Invalid audit shape" });
     if (v.action === "password_changed" && v.actor.kind !== v.target.kind)
       ctx.addIssue({ code: "custom", message: "Invalid actor" });
-    for (const group of [reviewFields, meterFields])
+    const requiredReviewGroup =
+      v.action === "held_release_proposed"
+        ? (["reviewPolicyRelease", "reviewPolicyRevision"] as const)
+        : v.action === "held_release_approved"
+          ? ([
+              "reviewPolicyRelease",
+              "reviewPolicyRevision",
+              "reviewEvaluationId",
+            ] as const)
+          : reviewFields;
+    for (const group of [requiredReviewGroup, meterFields])
       if (
         group.some((f) => fields.includes(f)) &&
         !group.every((f) => fields.includes(f))
