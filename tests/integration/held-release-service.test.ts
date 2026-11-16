@@ -127,6 +127,53 @@ async function fixture(kind: "card" | "price" | "date" | "capture" = "card") {
     svc,
   };
 }
+async function recoveredCorrection(
+  x: Awaited<ReturnType<typeof fixture>>,
+  recoveryUser: string,
+) {
+  const correction = newId(),
+    revision = newId(),
+    operation = newId();
+  const recoveryAdmin = (
+    await db.pool.query("SELECT id FROM admin WHERE user_id=$1", [recoveryUser])
+  ).rows[0].id;
+  const session = (
+    await db.pool.query(
+      "SELECT id FROM auth_session WHERE user_id=$1 AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1",
+      [recoveryUser],
+    )
+  ).rows[0].id;
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "INSERT INTO correction_request(id,purchase_id,originating_attendant_id,operation_id,payload_digest,frozen_request_digest,based_on_revision_id,expected_purchase_version,proposed_revision_id,first_received_at,cutoff_at_receipt,time_policy_version,timing,state,reason,submitted_by_user_id,verified_author_attendant_id,authorship,recovery_executor_id,recovery_authorizing_admin_id,policy_blocks,version,authority_session_id,reserved_purchase_version,receipt) VALUES($1,$2,$3,$4,'fictional recovery','fictional recovery',$5,$6,$7,'2026-11-10T12:00:00Z','2026-11-10T23:00:00Z','p20-bounded-day-v1','before_midnight','rejected','Fictional recovered proposal',$8,NULL,'unverified_recovery',$9,$9,ARRAY[]::text[],1,$10,$6+1,'{}')",
+      [
+        correction,
+        x.sale.purchaseId,
+        x.f.attendantId,
+        operation,
+        x.original,
+        x.body.expectedVersion,
+        revision,
+        recoveryUser,
+        recoveryAdmin,
+        session,
+      ],
+    );
+    await client.query(
+      "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','admin_correction','state','rejected','actor_user_id',$5::text,'reason','Fictional recovered proposal','based_on_revision_id',r.id,'correction_id',$4::text))).* FROM purchase_revision r WHERE r.id=$1",
+      [x.original, revision, operation, correction, recoveryUser],
+    );
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 describe("P-29 dormant two-person service on real Postgres", () => {
   beforeAll(async () => {
     vi.stubEnv("WHR_ENV", "test");
@@ -744,4 +791,187 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).rows[0].n,
     ).toBe(0);
   });
+  it.each(["proposer", "reviewer"])(
+    "SR-03 recovery %s stored by admin ID is excluded by canonical user identity",
+    async (which) => {
+      const x = await fixture();
+      await recoveredCorrection(x, x.actors[which === "proposer" ? 0 : 1]!);
+      if (which === "proposer")
+        await expect(
+          x.svc.propose(x.token, x.sale.purchaseId, x.body),
+        ).rejects.toMatchObject({
+          code: "independent_reviewer_required",
+          status: 403,
+        });
+      else {
+        const { proposal } = await x.svc.propose(
+          x.token,
+          x.sale.purchaseId,
+          x.body,
+        );
+        await expect(
+          x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+            ...(await x.h.guard(x.sale.purchaseId)),
+            expectedProposalVersion: 1,
+            outcome: "approve",
+          }),
+        ).rejects.toMatchObject({
+          code: "independent_reviewer_required",
+          status: 403,
+        });
+      }
+    },
+  );
+  it("SR-02a frozen lookup composite source remains valid protected provenance", async () => {
+    const x = await fixture();
+    const link = (
+      await db.pool.query(
+        "SELECT id,customer_id FROM card_customer_link WHERE card_id=$1",
+        [fixtureId(29)],
+      )
+    ).rows[0];
+    const context = (
+      await db.pool.query(
+        "SELECT offline_expires_at FROM capture_context WHERE id=$1",
+        [x.f.contextId],
+      )
+    ).rows[0];
+    const claims = {
+      version: 1,
+      purpose: "capture_lookup",
+      cardCode: "A7K3M9Q",
+      captureContextId: x.f.contextId,
+      originatingAccountId: x.f.attendantId,
+      stationId: x.f.stationId,
+      cardId: fixtureId(29),
+      customerId: link.customer_id,
+      cardCustomerLinkId: link.id,
+      issuedAt: "2026-11-10T12:05:00.000Z",
+      expiresAt: context.offline_expires_at.toISOString(),
+    };
+    await seedHistorical(
+      db.pool,
+      "purchase",
+      "UPDATE purchase SET lookup_receipt_status='valid',lookup_receipt_claims=$2,capture_lower_bound=$3,capture_policy_version='lookup-v1' WHERE id=$1",
+      [x.sale.purchaseId, claims, claims.issuedAt],
+    );
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    expect(
+      (
+        await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...(await x.h.guard(x.sale.purchaseId)),
+          expectedProposalVersion: 1,
+          outcome: "approve",
+        })
+      ).proposal.state,
+    ).toBe("approved");
+  });
+  it.each(["card", "price", "date", "capture"] as const)(
+    "SR-08 %s approval reason stays out of ordinary sales detail and history",
+    async (kind) => {
+      const x = await fixture(kind),
+        canary = "Private sheet witness narrative CANARY";
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const result = await x.svc.decide(
+        x.reviewerToken,
+        x.sale.purchaseId,
+        proposal.id,
+        {
+          ...(await x.h.guard(x.sale.purchaseId)),
+          expectedProposalVersion: 1,
+          outcome: "approve",
+          reason: canary,
+        },
+      );
+      expect(JSON.stringify(result)).toContain(canary);
+      const { readSales } =
+        await import("../../src/server/modules/sales/service");
+      const { adminConfig } =
+        await import("../../src/server/modules/admin-access/config");
+      for (const [action, input] of [
+        ["detail", {}],
+        ["history", { kind: "decisions" }],
+        ["history", { kind: "revisions" }],
+      ] as const) {
+        const read = await readSales(
+          db.pool,
+          adminConfig(),
+          x.token,
+          "admin",
+          action,
+          input,
+          x.sale.purchaseId,
+        );
+        expect(JSON.stringify(read)).not.toContain(canary);
+      }
+    },
+  );
+  it("SR-01 superseded campaign deadline does not invalidate a later applicable capture interval", async () => {
+    const x = await fixture();
+    const settings = (
+      await db.pool.query(
+        "SELECT id FROM settings_version WHERE station_id=$1 ORDER BY version",
+        [x.f.stationId],
+      )
+    ).rows[0].id;
+    const newer = newId();
+    await db.pool.query(
+      "INSERT INTO settings_version SELECT (jsonb_populate_record(NULL::settings_version,to_jsonb(s)||jsonb_build_object('id',$2::text,'version',2,'timing_history_version',2,'effective_from','2026-11-10T11:00:00Z'))).* FROM settings_version s WHERE id=$1",
+      [settings, newer],
+    );
+    await seedHistorical(
+      db.pool,
+      "settings_version",
+      "UPDATE settings_version SET purchase_cutoff='2026-11-09T12:00:00Z',upload_deadline='2026-11-09T13:00:00Z' WHERE id=$1",
+      [settings],
+    );
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    expect(proposal.state).toBe("pending");
+  });
+  it.each(["assignment_end", "context_revocation"])(
+    "SR-08 capture %s structural denial retains the exact boundary source",
+    async (boundary) => {
+      const x = await fixture("capture");
+      if (boundary === "context_revocation") {
+        await seedHistorical(
+          db.pool,
+          "assignment",
+          "UPDATE assignment SET effective_until=NULL WHERE id=$1",
+          [x.f.assignmentId],
+        );
+        await seedHistorical(
+          db.pool,
+          "capture_context",
+          "UPDATE capture_context SET revoked_at='2026-11-10T12:30:00Z' WHERE id=$1",
+          [x.f.contextId],
+        );
+      }
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const provenance = (
+        await db.pool.query(
+          "SELECT provenance FROM held_release_proposal WHERE id=$1",
+          [proposal.id],
+        )
+      ).rows[0].provenance;
+      expect(JSON.stringify(provenance.evaluation.boundaries)).toContain(
+        boundary === "assignment_end" ? x.f.assignmentId : x.f.contextId,
+      );
+    },
+  );
 });
