@@ -1,3 +1,5 @@
+import { contributions } from "../../src/server/modules/giveaway/data";
+import { hashContent } from "../../src/server/modules/giveaway/mutations";
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import {
@@ -1134,6 +1136,33 @@ describe("T-20 protected preparation and complete pending discovery on real Post
           : "UPDATE purchase SET version=version+1 WHERE id=$1",
         [x.sale.purchaseId],
       );
+      if (stage === "revision") {
+        const frozen = (
+          await db.pool.query(
+            "SELECT sources FROM giveaway_snapshot WHERE campaign_id=$1",
+            [f.campaignId],
+          )
+        ).rows[0].sources as { purchaseId: string; reasons: string[] }[];
+        const before = frozen.find(
+          (source) => source.purchaseId === x.sale.purchaseId,
+        )!;
+        const reader = await db.pool.connect();
+        try {
+          // Cancellation skips membership classification, so its effective reasons
+          // are identical with any campaign bounds. Reasons are part of effective()
+          // in the real revision/unchanged comparison, including excluded sales.
+          const after = (await contributions(reader, x.f.stationId, null)).find(
+            (source) => source.purchaseId === x.sale.purchaseId,
+          )!;
+          expect(before.reasons).toContain("held");
+          expect(after.reasons).toEqual(["cancelled"]);
+          expect(hashContent(after.reasons)).not.toBe(
+            hashContent(before.reasons),
+          );
+        } finally {
+          reader.release();
+        }
+      }
       await db.pool.query(
         "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,'test',3,$3,'Fictional deactivation')",
         [
