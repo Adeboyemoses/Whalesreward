@@ -19,6 +19,7 @@ import { transaction } from "../sync/repo";
 import { payloadDigest } from "../sync/canonical";
 import { validatePhoto } from "../sync/photo";
 import { saleAuditGates, saleAuditValues } from "../sync/audit";
+import { safeReason } from "../corrections/service";
 import { newId } from "../../lib/ids";
 import { AuthError } from "../auth/errors";
 import {
@@ -82,6 +83,7 @@ type ProposalRow = {
   content: ReleaseProposalInput;
   provenance: Provenance;
   proposed_at: Date;
+  cursor_at?: string;
   state: "pending" | "approved" | "rejected" | "superseded";
   version: number;
 };
@@ -159,7 +161,7 @@ async function independent(
 ) {
   const users = (
     await db.query<{ id: string }>(
-      `SELECT a.user_id id FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id WHERE p.id=$1 AND p.station_id=$2 UNION SELECT u.id FROM correction_request c JOIN auth_user u ON u.id IN(c.recovery_executor_id,c.recovery_authorizing_admin_id) JOIN purchase p ON p.id=c.purchase_id WHERE c.purchase_id=$1 AND p.station_id=$2`,
+      `SELECT a.user_id id FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id WHERE p.id=$1 AND p.station_id=$2 UNION SELECT u.id FROM correction_request c JOIN auth_user u ON u.id IN(c.recovery_executor_id,c.recovery_authorizing_admin_id) JOIN purchase p ON p.id=c.purchase_id WHERE c.purchase_id=$1 AND p.station_id=$2 UNION SELECT a.user_id id FROM purchase p JOIN recovery_grant g ON g.originating_attendant_id=p.originating_attendant_id JOIN recovery_grant_item i ON i.grant_id=g.id AND i.operation_id=p.operation_id JOIN admin a ON a.id=g.admin_id WHERE p.id=$1 AND p.station_id=$2`,
       [purchaseId, stationId],
     )
   ).rows.map((r) => r.id);
@@ -340,6 +342,7 @@ async function inspectPhotos(
   purchaseId: string,
   body: ReleaseProposalInput,
   personId: string,
+  uploaderId: string,
 ) {
   await inspectReviewEvidence(db, storage, purchaseId, {
     assetId: body.meterAssetId,
@@ -348,8 +351,14 @@ async function inspectPhotos(
   });
   const s = (
     await db.query<{ final_key: string; sha256: string; bytes: number }>(
-      `SELECT v.final_key,s.sha256,s.bytes FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.id=$1 AND s.purchase_id=$2 AND s.purpose='held_release_sheet' AND (s.uploader_person_id=$3 OR EXISTS(SELECT 1 FROM held_release_proposal p WHERE p.sheet_asset_id=s.id AND p.purchase_id=s.purchase_id))`,
-      [body.sheetAssetId, purchaseId, personId],
+      `SELECT v.final_key,s.sha256,s.bytes FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.id=$1 AND s.purchase_id=$2 AND s.purpose='held_release_sheet' AND ((s.uploader_person_id=$3 AND s.uploader_id=$4 AND s.target=$5::jsonb) OR EXISTS(SELECT 1 FROM held_release_proposal p WHERE p.sheet_asset_id=s.id AND p.purchase_id=s.purchase_id))`,
+      [
+        body.sheetAssetId,
+        purchaseId,
+        personId,
+        uploaderId,
+        JSON.stringify(body.target),
+      ],
     )
   ).rows[0];
   if (!s) return fail("evidence_unavailable", 422);
@@ -419,8 +428,25 @@ async function consistency(
     predicates: predicates(e.conclusions),
     sourceIds: e.sources.map((s) => s.id),
   };
-  // Cancellation is terminal and cannot establish an affirmative predicate, but its range must remain feasible.
-  if (outcome === "cancel") current.predicates = [{ kind: "day", day: "void" }];
+  // Cancellation supplies no affirmative conclusion. Check its range against retained
+  // conclusions without inventing a date or letting it contradict an existing day.
+  if (outcome === "cancel") {
+    const retained = releaseConsistency(e.originalInterval, applied);
+    const lower =
+      BigInt(retained.fromMicros) > BigInt(current.fromMicros)
+        ? retained.fromMicros
+        : current.fromMicros;
+    const upper =
+      BigInt(retained.throughMicros) < BigInt(current.throughMicros)
+        ? retained.throughMicros
+        : current.throughMicros;
+    if (BigInt(lower) > BigInt(upper)) return fail();
+    return {
+      applied,
+      current,
+      certificate: { ...retained, fromMicros: lower, throughMicros: upper },
+    };
+  }
   const certificate = releaseConsistency(e.originalInterval, [
     ...applied,
     current,
@@ -489,6 +515,7 @@ export function createHeldReleaseService({
   ) {
     const body = releaseProposalInputSchema.parse(input),
       hash = payloadDigest({ purchaseId, ...body });
+    safeReason(body.reason);
     return transaction(pool, async (db) => {
       const a = await authority(db, token, env, body.target.kind);
       const p = await sale.purchase(db, purchaseId, a.stationId);
@@ -521,6 +548,7 @@ export function createHeldReleaseService({
         purchaseId,
         body,
         person.personId,
+        a.user_id,
       );
       const evaluation = await classifyReleaseAdmission(db, purchaseId, body);
       const id = newId(),
@@ -612,6 +640,7 @@ export function createHeldReleaseService({
   ) {
     const body = releaseDecisionInputSchema.parse(input),
       hash = payloadDigest({ purchaseId, proposalId, ...body });
+    safeReason(body.reason);
     return transaction(pool, async (db) => {
       const a = await authority(db, token, env);
       const p = await sale.purchase(db, purchaseId, a.stationId),
@@ -684,6 +713,7 @@ export function createHeldReleaseService({
           purchaseId,
           r.content,
           r.proposer_person_id,
+          r.proposer_id,
         );
         const evaluation = await classifyReleaseAdmission(
           db,
@@ -807,11 +837,19 @@ export function createHeldReleaseService({
             ? { verifiedSaleDate: candidate.values.verifiedSaleDate }
             : {}),
         };
+        const proposedEvent = (
+          await db.query<{ content: { auditEventId: string } }>(
+            "SELECT content FROM held_release_transition WHERE proposal_id=$1 AND state='pending'",
+            [proposalId],
+          )
+        ).rows[0];
+        if (!proposedEvent?.content.auditEventId) return fail();
         auditId = await writeReleaseAudit(db, {
           stationId: a.stationId,
           purchaseId,
           actorId: a.user_id,
           operationId: body.operationId,
+          relatedEventIds: [proposedEvent.content.auditEventId],
           action: "held_release_approved",
           before: null,
           after,
@@ -888,6 +926,7 @@ export function createHeldReleaseService({
         extra = {
           ...extra,
           attestation: joint.current,
+          originalInterval: evaluation.originalInterval,
           certificate: joint.certificate,
           saleDecisionId,
         };
@@ -971,7 +1010,7 @@ export function createHeldReleaseService({
         cursor = decodeCursor(secret, scope, q.cursor);
       const rows = (
         await db.query<ProposalRow>(
-          `SELECT p.*,s.state,s.version FROM held_release_proposal p JOIN held_release_state s ON s.proposal_id=p.id WHERE p.purchase_id=$1 AND p.station_id=$2 AND p.target_kind=ANY($3::text[]) AND ($4::timestamptz IS NULL OR (p.proposed_at,p.id)<($4::timestamptz,$5::uuid)) ORDER BY p.proposed_at DESC,p.id DESC LIMIT $6`,
+          `SELECT p.*,s.state,s.version,to_char(p.proposed_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cursor_at FROM held_release_proposal p JOIN held_release_state s ON s.proposal_id=p.id WHERE p.purchase_id=$1 AND p.station_id=$2 AND p.target_kind=ANY($3::text[]) AND ($4::timestamptz IS NULL OR (p.proposed_at,p.id)<($4::timestamptz,$5::uuid)) ORDER BY p.proposed_at DESC,p.id DESC LIMIT $6`,
           [
             purchaseId,
             a.stationId,
