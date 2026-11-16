@@ -49,6 +49,9 @@ async function structural(
   ] as const;
   // Inspect every history before choosing a categorical reason. A malformed
   // earlier array must not mask missing data in a later one (T-20 enum order).
+  const capturedPrice = f.prices.find(
+    (p) => p.id === f.original.price_version_id,
+  );
   const incomplete =
     histories.some(
       ([history, field]) =>
@@ -56,7 +59,10 @@ async function structural(
         history.some((row, i) => row[field] !== i + 1),
     ) ||
     f.settings.some((s) => s.timing_history_complete !== true) ||
-    !f.prices.some((p) => p.id === f.original.price_version_id) ||
+    !capturedPrice ||
+    capturedPrice.rate_kobo !== f.original.rate_kobo ||
+    capturedPrice.currency !== f.original.currency ||
+    capturedPrice.quantity_precision !== f.original.quantity_precision ||
     f.prices.some(
       (p) =>
         f.audits.filter(
