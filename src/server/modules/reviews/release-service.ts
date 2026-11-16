@@ -344,7 +344,7 @@ async function inspectPhotos(
   personId: string,
   uploaderId: string,
 ) {
-  await inspectReviewEvidence(db, storage, purchaseId, {
+  const meter = await inspectReviewEvidence(db, storage, purchaseId, {
     assetId: body.meterAssetId,
     notes: body.reason,
     referenceIds: [],
@@ -375,7 +375,31 @@ async function inspectPhotos(
   } catch {
     return fail("evidence_unavailable", 422);
   }
-  return { sheetDigest: s.sha256, meterAssetId: body.meterAssetId };
+  return {
+    sheetDigest: s.sha256,
+    sheetFinalKey: s.final_key,
+    meterAssetId: body.meterAssetId,
+    meterDigest: meter.digest,
+  };
+}
+async function recheckPhotos(
+  db: pg.PoolClient,
+  purchaseId: string,
+  body: ReleaseProposalInput,
+  checked: Awaited<ReturnType<typeof inspectPhotos>>,
+) {
+  const row = await db.query(
+    `SELECT s.id FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id JOIN photo_asset m ON m.id=$3 AND m.purchase_id=s.purchase_id WHERE s.id=$1 AND s.purchase_id=$2 AND s.sha256=$4 AND v.final_key=$5 AND m.state='validated' AND m.validated_digest=$6 AND m.validated_digest=(SELECT expected_photo_digest FROM purchase WHERE id=$2)`,
+    [
+      body.sheetAssetId,
+      purchaseId,
+      body.meterAssetId,
+      checked.sheetDigest,
+      checked.sheetFinalKey,
+      checked.meterDigest,
+    ],
+  );
+  if (!row.rowCount) return fail("evidence_unavailable", 422);
 }
 function predicates(cs: TypedConclusion[]): AttestedPredicate[] {
   return cs.flatMap((c): AttestedPredicate[] => {
@@ -472,6 +496,22 @@ async function proposerCurrent(db: pg.PoolClient, p: ProposalRow) {
     return fail("proposal_stale", 409);
   }
 }
+async function effectiveValues(
+  db: pg.PoolClient,
+  purchaseId: string,
+  revisionId: string | null,
+  fallback: wire.SaleValues,
+) {
+  if (!revisionId) return fallback;
+  const row = (
+    await db.query<{ value: unknown }>(
+      `SELECT ${sql.values("r")} value FROM purchase_revision r WHERE id=$1 AND purchase_id=$2`,
+      [revisionId, purchaseId],
+    )
+  ).rows[0];
+  if (!row) return fail();
+  return wire.saleValuesSchema.parse(row.value);
+}
 async function appendTransition(
   db: pg.PoolClient,
   p: ProposalRow,
@@ -516,6 +556,37 @@ export function createHeldReleaseService({
     const body = releaseProposalInputSchema.parse(input),
       hash = payloadDigest({ purchaseId, ...body });
     safeReason(body.reason);
+    const preflight = await transaction(pool, async (db) => {
+      const a = await authority(db, token, env, body.target.kind),
+        p = await sale.purchase(db, purchaseId, a.stationId),
+        person = await independent(db, a.stationId, purchaseId, a.user_id);
+      const old = await receipt(
+        db,
+        a.user_id,
+        "propose",
+        body.operationId,
+        hash,
+      );
+      if (old) return { historical: old.response, person, actorId: a.user_id };
+      await pinReleaseV2Policy(db, a.stationId, env);
+      sale.guard(p, body);
+      await target(db, purchaseId, body.target);
+      return { historical: undefined, person, actorId: a.user_id };
+    });
+    if (preflight.historical !== undefined)
+      return { proposal: preflight.historical, replayed: true };
+    // Storage work does not hold the security lock: revocation can commit, and the
+    // final transaction below must load authority again before applying anything.
+    const photos = await transaction(pool, (db) =>
+      inspectPhotos(
+        db,
+        storage,
+        purchaseId,
+        body,
+        preflight.person.personId,
+        preflight.actorId,
+      ),
+    );
     return transaction(pool, async (db) => {
       const a = await authority(db, token, env, body.target.kind);
       const p = await sale.purchase(db, purchaseId, a.stationId);
@@ -542,14 +613,7 @@ export function createHeldReleaseService({
         return fail("proposal_pending", 409);
       const candidate = await sale.candidate(db, p);
       await validateFacts(db, purchaseId, body, candidate);
-      const photos = await inspectPhotos(
-        db,
-        storage,
-        purchaseId,
-        body,
-        person.personId,
-        a.user_id,
-      );
+      await recheckPhotos(db, purchaseId, body, photos);
       const evaluation = await classifyReleaseAdmission(db, purchaseId, body);
       const id = newId(),
         joint = await consistency(db, purchaseId, evaluation, id, body.outcome);
@@ -641,6 +705,47 @@ export function createHeldReleaseService({
     const body = releaseDecisionInputSchema.parse(input),
       hash = payloadDigest({ purchaseId, proposalId, ...body });
     safeReason(body.reason);
+    const preflight = await transaction(pool, async (db) => {
+      const a = await authority(db, token, env),
+        p = await sale.purchase(db, purchaseId, a.stationId),
+        r = await scopedProposal(db, proposalId, purchaseId, a.stationId);
+      requirePermission(a, permissions[r.target_kind]);
+      await independent(db, a.stationId, purchaseId, a.user_id, r.proposer_id);
+      const old = await receipt(
+        db,
+        a.user_id,
+        "decision",
+        body.operationId,
+        hash,
+      );
+      if (old) return { historical: old.response, row: r };
+      if (
+        p.version !== body.expectedVersion ||
+        p.current_revision_id !== body.expectedRevisionId ||
+        r.version !== body.expectedProposalVersion
+      )
+        return fail("version_conflict", 409);
+      if (r.state !== "pending") return fail("review_closed", 409);
+      if (body.outcome === "approve") {
+        await pinReleaseV2Policy(db, a.stationId, env);
+        await proposerCurrent(db, r);
+      }
+      return { historical: undefined, row: r };
+    });
+    if (preflight.historical !== undefined) return preflight.historical;
+    const checkedPhotos =
+      body.outcome === "approve"
+        ? await transaction(pool, (db) =>
+            inspectPhotos(
+              db,
+              storage,
+              purchaseId,
+              preflight.row.content,
+              preflight.row.proposer_person_id,
+              preflight.row.proposer_id,
+            ),
+          )
+        : null;
     return transaction(pool, async (db) => {
       const a = await authority(db, token, env);
       const p = await sale.purchase(db, purchaseId, a.stationId),
@@ -707,14 +812,8 @@ export function createHeldReleaseService({
           return fail("proposal_stale", 409);
         await target(db, purchaseId, r.content.target);
         await validateFacts(db, purchaseId, r.content, candidate);
-        await inspectPhotos(
-          db,
-          storage,
-          purchaseId,
-          r.content,
-          r.proposer_person_id,
-          r.proposer_id,
-        );
+        if (!checkedPhotos) return fail();
+        await recheckPhotos(db, purchaseId, r.content, checkedPhotos);
         const evaluation = await classifyReleaseAdmission(
           db,
           purchaseId,
@@ -828,7 +927,12 @@ export function createHeldReleaseService({
           decisionId: saleDecisionId,
           reviewEvaluationId: saleDecisionId,
           ...saleAuditValues(
-            candidate.values,
+            await effectiveValues(
+              db,
+              purchaseId,
+              current.current_revision_id,
+              candidate.values,
+            ),
             current.current_revision_id,
             current.status === "credited",
           ),
@@ -851,7 +955,23 @@ export function createHeldReleaseService({
           operationId: body.operationId,
           relatedEventIds: [proposedEvent.content.auditEventId],
           action: "held_release_approved",
-          before: null,
+          before: {
+            ...Object.fromEntries(Object.keys(after).map((key) => [key, null])),
+            ...fields(r),
+            reviewPolicyRelease: policy.release,
+            reviewPolicyRevision: String(policy.revision),
+            ...saleAuditValues(
+              await effectiveValues(
+                db,
+                purchaseId,
+                p.current_revision_id,
+                before,
+              ),
+              p.current_revision_id,
+              p.status === "credited",
+            ),
+            ...p.auditGates,
+          },
           after,
         });
         result = wire.decisionSchema.parse({
@@ -1028,12 +1148,7 @@ export function createHeldReleaseService({
         items: await Promise.all(shown.map((p) => project(db, p))),
         nextCursor:
           more && last
-            ? encodeCursor(
-                secret,
-                scope,
-                last.proposed_at.toISOString(),
-                last.id,
-              )
+            ? encodeCursor(secret, scope, last.cursor_at!, last.id)
             : null,
       };
     });
