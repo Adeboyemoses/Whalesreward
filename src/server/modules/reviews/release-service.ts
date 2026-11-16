@@ -302,12 +302,13 @@ async function validateFacts(
     return fail();
   if (r.evidence_asset_id !== body.meterAssetId)
     return fail("evidence_unavailable", 422);
+  // Basis remains the original capture basis; compare against the guarded
+  // effective candidate, including independently retained meter-evidence values.
   if (
     r.values.basis === "amount"
-      ? f.recordedAmountKobo !== r.values.enteredAmountKobo
+      ? f.recordedAmountKobo !== r.values.amountKobo
       : f.recordedQuantity === null ||
-        parseQuantity(f.recordedQuantity) !==
-          parseQuantity(r.values.enteredQuantity!)
+        parseQuantity(f.recordedQuantity) !== parseQuantity(r.values.quantity)
   )
     return fail();
   if (
@@ -811,6 +812,15 @@ export function createHeldReleaseService({
         );
       } else {
         const policy = await pinReleaseV2Policy(db, a.stationId, env);
+        if (
+          (
+            await db.query(
+              "SELECT id FROM sale_decision WHERE actor_user_id=$1 AND operation_id=$2",
+              [a.user_id, body.operationId],
+            )
+          ).rowCount
+        )
+          return fail("operation_conflict", 409);
         await proposerCurrent(db, r);
         if (
           p.version !== r.provenance.expectedPostVersion ||
