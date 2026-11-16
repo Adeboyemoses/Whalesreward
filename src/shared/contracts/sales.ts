@@ -204,6 +204,7 @@ export const revisionSchema = attendantRevisionSchema
   .extend({ actor: actorSchema, reason: reason.nullable() })
   .strict();
 const decisionKind = z.enum([
+  "held_release",
   "correction",
   "duplicate",
   "price",

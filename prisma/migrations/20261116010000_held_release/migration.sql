@@ -132,3 +132,13 @@ DO $$ DECLARE t TEXT; BEGIN
  EXECUTE format('CREATE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION reject_held_release_truncate()',t||'_no_truncate',t);
  END LOOP;
 END $$;
+
+ALTER TABLE sale_decision DROP CONSTRAINT ck_decision_kind;
+ALTER TABLE sale_decision ADD CONSTRAINT ck_decision_kind CHECK (
+ (kind='correction' AND correction_id IS NOT NULL AND hold_id IS NULL AND flag_id IS NULL AND outcome IN ('approve','reject')) OR
+ (kind='duplicate' AND correction_id IS NULL AND hold_id IS NULL AND flag_id IS NOT NULL AND outcome IN ('keep_both','cancel')) OR
+ (kind='price' AND correction_id IS NULL AND hold_id IS NOT NULL AND flag_id IS NULL AND outcome IN ('accept_captured','correct_meter','cancel')) OR
+ (kind='card' AND correction_id IS NULL AND hold_id IS NOT NULL AND flag_id IS NULL AND outcome IN ('confirm_earlier','cancel')) OR
+ (kind='date' AND correction_id IS NULL AND hold_id IS NOT NULL AND flag_id IS NULL AND outcome='verify_date') OR
+ (kind='capture' AND correction_id IS NULL AND hold_id IS NULL AND flag_id IS NULL AND outcome IN ('confirm','cancel')) OR
+ (kind='held_release' AND correction_id IS NULL AND flag_id IS NULL AND outcome IN ('confirm','cancel')));
