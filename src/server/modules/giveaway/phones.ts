@@ -205,7 +205,7 @@ async function partial(
   for (const source of ids) {
     const p = (
       await db.query(
-        `SELECT p.*,EXISTS(SELECT 1 FROM photo_receipt_observation o WHERE o.purchase_id=p.id) AS observed FROM purchase p WHERE p.id=$1 AND p.station_id=$2 FOR SHARE`,
+        `SELECT p.*,EXISTS(SELECT 1 FROM photo_receipt_observation o WHERE o.purchase_id=p.id) AS observed,EXISTS(SELECT 1 FROM purchase_revision r WHERE r.purchase_id=p.id AND r.state='accepted') AS ever_accepted FROM purchase p WHERE p.id=$1 AND p.station_id=$2 FOR SHARE`,
         [source.purchaseId, c.station_id],
       )
     ).rows[0];
@@ -213,6 +213,8 @@ async function partial(
       !p ||
       !phone.attendantIds.includes(p.originating_attendant_id) ||
       p.current_revision_id ||
+      p.ever_accepted ||
+      !["received", "photo_pending"].includes(p.status) ||
       p.observed
     )
       fail("exclusion_source_invalid", 422);
