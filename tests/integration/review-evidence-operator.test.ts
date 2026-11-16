@@ -89,7 +89,7 @@ async function input(action = "activate", apply = false) {
     "test",
     "--digest",
     releaseDigest,
-  releaseV2Digest,
+    releaseV2Digest,
     "--authorization",
     "WHR-114",
     ...(action === "activate"
@@ -461,7 +461,7 @@ it("runs real CLI dry run and guarded production apply against persisted identit
     "production",
     "--digest",
     releaseDigest,
-  releaseV2Digest,
+    releaseV2Digest,
     "--authorization",
     "APPROVAL-114",
     "--activated-at",
@@ -530,14 +530,78 @@ it("runs real CLI dry run and guarded production apply against persisted identit
   expect(await counts(request.stationId)).toEqual([1, 2]);
 });
 
-
 it("SR-07 partial v2 installation or absent person bindings refuses preview/apply with no SR-08 audit", async () => {
   const ordinary = await input();
-  const v2 = { ...ordinary, release: "review-evidence-v2", digest: releaseV2Digest };
-  const before = await db.pool.query("SELECT count(*)::int AS count FROM audit_event WHERE station_id=$1", [v2.stationId]);
+  const v2 = {
+    ...ordinary,
+    release: "review-evidence-v2",
+    digest: releaseV2Digest,
+  };
+  const before = await db.pool.query(
+    "SELECT count(*)::int AS count FROM audit_event WHERE station_id=$1",
+    [v2.stationId],
+  );
   await expect(operate(db.pool, v2)).rejects.toThrow();
-  await expect(operate(db.pool, { ...v2, apply: true, expectedRevision: 1 })).rejects.toThrow();
+  await expect(
+    operate(db.pool, { ...v2, apply: true, expectedRevision: 1 }),
+  ).rejects.toThrow();
   expect(await counts(v2.stationId)).toEqual([0, 0]);
-  const after = await db.pool.query("SELECT count(*)::int AS count FROM audit_event WHERE station_id=$1", [v2.stationId]);
+  const after = await db.pool.query(
+    "SELECT count(*)::int AS count FROM audit_event WHERE station_id=$1",
+    [v2.stationId],
+  );
   expect(after.rows).toEqual(before.rows);
+});
+
+it("SR-07 v2 requires exact persisted database identity before any installation check", async () => {
+  const ordinary = await input();
+  const v2 = {
+    ...ordinary,
+    release: "review-evidence-v2",
+    digest: releaseV2Digest,
+  };
+  for (const comment of [
+    null,
+    "whr.environment=staging",
+    "whr.environment=test extra",
+  ]) {
+    await setComment(comment);
+    await expect(operate(db.pool, v2)).rejects.toThrow(refusal);
+    await expect(
+      operate(db.pool, { ...v2, apply: true, expectedRevision: 1 }),
+    ).rejects.toThrow(refusal);
+    expect(await counts(v2.stationId)).toEqual([0, 0]);
+    expect(await auditRows(v2.stationId)).toEqual([]);
+  }
+});
+
+it("SR-07 v2 deactivation remains available without installation and SR-08 writes one safe event", async () => {
+  const ordinary = await input("deactivate", true);
+  const inactive = {
+    ...ordinary,
+    release: "review-evidence-v2",
+    digest: releaseV2Digest,
+  };
+  const result = await operate(db.pool, inactive);
+  expect(result.policy).toMatchObject({
+    release: "review-evidence-v2",
+    digest: releaseV2Digest,
+    revision: 1,
+    activation: {
+      state: "inactive",
+      approvalReference: null,
+      activatedAt: null,
+    },
+  });
+  expect(result.applyCommand).toContain("--release review-evidence-v2");
+  expect(await counts(inactive.stationId)).toEqual([0, 1]);
+  const events = await auditRows(inactive.stationId);
+  expect(events).toHaveLength(1);
+  expect(events[0].action).toBe("review_evidence_deactivated");
+  expect(events[0].after.policyRelease).toBe("review-evidence-v2");
+  expect(JSON.stringify(events)).not.toContain(releaseV2Digest);
+  await expect(operate(db.pool, inactive)).rejects.toThrow("Revision changed");
+  expect(await auditRows(inactive.stationId)).toHaveLength(1);
+  const later = await operate(db.pool, { ...inactive, expectedRevision: 2 });
+  expect(later.policy.revision).toBe(2);
 });

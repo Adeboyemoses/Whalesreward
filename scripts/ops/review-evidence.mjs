@@ -9,9 +9,14 @@ import {
 } from "../../src/server/modules/audit/write.ts";
 import { reviewEvidenceReleaseArtifact } from "../../src/server/modules/reviews/release.ts";
 
-import { reviewEvidenceV2ReleaseArtifact, assertReleaseV2Installation } from "../../src/server/modules/reviews/release-v2.ts";
+import {
+  reviewEvidenceV2ReleaseArtifact,
+  assertReleaseV2Installation,
+} from "../../src/server/modules/reviews/release-v2.ts";
 
-export const releaseV2Digest = createHash("sha256").update(reviewEvidenceV2ReleaseArtifact, "utf8").digest("hex");
+export const releaseV2Digest = createHash("sha256")
+  .update(reviewEvidenceV2ReleaseArtifact, "utf8")
+  .digest("hex");
 
 export const releaseDigest = createHash("sha256")
   .update(reviewEvidenceReleaseArtifact, "utf8")
@@ -24,7 +29,9 @@ Default: dry run. DATABASE_URL must already be set in your shell; never pass it 
 
 class OperatorError extends Error {}
 const inputSchema = z.strictObject({
-  release: z.enum(["review-evidence-v1", "review-evidence-v2"]).default("review-evidence-v1"),
+  release: z
+    .enum(["review-evidence-v1", "review-evidence-v2"])
+    .default("review-evidence-v1"),
   action: z.enum(["activate", "deactivate"]),
   stationId: z.uuid().transform((value) => value.toLowerCase()),
   environment: z.enum(["development", "test", "staging", "production"]),
@@ -91,7 +98,12 @@ export function parseArguments(args) {
     throw new OperatorError(
       "Invalid or missing input. Authorization must be a non-secret reference ID. Use --help.",
     );
-  if (parsed.data.digest !== (parsed.data.release === "review-evidence-v2" ? releaseV2Digest : releaseDigest))
+  if (
+    parsed.data.digest !==
+    (parsed.data.release === "review-evidence-v2"
+      ? releaseV2Digest
+      : releaseDigest)
+  )
     throw new OperatorError(
       "Release digest does not match the built-in artifact.",
     );
@@ -130,7 +142,10 @@ export async function operate(pool, input) {
   const parsed = inputSchema.safeParse(input);
   if (
     !parsed.success ||
-    input.digest !== (parsed.success && parsed.data.release === "review-evidence-v2" ? releaseV2Digest : releaseDigest) ||
+    input.digest !==
+      (parsed.success && parsed.data.release === "review-evidence-v2"
+        ? releaseV2Digest
+        : releaseDigest) ||
     (input.action === "activate") !== (input.activatedAt !== null) ||
     (input.apply && input.expectedRevision === null)
   )

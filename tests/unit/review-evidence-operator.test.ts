@@ -107,12 +107,23 @@ it("requires a strict expected revision when applying", () => {
     ).toThrow();
 });
 
-
 it("SR-07 operator selects an immutable v2 digest without changing the v1 default", () => {
   expect(parseArguments(args).release).toBe("review-evidence-v1");
-  const v2 = [...args.map((x) => x === releaseDigest ? releaseV2Digest : x), "--release", "review-evidence-v2"];
+  const v2 = [
+    ...args.map((x) => (x === releaseDigest ? releaseV2Digest : x)),
+    "--release",
+    "review-evidence-v2",
+  ];
   expect(parseArguments(v2).release).toBe("review-evidence-v2");
-  expect(() => parseArguments([...args, "--release", "review-evidence-v2"])).toThrow();
-  expect(() => parseArguments([...args, "--release", "review-evidence-v3"])).toThrow();
-  expect(() => parseArguments(args.map((x) => x === releaseDigest ? releaseV2Digest : x))).toThrow();
+  expect(() =>
+    parseArguments([...args, "--release", "review-evidence-v2"]),
+  ).toThrow();
+  expect(() =>
+    parseArguments([...args, "--release", "review-evidence-v3"]),
+  ).toThrow();
+  expect(() =>
+    parseArguments(
+      args.map((x) => (x === releaseDigest ? releaseV2Digest : x)),
+    ),
+  ).toThrow();
 });

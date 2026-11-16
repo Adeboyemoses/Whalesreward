@@ -78,7 +78,6 @@ Use bound SQL parameters, never concatenate operator values. No application or h
 
 The present implementation stores campaign membership in protected evaluation provenance. Existing `sync_validation.campaign_eligible` remains immutable and false for held originals; confirming an outside interval never changes that to true. Future campaign aggregation must consume the typed membership and independently enforce receipt deadlines and remaining eligibility gates. This release adds no campaign report or snapshot implementation.
 
-
 ## Two-person release v2 (WHR-153)
 
 Installation does not activate v2. V1 remains the default when `--release` is omitted. Earl must separately authorize the exact environment, station, reviewed v2 artifact digest, higher revision and activation instant. Preview and apply v2 by adding `--release review-evidence-v2` to the command above and supplying the SHA-256 of `reviewEvidenceV2ReleaseArtifact` in `src/server/modules/reviews/release-v2.ts`. Never substitute the v1 digest. Both preview and apply require the installed proposal, identity, sheet-photo, decision and giveaway integrations and canonical person bindings. A partially installed package refuses activation. The exact owner-written database-comment identity remains mandatory for both releases.
