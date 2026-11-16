@@ -602,6 +602,7 @@ export function createHeldReleaseService({
       await pinReleaseV2Policy(db, a.stationId, env);
       sale.guard(p, body);
       await target(db, purchaseId, body.target);
+      await classifyReleaseAdmission(db, purchaseId, body);
       return { historical: undefined, person, actorId: a.user_id };
     });
     if (preflight.historical !== undefined)

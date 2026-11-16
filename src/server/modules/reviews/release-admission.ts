@@ -65,14 +65,6 @@ export async function classifyReleaseAdmission(
         BigInt(at) < BigInt(E) ? "confirm_earlier" : "cancel",
       );
   }
-  const from = BigInt(trustedMicros(body.facts.observedCapture.from));
-  const through = BigInt(trustedMicros(body.facts.observedCapture.through));
-  const J = {
-    ...I,
-    L: String(from > BigInt(I.L) ? from : BigInt(I.L)),
-    U: String(through < BigInt(I.U) ? through : BigInt(I.U)),
-  };
-  if (BigInt(J.L) > BigInt(J.U)) return insufficient();
   const boundary = (at: unknown) => {
     const t = BigInt(trustedMicros(at));
     return t > BigInt(I.L) && t <= BigInt(I.U);
@@ -116,7 +108,6 @@ export async function classifyReleaseAdmission(
           addBoundary("price_activation", p.id, p.effective_from);
       }
       admitted = boundaries.length > 0;
-      if (body.outcome === "confirm") conclusions.push(rules.price(f, J));
       break;
     }
     case "card":
@@ -125,8 +116,6 @@ export async function classifyReleaseAdmission(
       admitted = boundary(f.card.retired_at);
       if (admitted)
         addBoundary("card_replacement", f.card.id, f.card.retired_at);
-      if (body.outcome === "confirm")
-        conclusions.push(rules.card(f, J, "confirm_earlier"));
       break;
     case "date":
       admitted = intervalDay(I.L, I.U) === null;
@@ -149,8 +138,6 @@ export async function classifyReleaseAdmission(
           });
         }
       }
-      if (body.outcome === "confirm")
-        conclusions.push(rules.date(f, J, intervalDay(J.L, J.U) ?? undefined));
       break;
     case "capture": {
       const authorization = rules.authorization(f, I),
@@ -205,20 +192,45 @@ export async function classifyReleaseAdmission(
         }
       }
       if (admitted && !boundaries.length) return insufficient();
-      if (body.outcome === "confirm")
-        for (const b of body.target.blocks) {
-          const c =
-            b.code === "capture_authorization_unresolved"
-              ? rules.authorization(f, J)
-              : rules.campaign(f, J);
-          if (!c || c.tag === "capture_unauthorized_throughout")
-            return insufficient();
-          conclusions.push(c);
-        }
       break;
     }
   }
   if (!admitted) throw new AuthError("release_not_required", 409);
+  const from = BigInt(trustedMicros(body.facts.observedCapture.from));
+  const through = BigInt(trustedMicros(body.facts.observedCapture.through));
+  const J = {
+    ...I,
+    L: String(from > BigInt(I.L) ? from : BigInt(I.L)),
+    U: String(through < BigInt(I.U) ? through : BigInt(I.U)),
+  };
+  if (BigInt(J.L) > BigInt(J.U)) return insufficient();
+  if (body.outcome === "confirm") {
+    switch (body.target.kind) {
+      case "price":
+        conclusions.push(rules.price(f, J));
+        break;
+      case "card":
+        conclusions.push(rules.card(f, J, "confirm_earlier"));
+        break;
+      case "date":
+        conclusions.push(rules.date(f, J, intervalDay(J.L, J.U) ?? undefined));
+        break;
+      case "capture":
+        for (const b of body.target.blocks) {
+          const conclusion =
+            b.code === "capture_authorization_unresolved"
+              ? rules.authorization(f, J)
+              : rules.campaign(f, J);
+          if (
+            !conclusion ||
+            conclusion.tag === "capture_unauthorized_throughout"
+          )
+            return insufficient();
+          conclusions.push(conclusion);
+        }
+    }
+  }
+
   if (
     body.outcome === "cancel"
       ? body.facts.finding !== "entry_marked_void"
