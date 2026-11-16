@@ -11,6 +11,7 @@ import {
   sheetBytes,
   type Proposal,
   type ReleaseFixture,
+  type Preparation,
 } from "../fixtures/held-release-browser";
 import { adminDetail } from "../reviews/helpers";
 
@@ -36,20 +37,22 @@ async function open(page: Page, id: string, kind: string, proposal?: string) {
     page.getByText("Loading release details…", { exact: true }),
   ).toHaveCount(0);
 }
-async function fillDateForm(page: Page) {
+async function fillDateForm(page: Page, prep: Preparation) {
+  const naira = (k: string) =>
+    `${BigInt(k) / 100n}.${(BigInt(k) % 100n).toString().padStart(2, "0")}`;
   await page.getByRole("radio", { name: "Shift sheet", exact: true }).check();
   await page
     .getByLabel("Entry reference", { exact: true })
     .fill("Shift A entry 7");
   await page
     .getByLabel("Amount written in the entry (₦)", { exact: true })
-    .fill("20000.00");
+    .fill(naira(prep.currentCandidate.values.amountKobo));
   await page
     .getByLabel("Quantity written in the entry (litres)", { exact: true })
-    .fill("20.00");
+    .fill(prep.currentCandidate.values.quantity);
   await page
     .getByLabel("Rate written in the entry (₦ / litre)", { exact: true })
-    .fill("1000.00");
+    .fill(naira(prep.currentCandidate.values.rateKobo));
   await page.getByRole("radio", { name: "Time range", exact: true }).check();
   await page.getByRole("radio", { name: "Minute", exact: true }).check();
   await page
@@ -76,11 +79,11 @@ async function fillDateForm(page: Page) {
     );
   await page.getByLabel(proposerAttestation, { exact: true }).check();
 }
-async function addPhoto(page: Page) {
+async function addPhoto(page: Page, prep: Preparation) {
   await page.getByLabel("Choose JPEG", { exact: true }).setInputFiles({
     name: "fictional-entry.jpg",
     mimeType: "image/jpeg",
-    buffer: await sheetBytes("date"),
+    buffer: await sheetBytes("date", "confirm", prep.currentCandidate.values),
   });
   await expect(
     page.getByText("Sheet photo preview", { exact: true }),
@@ -170,8 +173,9 @@ test("R2 R4–R11 minute attestation uploads, freezes lost proposal/decision res
         exact: true,
       })
       .click();
-    await addPhoto(page);
-    await fillDateForm(page);
+    const prep = await preparation(page, sale.id, "date");
+    await addPhoto(page, prep);
+    await fillDateForm(page, prep);
     const bodies: unknown[] = [];
     await page.route(
       `**/api/admin/sales/${sale.id}/release-proposals`,
