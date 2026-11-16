@@ -63,7 +63,7 @@ export const phoneAudit: PhoneAudit = async (
       target: {
         kind: "campaign",
         id: campaignId,
-        code: campaignId,
+        code: `CAMPAIGN-${campaignId}`,
         subjectAtEvent: null,
       },
       operationId,
@@ -72,7 +72,10 @@ export const phoneAudit: PhoneAudit = async (
       changes: mapping.map((field) => ({
         field,
         before: null,
-        after: values[field],
+        after:
+          typeof values[field] === "number"
+            ? String(values[field])
+            : values[field],
       })),
       relatedEventIds: related,
     });

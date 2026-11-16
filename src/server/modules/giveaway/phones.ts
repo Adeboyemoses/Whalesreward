@@ -80,12 +80,12 @@ async function context(
   ]);
   const c = (
     await db.query<CampaignRow>(
-      `SELECT c.*,r.data_version::text,d.manager_admin_id,pc.version AS census_version,t.upload_deadline,sp.policy_version
+      `SELECT c.*,r.data_version::text,d.manager_admin_id,pc.version AS census_version,t.upload_deadline,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
  FROM campaign c JOIN station_reporting_state r ON r.station_id=c.station_id
  LEFT JOIN giveaway_manager_designation d ON d.id=c.manager_designation_id
  LEFT JOIN giveaway_phone_census pc ON pc.id=c.phone_census_id
  LEFT JOIN settings_version t ON t.id=c.current_timing_version_id
- LEFT JOIN station_reconciliation_policy sp ON sp.station_id=c.station_id WHERE c.id=$1`,
+ LEFT JOIN station_reconciliation_policy sp ON sp.station_id=c.station_id LEFT JOIN reconciliation_policy_definition pd ON pd.policy_version=sp.policy_version WHERE c.id=$1`,
       [campaignId],
     )
   ).rows[0]!;
