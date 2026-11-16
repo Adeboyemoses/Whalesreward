@@ -5,7 +5,13 @@ import { newId } from "../../src/server/lib/ids";
 import { digest } from "../../src/server/modules/auth/crypto";
 import { createHeldReleaseService } from "../../src/server/modules/reviews/release-service";
 import { reviewEvidenceV2ReleaseArtifact } from "../../src/server/modules/reviews/release-v2";
-import { evidenceDatabase, S } from "../helpers/review-evidence-fixture";
+import {
+  evidenceDatabase,
+  S,
+  sourceAudit,
+  seedHistorical,
+} from "../helpers/review-evidence-fixture";
+import { fixtureId } from "../helpers/sync-fixture";
 import { heldReleaseFixture } from "../helpers/held-release-fixture";
 // Dormant protocol only: actual installation remains denied and is verified separately.
 vi.mock(
@@ -119,6 +125,7 @@ async function fixture(kind: "card" | "price" = "card") {
 describe("P-29 dormant two-person service on real Postgres", () => {
   beforeAll(async () => {
     vi.stubEnv("WHR_ENV", "test");
+    vi.stubEnv("BETTER_AUTH_URL", "https://reviews.example.test");
     vi.stubEnv("NEXT_PHASE", "phase-production-build");
     vi.stubEnv("BETTER_AUTH_SECRET", randomBytes(32).toString("hex"));
     db = await evidenceDatabase();
@@ -310,4 +317,277 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).rows[0].n,
     ).toBe(1);
   });
+  it("SR-03 proposer disablement makes approval stale but permits independent rejection", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    await db.pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
+      x.actors[0],
+    ]);
+    const guard = {
+      ...(await x.h.guard(x.sale.purchaseId)),
+      expectedProposalVersion: 1,
+    };
+    await expect(
+      x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...guard,
+        outcome: "approve",
+      }),
+    ).rejects.toMatchObject({ code: "proposal_stale" });
+    expect(
+      (
+        await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...guard,
+          operationId: newId(),
+          outcome: "reject",
+        })
+      ).proposal.state,
+    ).toBe("rejected");
+  });
+  it("SR-03 same-person alias and attendant alias cannot approve", async () => {
+    for (const excluded of [0, 2]) {
+      const x = await fixture();
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      await db.pool.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+        [newId(), x.f.stationId, x.actors[1], x.people[excluded]],
+      );
+      await expect(
+        x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...(await x.h.guard(x.sale.purchaseId)),
+          expectedProposalVersion: 1,
+          outcome: "approve",
+        }),
+      ).rejects.toMatchObject({ code: "independent_reviewer_required" });
+    }
+  });
+  it("SR-06 unrelated purchase change cannot silently rebase frozen approval", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    await db.pool.query("UPDATE purchase SET version=version+1 WHERE id=$1", [
+      x.sale.purchaseId,
+    ]);
+    await expect(
+      x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "approve",
+      }),
+    ).rejects.toMatchObject({ code: "proposal_stale" });
+    expect(
+      (await x.svc.get(x.token, x.sale.purchaseId, proposal.id)).state,
+    ).toBe("pending");
+  });
+  it("SR-08 protected proposal detail and list retain facts while general audit omits them", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const detail = await x.svc.get(
+      x.reviewerToken,
+      x.sale.purchaseId,
+      proposal.id,
+    );
+    expect(detail.facts.entryReference).toBe(x.facts.entryReference);
+    const page = await x.svc.list(x.reviewerToken, x.sale.purchaseId, {
+      limit: 1,
+    });
+    expect(page.items).toHaveLength(1);
+    const audit = JSON.stringify(
+      (
+        await db.pool.query(
+          "SELECT * FROM audit_event WHERE target_id=$1 AND action LIKE 'held_release_%'",
+          [x.sale.purchaseId],
+        )
+      ).rows,
+    );
+    expect(audit).not.toContain(x.facts.entryReference);
+    expect(audit).not.toContain("recordedAmountKobo");
+    expect(audit).not.toContain(x.people[0]);
+  });
+  it("SR-03 reviewer revocation during slow evidence read aborts approval", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const read = x.h.storage.read.bind(x.h.storage);
+    let revoked = false;
+    x.h.storage.read = async (...args) => {
+      if (!revoked) {
+        revoked = true;
+        await db.pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
+          x.actors[1],
+        ]);
+      }
+      return read(...args);
+    };
+    await expect(
+      x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "approve",
+      }),
+    ).rejects.toThrow();
+    expect(revoked).toBe(true);
+    expect(
+      (
+        await db.pool.query(
+          "SELECT state FROM held_release_state WHERE proposal_id=$1",
+          [proposal.id],
+        )
+      ).rows[0].state,
+    ).toBe("pending");
+    expect(
+      (
+        await db.pool.query(
+          "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1 AND kind='held_release'",
+          [x.sale.purchaseId],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  });
+  it("SR-07 successful approval replays after deactivation without reinterpretation", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const decision = {
+      ...(await x.h.guard(x.sale.purchaseId)),
+      expectedProposalVersion: 1,
+      outcome: "approve",
+    };
+    const result = await x.svc.decide(
+      x.reviewerToken,
+      x.sale.purchaseId,
+      proposal.id,
+      decision,
+    );
+    const inactive = {
+      ...x.policy,
+      revision: 3,
+      activation: {
+        state: "inactive",
+        approvalReference: null,
+        activatedAt: null,
+      },
+    };
+    await db.pool.query(
+      "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,'test',3,$3,'Fictional deactivation')",
+      [newId(), x.f.stationId, inactive],
+    );
+    expect(
+      await x.svc.decide(
+        x.reviewerToken,
+        x.sale.purchaseId,
+        proposal.id,
+        decision,
+      ),
+    ).toEqual(result);
+    await db.pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
+      x.actors[1],
+    ]);
+    await expect(
+      x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, decision),
+    ).rejects.toThrow();
+  });
+  it.each(["card_first", "price_first"])(
+    "SR-02a disjoint same-sale card and price attestations deny the second proposal in %s order",
+    async (order) => {
+      const x = await fixture();
+      for (const [version, rate, at] of [
+        [2, "110000", "2026-11-10T12:15:00Z"],
+        [3, "100000", "2026-11-10T12:45:00Z"],
+      ] as const) {
+        const id = newId();
+        await db.pool.query(
+          "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,$4,$5,'NGN',2,$6,$7,'Fictional joint constraint')",
+          [id, x.f.stationId, fixtureId(9), version, rate, at, fixtureId(5)],
+        );
+        await sourceAudit(
+          db.pool,
+          "price_activated",
+          "product",
+          fixtureId(9),
+          { priceVersionId: id, version, rateKobo: rate, quantityPrecision: 2 },
+          at,
+        );
+      }
+      const holdId = newId();
+      await db.pool.query(
+        "INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) VALUES($1,$2,'price','open',$3,'price_uncertain',1)",
+        [holdId, x.sale.purchaseId, x.original],
+      );
+      const priceTarget = { kind: "price", holdId, expectedHoldVersion: 1 };
+      const priceFacts = {
+        ...x.facts,
+        observedCapture: {
+          ...x.facts.observedCapture,
+          from: "2026-11-10T12:50:00.000Z",
+          through: "2026-11-10T12:55:00.000Z",
+        },
+      };
+      const first =
+        order === "card_first"
+          ? x.body
+          : { ...x.body, target: priceTarget, facts: priceFacts };
+      if (order === "price_first")
+        await seedHistorical(
+          db.pool,
+          "held_release_sheet",
+          "UPDATE held_release_sheet SET target=$2 WHERE id=$1",
+          [x.body.sheetAssetId, priceTarget],
+        );
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        first,
+      );
+      await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "approve",
+      });
+      const second = {
+        ...(order === "card_first"
+          ? { ...x.body, target: priceTarget, facts: priceFacts }
+          : x.body),
+        ...(await x.h.guard(x.sale.purchaseId)),
+      };
+      await expect(
+        x.svc.propose(x.token, x.sale.purchaseId, second),
+      ).rejects.toMatchObject({ code: "evidence_insufficient" });
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1 AND kind='held_release'",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+      expect(
+        (
+          await db.pool.query("SELECT status FROM purchase WHERE id=$1", [
+            x.sale.purchaseId,
+          ])
+        ).rows[0].status,
+      ).toBe("held");
+    },
+  );
 });
