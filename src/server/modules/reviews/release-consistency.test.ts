@@ -55,6 +55,24 @@ describe("P-29 joint attestation constraint", () => {
     ])
       expect(() => releaseConsistency(original, applied)).toThrow();
   });
+  it("SR-02a only the purchase-bound synthetic lookup source is admitted", () => {
+    const purchaseId = "019a88a0-0000-7000-8000-000000000001";
+    const foreignId = "019a88a0-0000-7000-8000-000000000002";
+    const a = attestation("a", "100", "200");
+    a.sourceIds = [purchaseId, `${purchaseId}:lookup`];
+    expect(releaseConsistency(original, [a], purchaseId).compatible).toBe(true);
+    for (const sourceIds of [
+      [purchaseId, `${foreignId}:lookup`],
+      [purchaseId, `${purchaseId}:other`],
+      [`${purchaseId}:lookup`],
+      [purchaseId, `${purchaseId}:lookup:extra`],
+    ]) {
+      expect(() =>
+        releaseConsistency(original, [{ ...a, sourceIds }], purchaseId),
+      ).toThrow(expect.objectContaining({ code: "evidence_insufficient" }));
+    }
+    expect(() => releaseConsistency(original, [a])).toThrow();
+  });
   it("SR-02a compatible intersection retains decision versions and leaves original interval unchanged", () => {
     const before = { ...original };
     const result = releaseConsistency(original, [
