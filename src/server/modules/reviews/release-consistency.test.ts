@@ -49,6 +49,7 @@ describe("P-29 joint attestation constraint", () => {
     const a = attestation("a", "100", "200");
     for (const applied of [
       [{ ...a, sourceIds: [] }],
+      [{ ...a, sourceIds: [""] }],
       [{ ...a, predicates: [] }],
       [a, a],
     ])
