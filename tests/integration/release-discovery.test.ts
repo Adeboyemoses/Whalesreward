@@ -11,6 +11,7 @@ import {
 } from "vitest";
 import { newId } from "../../src/server/lib/ids";
 import { createReleaseDiscoveryService } from "../../src/server/modules/reviews/release-discovery";
+import { handleSalesRead } from "../../src/server/modules/sales/http";
 import { readSales } from "../../src/server/modules/sales/service";
 import {
   prepareGiveaway,
@@ -278,6 +279,38 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       expect(result.admission.state).toBe("not_admissible");
     },
   );
+  it("RD-02 categorical reason precedence chooses history before unavailable photo and invalid bounds before photo", async () => {
+    const x = await discoveryFixture(db);
+    await db.pool.query(
+      "UPDATE photo_asset SET deleted_at=clock_timestamp() WHERE id=$1",
+      [x.sale.assetId],
+    );
+    await seedHistorical(
+      db.pool,
+      "audit_event",
+      "DELETE FROM audit_event WHERE id=$1",
+      [x.priceAudit],
+    );
+    expect(
+      (await x.discovery.prepare(x.token, x.sale.purchaseId, { kind: "card" }))
+        .admission,
+    ).toEqual({ state: "not_admissible", reason: "history_incomplete" });
+    const y = await discoveryFixture(db);
+    await db.pool.query(
+      "UPDATE photo_asset SET deleted_at=clock_timestamp() WHERE id=$1",
+      [y.sale.assetId],
+    );
+    await seedHistorical(
+      db.pool,
+      "purchase",
+      "UPDATE purchase SET server_received_at='2026-11-09T00:00:00Z' WHERE id=$1",
+      [y.sale.purchaseId],
+    );
+    expect(
+      (await y.discovery.prepare(y.token, y.sale.purchaseId, { kind: "card" }))
+        .admission,
+    ).toEqual({ state: "not_admissible", reason: "invalid_capture_bounds" });
+  });
   it("RD-02 positive advisory admission never bypasses invalid sheet facts or disjoint J", async () => {
     const x = await discoveryFixture(db);
     expect(
@@ -702,6 +735,39 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       expect(result.headers.get("vary")).toBe("Cookie");
       expect(result.headers.get("referrer-policy")).toBe("no-referrer");
     }
+  });
+  it("RD-05 pending sales search enforces POST Origin before disclosing summaries", async () => {
+    const x = await discoveryFixture(db);
+    await propose(x);
+    const request = (origin: string) =>
+      new Request("https://reviews.example.test/api/admin/sales/search", {
+        method: "POST",
+        headers: {
+          origin,
+          "content-type": "application/json",
+          cookie: `__Host-whr-admin-session=${x.token}`,
+        },
+        body: JSON.stringify({ status: "pending_release" }),
+      });
+    const denied = await handleSalesRead(
+      request("https://foreign.example.test"),
+      "admin",
+      "search",
+    );
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({
+      error: { code: "origin_rejected" },
+    });
+    const allowed = await handleSalesRead(
+      request("https://reviews.example.test"),
+      "admin",
+      "search",
+    );
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toMatchObject({
+      data: { items: [{ pendingRelease: { kind: "card" } }] },
+    });
+    expect(allowed.headers.get("cache-control")).toBe("no-store");
   });
   it("RD-05 sales-only audit-only leaderboard-only and restricted sessions cannot disclose queue actors", async () => {
     const x = await discoveryFixture(db);
