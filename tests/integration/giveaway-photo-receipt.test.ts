@@ -177,6 +177,47 @@ describe("P-30 trusted complete-photo receipt", () => {
       client.release();
     }
   });
+  it("P-30 complete-byte receipt uses database time after seal verification and before later validation", async () => {
+    const p = await pending();
+    const read = p.h.storage.read;
+    let finalReads = 0;
+    let sealVerifiedAt: Date | undefined;
+    let validationResumedAt: Date | undefined;
+    p.h.storage.read = async (key, max) => {
+      const bytes = await read(key, max);
+      if (key.startsWith("final/")) {
+        finalReads++;
+        if (finalReads === 1)
+          sealVerifiedAt = (
+            await db.pool.query("SELECT clock_timestamp() AS at")
+          ).rows[0].at;
+        if (finalReads === 2) {
+          await db.pool.query("SELECT pg_sleep(0.025)");
+          validationResumedAt = (
+            await db.pool.query("SELECT clock_timestamp() AS at")
+          ).rows[0].at;
+        }
+      }
+      return bytes;
+    };
+    await p.h.sync.finalize(p.f.token, p.purchaseId, p.body);
+    const r = (
+      await db.pool.query(
+        "SELECT f.receipt_at,a.validated_at,p.server_received_at FROM photo_receipt_fact f JOIN photo_asset a ON a.id=f.asset_id JOIN purchase p ON p.id=f.purchase_id WHERE f.purchase_id=$1",
+        [p.purchaseId],
+      )
+    ).rows[0];
+    expect(r.receipt_at.getTime()).toBeGreaterThanOrEqual(
+      sealVerifiedAt!.getTime(),
+    );
+    expect(r.receipt_at.getTime()).toBeLessThan(validationResumedAt!.getTime());
+    expect(r.validated_at.getTime()).toBeGreaterThanOrEqual(
+      validationResumedAt!.getTime(),
+    );
+    expect(r.server_received_at.getTime()).toBeLessThanOrEqual(
+      r.receipt_at.getTime(),
+    );
+  });
   it("P-30 concurrent same-byte retries retain one observation and one final fact", async () => {
     const p = await pending();
     const results = await Promise.allSettled([
