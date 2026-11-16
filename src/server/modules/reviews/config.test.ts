@@ -57,7 +57,7 @@ describe("review evidence deployment configuration", () => {
       { ...policy, scope: { ...policy.scope, extra: true } },
       { ...policy, activation: { ...policy.activation, extra: true } },
       { ...policy, activation: { state: "active" } },
-      { ...policy, release: "review-evidence-v2" },
+      { ...policy, release: "review-evidence-v3" },
       { ...policy, scope: { ...policy.scope, stationId: "bad" } },
       {
         ...policy,

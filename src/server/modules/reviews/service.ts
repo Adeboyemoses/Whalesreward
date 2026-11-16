@@ -1,4 +1,8 @@
 import {
+  assertAppliedReleaseConsistency,
+  supersedeClosedRelease,
+} from "./release-integrations";
+import {
   writeAudit,
   auditActor,
   auditTarget,
@@ -195,6 +199,7 @@ async function accept(
   actor: string,
   reason: string,
 ) {
+  await assertAppliedReleaseConsistency(db, p.id);
   const blocked = (
     await db.query<{ blocked: boolean }>(
       `SELECT
@@ -560,6 +565,7 @@ async function record(
     "INSERT INTO duplicate_reporting_state(station_id,generation) VALUES($1,1) ON CONFLICT(station_id) DO UPDATE SET generation=duplicate_reporting_state.generation+1",
     [p.station_id],
   );
+  await supersedeClosedRelease(db, p.id, p.station_id, auditId);
   return response;
 }
 export function createReviewsService({
@@ -1071,3 +1077,15 @@ const duplicateResponse = z.strictObject({
   flag: wire.duplicateFlagSchema,
   purchases: z.array(wire.saleRowSchema).length(2),
 });
+
+/** Shared sale mutations for the independently authorized P-29 service. */
+export const releaseSaleMutations = {
+  authority,
+  purchase,
+  guard,
+  candidate,
+  cancel,
+  accept,
+  dateRevision,
+  markCampaigns,
+};

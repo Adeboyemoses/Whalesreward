@@ -3,12 +3,16 @@ import type pg from "pg";
 import { z } from "zod";
 import { AuthError } from "../auth/errors";
 import { reviewEvidenceReleaseArtifact } from "./release";
+import {
+  reviewEvidenceV2ReleaseArtifact,
+  assertReleaseV2Installation,
+} from "./release-v2";
 
 export const reviewEvidenceReleaseDigest = createHash("sha256")
   .update(reviewEvidenceReleaseArtifact, "utf8")
   .digest("hex");
 export const reviewEvidencePolicySchema = z.strictObject({
-  release: z.literal("review-evidence-v1"),
+  release: z.enum(["review-evidence-v1", "review-evidence-v2"]),
   digest: z.string().regex(/^[a-f0-9]{64}$/),
   revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   scope: z.strictObject({
@@ -45,7 +49,12 @@ export function reviewEvidenceConfiguration(
       JSON.parse(env.WHR_REVIEW_EVIDENCE_POLICY ?? "null"),
     );
     if (
-      parsed.digest !== reviewEvidenceReleaseDigest ||
+      parsed.digest !==
+        (parsed.release === "review-evidence-v1"
+          ? reviewEvidenceReleaseDigest
+          : createHash("sha256")
+              .update(reviewEvidenceV2ReleaseArtifact, "utf8")
+              .digest("hex")) ||
       parsed.scope.environment !== reviewEnvironment(env)
     )
       return null;
@@ -81,6 +90,13 @@ export async function reviewEvidenceApprovalValid(
   policy: ReviewEvidenceConfiguration,
 ) {
   if (policy.activation.state !== "active") return false;
+  if (policy.release === "review-evidence-v2") {
+    try {
+      await assertReleaseV2Installation(db, policy.scope.stationId);
+    } catch {
+      return false;
+    }
+  }
   const found = await db.query(
     `SELECT c.id FROM review_evidence_configuration c JOIN review_evidence_approval a ON a.id=$4
      WHERE c.station_id=$1 AND c.environment=$2 AND c.revision=$3 AND c.configuration=$5::jsonb
@@ -99,4 +115,26 @@ export async function reviewEvidenceApprovalValid(
     ],
   );
   return found.rowCount === 1;
+}
+
+export async function pinReleaseV2Policy(
+  db: pg.PoolClient,
+  stationId: string,
+  env: ReviewEnvironment = process.env,
+) {
+  const policy = reviewEvidenceConfiguration(env);
+  if (
+    !policy ||
+    policy.release !== "review-evidence-v2" ||
+    policy.scope.stationId !== stationId ||
+    policy.activation.state !== "active"
+  )
+    throw new AuthError("release_policy_unconfigured", 409);
+  await db.query(
+    "SELECT pg_advisory_xact_lock(hashtextextended('review-evidence:'||$1::text||':'||$2::text,0))",
+    [stationId, policy.scope.environment],
+  );
+  if (!(await reviewEvidenceApprovalValid(db, policy)))
+    throw new AuthError("release_policy_unconfigured", 409);
+  return policy;
 }
