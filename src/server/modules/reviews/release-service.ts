@@ -1101,6 +1101,24 @@ export function createHeldReleaseService({
               proposalId,
               proposer: r.provenance.person,
               approver: person,
+              people: {
+                proposer: {
+                  actor: r.provenance.actor,
+                  person: r.provenance.person,
+                  reason: r.content.reason,
+                  at: r.proposed_at.toISOString(),
+                },
+                approver: {
+                  actor,
+                  person,
+                  reason: body.reason,
+                  at: now.toISOString(),
+                },
+              },
+              evidence: {
+                meterAssetId: r.content.meterAssetId,
+                sheetAssetId: r.sheet_asset_id,
+              },
               certificate: joint.certificate,
             }),
           ],
