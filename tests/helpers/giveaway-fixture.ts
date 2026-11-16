@@ -131,9 +131,23 @@ export async function pendingGiveawayProposal(
     "INSERT INTO held_release_proposal(id,purchase_id,station_id,target_kind,outcome,sheet_asset_id,proposer_id,proposer_person_id,content,provenance) VALUES($1,$2,$3,'capture','confirm',$4,$5,$6,'{}','{}')",
     [proposal, purchaseId, fixtureId(8), sheet, fixtureId(2), person],
   );
-  await f.pool.query(
-    "INSERT INTO held_release_state(proposal_id,purchase_id) VALUES($1,$2)",
-    [proposal, purchaseId],
-  );
+  const db = await f.pool.connect();
+  try {
+    await db.query("BEGIN");
+    await db.query(
+      "INSERT INTO held_release_transition(id,proposal_id,version,state,actor_id,content) VALUES($1,$2,1,'pending',$3,'{}')",
+      [newId(), proposal, fixtureId(2)],
+    );
+    await db.query(
+      "INSERT INTO held_release_state(proposal_id,purchase_id) VALUES($1,$2)",
+      [proposal, purchaseId],
+    );
+    await db.query("COMMIT");
+  } catch (error) {
+    await db.query("ROLLBACK");
+    throw error;
+  } finally {
+    db.release();
+  }
   return proposal;
 }

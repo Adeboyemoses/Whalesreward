@@ -16,7 +16,7 @@ it("I-46 complete phone checklist permits one frozen initial snapshot", async ()
   try {
     await f.check();
     const r = await readReadiness(f.pool, f.token, f.campaignId);
-    expect(r.blockers).toEqual([]);
+    expect(r.canPrepare).toBe(true);
     const p = await prepareGiveaway(
       f.pool,
       f.token,
