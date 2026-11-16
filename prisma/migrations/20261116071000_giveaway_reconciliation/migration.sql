@@ -84,3 +84,14 @@ DO $$ DECLARE t text; BEGIN
  EXECUTE format('CREATE TRIGGER immutable_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION guard_immutable_columns()',t);
  END LOOP;
 END $$;
+CREATE FUNCTION dirty_giveaway_generation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ UPDATE campaign SET reconciliation_required=true,version=version+1 WHERE station_id=NEW.station_id;
+ RETURN NULL;
+END $$;
+CREATE TRIGGER giveaway_generation AFTER UPDATE OF data_version ON station_reporting_state FOR EACH ROW WHEN(OLD.data_version IS DISTINCT FROM NEW.data_version) EXECUTE FUNCTION dirty_giveaway_generation();
+CREATE TRIGGER reports_photo_observation AFTER INSERT ON photo_receipt_observation FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
+CREATE TRIGGER reports_photo_receipt AFTER INSERT ON photo_receipt_fact FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
+CREATE TRIGGER reports_card AFTER INSERT OR UPDATE OR DELETE ON card FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
+CREATE TRIGGER reports_card_link AFTER INSERT OR UPDATE OR DELETE ON card_customer_link FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
+CREATE TRIGGER reports_review_evaluation AFTER INSERT ON review_evaluation FOR EACH ROW EXECUTE FUNCTION advance_report_generation();

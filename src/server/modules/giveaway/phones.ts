@@ -146,10 +146,6 @@ async function advance(db: pg.PoolClient, c: CampaignRow) {
     "UPDATE station_reporting_state SET data_version=data_version+1 WHERE station_id=$1",
     [c.station_id],
   );
-  await db.query(
-    "UPDATE campaign SET version=version+1,reconciliation_required=true WHERE id=$1",
-    [c.id],
-  );
   return (
     await db.query(
       "SELECT data_version::text FROM station_reporting_state WHERE station_id=$1",
@@ -329,7 +325,7 @@ export function createPhoneService(
               c.id,
               b.operationId,
               "giveaway_phone_census_recorded",
-              { censusId: id, censusVersion: version },
+              { phoneCensusId: id, censusVersion: version, actionKind: b.kind },
             );
             await db.query(
               "INSERT INTO giveaway_phone_census(id,campaign_id,version,designation_id,content) VALUES($1,$2,$3,$4,$5)",
@@ -405,7 +401,16 @@ export function createPhoneService(
               c.id,
               b.operationId,
               "giveaway_phone_unavailable_proposed",
-              { phoneExclusionId: id, phoneId, censusId: c.phone_census_id },
+              {
+                phoneExclusionId: id,
+                phoneId,
+                censusVersion: c.census_version,
+                phoneVersion: phone.version,
+                exclusionVersion: 1,
+                phoneExclusionState: "pending",
+                proposerAdminId: actor.admin_id,
+                actionKind: b.kind,
+              },
             );
             const time = (
               await db.query("SELECT clock_timestamp() AS at")
@@ -547,7 +552,12 @@ export function createPhoneService(
               {
                 phoneExclusionId: exclusionId,
                 phoneId: phone.id,
-                censusId: c.phone_census_id,
+                exclusionVersion: e.version + 1,
+                phoneExclusionState:
+                  b.decision === "approve" ? "approved" : "rejected",
+                proposerAdminId: e.content.proposedBy.id,
+                approverAdminId: actor.admin_id,
+                actionKind: e.content.kind,
               },
               [e.content.auditEventId],
             );
@@ -648,7 +658,12 @@ export function createPhoneService(
                 c.id,
                 b.operationId,
                 "giveaway_phone_check_recorded",
-                { phoneCheckId: id, censusId: c.phone_census_id },
+                {
+                  phoneCheckId: id,
+                  phoneCensusId: c.phone_census_id,
+                  censusVersion: c.census_version,
+                  actionKind: b.kind,
+                },
               );
             const sourceDataVersion = await advance(db, c);
             const content = {
