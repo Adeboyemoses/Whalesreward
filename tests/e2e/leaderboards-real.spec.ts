@@ -635,9 +635,11 @@ test("I-09 I-11 source changes refuse stale confirmation and revoked authority c
         exact: true,
       }),
     ).toHaveCount(0);
-    await expect(page.getByRole("main")).not.toContainText(
-      "Fictional authority changed result",
-    );
+    await expect(
+      page.getByText("Fictional authority changed result"),
+    ).toHaveCount(0);
+    await expect(page).toHaveURL(/\/admin\/sign-in$/);
+    await expect(page.getByLabel("Username", { exact: true })).toBeVisible();
     expect(
       (
         await f.pool.query(
