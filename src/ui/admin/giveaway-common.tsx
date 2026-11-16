@@ -35,7 +35,12 @@ export function useGiveawayRead<T>(key: string, load: () => Promise<T>) {
       },
       (e) => {
         if (alive && store.getSnapshot().epoch === epoch)
-          setState({ key: viewKey, data: null, error: giveawayMessage(e), busy: false });
+          setState({
+            key: viewKey,
+            data: null,
+            error: giveawayMessage(e),
+            busy: false,
+          });
       },
     );
     return () => {

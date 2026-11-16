@@ -324,20 +324,27 @@ export function GiveawayPage({
     if (
       flight.current ||
       !valid() ||
-      !campaign ||
-      (!draft.pending && !ready?.canPrepare) ||
-      !allowed
+      (!draft.pending && (!campaign || !ready?.canPrepare || !allowed))
     )
       return;
     if (draft.pending?.kind === "confirm") return;
+    if (
+      draft.pending?.kind === "prepare" &&
+      !session.permissions?.includes(
+        draft.pending.value.body.kind === "revision"
+          ? "giveawayRevise"
+          : "giveawayFinalize",
+      )
+    )
+      return;
     flight.current = true;
     setBusy(true);
     let pending =
       draft.pending?.kind === "prepare" ? draft.pending.value : null;
     try {
       pending ??= api.freezePreparation(
-        campaign,
-        campaign.latestSnapshotId ? "revision" : "initial",
+        campaign!,
+        campaign!.latestSnapshotId ? "revision" : "initial",
         draft.reason,
       );
       update({

@@ -78,8 +78,9 @@ export function LeaderboardsPage({ session }: { session: AdminSession }) {
       <div className="wr-two-col">
         <Sheet title="What is counted">
           <p>
-            Completed, non-cancelled purchases within the eligible period. No
-            minimum purchase amount applies.
+            {basis === "recorded_all_time"
+              ? "Completed, non-cancelled recorded purchases across all time, separate from campaign qualification."
+              : "Completed, non-cancelled purchases within the eligible period. No minimum purchase amount applies."}
           </p>
           <p>
             Possible duplicates remain counted until cancelled. Late corrections
@@ -172,7 +173,11 @@ export function LiveRanking({
               basis={basis}
             />
             {data.items.length === 0 && (
-              <Notice>No qualifying purchases in this category.</Notice>
+              <Notice>
+                {basis === "recorded_all_time"
+                  ? "No recorded purchases in this category."
+                  : "No qualifying purchases in this category."}
+              </Notice>
             )}
             <Pager
               busy={result.busy}
