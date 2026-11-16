@@ -1,3 +1,4 @@
+import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 import type pg from "pg";
 import {
   managerSchema,
@@ -55,6 +56,7 @@ export type CampaignProjection = (
 ) => Promise<unknown>;
 function publicExclusion(value: Record<string, unknown>) {
   const result = { ...value };
+  delete result.operationId;
   delete result.proposerUserId;
   delete result.proposerPerson;
   delete result.approverPerson;
@@ -63,6 +65,8 @@ function publicExclusion(value: Record<string, unknown>) {
 function publicCheck(value: Record<string, unknown>) {
   const result = { ...value };
   delete result.designationId;
+  delete result.operationId;
+  delete result.reason;
   return result;
 }
 function fail(code: string, status = 409): never {
@@ -92,7 +96,7 @@ async function context(
   ]);
   const c = (
     await db.query<CampaignRow>(
-      `SELECT c.*,r.data_version::text,d.manager_admin_id,pc.version AS census_version,t.upload_deadline,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
+      `SELECT c.*,r.data_version::text,d.manager_admin_id,pc.version AS census_version,t.upload_deadline,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.semantics_digest='${RECONCILIATION_DIGEST}' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
  FROM campaign c JOIN station_reporting_state r ON r.station_id=c.station_id
  LEFT JOIN giveaway_manager_designation d ON d.id=c.manager_designation_id
  LEFT JOIN giveaway_phone_census pc ON pc.id=c.phone_census_id
@@ -160,7 +164,7 @@ async function advance(db: pg.PoolClient, c: CampaignRow, bumped = false) {
       [c.id],
     );
   await db.query(
-    "UPDATE station_reporting_state SET data_version=data_version+1 WHERE station_id=$1",
+    "UPDATE station_reporting_state SET data_version=data_version+1,last_writer_transaction=pg_current_xact_id() WHERE station_id=$1 AND last_writer_transaction IS DISTINCT FROM pg_current_xact_id()",
     [c.station_id],
   );
   return (
@@ -298,7 +302,17 @@ export function createPhoneService(
             );
             await db.query(
               "INSERT INTO giveaway_manager_designation(id,campaign_id,manager_admin_id,content) VALUES($1,$2,$3,$4)",
-              [id, c.id, b.managerAdminId, { reason: b.reason, auditEventId }],
+              [
+                id,
+                c.id,
+                b.managerAdminId,
+                {
+                  reason: b.reason,
+                  auditEventId,
+                  actorId: actor.admin_id,
+                  operationId: b.operationId,
+                },
+              ],
             );
             await db.query(
               "UPDATE campaign SET manager_designation_id=$2,version=version+1,reconciliation_required=true WHERE id=$1",
@@ -372,7 +386,14 @@ export function createPhoneService(
                 c.id,
                 version,
                 c.manager_designation_id,
-                { phones, reason: b.reason, kind: b.kind, auditEventId },
+                {
+                  phones,
+                  reason: b.reason,
+                  kind: b.kind,
+                  auditEventId,
+                  actorId: actor.admin_id,
+                  operationId: b.operationId,
+                },
               ],
             );
             await db.query(
@@ -476,6 +497,7 @@ export function createPhoneService(
               partialSources,
               kind: b.kind,
               state: "pending",
+              operationId: b.operationId,
               proposerUserId: actor.user_id,
               proposerPerson: await releasePerson(
                 db,
@@ -725,6 +747,8 @@ export function createPhoneService(
               id,
               campaignId: c.id,
               kind: b.kind,
+              operationId: b.operationId,
+              reason: b.reason,
               manager: await actorProjection(db, actor),
               checkedAt: (
                 await db.query("SELECT clock_timestamp() AS at")

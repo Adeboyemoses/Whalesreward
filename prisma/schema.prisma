@@ -725,6 +725,7 @@ model DuplicateFlag {
 }
 
 model Campaign {
+  reconciliation_id String? @db.Uuid
   manager_designation_id String? @db.Uuid
   phone_census_id String? @db.Uuid
   phone_check_id String? @db.Uuid
@@ -1387,6 +1388,7 @@ model SettingsChange {
 }
 
 model StationReportingState {
+  last_writer_transaction Unsupported("xid8")?
   station_id                  String           @id @db.Uuid
   data_version                BigInt           @default(0)
   settings_version            Int              @default(1)
@@ -1475,6 +1477,7 @@ model PhotoReceiptFact {
 }
 
 model ReconciliationPolicyDefinition {
+  semantics_digest String @default("6c2fe33b4b9f079540fdc79618b2eb5a209c88147d589ee40df22fbf0623c21a")
   policy_version     String   @id
   evaluator_identity String
   approval_reference String
@@ -1493,6 +1496,10 @@ model StationReconciliationPolicy {
 }
 
 model GiveawayManagerDesignation {
+  actor_id String @default(dbgenerated()) @db.Uuid
+  operation_id String @default(dbgenerated()) @db.Uuid
+  audit_event_id String @default(dbgenerated()) @db.Uuid
+
   id               String   @id @db.Uuid
   campaign_id      String   @db.Uuid
   manager_admin_id String   @db.Uuid
@@ -1503,6 +1510,10 @@ model GiveawayManagerDesignation {
 }
 
 model GiveawayPhoneCensus {
+  actor_id String @default(dbgenerated()) @db.Uuid
+  operation_id String @default(dbgenerated()) @db.Uuid
+  audit_event_id String @default(dbgenerated()) @db.Uuid
+
   id             String @id @db.Uuid
   campaign_id    String @db.Uuid
   version        Int
@@ -1515,6 +1526,12 @@ model GiveawayPhoneCensus {
 }
 
 model GiveawayPhoneExclusion {
+  proposer_id String @default(dbgenerated()) @db.Uuid
+  operation_id String @default(dbgenerated()) @db.Uuid
+  proposal_audit_id String @default(dbgenerated()) @db.Uuid
+  designation_id String @default(dbgenerated()) @db.Uuid
+  settings_version_id String @default(dbgenerated()) @db.Uuid
+  previous_snapshot_id String? @default(dbgenerated()) @db.Uuid
   id          String @id @db.Uuid
   campaign_id String @db.Uuid
   census_id   String @db.Uuid
@@ -1536,6 +1553,13 @@ model GiveawayPhoneExclusionTransition {
 }
 
 model GiveawayPhoneCheck {
+  designation_id String @default(dbgenerated()) @db.Uuid
+  settings_version_id String @default(dbgenerated()) @db.Uuid
+  previous_snapshot_id String? @default(dbgenerated()) @db.Uuid
+  actor_id String @default(dbgenerated()) @db.Uuid
+  operation_id String @default(dbgenerated()) @db.Uuid
+  audit_event_id String @default(dbgenerated()) @db.Uuid
+
   id          String @id @db.Uuid
   campaign_id String @db.Uuid
   census_id   String @db.Uuid
@@ -1547,6 +1571,17 @@ model GiveawayPhoneCheck {
 }
 
 model GiveawayReconciliation {
+  checked_at DateTime @db.Timestamptz(6)
+  settings_version_id String @default(dbgenerated()) @db.Uuid
+  policy_version String @default(dbgenerated())
+  timing_policy_version String @default(dbgenerated())
+  reason String @default(dbgenerated())
+  outcome String @default(dbgenerated())
+  current_snapshot_id String? @default(dbgenerated()) @db.Uuid
+  actor_id String @default(dbgenerated()) @db.Uuid
+  operation_id String @default(dbgenerated()) @db.Uuid
+  audit_event_id String @default(dbgenerated()) @db.Uuid
+
   id                  String   @id @db.Uuid
   campaign_id         String   @db.Uuid
   station_id          String   @db.Uuid

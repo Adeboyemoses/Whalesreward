@@ -1,3 +1,4 @@
+import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 import type pg from "pg";
 export type PhoneReadiness = {
   phoneCheckId: string | null;
@@ -22,7 +23,7 @@ export async function phoneReadiness(
   const row = (
     await db.query(
       `SELECT c.*,s.data_version::text,d.manager_admin_id,pc.version AS census_version,
- ch.content AS check_content,ch.entries,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
+ ch.content AS check_content,ch.entries,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.semantics_digest='${RECONCILIATION_DIGEST}' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
  FROM campaign c JOIN station_reporting_state s ON s.station_id=c.station_id
  LEFT JOIN giveaway_manager_designation d ON d.id=c.manager_designation_id
  LEFT JOIN giveaway_phone_census pc ON pc.id=c.phone_census_id

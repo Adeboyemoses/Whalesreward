@@ -135,6 +135,7 @@ export async function readPhones(
         )
       ).rows.map((r) => {
         const value = { ...r.content };
+        delete value.operationId;
         delete value.proposerUserId;
         delete value.proposerPerson;
         delete value.approverPerson;
@@ -155,6 +156,8 @@ export async function readPhones(
       if (action === "check") {
         const value = { ...check.content };
         delete value.designationId;
+        delete value.operationId;
+        delete value.reason;
         return value;
       }
       rows = check.entries;

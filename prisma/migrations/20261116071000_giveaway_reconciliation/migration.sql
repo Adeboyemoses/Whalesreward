@@ -2,6 +2,7 @@
 CREATE TABLE reconciliation_policy_definition (
  policy_version text PRIMARY KEY,
  evaluator_identity text NOT NULL,
+ semantics_digest text NOT NULL DEFAULT '6c2fe33b4b9f079540fdc79618b2eb5a209c88147d589ee40df22fbf0623c21a' CHECK(semantics_digest ~ '^[0-9a-f]{64}$'),
  approval_reference text NOT NULL,
  partial_uploads text NOT NULL CHECK(partial_uploads='exact_incomplete'),
  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
@@ -125,23 +126,97 @@ CREATE CONSTRAINT TRIGGER phone_exclusion_pin_supersession AFTER UPDATE ON campa
 
 INSERT INTO reconciliation_policy_definition(policy_version,evaluator_identity,approval_reference,partial_uploads) VALUES('reconciliation-v1','reconciliation-v1','WHR-158 / WHR-162 / Earl 16 Nov 2026','exact_incomplete');
 
+ALTER TABLE station_reporting_state ADD COLUMN last_writer_transaction xid8;
 CREATE OR REPLACE FUNCTION advance_report_generation() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE sid uuid; payload jsonb;
+DECLARE sid uuid; payload jsonb; changed uuid[];
 BEGIN
  payload:=CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
- IF TG_TABLE_NAME IN ('purchase','settings_version','station_reporting_state') THEN sid:=(payload->>'station_id')::uuid;
+ IF TG_TABLE_NAME IN ('purchase','settings_version','station_reporting_state','photo_receipt_observation') THEN sid:=(payload->>'station_id')::uuid;
  ELSIF TG_TABLE_NAME='customer' THEN sid:=(payload->>'registered_station_id')::uuid;
  ELSE SELECT station_id INTO sid FROM purchase WHERE id=(payload->>'purchase_id')::uuid;
  END IF;
- IF sid IS NULL THEN
-   INSERT INTO station_reporting_state(station_id,data_version) SELECT id,1 FROM station
-   ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1;
- ELSE
-   INSERT INTO station_reporting_state(station_id,data_version) VALUES(sid,1)
-   ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1;
- END IF;
+ WITH bumped AS (
+ INSERT INTO station_reporting_state(station_id,data_version,last_writer_transaction)
+ SELECT id,1,pg_current_xact_id() FROM station WHERE sid IS NULL OR id=sid
+ ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1,last_writer_transaction=pg_current_xact_id()
+ WHERE station_reporting_state.last_writer_transaction IS DISTINCT FROM pg_current_xact_id()
+ RETURNING station_id)
+ SELECT array_agg(station_id) INTO changed FROM bumped;
  IF TG_TABLE_NAME NOT IN ('settings_version','station_reporting_state') THEN
- UPDATE campaign SET version=version+1,reconciliation_required=true WHERE sid IS NULL OR station_id=sid;
+ UPDATE campaign SET version=version+1,reconciliation_required=true WHERE station_id=ANY(changed);
  END IF;
  RETURN NULL;
 END $$;
+-- Composite identities prevent cross-campaign links even for a non-superuser SQL writer.
+ALTER TABLE giveaway_manager_designation ADD UNIQUE(campaign_id,id);
+ALTER TABLE giveaway_snapshot ADD UNIQUE(campaign_id,id);
+ALTER TABLE giveaway_preview ADD UNIQUE(campaign_id,id);
+ALTER TABLE giveaway_reconciliation ADD UNIQUE(campaign_id,id);
+ALTER TABLE campaign ADD COLUMN reconciliation_id uuid;
+DROP TRIGGER guard_campaign_immutable ON campaign;
+CREATE TRIGGER guard_campaign_immutable BEFORE UPDATE OR DELETE ON campaign FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('name','version','reconciliation_required','current_timing_version_id','latest_snapshot_id','reconciled_data_version','manager_designation_id','phone_census_id','phone_check_id','reconciliation_id');
+ALTER TABLE campaign ADD FOREIGN KEY(id,manager_designation_id) REFERENCES giveaway_manager_designation(campaign_id,id),
+ ADD FOREIGN KEY(id,phone_census_id) REFERENCES giveaway_phone_census(campaign_id,id),
+ ADD FOREIGN KEY(id,phone_check_id) REFERENCES giveaway_phone_check(campaign_id,id),
+ ADD FOREIGN KEY(id,reconciliation_id) REFERENCES giveaway_reconciliation(campaign_id,id),
+ ADD FOREIGN KEY(id,latest_snapshot_id) REFERENCES giveaway_snapshot(campaign_id,id);
+ALTER TABLE giveaway_phone_census ADD FOREIGN KEY(campaign_id,designation_id) REFERENCES giveaway_manager_designation(campaign_id,id);
+ALTER TABLE giveaway_phone_exclusion ADD FOREIGN KEY(campaign_id,census_id) REFERENCES giveaway_phone_census(campaign_id,id),
+ ADD COLUMN designation_id uuid GENERATED ALWAYS AS ((content->>'designationId')::uuid) STORED NOT NULL,
+ ADD COLUMN settings_version_id uuid GENERATED ALWAYS AS ((content->>'settingsVersionId')::uuid) STORED NOT NULL,
+ ADD COLUMN previous_snapshot_id uuid GENERATED ALWAYS AS ((content->>'previousSnapshotId')::uuid) STORED,
+ ADD COLUMN proposer_id uuid GENERATED ALWAYS AS ((content#>>'{proposedBy,id}')::uuid) STORED NOT NULL REFERENCES admin(id),
+ ADD COLUMN operation_id uuid GENERATED ALWAYS AS ((content->>'operationId')::uuid) STORED NOT NULL,
+ ADD COLUMN proposal_audit_id uuid GENERATED ALWAYS AS ((content->>'auditEventId')::uuid) STORED NOT NULL REFERENCES audit_event(id) DEFERRABLE INITIALLY DEFERRED,
+ ADD FOREIGN KEY(campaign_id,designation_id) REFERENCES giveaway_manager_designation(campaign_id,id),
+ ADD FOREIGN KEY(campaign_id,previous_snapshot_id) REFERENCES giveaway_snapshot(campaign_id,id),
+ ADD UNIQUE(proposer_id,operation_id);
+ALTER TABLE settings_version ADD UNIQUE(campaign_id,id);
+ALTER TABLE giveaway_phone_exclusion ADD FOREIGN KEY(campaign_id,settings_version_id) REFERENCES settings_version(campaign_id,id);
+ALTER TABLE giveaway_phone_check ADD FOREIGN KEY(campaign_id,census_id) REFERENCES giveaway_phone_census(campaign_id,id),
+ ADD COLUMN designation_id uuid GENERATED ALWAYS AS ((content->>'designationId')::uuid) STORED NOT NULL,
+ ADD COLUMN settings_version_id uuid GENERATED ALWAYS AS ((content->>'settingsVersionId')::uuid) STORED NOT NULL,
+ ADD COLUMN previous_snapshot_id uuid GENERATED ALWAYS AS ((content->>'previousSnapshotId')::uuid) STORED,
+ ADD COLUMN actor_id uuid GENERATED ALWAYS AS ((content#>>'{manager,id}')::uuid) STORED NOT NULL REFERENCES admin(id),
+ ADD COLUMN operation_id uuid GENERATED ALWAYS AS ((content->>'operationId')::uuid) STORED NOT NULL,
+ ADD COLUMN audit_event_id uuid GENERATED ALWAYS AS ((content->>'auditEventId')::uuid) STORED NOT NULL REFERENCES audit_event(id) DEFERRABLE INITIALLY DEFERRED,
+ ADD FOREIGN KEY(campaign_id,designation_id) REFERENCES giveaway_manager_designation(campaign_id,id),
+ ADD FOREIGN KEY(campaign_id,settings_version_id) REFERENCES settings_version(campaign_id,id),
+ ADD FOREIGN KEY(campaign_id,previous_snapshot_id) REFERENCES giveaway_snapshot(campaign_id,id),
+ ADD UNIQUE(actor_id,operation_id);
+ALTER TABLE giveaway_reconciliation ADD FOREIGN KEY(station_id,campaign_id) REFERENCES campaign(station_id,id),
+ ADD FOREIGN KEY(campaign_id,phone_check_id) REFERENCES giveaway_phone_check(campaign_id,id),
+ ADD COLUMN actor_id uuid GENERATED ALWAYS AS ((content->>'actorId')::uuid) STORED NOT NULL REFERENCES admin(id),
+ ADD COLUMN operation_id uuid GENERATED ALWAYS AS ((content->>'operationId')::uuid) STORED NOT NULL,
+ ADD COLUMN settings_version_id uuid GENERATED ALWAYS AS ((content->>'settingsVersionId')::uuid) STORED NOT NULL,
+ ADD COLUMN policy_version text GENERATED ALWAYS AS (content->>'policyVersion') STORED NOT NULL REFERENCES reconciliation_policy_definition(policy_version),
+ ADD COLUMN timing_policy_version text GENERATED ALWAYS AS (content->>'timingPolicyVersion') STORED NOT NULL,
+ ADD COLUMN reason text GENERATED ALWAYS AS (content->>'reason') STORED NOT NULL,
+ ADD COLUMN outcome text GENERATED ALWAYS AS (content->>'outcome') STORED NOT NULL CHECK(outcome IN ('preview_prepared','unchanged')),
+ ADD COLUMN current_snapshot_id uuid GENERATED ALWAYS AS ((content->>'currentSnapshotId')::uuid) STORED,
+ ADD COLUMN audit_event_id uuid GENERATED ALWAYS AS ((content->>'auditEventId')::uuid) STORED NOT NULL REFERENCES audit_event(id) DEFERRABLE INITIALLY DEFERRED,
+ ADD COLUMN checked_at timestamptz NOT NULL,
+ ADD FOREIGN KEY(campaign_id,settings_version_id) REFERENCES settings_version(campaign_id,id),
+ ADD FOREIGN KEY(campaign_id,current_snapshot_id) REFERENCES giveaway_snapshot(campaign_id,id),
+ ADD UNIQUE(actor_id,operation_id);
+ALTER TABLE giveaway_preview ADD FOREIGN KEY(station_id,campaign_id) REFERENCES campaign(station_id,id);
+ALTER TABLE giveaway_snapshot ADD FOREIGN KEY(campaign_id,reconciliation_id) REFERENCES giveaway_reconciliation(campaign_id,id),
+ ADD FOREIGN KEY(campaign_id,phone_check_id) REFERENCES giveaway_phone_check(campaign_id,id),
+ ADD FOREIGN KEY(campaign_id,previous_snapshot_id) REFERENCES giveaway_snapshot(campaign_id,id);
+CREATE FUNCTION check_preview_consumption_parent() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM giveaway_preview p JOIN giveaway_snapshot s ON s.campaign_id=p.campaign_id WHERE p.id=NEW.preview_id AND s.id=NEW.snapshot_id) THEN
+ RAISE EXCEPTION 'preview and snapshot must belong to same campaign' USING ERRCODE='23503'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER consumption_same_campaign BEFORE INSERT ON giveaway_preview_consumption FOR EACH ROW EXECUTE FUNCTION check_preview_consumption_parent();
+ALTER TABLE giveaway_manager_designation
+ ADD COLUMN actor_id uuid GENERATED ALWAYS AS ((content->>'actorId')::uuid) STORED NOT NULL REFERENCES admin(id),
+ ADD COLUMN operation_id uuid GENERATED ALWAYS AS ((content->>'operationId')::uuid) STORED NOT NULL,
+ ADD COLUMN audit_event_id uuid GENERATED ALWAYS AS ((content->>'auditEventId')::uuid) STORED NOT NULL REFERENCES audit_event(id),
+ ADD UNIQUE(actor_id,operation_id);
+ALTER TABLE giveaway_phone_census
+ ADD COLUMN actor_id uuid GENERATED ALWAYS AS ((content->>'actorId')::uuid) STORED NOT NULL REFERENCES admin(id),
+ ADD COLUMN operation_id uuid GENERATED ALWAYS AS ((content->>'operationId')::uuid) STORED NOT NULL,
+ ADD COLUMN audit_event_id uuid GENERATED ALWAYS AS ((content->>'auditEventId')::uuid) STORED NOT NULL REFERENCES audit_event(id),
+ ADD UNIQUE(actor_id,operation_id);
