@@ -88,11 +88,11 @@ async function audit(
   reason: string,
   before: Record<string, string | null>,
   after: Record<string, string | null>,
+  id = newId(),
 ) {
-  const id = newId(),
-    at = (
-      await db.query("SELECT clock_timestamp() now")
-    ).rows[0].now.toISOString();
+  const at = (
+    await db.query("SELECT clock_timestamp() now")
+  ).rows[0].now.toISOString();
   await writeGiveawayAudit(db, {
     id,
     eventCode: `AUD-${id}`,
@@ -175,6 +175,15 @@ export async function prepareGiveaway(
           phoneCheckId = ready.phone.phoneCheckId!,
           policy = ready.phone.policyVersion!,
           sources = ready.sources;
+        const predecessor = c.latest_snapshot_id
+          ? (
+              await db.query(
+                "SELECT content,sources,rows FROM giveaway_snapshot WHERE id=$1 AND campaign_id=$2",
+                [c.latest_snapshot_id, c.id],
+              )
+            ).rows[0]
+          : null;
+        const reconciliationAuditId = newId();
         const checkNames = [
           "timing",
           "holds",
@@ -203,6 +212,22 @@ export async function prepareGiveaway(
             c.data_version,
             JSON.stringify({
               checks,
+              actor: await actorView(db, actor),
+              actorId: actor.admin_id,
+              operationId: p.operationId,
+              reason: p.reason,
+              auditEventId: reconciliationAuditId,
+              checkedAt: (
+                await db.query("SELECT clock_timestamp() now")
+              ).rows[0].now.toISOString(),
+              timingPolicyVersion: c.timing_policy_version,
+              outcome:
+                predecessor &&
+                hashContent(effective(predecessor.sources)) ===
+                  hashContent(effective(sources))
+                  ? "unchanged"
+                  : "preview_prepared",
+              currentSnapshotId: c.latest_snapshot_id,
               sourceDigest: hashContent(sources),
               phoneCheckId,
               approvedExclusionIds: ready.phone.approvedExclusionIds,
@@ -218,14 +243,6 @@ export async function prepareGiveaway(
         c.version++;
         c.reconciliation_required = false;
         c.reconciled_data_version = c.data_version;
-        const predecessor = c.latest_snapshot_id
-          ? (
-              await db.query(
-                "SELECT content,sources,rows FROM giveaway_snapshot WHERE id=$1 AND campaign_id=$2",
-                [c.latest_snapshot_id, c.id],
-              )
-            ).rows[0]
-          : null;
         const context = {
           phoneCheckId,
           reconciliationId,
@@ -248,6 +265,7 @@ export async function prepareGiveaway(
             p.reason,
             { campaignVersion: String(c.version - 1) },
             { ...context, snapshotId: c.latest_snapshot_id },
+            reconciliationAuditId,
           );
           return {
             state: "unchanged",
@@ -333,6 +351,7 @@ export async function prepareGiveaway(
             previewId: id,
             previousSnapshotId: c.latest_snapshot_id,
           },
+          reconciliationAuditId,
         );
         return content;
       },

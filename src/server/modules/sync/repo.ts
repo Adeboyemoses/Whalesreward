@@ -12,7 +12,8 @@ export async function authority(
   lockGeneration = true,
 ) {
   if (!token) throw new AuthError("unauthenticated", 401);
-  await db.query("SELECT id FROM security_state WHERE id=true FOR SHARE");
+  if (lockGeneration)
+    await db.query("SELECT id FROM security_state WHERE id=true FOR SHARE");
   const session = await requireSession(db, digest(token));
   const r = (
     await db.query<{ id: string; expired: boolean }>(
