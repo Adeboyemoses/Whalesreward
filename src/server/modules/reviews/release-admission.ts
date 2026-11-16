@@ -38,13 +38,15 @@ async function structural(
 ) {
   const f = await resolveEvidenceSources(db, purchaseId, meterAssetId, false);
   if (!f.original.customer_id) return exclude("history_incomplete");
-  if (!f.settings.length) return exclude("campaign_unconfigured");
   for (const [history, field] of [
     [f.prices, "version"],
     [f.assignments, "assignment_version"],
     [f.settings, "timing_history_version"],
   ] as const) {
-    if (!history.length || history.some((row, i) => row[field] !== i + 1))
+    if (
+      (field !== "timing_history_version" && !history.length) ||
+      history.some((row, i) => row[field] !== i + 1)
+    )
       return exclude("history_incomplete");
     if (
       history.some(
@@ -73,6 +75,7 @@ async function structural(
     if (e instanceof AuthError) return exclude("invalid_capture_bounds");
     throw e;
   }
+  if (!f.settings.length) return exclude("campaign_unconfigured");
   const orderedTiming = f.settings.filter(
     (s) => BigInt(trustedMicros(s.effective_from)) <= BigInt(I.U),
   );

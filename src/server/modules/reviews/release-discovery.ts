@@ -87,7 +87,7 @@ export function createReleaseDiscoveryService({
     return transaction(pool, async (db) => {
       const actor = await releaseReadInternals.authority(db, token, env, kind);
       const p = await sale.purchase(db, purchaseId, actor.stationId);
-      await pinReleaseV2Policy(db, actor.stationId, env);
+      await pinReleaseV2Policy(db, actor.stationId, env, "preparation");
       if (p.status === "cancelled") return fail("review_closed", 409);
       let target: z.infer<typeof releaseTargetSchema>;
       if (kind === "capture") {
@@ -118,7 +118,7 @@ export function createReleaseDiscoveryService({
       }
       const originals = (
         await db.query(
-          `SELECT ${sql.values("p")} original,
+          `SELECT ${sql.values("r")} original,
         p.station_id,p.pump_id,p.customer_id,p.card_id,a.user_id account_id,pr.code product,
         r.id revision_id,r.evidence_asset_id meter_asset_id
         FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id

@@ -31,6 +31,7 @@ export const reviewEvidenceV2Installation = Object.freeze({
 export async function assertReleaseV2Installation(
   db: Pick<pg.PoolClient, "query">,
   stationId: string,
+  purpose: "mutation" | "preparation" = "mutation",
 ): Promise<void> {
   if (!Object.values(reviewEvidenceV2Installation).every(Boolean))
     throw new Error("release_policy_unconfigured");
@@ -47,6 +48,8 @@ export async function assertReleaseV2Installation(
   );
   if (!tables.rows[0]?.installed)
     throw new Error("release_policy_unconfigured");
+  // Preparation reports current person eligibility separately without granting write authority.
+  if (purpose === "preparation") return;
   const people = await db.query<{ ready: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM station WHERE id=$1) AND
       (SELECT count(DISTINCT b.person_id) FROM auth_user u JOIN admin a ON a.user_id=u.id
