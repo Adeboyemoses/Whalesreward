@@ -32,7 +32,7 @@ describe("M4 exact leaderboards", () => {
     await historicalSale(f.pool, { state: "cancelled", amount: "9000000" });
     const r = await ranking();
     expect(r.customers).toBe("1");
-    expect(r.items[0].totals.spend).toEqual([
+    expect(r.items[0]!.totals.spend).toEqual([
       { currency: "NGN", amountKobo: "2000000" },
     ]);
   });
@@ -48,11 +48,11 @@ describe("M4 exact leaderboards", () => {
     });
     const first = await ranking({ limit: 1 });
     const second = await ranking({ limit: 1, cursor: first.nextCursor });
-    expect(first.items[0].rank).toBe("1");
-    expect(second.items[0].rank).toBe("1");
-    expect(first.items[0].sharedRank).toBe(true);
-    expect(second.items[0].sharedRank).toBe(true);
-    expect(first.items[0].customerId).not.toBe(second.items[0].customerId);
+    expect(first.items[0]!.rank).toBe("1");
+    expect(second.items[0]!.rank).toBe("1");
+    expect(first.items[0]!.sharedRank).toBe(true);
+    expect(second.items[0]!.sharedRank).toBe(true);
+    expect(first.items[0]!.customerId).not.toBe(second.items[0]!.customerId);
     expect(first.summary).toEqual(second.summary);
   });
   it("I-40/I-44 duplicates and pending corrections count live with unit-separated quantities", async () => {
