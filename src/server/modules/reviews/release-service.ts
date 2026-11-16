@@ -812,7 +812,16 @@ export function createHeldReleaseService({
         now = (await db.query<{ now: Date }>("SELECT clock_timestamp() now"))
           .rows[0]!.now;
       let result: wire.Decision | null = null;
-      let extra: Record<string, unknown> = { person };
+      let extra: Record<string, unknown> = {
+        person,
+        guard: {
+          expectedVersion: body.expectedVersion,
+          expectedRevisionId: body.expectedRevisionId,
+          expectedProposalVersion: body.expectedProposalVersion,
+        },
+        appliedPurchaseVersion: p.version + 1,
+        appliedProposalVersion: r.version + 1,
+      };
       let auditId: string;
       if (body.outcome === "reject") {
         const before = { ...fields(r), releaseDecisionId: null };
