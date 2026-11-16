@@ -84,6 +84,47 @@ it.each(["inside", "outside"] as const)(
           })
         ).find((s) => s.purchaseId === x.sale.purchaseId)!;
         expect(staleConfig.included).toBe(mode === "outside");
+        await seedHistorical(
+          db.pool,
+          "review_evaluation",
+          "UPDATE review_evaluation SET provenance=jsonb_set(provenance,'{conclusions}',$2::jsonb) WHERE purchase_id=$1",
+          [
+            x.sale.purchaseId,
+            JSON.stringify(
+              [true, false].map((inside) => ({
+                tag: "campaign_membership_uniform",
+                campaignIds: [settings.campaign_id],
+                configurationIds: [settings.id],
+                inside,
+              })),
+            ),
+          ],
+        );
+        const contradictory = (
+          await contributions(client, x.f.stationId, bounds)
+        ).find((s) => s.purchaseId === x.sale.purchaseId)!;
+        expect(contradictory.reasons).toContain("timing_unresolved");
+        await seedHistorical(
+          db.pool,
+          "review_evaluation",
+          "UPDATE review_evaluation SET provenance=jsonb_set(provenance,'{conclusions}',$2::jsonb) WHERE purchase_id=$1",
+          [
+            x.sale.purchaseId,
+            JSON.stringify([
+              {
+                tag: "campaign_membership_uniform",
+                campaignIds: [settings.campaign_id],
+                configurationIds: [settings.id],
+                inside: "untrusted",
+              },
+            ]),
+          ],
+        );
+        const malformed = (
+          await contributions(client, x.f.stationId, bounds)
+        ).find((s) => s.purchaseId === x.sale.purchaseId)!;
+        expect(malformed.included).toBe(false);
+        expect(malformed.reasons).toContain("timing_unresolved");
         expect(
           (
             await db.pool.query(

@@ -221,6 +221,47 @@ describe("P-30 trusted complete-photo receipt", () => {
       r.receipt_at.getTime(),
     );
   });
+  it("P-30 sealed bytes and PUT before deadline cannot backdate receipt after waiting for locks", async () => {
+    const p = await pending();
+    const read = p.h.storage.read;
+    let first = true;
+    let deadline: string | undefined;
+    let releaseLock: Promise<void> | undefined;
+    p.h.storage.read = async (key, max) => {
+      const bytes = await read(key, max);
+      if (key.startsWith("final/") && first) {
+        first = false;
+        const blocker = await db.pool.connect();
+        await blocker.query("BEGIN");
+        await blocker.query(
+          "SELECT id FROM security_state WHERE id=true FOR UPDATE",
+        );
+        deadline = (
+          await blocker.query(
+            "SELECT (extract(epoch FROM clock_timestamp())*1000000)::bigint::text at",
+          )
+        ).rows[0].at;
+        releaseLock = new Promise<void>((resolve, reject) =>
+          setTimeout(() => {
+            void blocker
+              .query("COMMIT")
+              .then(() => resolve(), reject)
+              .finally(() => blocker.release());
+          }, 30),
+        );
+      }
+      return bytes;
+    };
+    await p.h.sync.finalize(p.f.token, p.purchaseId, p.body);
+    await releaseLock;
+    const facts = (
+      await db.pool.query(
+        "SELECT (extract(epoch FROM receipt_at)*1000000)::bigint::text at FROM photo_receipt_fact WHERE purchase_id=$1",
+        [p.purchaseId],
+      )
+    ).rows[0];
+    expect(BigInt(facts.at)).toBeGreaterThan(BigInt(deadline!));
+  });
   it("P-30 concurrent same-byte retries retain one observation and one final fact", async () => {
     const p = await pending();
     const results = await Promise.allSettled([

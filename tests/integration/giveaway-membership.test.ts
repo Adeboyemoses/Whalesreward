@@ -85,3 +85,46 @@ it("I-45/P-30 exact capture and details/photo deadline boundaries use durable da
     await f.close();
   }
 }, 30000);
+it("P-30 timely details cannot waive complete-photo receipt one microsecond after deadline", async () => {
+  const f = await cardsFixture(),
+    db = await f.pool.connect();
+  try {
+    const sale = await historicalSale(f.pool, {}),
+      observation = newId();
+    const facts = (
+      await db.query(
+        "SELECT p.id,r.evidence_asset_id asset,(extract(epoch FROM ctx.signed_in_at)*1000000)::bigint::text lo,(extract(epoch FROM least(ctx.offline_expires_at,p.server_received_at))*1000000)::bigint::text hi,(extract(epoch FROM p.server_received_at)*1000000)::bigint::text deadline FROM purchase p JOIN capture_context ctx ON ctx.id=p.capture_context_id JOIN purchase_revision r ON r.id=p.current_revision_id WHERE p.id=$1",
+        [sale.id],
+      )
+    ).rows[0];
+    await db.query(
+      "INSERT INTO photo_receipt_observation(id,station_id,purchase_id,asset_id,declared_digest,observed_digest,observed_bytes,sealed_key,receipt_at) SELECT $1,$2,$3,$4,expected_digest,validated_digest,validated_bytes,$5,(SELECT server_received_at+interval '1 microsecond' FROM purchase WHERE id=$3) FROM photo_asset WHERE id=$4",
+      [
+        observation,
+        fixtureId(8),
+        sale.id,
+        facts.asset,
+        `fictional/${observation}`,
+      ],
+    );
+    await db.query(
+      "INSERT INTO photo_receipt_fact(asset_id,observation_id,purchase_id,receipt_at) SELECT $1,$2,$3,receipt_at FROM photo_receipt_observation WHERE id=$2",
+      [facts.asset, observation, sale.id],
+    );
+    const row = (
+      await contributions(db, fixtureId(8), {
+        id: newId(),
+        settingsVersionId: newId(),
+        launch: facts.lo,
+        start: facts.lo,
+        cutoff: facts.hi,
+        deadline: facts.deadline,
+      })
+    ).find((s) => s.purchaseId === sale.id)!;
+    expect(row.included).toBe(false);
+    expect(row.reasons).toEqual(["upload_late"]);
+  } finally {
+    db.release();
+    await f.close();
+  }
+}, 30000);
