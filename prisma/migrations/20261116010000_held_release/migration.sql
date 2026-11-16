@@ -125,3 +125,10 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+CREATE FUNCTION reject_held_release_truncate() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION 'release history is retained'; END $$;
+DO $$ DECLARE t TEXT; BEGIN
+ FOREACH t IN ARRAY ARRAY['held_release_person','held_release_person_binding','held_release_sheet','held_release_sheet_validation','held_release_proposal','held_release_state','held_release_transition','held_release_receipt'] LOOP
+ EXECUTE format('CREATE TRIGGER %I BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION reject_held_release_truncate()',t||'_no_truncate',t);
+ END LOOP;
+END $$;
