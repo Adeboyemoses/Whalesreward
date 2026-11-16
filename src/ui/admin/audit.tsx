@@ -15,6 +15,11 @@ import {
   type AuditEvent,
   type AuditSearch,
 } from "@/shared/contracts/audit";
+import {
+  releaseProposalHref,
+  releaseReviewAllowed,
+} from "@/client/admin-pending-release-api";
+import { releaseKindSchema } from "@/shared/contracts/pending-release";
 import { AdminError } from "@/client/admin-api";
 import { adminAction, adminTime } from "@/client/admin-display";
 import { Button, DataTable, KeyValueList, Notice, TextField } from "@/ui";
@@ -242,7 +247,11 @@ function List() {
                 ),
                 actor: (
                   <>
-                    <b>{e.actor?.nameAtEvent ?? "Actor not recorded"}</b>
+                    <b>
+                      {e.action === "held_release_superseded"
+                        ? "System · validation"
+                        : (e.actor?.nameAtEvent ?? "Actor not recorded")}
+                    </b>
                     <span className="wr-sub">
                       {e.actor ? adminAction(e.actor.kind) : "Unknown"} ·{" "}
                       {e.actor && e.actor.kind !== "system"
@@ -322,6 +331,7 @@ function Detail({ id }: { id: string }) {
 }
 function Event({ event: e }: { event: AuditEvent }) {
   const actor = e.actor;
+  const isRelease = e.action.startsWith("held_release_");
   return (
     <>
       <div className="wr-two-col">
@@ -356,7 +366,10 @@ function Event({ event: e }: { event: AuditEvent }) {
               },
               {
                 label: "Performed by",
-                value: actor?.nameAtEvent ?? "Not recorded",
+                value:
+                  e.action === "held_release_superseded"
+                    ? "System · validation"
+                    : (actor?.nameAtEvent ?? "Not recorded"),
               },
               {
                 label: "Username",
@@ -416,6 +429,7 @@ function Event({ event: e }: { event: AuditEvent }) {
           </Sheet>
         </div>
       </div>
+      {isRelease && <ReleaseActors event={e} />}
       {e.action !== "legacy_event" && (
         <DataTable
           caption="Recorded changes"
@@ -425,14 +439,16 @@ function Event({ event: e }: { event: AuditEvent }) {
             { key: "before", label: "Before" },
             { key: "after", label: "After" },
           ]}
-          rows={e.changes.map((c) => ({
-            id: c.field,
-            cells: {
-              field: <b>{auditFieldLabel(c.field)}</b>,
-              before: <ChangeValue event={e} change={c} side="before" />,
-              after: <ChangeValue event={e} change={c} side="after" />,
-            },
-          }))}
+          rows={e.changes
+            .filter((c) => !isRelease || c.field !== "sheetAssetId")
+            .map((c) => ({
+              id: c.field,
+              cells: {
+                field: <b>{auditFieldLabel(c.field)}</b>,
+                before: <ChangeValue event={e} change={c} side="before" />,
+                after: <ChangeValue event={e} change={c} side="after" />,
+              },
+            }))}
         />
       )}
       {!!e.relatedEventIds.length && (
@@ -456,6 +472,97 @@ function Event({ event: e }: { event: AuditEvent }) {
   );
 }
 
+function ReleaseActors({ event }: { event: AuditEvent }) {
+  const api = useAuditApi();
+  const { session } = useAdminSession();
+  const load = useCallback(
+    async () =>
+      Promise.all(
+        event.relatedEventIds.map(async (id) => {
+          try {
+            return await api.detail(id);
+          } catch {
+            return null;
+          }
+        }),
+      ),
+    [api, event.relatedEventIds],
+  );
+  const related = useRead(load);
+  const proposalId = event.changes.find(
+    (c) => c.field === "releaseProposalId",
+  )?.after;
+  const events = [
+    event,
+    ...(related.data ?? []).filter((e): e is AuditEvent => e !== null),
+  ].filter((e) =>
+    e.changes.some(
+      (c) => c.field === "releaseProposalId" && c.after === proposalId,
+    ),
+  );
+  const proposer = events.find((e) => e.action === "held_release_proposed");
+  const decision = events.find(
+    (e) =>
+      e.action === "held_release_approved" ||
+      e.action === "held_release_rejected",
+  );
+  const kind = releaseKindSchema.safeParse(
+    event.changes.find((c) => c.field === "releaseTargetKind")?.after,
+  );
+  const actorLabel = (e: AuditEvent) =>
+    e.actor?.kind === "system"
+      ? "System · validation"
+      : e.actor
+        ? `${e.actor.nameAtEvent} · ${e.actor.usernameAtEvent ?? e.actor.code}`
+        : "Related actor details unavailable";
+  return (
+    <Sheet title="Release actors">
+      {related.busy && <p role="status">Loading related actors…</p>}
+      {proposer ? (
+        <p>
+          <b>Proposed by</b> {actorLabel(proposer)} ·{" "}
+          {adminTime(proposer.occurredAt)}
+        </p>
+      ) : (
+        !related.busy && <p>Related actor details unavailable</p>
+      )}
+      {decision && (
+        <p>
+          <b>
+            {decision.action === "held_release_approved"
+              ? "Approved by"
+              : "Rejected by"}
+          </b>{" "}
+          {actorLabel(decision)} · {adminTime(decision.occurredAt)}
+        </p>
+      )}
+      {event.action === "held_release_superseded" && (
+        <p>
+          <b>System · validation</b> · {adminTime(event.occurredAt)}
+        </p>
+      )}
+      {!related.busy &&
+        (related.error ||
+          related.data?.some((e) => e === null) ||
+          (event.action !== "held_release_proposed" && !proposer)) && (
+          <p>Related actor details unavailable</p>
+        )}
+      {kind.success &&
+        typeof proposalId === "string" &&
+        releaseReviewAllowed(session?.permissions, kind.data) && (
+          <Link
+            className="wr-btn wr-btn-secondary"
+            href={releaseProposalHref(event.target.id, {
+              kind: kind.data,
+              proposalId,
+            })}
+          >
+            Open protected proposal
+          </Link>
+        )}
+    </Sheet>
+  );
+}
 function ChangeValue({
   event,
   change,
@@ -475,6 +582,7 @@ function ChangeValue({
     "recoveryState",
     "verificationState",
     "policyState",
+    "releaseState",
   ];
   if (value === null || !states.includes(change.field)) return text;
   const tone = [

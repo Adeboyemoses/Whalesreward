@@ -1,13 +1,21 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   createContext,
+  useEffect,
   useContext,
   useCallback,
   useMemo,
   useRef,
   useState,
 } from "react";
+import {
+  AdminPendingReleaseApi,
+  releaseProposalHref,
+  releaseReviewAllowed,
+} from "@/client/admin-pending-release-api";
+import type { ReleaseKind } from "@/shared/contracts/pending-release";
 import type { AdminSession } from "@/client/admin-session";
 import type { AdminSaleDetail } from "@/client/admin-sales-api";
 import { correctionDecisionRequest } from "@/client/admin-sales-api";
@@ -115,9 +123,16 @@ export function ReviewLinks({
       ? ["capture" as const]
       : []),
   ];
-  if (!kinds.length) return null;
+  if (!kinds.length && !sale.pendingRelease) return null;
   return (
     <Sheet title="Reviews">
+      {sale.pendingRelease && (
+        <PendingReleaseLabel
+          purchaseId={sale.id}
+          proposal={sale.pendingRelease}
+          suffix={suffix}
+        />
+      )}
       <div className="wr-row">
         {kinds.map((kind) => (
           <Link
@@ -139,7 +154,22 @@ export function ReviewQueue({
   customer: string | null;
   suffix: string;
 }) {
-  const [kind, setKind] = useMemory<ReviewKind>("reviews:kind", "duplicate");
+  const view = useSearchParams().get("view");
+  const [savedKind, saveKind] = useMemory<ReviewKind | "pending_release">(
+    "reviews:kind",
+    "duplicate",
+  );
+  const [kind, selectKind] = useState<ReviewKind | "pending_release">(() =>
+    view === "pending_release" ? "pending_release" : savedKind,
+  );
+  const setKind = (next: ReviewKind | "pending_release") => {
+    selectKind(next);
+    saveKind(next);
+  };
+  const { session } = useAdminSession();
+  const pendingAllowed = (["price", "card", "date", "capture"] as const).some(
+    (k) => releaseReviewAllowed(session?.permissions, k),
+  );
   return (
     <>
       <PageHead
@@ -151,20 +181,34 @@ export function ReviewQueue({
       <SelectField
         label="Review type"
         value={kind}
-        onChange={(v) => setKind(v as ReviewKind)}
+        onChange={(v) => setKind(v as ReviewKind | "pending_release")}
       >
+        {pendingAllowed && (
+          <option value="pending_release">Pending releases</option>
+        )}
         {Object.entries(titles).map(([key, title]) => (
           <option key={key} value={key}>
             {title}
           </option>
         ))}
       </SelectField>
-      <QueuePage
-        key={kind + customer}
-        kind={kind}
-        customer={customer}
-        suffix={suffix}
-      />
+      {kind === "pending_release" ? (
+        pendingAllowed ? (
+          <PendingReleaseQueue />
+        ) : (
+          <Notice>
+            You do not have permission to view pending releases. Choose an
+            ordinary review type to continue.
+          </Notice>
+        )
+      ) : (
+        <QueuePage
+          key={kind + customer}
+          kind={kind}
+          customer={customer}
+          suffix={suffix}
+        />
+      )}
     </>
   );
 }
@@ -191,7 +235,7 @@ function QueuePage({
     [api, kind, customer, cursor],
   );
   const result = useSalesRead(kind + ":" + cursor, load);
-  const rows = result.data?.items ?? [];
+  const rows = !result.busy && !result.error ? (result.data?.items ?? []) : [];
   return (
     <>
       <ReadState {...result} />
@@ -224,7 +268,18 @@ function QueuePage({
                 </span>
               </>
             ),
-            status: <SaleStatus sale={s} />,
+            status: (
+              <>
+                <SaleStatus sale={s} />
+                {s.pendingRelease && (
+                  <PendingReleaseLabel
+                    purchaseId={s.id}
+                    proposal={s.pendingRelease}
+                    suffix={suffix}
+                  />
+                )}
+              </>
+            ),
             action: (
               <Link
                 href={`/admin/sales/${s.id}${kind === "capture" && !s.policyBlocks.some((b) => b === "capture_authorization_unresolved" || b === "capture_time_unresolved") ? "" : "/" + routes[kind]}${suffix}`}
@@ -266,6 +321,179 @@ function QueuePage({
       <p className="wr-help">
         Duplicate flags do not remove credit. Held sales are not counted until
         all required checks pass.
+      </p>
+    </>
+  );
+}
+export function PendingReleaseLabel({
+  purchaseId,
+  proposal,
+  suffix = "",
+}: {
+  purchaseId: string;
+  proposal: NonNullable<AdminSaleDetail["pendingRelease"]>;
+  suffix?: string;
+}) {
+  return (
+    <div className="wr-sub">
+      <b>Awaiting another reviewer</b>
+      <span className="wr-sub">
+        Proposed by {proposal.proposedBy.name} · {proposal.proposedBy.code}
+      </span>
+      <span className="wr-sub">{adminTime(proposal.proposedAt)}</span>
+      <Link href={releaseProposalHref(purchaseId, proposal, suffix)}>
+        Review proposal
+      </Link>
+    </div>
+  );
+}
+function PendingReleaseQueue() {
+  const { store, session, epoch } = useAdminSession();
+  const api = useMemo(() => new AdminPendingReleaseApi(store.request), [store]);
+  const [kind, setKind] = useState<ReleaseKind | "">("");
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [previous, setPrevious] = useState<(string | undefined)[]>([]);
+  const [serial, setSerial] = useState(0);
+  const viewKey = `${epoch}:${kind}:${cursor}:${serial}`;
+  const [state, setResult] = useState<{
+    key: string;
+    data: Awaited<ReturnType<AdminPendingReleaseApi["pending"]>> | null;
+    busy: boolean;
+    error: boolean;
+  }>({ key: "", data: null, busy: true, error: false });
+  const result =
+    state.key === viewKey ? state : { data: null, busy: true, error: false };
+  useEffect(() => {
+    let live = true;
+    void api.pending({ ...(kind ? { kind } : {}), cursor, limit: 25 }).then(
+      (data) => {
+        if (live && store.getSnapshot().epoch === epoch)
+          setResult({ key: viewKey, data, busy: false, error: false });
+      },
+      () => {
+        if (live && store.getSnapshot().epoch === epoch)
+          setResult({ key: viewKey, data: null, busy: false, error: true });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, kind, cursor, store, epoch, viewKey]);
+  const refresh = () => {
+    setCursor(undefined);
+    setPrevious([]);
+    setSerial((n) => n + 1);
+  };
+  const reset = () => {
+    setKind("");
+    setCursor(undefined);
+    setPrevious([]);
+    setSerial((n) => n + 1);
+  };
+  return (
+    <>
+      <Notice>
+        All pending releases you are permitted to review, across station sales.
+        Ordinary customer, day and status filters do not apply here.
+      </Notice>
+      <SelectField
+        label="Pending release kind"
+        value={kind}
+        onChange={(value) => {
+          setKind(value as ReleaseKind | "");
+          setCursor(undefined);
+          setPrevious([]);
+        }}
+      >
+        <option value="">All authorized kinds</option>
+        {(["price", "card", "date", "capture"] as const)
+          .filter((k) => releaseReviewAllowed(session?.permissions, k))
+          .map((k) => (
+            <option key={k} value={k}>
+              {titles[k]}
+            </option>
+          ))}
+      </SelectField>
+      {kind && (
+        <Notice>
+          Kind filter applied: {titles[kind]}.{" "}
+          <Button variant="ghost" onClick={reset}>
+            Clear filters
+          </Button>
+        </Notice>
+      )}
+      {result.busy && <p role="status">Checking release status…</p>}
+      {result.error && (
+        <Notice role="alert" tone="danger">
+          Release status unavailable{" "}
+          <Button variant="secondary" onClick={refresh}>
+            Try again
+          </Button>
+        </Notice>
+      )}
+      {result.data && (
+        <>
+          <DataTable
+            caption="Pending releases"
+            summary={`${result.data.summary.pending} pending releases in the full authorized set · as of ${adminTime(result.data.asOf)}`}
+            columns={[
+              { key: "sale", label: "Sale" },
+              { key: "kind", label: "Review" },
+              { key: "proposal", label: "Pending proposal" },
+            ]}
+            rows={result.data.items.map((row) => ({
+              id: row.proposalId,
+              cells: {
+                sale: <span className="wr-mono">{row.saleCode}</span>,
+                kind: titles[row.kind],
+                proposal: (
+                  <PendingReleaseLabel
+                    purchaseId={row.purchaseId}
+                    proposal={row}
+                  />
+                ),
+              },
+            }))}
+          />
+          {!result.data.items.length && (
+            <Notice>
+              No pending releases visible with your current access and filters.
+            </Notice>
+          )}
+        </>
+      )}
+      <div className="wr-row">
+        <Button
+          variant="secondary"
+          disabled={!previous.length || result.busy}
+          onClick={() => {
+            setCursor(previous.at(-1));
+            setPrevious(previous.slice(0, -1));
+          }}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!result.data?.nextCursor || result.busy || result.error}
+          onClick={() => {
+            if (result.data?.nextCursor) {
+              setPrevious([...previous, cursor]);
+              setCursor(result.data.nextCursor);
+            }
+          }}
+        >
+          Next
+        </Button>
+        <Button variant="ghost" disabled={result.busy} onClick={refresh}>
+          Refresh pending releases
+        </Button>
+      </div>
+      <p className="wr-help">
+        Pending and stale proposals remain blocking until a recorded decision
+        closes them. This view shows only your authorized kinds. No visible rows
+        does not mean giveaway results are ready; check server readiness
+        separately.
       </p>
     </>
   );

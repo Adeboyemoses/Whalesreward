@@ -96,7 +96,7 @@ const blockerCopy: Record<string, string> = {
   before_cutoff: "Purchase cutoff has not passed.",
   grace_open: "Upload grace period is still open.",
   reviews_unresolved:
-    "Held sales, corrections, duplicate flags or two-person release proposals need review. Pending and stale release proposals still block this result.",
+    "Unresolved holds and pending two-person release proposals block saving giveaway results, revisions and unchanged reconciliation.",
   uploads_unresolved:
     "Server-known sales need upload or complete-photo evidence resolution.",
   eligibility_unresolved: "Campaign eligibility remains unresolved.",
@@ -131,7 +131,7 @@ function ReadinessSheet({
       <KeyValueList
         items={[
           {
-            label: "Held sales and related release proposals",
+            label: "Sales with holds or pending hold releases",
             value: ready.counts.holds,
           },
           { label: "Unresolved corrections", value: ready.counts.corrections },
@@ -144,7 +144,7 @@ function ReadinessSheet({
             value: ready.counts.uploads,
           },
           {
-            label: "Policy and related release blocks",
+            label: "Sales with policy checks or pending capture releases",
             value: ready.counts.policyBlocks,
           },
         ]}
@@ -157,6 +157,12 @@ function ReadinessSheet({
         <ul className="wr-giveaway-blockers">
           {ready.blockers.map((b) => (
             <li key={b}>
+              {b === "reviews_unresolved" && (
+                <>
+                  <b>Reviews still need decisions</b>
+                  <br />
+                </>
+              )}
               {blockerCopy[b]}
               {(b === "campaign_unconfigured" ||
                 b === "timing_policy_unconfigured") &&
@@ -185,15 +191,18 @@ function ReadinessSheet({
       )}
       {sales && (
         <div className="wr-row wr-giveaway-actions">
-          <Link className="wr-btn wr-btn-secondary" href="/admin/sales/reviews">
-            Review queue
+          <Link
+            className="wr-btn wr-btn-secondary"
+            href="/admin/sales/reviews?view=pending_release"
+          >
+            Open review queue
           </Link>
           <Link className="wr-btn wr-btn-ghost" href="/admin/sales">
             Review uploads and sales
           </Link>
         </div>
       )}
-      <p>Dedicated two-person release review · not available yet.</p>
+
       <h3>Finalization checklist · not available yet</h3>
       <p>
         Manager designation, phone census, unavailable-phone proposals and

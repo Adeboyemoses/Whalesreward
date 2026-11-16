@@ -136,3 +136,19 @@ describe("audit presentation boundary", () => {
     });
   });
 });
+
+describe("P-29 safe release event presentation", () => {
+  it("uses the four approved release transition labels", async () => {
+    const { auditTitle } = await import("./admin-audit");
+    for (const [action, title] of Object.entries({
+      held_release_proposed: "Release proposed",
+      held_release_approved: "Release approved",
+      held_release_rejected: "Release rejected",
+      held_release_superseded: "Release superseded",
+    })) {
+      expect(auditTitle({ action } as Parameters<typeof auditTitle>[0])).toBe(
+        title,
+      );
+    }
+  });
+});
