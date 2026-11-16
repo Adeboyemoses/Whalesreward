@@ -141,7 +141,12 @@ function guard(
   )
     fail("version_conflict");
 }
-async function advance(db: pg.PoolClient, c: CampaignRow) {
+async function advance(db: pg.PoolClient, c: CampaignRow, bumped = false) {
+  if (!bumped)
+    await db.query(
+      "UPDATE campaign SET version=version+1,reconciliation_required=true WHERE id=$1",
+      [c.id],
+    );
   await db.query(
     "UPDATE station_reporting_state SET data_version=data_version+1 WHERE station_id=$1",
     [c.station_id],
@@ -263,7 +268,7 @@ export function createPhoneService(
               [id, c.id, b.managerAdminId, { reason: b.reason, auditEventId }],
             );
             await db.query(
-              "UPDATE campaign SET manager_designation_id=$2 WHERE id=$1",
+              "UPDATE campaign SET manager_designation_id=$2,version=version+1,reconciliation_required=true WHERE id=$1",
               [c.id, id],
             );
             await advance(db, c);
@@ -338,10 +343,10 @@ export function createPhoneService(
               ],
             );
             await db.query(
-              "UPDATE campaign SET phone_census_id=$2 WHERE id=$1",
+              "UPDATE campaign SET phone_census_id=$2,version=version+1,reconciliation_required=true WHERE id=$1",
               [c.id, id],
             );
-            const dataVersion = await advance(db, c);
+            const dataVersion = await advance(db, c, true);
             return {
               census: {
                 id,
@@ -665,7 +670,7 @@ export function createPhoneService(
                   actionKind: b.kind,
                 },
               );
-            const sourceDataVersion = await advance(db, c);
+            const sourceDataVersion = await advance(db, c, true);
             const content = {
               id,
               campaignId: c.id,
@@ -688,7 +693,7 @@ export function createPhoneService(
               [id, c.id, c.phone_census_id, content, JSON.stringify(entries)],
             );
             await db.query(
-              "UPDATE campaign SET phone_check_id=$2 WHERE id=$1",
+              "UPDATE campaign SET phone_check_id=$2,version=version+1,reconciliation_required=true WHERE id=$1",
               [c.id, id],
             );
             return { phoneCheck: content, campaign: await project(db, c.id) };

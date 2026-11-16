@@ -84,12 +84,6 @@ DO $$ DECLARE t text; BEGIN
  EXECUTE format('CREATE TRIGGER immutable_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION guard_immutable_columns()',t);
  END LOOP;
 END $$;
-CREATE FUNCTION dirty_giveaway_generation() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
- UPDATE campaign SET reconciliation_required=true,version=version+1 WHERE station_id=NEW.station_id;
- RETURN NULL;
-END $$;
-CREATE TRIGGER giveaway_generation AFTER UPDATE OF data_version ON station_reporting_state FOR EACH ROW WHEN(OLD.data_version IS DISTINCT FROM NEW.data_version) EXECUTE FUNCTION dirty_giveaway_generation();
 CREATE TRIGGER reports_photo_observation AFTER INSERT ON photo_receipt_observation FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
 CREATE TRIGGER reports_photo_receipt AFTER INSERT ON photo_receipt_fact FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
 CREATE TRIGGER reports_card AFTER INSERT OR UPDATE OR DELETE ON card FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
@@ -125,3 +119,24 @@ END $$;
 CREATE TRIGGER phone_exclusion_pin_supersession AFTER UPDATE ON campaign FOR EACH ROW EXECUTE FUNCTION supersede_phone_exclusions();
 
 INSERT INTO reconciliation_policy_definition(policy_version,evaluator_identity,approval_reference,partial_uploads) VALUES('reconciliation-v1','reconciliation-v1','WHR-158 / WHR-162 / Earl 16 Nov 2026','exact_incomplete');
+
+CREATE OR REPLACE FUNCTION advance_report_generation() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE sid uuid; payload jsonb;
+BEGIN
+ payload:=CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+ IF TG_TABLE_NAME IN ('purchase','settings_version','station_reporting_state') THEN sid:=(payload->>'station_id')::uuid;
+ ELSIF TG_TABLE_NAME='customer' THEN sid:=(payload->>'registered_station_id')::uuid;
+ ELSE SELECT station_id INTO sid FROM purchase WHERE id=(payload->>'purchase_id')::uuid;
+ END IF;
+ IF sid IS NULL THEN
+   INSERT INTO station_reporting_state(station_id,data_version) SELECT id,1 FROM station
+   ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1;
+ ELSE
+   INSERT INTO station_reporting_state(station_id,data_version) VALUES(sid,1)
+   ON CONFLICT(station_id) DO UPDATE SET data_version=station_reporting_state.data_version+1;
+ END IF;
+ IF TG_TABLE_NAME NOT IN ('settings_version','station_reporting_state') THEN
+ UPDATE campaign SET version=version+1,reconciliation_required=true WHERE sid IS NULL OR station_id=sid;
+ END IF;
+ RETURN NULL;
+END $$;
