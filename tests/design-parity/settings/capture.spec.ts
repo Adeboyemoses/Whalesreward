@@ -7,7 +7,6 @@ import {
   editIntent,
   reviewIntent,
   daysLabel,
-  timingLocked,
 } from "../../settings/helpers";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
@@ -89,14 +88,48 @@ test("B07 T01 T03 T02 T04 independent 1440px settings fidelity and phone layout"
       page.getByRole("heading", { name: "Settings", exact: true }),
     ).toBeVisible();
     await capture(page, "B07-1440");
-    for (const [board, route] of [
-      ["T01", "giveaway"],
-      ["T03", "giveaway/confirm"],
-    ]) {
-      await page.goto(`/admin/settings/${route}`);
-      await expect(page.getByRole("main")).toContainText(timingLocked);
-      await capture(page, `${board}-locked-1440`);
+    await page.goto("/admin/settings/giveaway");
+    await expect(page.getByLabel("Launch", { exact: true })).toBeVisible();
+    for (const [label, value] of [
+      ["Launch", "2035-03-01T00:00:00Z"],
+      ["Purchase start", "2035-03-02T00:00:00Z"],
+      ["Purchase cutoff", "2035-03-09T01:59:59Z"],
+      ["Campaign timezone", "Africa/Lagos"],
+      ["Upload grace period (hours)", "0"],
+      ["Reason for change", "Fictional campaign timing discussion"],
+    ])
+      await page.getByLabel(label!, { exact: true }).fill(value!);
+    await capture(page, "T01-1440");
+    const review = page.waitForResponse((r) =>
+      r.url().endsWith("/settings/giveaway/review"),
+    );
+    await page
+      .getByRole("button", { name: "Review changes", exact: true })
+      .click();
+    expect((await review).status()).toBe(200);
+    await expect(
+      page.getByRole("button", { name: "Confirm changes", exact: true }),
+    ).toBeVisible();
+    await capture(page, "T03-1440");
+    for (const width of [390, 360]) {
+      await page.setViewportSize({ width, height: 844 });
+      await capture(page, `T03-${width}`);
+      await page
+        .getByRole("button", { name: "Keep editing", exact: true })
+        .click();
+      await capture(page, `T01-${width}`);
+      const response = page.waitForResponse((r) =>
+        r.url().endsWith("/settings/giveaway/review"),
+      );
+      await page
+        .getByRole("button", { name: "Review changes", exact: true })
+        .click();
+      expect((await response).status()).toBe(200);
+      await expect(
+        page.getByRole("button", { name: "Confirm changes", exact: true }),
+      ).toBeVisible();
     }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await editIntent(page, 37, "Fictional evidence retention discussion");
     await capture(page, "T02-1440");
     expect((await reviewIntent(page)).status()).toBe(200);
