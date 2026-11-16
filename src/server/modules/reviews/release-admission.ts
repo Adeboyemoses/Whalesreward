@@ -35,6 +35,28 @@ export async function classifyReleaseAdmission(
     )
   )
     return insufficient();
+  // Validate all relevant historical segments independently of whether a uniform
+  // conclusion exists. A boundary is not permission to overlook missing audits.
+  const points = new Set<string>([I.L, I.U]);
+  for (const row of [...f.prices, ...f.assignments, ...f.settings]) {
+    const at = trustedMicros(row.effective_from);
+    if (BigInt(at) >= BigInt(I.L) && BigInt(at) <= BigInt(I.U)) points.add(at);
+  }
+  for (const at of points) {
+    const point = { ...I, L: at, U: at };
+    rules.price(f, point, false);
+    if (!rules.authorization(f, point) || !rules.campaign(f, point))
+      return insufficient();
+  }
+  if (f.card?.retirement_reason === "replaced") {
+    const E = trustedMicros(f.card.retired_at);
+    for (const at of [I.L, I.U])
+      rules.card(
+        f,
+        { ...I, L: at, U: at },
+        BigInt(at) < BigInt(E) ? "confirm_earlier" : "cancel",
+      );
+  }
   const from = BigInt(trustedMicros(body.facts.observedCapture.from));
   const through = BigInt(trustedMicros(body.facts.observedCapture.through));
   const J = {
