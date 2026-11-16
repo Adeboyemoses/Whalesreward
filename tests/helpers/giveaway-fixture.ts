@@ -101,3 +101,39 @@ export async function giveawayFixture() {
   }
   return { ...f, token, campaignId, phones, guard, check };
 }
+
+/** Retained proposal history for stale/inactive-policy readiness regression. */
+export async function pendingGiveawayProposal(
+  f: Awaited<ReturnType<typeof giveawayFixture>>,
+  purchaseId: string,
+) {
+  const sheet = newId(),
+    proposal = newId();
+  const person = (
+    await f.pool.query(
+      "SELECT person_id FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+      [fixtureId(2)],
+    )
+  ).rows[0].person_id;
+  await f.pool.query(
+    "INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at) VALUES($1,$2,$3,$4,$5,'{}',$6,100,$7,clock_timestamp()+interval '1 hour')",
+    [
+      sheet,
+      purchaseId,
+      fixtureId(8),
+      fixtureId(2),
+      person,
+      "a".repeat(64),
+      `fictional/${sheet}`,
+    ],
+  );
+  await f.pool.query(
+    "INSERT INTO held_release_proposal(id,purchase_id,station_id,target_kind,outcome,sheet_asset_id,proposer_id,proposer_person_id,content,provenance) VALUES($1,$2,$3,'capture','confirm',$4,$5,$6,'{}','{}')",
+    [proposal, purchaseId, fixtureId(8), sheet, fixtureId(2), person],
+  );
+  await f.pool.query(
+    "INSERT INTO held_release_state(proposal_id,purchase_id) VALUES($1,$2)",
+    [proposal, purchaseId],
+  );
+  return proposal;
+}
