@@ -6,7 +6,10 @@ import { newId } from "../../src/server/lib/ids";
 let db: Awaited<ReturnType<typeof evidenceDatabase>>;
 beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
-  if (url.hostname !== "127.0.0.1" || url.pathname !== "/whr22_test")
+  if (
+    !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
+    !["/whr_test", "/whr22_test", "/whr22_verification"].includes(url.pathname)
+  )
     throw new Error("Disposable WHR-22 database required");
   db = await evidenceDatabase();
 }, 60000);
