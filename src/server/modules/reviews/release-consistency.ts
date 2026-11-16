@@ -44,6 +44,13 @@ export function releaseConsistency(
       !Number.isSafeInteger(a.version) ||
       a.version < 1 ||
       !a.sourceIds.length ||
+      a.sourceIds.some(
+        (id) =>
+          !id ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            id,
+          ),
+      ) ||
       !a.predicates.length
     )
       return invalid();

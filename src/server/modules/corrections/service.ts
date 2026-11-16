@@ -1,3 +1,4 @@
+import { assertAppliedReleaseConsistency } from "../reviews/release-integrations";
 import {
   writeAudit,
   auditActor,
@@ -280,6 +281,7 @@ async function apply(
   actor: string,
   reason: string,
 ) {
+  await assertAppliedReleaseConsistency(db, p.id);
   const r = await revision(db, p.id, c.proposed_revision_id);
   await evidence(db, p, r.evidence_asset_id!);
   const gate = (
@@ -837,6 +839,7 @@ export function createCorrectionsService({
               p.resolution_candidate_revision_id)
           )
             throw new AuthError("base_revision_changed", 409);
+          await assertAppliedReleaseConsistency(db, p.id);
           const r = await revision(db, p.id, c.proposed_revision_id);
           const asset = await evidence(db, p, r.evidence_asset_id!);
           return { a, p, c, r, asset, hash };

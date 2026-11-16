@@ -142,3 +142,28 @@ ALTER TABLE sale_decision ADD CONSTRAINT ck_decision_kind CHECK (
  (kind='date' AND correction_id IS NULL AND hold_id IS NOT NULL AND flag_id IS NULL AND outcome='verify_date') OR
  (kind='capture' AND correction_id IS NULL AND hold_id IS NULL AND flag_id IS NULL AND outcome IN ('confirm','cancel')) OR
  (kind='held_release' AND correction_id IS NULL AND flag_id IS NULL AND outcome IN ('confirm','cancel')));
+-- Read-side fail-closed consistency fence shared by current contribution projections.
+CREATE FUNCTION held_release_consistent(purchase UUID) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+DECLARE r RECORD; a JSONB; pred JSONB; seen JSONB:='{}'::jsonb; k TEXT; lo NUMERIC; hi NUMERIC; l NUMERIC; u NUMERIC;
+BEGIN
+ FOR r IN SELECT p.provenance,t.content FROM held_release_proposal p JOIN held_release_state s ON s.proposal_id=p.id
+ LEFT JOIN held_release_transition t ON t.proposal_id=p.id AND t.version=s.version AND t.state='approved'
+ WHERE p.purchase_id=purchase AND p.outcome='confirm' AND s.state='approved' LOOP
+  a:=r.content->'attestation';
+  IF a IS NULL OR NOT (a ?& ARRAY['decisionId','version','fromMicros','throughMicros','predicates','sourceIds'])
+    OR jsonb_array_length(a->'sourceIds')=0 OR jsonb_array_length(a->'predicates')=0 THEN RETURN false; END IF;
+  l:=(a->>'fromMicros')::numeric; u:=(a->>'throughMicros')::numeric;
+  IF l>u OR l<(r.provenance->'evaluation'->'originalInterval'->>'L')::numeric OR u>(r.provenance->'evaluation'->'originalInterval'->>'U')::numeric THEN RETURN false; END IF;
+  lo:=greatest(lo,l); hi:=least(hi,u); IF lo>hi THEN RETURN false; END IF;
+  FOR pred IN SELECT value FROM jsonb_array_elements(a->'predicates') LOOP
+   k:=pred->>'kind';
+   IF k NOT IN ('rate','card','day','authorization','campaign') THEN RETURN false; END IF;
+   IF k='campaign' THEN k:=k||':'||(pred->>'campaignId'); END IF;
+   IF seen ? k AND seen->k IS DISTINCT FROM pred THEN RETURN false; END IF;
+   seen:=jsonb_set(seen,ARRAY[k],pred);
+  END LOOP;
+ END LOOP;
+ RETURN true;
+EXCEPTION WHEN OTHERS THEN RETURN false;
+END $$;
+CREATE TRIGGER reports_held_release AFTER INSERT OR UPDATE OR DELETE ON held_release_state FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
