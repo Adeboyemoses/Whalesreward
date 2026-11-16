@@ -236,7 +236,26 @@ export function createPhoneService(
   config: AdminConfig,
   audit: PhoneAudit,
   project: CampaignProjection,
+  onReplay?: () => void,
 ) {
+  const domainReceipt: typeof receipt = async (
+    db,
+    configuration,
+    actor,
+    kind,
+    input,
+    run,
+  ) => {
+    const existing = (
+      await db.query(
+        "SELECT 1 FROM mutation_receipt WHERE actor_user_id=$1 AND operation_kind=$2 AND operation_id=$3",
+        [actor.user_id, kind, input.operationId],
+      )
+    ).rowCount;
+    const result = await receipt(db, configuration, actor, kind, input, run);
+    if (existing) onReplay?.();
+    return result;
+  };
   return {
     async designate(
       token: string | undefined,
@@ -248,7 +267,7 @@ export function createPhoneService(
         const { actor, c } = await context(db, token, campaignId);
         requirePermission(actor, "settings");
         if (!actor.is_owner) fail("owner_required", 403);
-        return receipt(
+        return domainReceipt(
           db,
           config,
           actor,
@@ -297,7 +316,7 @@ export function createPhoneService(
         const { actor, c } = await context(db, token, campaignId);
         grant(actor, b.kind);
         await manager(db, actor, c);
-        return receipt(
+        return domainReceipt(
           db,
           config,
           actor,
@@ -383,7 +402,7 @@ export function createPhoneService(
         const { actor, c } = await context(db, token, campaignId);
         grant(actor, b.kind);
         await manager(db, actor, c);
-        return receipt(
+        return domainReceipt(
           db,
           config,
           actor,
@@ -501,7 +520,7 @@ export function createPhoneService(
         const a = await releasePerson(db, c.station_id, actor.user_id),
           p = await releasePerson(db, c.station_id, e.content.proposerUserId);
         if (a.personId === p.personId) fail("independent_admin_required", 403);
-        return receipt(
+        return domainReceipt(
           db,
           config,
           actor,
@@ -609,7 +628,7 @@ export function createPhoneService(
         const { actor, c } = await context(db, token, campaignId);
         grant(actor, b.kind);
         await manager(db, actor, c);
-        return receipt(
+        return domainReceipt(
           db,
           config,
           actor,

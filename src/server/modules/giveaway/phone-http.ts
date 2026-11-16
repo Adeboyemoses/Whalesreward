@@ -102,6 +102,7 @@ export async function handlePhones(
       },
     ]);
     let data: unknown;
+    let replayed = false;
     const query = Object.fromEntries(new URL(request.url).searchParams);
     if (write && Object.keys(query).length)
       throw new AuthError("invalid_request", 400);
@@ -114,6 +115,9 @@ export async function handlePhones(
           await db.query("SELECT station_id FROM campaign WHERE id=$1", [cid])
         ).rows[0];
         return campaignView(await campaignData(db, s.station_id, cid));
+      },
+      () => {
+        replayed = true;
       },
     );
     if (action === "designate")
@@ -138,7 +142,10 @@ export async function handlePhones(
       );
     return Response.json(
       { data, serverTime: new Date().toISOString(), requestId },
-      { headers, status: 200 },
+      {
+        headers,
+        status: write && action !== "decide" && !replayed ? 201 : 200,
+      },
     );
   } catch (e) {
     const failure =
