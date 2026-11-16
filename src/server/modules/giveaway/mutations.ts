@@ -26,8 +26,20 @@ import {
 import { readiness } from "./readiness";
 import { totals } from "../reports/data";
 type Campaign = NonNullable<Awaited<ReturnType<typeof campaignData>>>;
+const canonical = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(canonical)
+    : v !== null && typeof v === "object"
+      ? Object.fromEntries(
+          Object.entries(v)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, value]) => [k, canonical(value)]),
+        )
+      : v;
 export const hashContent = (v: unknown): string =>
-  createHash("sha256").update(JSON.stringify(v)).digest("hex");
+  createHash("sha256")
+    .update(JSON.stringify(canonical(v)))
+    .digest("hex");
 function guard(
   c: Campaign,
   p: {
@@ -155,6 +167,8 @@ export async function prepareGiveaway(
         if (p.kind === "revision" && !c.latest_snapshot_id)
           throw new AuthError("snapshot_missing", 409);
         const ready = await readiness(db, c, actor.admin_id);
+        if (!ready.phone.policyVersion)
+          throw new AuthError("reconciliation_policy_unconfigured", 409);
         if (!ready.view.canPrepare)
           throw new AuthError("finalization_blocked", 409);
         const reconciliationId = newId(),
@@ -172,12 +186,13 @@ export async function prepareGiveaway(
           "eligibility",
           "phone_census",
         ];
-        const checks = checkNames.map((name) => ({
-          name,
-          result: "clear",
-          checked: String(sources.length),
-          blocking: "0",
-        }));
+        const checks = await checkedCounts(
+          db,
+          c.station_id,
+          sources,
+          phoneCheckId,
+          checkNames,
+        );
         await db.query(
           "INSERT INTO giveaway_reconciliation(id,campaign_id,station_id,phone_check_id,source_data_version,content) VALUES($1,$2,$3,$4,$5,$6::jsonb)",
           [
@@ -381,7 +396,7 @@ export async function confirmGiveaway(
           ).rowCount
         )
           throw new AuthError("preview_used", 409);
-        if (JSON.stringify(v.guard) !== JSON.stringify(campaignGuard(c)))
+        if (hashContent(v.guard) !== hashContent(campaignGuard(c)))
           throw new AuthError("preview_stale", 409);
         const ready = await readiness(db, c, actor.admin_id);
         if (
@@ -533,4 +548,36 @@ export async function confirmGiveaway(
     );
     return { data, replayed };
   });
+}
+async function checkedCounts(
+  db: pg.PoolClient,
+  stationId: string,
+  sources: Contribution[],
+  phoneCheckId: string,
+  names: string[],
+) {
+  const relevant = sources
+    .filter(
+      (s) =>
+        !s.reasons.includes("outside_period") &&
+        !s.reasons.includes("before_launch"),
+    )
+    .map((s) => s.purchaseId);
+  const r = (
+    await db.query(
+      `SELECT
+ (SELECT count(DISTINCT purchase_id)::text FROM purchase_hold WHERE purchase_id=ANY($1::uuid[])) holds,
+ (SELECT count(DISTINCT purchase_id)::text FROM correction_request WHERE purchase_id=ANY($1::uuid[])) corrections,
+ (SELECT count(*)::text FROM duplicate_flag WHERE purchase_id=ANY($1::uuid[]) OR other_purchase_id=ANY($1::uuid[])) duplicates,
+ (SELECT count(DISTINCT purchase_id)::text FROM held_release_proposal WHERE station_id=$2) two_person_proposals,
+ (SELECT jsonb_array_length(entries)::text FROM giveaway_phone_check WHERE id=$3) phone_census`,
+      [relevant, stationId, phoneCheckId],
+    )
+  ).rows[0];
+  return names.map((name) => ({
+    name,
+    result: "clear",
+    checked: r[name] ?? String(relevant.length),
+    blocking: "0",
+  }));
 }
