@@ -106,7 +106,7 @@ async function audit(
     target: {
       kind: "campaign",
       id: c.id,
-      code: "CAMPAIGN",
+      code: `CAMPAIGN-${c.id}`,
       subjectAtEvent: null,
     },
     operationId,

@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { recordedReconciliationPolicy } from "./policy";
 import { phoneReadiness } from "./phone-readiness";
 import { campaignView, contributions, type campaignData } from "./data";
 import { recordedTimingPolicy } from "../settings/policy";
@@ -14,6 +15,7 @@ export async function readiness(
     c.id,
     c.latest_snapshot_id ? "revision" : "initial",
   );
+  phone.policyVersion = await recordedReconciliationPolicy(db, c.station_id);
   const bounds =
     c.start_us && c.cutoff_us && c.launch_us && c.deadline_us
       ? {

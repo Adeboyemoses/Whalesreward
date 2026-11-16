@@ -263,6 +263,7 @@ export const meterFields = [
   "meterConclusion",
 ] as const;
 export const auditAreas = [
+  "giveaway",
   "reports",
   "sales",
   "customers",
