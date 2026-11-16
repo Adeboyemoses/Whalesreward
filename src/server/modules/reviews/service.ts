@@ -1071,3 +1071,14 @@ const duplicateResponse = z.strictObject({
   flag: wire.duplicateFlagSchema,
   purchases: z.array(wire.saleRowSchema).length(2),
 });
+
+/** Shared sale mutations for the independently authorized P-29 service. */
+export const releaseSaleMutations = {
+  purchase,
+  guard,
+  candidate,
+  cancel,
+  accept,
+  dateRevision,
+  markCampaigns,
+};

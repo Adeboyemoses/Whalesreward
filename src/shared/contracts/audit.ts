@@ -67,6 +67,18 @@ const permissions = z.enum([
   "roles",
 ]);
 export const auditFieldValues = {
+  releaseProposalId: auditId,
+  releaseDecisionId: auditId,
+  releaseState: z.enum(["pending", "approved", "rejected", "superseded"]),
+  releaseTargetKind: z.enum(["price", "card", "date", "capture"]),
+  releaseOutcome: z.enum(["confirm", "cancel"]),
+  releaseConclusion: z.enum([
+    "sheet_attested_confirm",
+    "sheet_attested_cancel",
+  ]),
+  sheetAssetId: auditId,
+  proposerId: auditId,
+  approverId: auditId,
   state: z.enum([
     "received",
     "photo_pending",
@@ -293,6 +305,69 @@ const rule = (
   optional?: Rule["optional"],
 ): Rule => ({ area, targets: [target], actors, fields, optional });
 export const auditRules = {
+  held_release_proposed: rule(
+    "sales",
+    "purchase",
+    ["admin"],
+    [
+      "releaseProposalId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+      "sheetAssetId",
+      "proposerId",
+      "reviewPolicyRelease",
+      "reviewPolicyRevision",
+    ],
+  ),
+  held_release_approved: rule(
+    "sales",
+    "purchase",
+    ["admin"],
+    [
+      "releaseProposalId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+      "sheetAssetId",
+      "proposerId",
+      "reviewPolicyRelease",
+      "reviewPolicyRevision",
+      "releaseDecisionId",
+      "approverId",
+      "releaseConclusion",
+      "decisionId",
+      "reviewEvaluationId",
+      ...V,
+      ...G,
+    ],
+    ["verifiedSaleDate"],
+  ),
+  held_release_rejected: rule(
+    "sales",
+    "purchase",
+    ["admin"],
+    [
+      "releaseProposalId",
+      "releaseDecisionId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+      "sheetAssetId",
+      "proposerId",
+    ],
+  ),
+  held_release_superseded: rule(
+    "sales",
+    "purchase",
+    ["system:validation"],
+    [
+      "releaseProposalId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+    ],
+  ),
   sale_received: rule(
     "sales",
     "purchase",
