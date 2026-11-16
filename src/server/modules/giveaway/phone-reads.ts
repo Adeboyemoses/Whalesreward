@@ -73,8 +73,47 @@ export async function readPhones(
     };
     let rows: unknown[] = [];
     let generation = `${c.data_version}:${c.census_version ?? 1}`;
-    if (action === "phones") rows = c.census_content?.phones ?? [];
-    else if (action === "required-attendants")
+    if (action === "phones") {
+      rows = c.census_content?.phones ?? [];
+      const exclusions = (
+        await db.query(
+          `SELECT e.content,t.state FROM giveaway_phone_exclusion e JOIN LATERAL(SELECT state FROM giveaway_phone_exclusion_transition WHERE exclusion_id=e.id ORDER BY version DESC LIMIT 1)t ON true WHERE e.campaign_id=$1 AND e.census_id=$2 ORDER BY e.id`,
+          [c.id, c.phone_census_id],
+        )
+      ).rows;
+      const check = c.phone_check_id
+        ? (
+            await db.query(
+              "SELECT entries,content FROM giveaway_phone_check WHERE id=$1",
+              [c.phone_check_id],
+            )
+          ).rows[0]
+        : null;
+      rows = rows.map((value) => {
+        const phone = value as { id: string; state: string };
+        const e = exclusions.find(
+          (e) =>
+            e.content.phoneId === phone.id &&
+            ["pending", "approved"].includes(e.state),
+        );
+        const empty =
+          check?.content.sourceDataVersion === c.data_version &&
+          check.entries.some(
+            (v: { phoneId: string; result: string }) =>
+              v.phoneId === phone.id && v.result === "empty",
+          );
+        return {
+          ...phone,
+          state: e
+            ? e.state === "approved"
+              ? "unavailable_approved"
+              : "unavailable_pending"
+            : empty
+              ? "empty"
+              : "unchecked",
+        };
+      });
+    } else if (action === "required-attendants")
       rows = (
         await db.query(
           `SELECT DISTINCT a.attendant_id AS "attendantId" FROM assignment a JOIN pump p ON p.id=a.pump_id WHERE p.station_id=$1 UNION SELECT originating_attendant_id AS "attendantId" FROM purchase WHERE station_id=$1 ORDER BY "attendantId"`,

@@ -69,6 +69,27 @@ export async function phoneReadiness(
     result.blockers.push("phone_check_required");
     return result;
   }
+  const liveManager = (
+    await db.query(
+      `SELECT 1 FROM admin a JOIN auth_user u ON u.id=a.user_id JOIN role r ON r.id=a.role_id
+    JOIN LATERAL(SELECT verified FROM held_release_person_binding WHERE station_id=$2 AND user_id=u.id ORDER BY version DESC LIMIT 1)b ON b.verified
+    WHERE a.id=$1 AND u.enabled AND r.enabled AND NOT u.must_change_password
+    AND (SELECT count(DISTINCT permission_code) FROM role_permission WHERE role_id=r.id AND permission_code=ANY($3::text[]))=3`,
+      [
+        row.manager_admin_id,
+        row.station_id,
+        [
+          "sales",
+          "leaderboards",
+          kind === "initial" ? "giveawayFinalize" : "giveawayRevise",
+        ],
+      ],
+    )
+  ).rowCount;
+  if (!liveManager) {
+    result.blockers.push("phone_check_required");
+    return result;
+  }
   for (const entry of row.entries) {
     if (entry.result !== "unavailable") continue;
     const exclusion = (

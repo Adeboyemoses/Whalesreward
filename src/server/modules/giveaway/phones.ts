@@ -53,6 +53,16 @@ export type CampaignProjection = (
   db: pg.PoolClient,
   campaignId: string,
 ) => Promise<unknown>;
+function publicExclusion(value: Record<string, unknown>) {
+  const result = { ...value };
+  delete result.proposerUserId;
+  return result;
+}
+function publicCheck(value: Record<string, unknown>) {
+  const result = { ...value };
+  delete result.designationId;
+  return result;
+}
 function fail(code: string, status = 409): never {
   throw new AuthError(code, status);
 }
@@ -463,7 +473,10 @@ export function createPhoneService(
               [newId(), id, { auditEventId }],
             );
             await advance(db, c);
-            return { exclusion: content, campaign: await project(db, c.id) };
+            return {
+              exclusion: publicExclusion(content),
+              campaign: await project(db, c.id),
+            };
           },
         );
       });
@@ -582,7 +595,10 @@ export function createPhoneService(
               [newId(), exclusionId, content.version, content.state, content],
             );
             await advance(db, c);
-            return { exclusion: content, campaign: await project(db, c.id) };
+            return {
+              exclusion: publicExclusion(content),
+              campaign: await project(db, c.id),
+            };
           },
         );
       });
@@ -696,7 +712,10 @@ export function createPhoneService(
               "UPDATE campaign SET phone_check_id=$2,version=version+1,reconciliation_required=true WHERE id=$1",
               [c.id, id],
             );
-            return { phoneCheck: content, campaign: await project(db, c.id) };
+            return {
+              phoneCheck: publicCheck(content),
+              campaign: await project(db, c.id),
+            };
           },
         );
       });
