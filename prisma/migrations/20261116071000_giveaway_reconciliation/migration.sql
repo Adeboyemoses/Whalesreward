@@ -220,3 +220,45 @@ ALTER TABLE giveaway_phone_census
  ADD COLUMN operation_id uuid GENERATED ALWAYS AS ((content->>'operationId')::uuid) STORED NOT NULL,
  ADD COLUMN audit_event_id uuid GENERATED ALWAYS AS ((content->>'auditEventId')::uuid) STORED NOT NULL REFERENCES audit_event(id),
  ADD UNIQUE(actor_id,operation_id);
+CREATE FUNCTION validate_phone_check_entries() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE census jsonb; e jsonb; phone jsonb;
+BEGIN
+ SELECT content INTO census FROM giveaway_phone_census WHERE id=NEW.census_id AND campaign_id=NEW.campaign_id;
+ IF census IS NULL OR jsonb_array_length(NEW.entries)<>jsonb_array_length(census->'phones') OR
+ (SELECT count(DISTINCT value->>'phoneId') FROM jsonb_array_elements(NEW.entries))<>jsonb_array_length(NEW.entries) THEN
+ RAISE EXCEPTION 'incomplete phone check entries' USING ERRCODE='23514'; END IF;
+ FOR e IN SELECT value FROM jsonb_array_elements(NEW.entries) LOOP
+ SELECT value INTO phone FROM jsonb_array_elements(census->'phones') WHERE value->>'id'=e->>'phoneId';
+ IF phone IS NULL OR phone->>'version' IS DISTINCT FROM e->>'phoneVersion' OR NOT ((phone->'attendantIds') @> (e->'attendantIds') AND (e->'attendantIds') @> (phone->'attendantIds')) THEN
+ RAISE EXCEPTION 'phone entry does not match census' USING ERRCODE='23514'; END IF;
+ IF e->>'result'='empty' THEN
+ IF e->>'exclusionId' IS NOT NULL THEN RAISE EXCEPTION 'empty phone has exclusion' USING ERRCODE='23514'; END IF;
+ ELSIF e->>'result'='unavailable' THEN
+ IF NOT EXISTS(SELECT 1 FROM giveaway_phone_exclusion x JOIN LATERAL(SELECT state FROM giveaway_phone_exclusion_transition WHERE exclusion_id=x.id ORDER BY version DESC LIMIT 1)t ON t.state='approved'
+ WHERE x.id=(e->>'exclusionId')::uuid AND x.campaign_id=NEW.campaign_id AND x.census_id=NEW.census_id AND x.content->>'phoneId'=e->>'phoneId') THEN
+ RAISE EXCEPTION 'unapproved phone exclusion' USING ERRCODE='23503'; END IF;
+ ELSE RAISE EXCEPTION 'unknown phone result' USING ERRCODE='23514'; END IF;
+ END LOOP;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER check_phone_entries BEFORE INSERT ON giveaway_phone_check FOR EACH ROW EXECUTE FUNCTION validate_phone_check_entries();
+CREATE FUNCTION validate_phone_exclusion_sources() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source jsonb; phone jsonb; sid uuid;
+BEGIN
+ SELECT station_id INTO sid FROM campaign WHERE id=NEW.campaign_id;
+ SELECT value INTO phone FROM giveaway_phone_census c CROSS JOIN LATERAL jsonb_array_elements(c.content->'phones')
+ WHERE c.id=NEW.census_id AND c.campaign_id=NEW.campaign_id AND value->>'id'=NEW.content->>'phoneId';
+ IF phone IS NULL OR phone->>'version' IS DISTINCT FROM NEW.content->>'phoneVersion' THEN RAISE EXCEPTION 'exclusion phone mismatch' USING ERRCODE='23503'; END IF;
+ IF (SELECT count(DISTINCT value->>'purchaseId') FROM jsonb_array_elements(NEW.content->'partialSources'))<>jsonb_array_length(NEW.content->'partialSources') THEN RAISE EXCEPTION 'duplicate partial sources' USING ERRCODE='23514'; END IF;
+ FOR source IN SELECT value FROM jsonb_array_elements(NEW.content->'partialSources') LOOP
+ IF NOT EXISTS(SELECT 1 FROM purchase p WHERE p.id=(source->>'purchaseId')::uuid AND p.station_id=sid AND p.version=(source->>'purchaseVersion')::integer AND p.status IN ('received','photo_pending')
+ AND (phone->'attendantIds') @> to_jsonb(ARRAY[p.originating_attendant_id::text]) AND p.current_revision_id IS NULL
+ AND NOT EXISTS(SELECT 1 FROM purchase_revision r WHERE r.purchase_id=p.id AND r.state='accepted')
+ AND NOT EXISTS(SELECT 1 FROM photo_receipt_observation o WHERE o.purchase_id=p.id)) THEN
+ RAISE EXCEPTION 'invalid exact partial source' USING ERRCODE='23514'; END IF;
+ END LOOP;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER check_exclusion_sources BEFORE INSERT ON giveaway_phone_exclusion FOR EACH ROW EXECUTE FUNCTION validate_phone_exclusion_sources();
+ALTER TABLE giveaway_phone_exclusion ADD CHECK(content->>'id'=id::text AND content->>'campaignId'=campaign_id::text AND content->>'censusId'=census_id::text);
+ALTER TABLE giveaway_phone_check ADD CHECK(content->>'id'=id::text AND content->>'campaignId'=campaign_id::text AND content->>'censusId'=census_id::text);

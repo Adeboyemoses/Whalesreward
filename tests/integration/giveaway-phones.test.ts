@@ -590,3 +590,145 @@ it("P-30 proposer identity rebinding cannot silently rebase an existing exclusio
     await f.close();
   }
 }, 30000);
+it("P-30 revoked manager grant denies independent approval and manager proposal replay", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f);
+    await f.pool.query(
+      "DELETE FROM role_permission WHERE role_id=(SELECT role_id FROM admin WHERE id=(SELECT manager_admin_id FROM giveaway_manager_designation WHERE id=(SELECT manager_designation_id FROM campaign WHERE id=$1))) AND permission_code='giveawayFinalize'",
+      [f.campaignId],
+    );
+    await expect(
+      f.phones.decide(a.token, f.campaignId, String(p.result.exclusion.id), {
+        operationId: newId(),
+        expectedVersion: 1,
+        decision: "approve",
+        reason: "Fictional authority recheck",
+      }),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(
+      f.phones.propose(f.token, f.campaignId, p.phoneId, p.request),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    expect(p.result.exclusion).not.toHaveProperty("unsentCount");
+    expect(p.result.exclusion).not.toHaveProperty("queueCount");
+    expect(p.result.exclusion.partialSources).toEqual([]);
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 extra and duplicate phone-check rows never certify a partial census", async () => {
+  const f = await giveawayFixture();
+  try {
+    await f.check();
+    const c = (
+      await f.pool.query(
+        "SELECT content,version FROM giveaway_phone_census WHERE campaign_id=$1 ORDER BY version DESC LIMIT 1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    const entry = {
+      phoneId: c.content.phones[0].id,
+      expectedPhoneVersion: 1,
+      result: "empty",
+      exclusionId: null,
+    };
+    for (const entries of [
+      [entry, entry],
+      [entry, { ...entry, phoneId: newId() }],
+    ])
+      await expect(
+        f.phones.check(f.token, f.campaignId, {
+          operationId: newId(),
+          kind: "initial",
+          reason: "Fictional extra inventory rows",
+          ...(await f.guard()),
+          expectedCensusVersion: c.version,
+          entries,
+        }),
+      ).rejects.toMatchObject({ code: "census_incomplete" });
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("M4 one transaction with receipt validation and revision writes advances generations exactly once", async () => {
+  const f = await giveawayFixture();
+  try {
+    const before = await f.guard();
+    await historicalSale(f.pool, {});
+    const after = await f.guard();
+    expect(
+      BigInt(after.expectedDataVersion) - BigInt(before.expectedDataVersion),
+    ).toBe(1n);
+    expect(after.expectedVersion - before.expectedVersion).toBe(1);
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 non-superuser cannot attach another campaign census or omit its check entries", async () => {
+  const f = await giveawayFixture();
+  const role = `phone_${newId().replaceAll("-", "")}`;
+  let client: Awaited<ReturnType<typeof f.pool.connect>> | undefined;
+  try {
+    await f.check();
+    const check = (
+      await f.pool.query(
+        "SELECT * FROM giveaway_phone_check WHERE campaign_id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    const station = newId(),
+      campaign = newId();
+    await f.pool.query(
+      "INSERT INTO station(id,code,name,timezone,version) VALUES($1,$2,'Fictional other station','Africa/Lagos',1)",
+      [station, `OTHER-${station}`],
+    );
+    await f.pool.query(
+      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional other campaign',1,true)",
+      [campaign, station],
+    );
+    await f.pool.query(
+      `CREATE ROLE ${role} NOSUPERUSER NOCREATEDB NOCREATEROLE`,
+    );
+    await f.pool.query(`GRANT USAGE ON SCHEMA ${f.schema} TO ${role}`);
+    await f.pool.query(
+      `GRANT SELECT,INSERT ON ALL TABLES IN SCHEMA ${f.schema} TO ${role}`,
+    );
+    client = await f.pool.connect();
+    await client.query(`SET ROLE ${role}`);
+    const id = newId();
+    await expect(
+      client.query(
+        "INSERT INTO giveaway_phone_check(id,campaign_id,census_id,content,entries) VALUES($1,$2,$3,$4,$5)",
+        [
+          id,
+          campaign,
+          check.census_id,
+          { ...check.content, id, campaignId: campaign, operationId: newId() },
+          JSON.stringify(check.entries),
+        ],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+    const ownId = newId();
+    await expect(
+      client.query(
+        "INSERT INTO giveaway_phone_check(id,campaign_id,census_id,content,entries) VALUES($1,$2,$3,$4,$5)",
+        [
+          ownId,
+          f.campaignId,
+          check.census_id,
+          { ...check.content, id: ownId, operationId: newId() },
+          "[]",
+        ],
+      ),
+    ).rejects.toMatchObject({ code: "23514" });
+  } finally {
+    if (client) {
+      await client.query("RESET ROLE");
+      client.release();
+    }
+    await f.pool.query(`DROP OWNED BY ${role}`);
+    await f.pool.query(`DROP ROLE ${role}`);
+    await f.close();
+  }
+}, 30000);
