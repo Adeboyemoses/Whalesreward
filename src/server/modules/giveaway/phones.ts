@@ -56,6 +56,8 @@ export type CampaignProjection = (
 function publicExclusion(value: Record<string, unknown>) {
   const result = { ...value };
   delete result.proposerUserId;
+  delete result.proposerPerson;
+  delete result.approverPerson;
   return result;
 }
 function publicCheck(value: Record<string, unknown>) {
@@ -475,6 +477,11 @@ export function createPhoneService(
               kind: b.kind,
               state: "pending",
               proposerUserId: actor.user_id,
+              proposerPerson: await releasePerson(
+                db,
+                c.station_id,
+                actor.user_id,
+              ),
               proposedBy: await actorProjection(db, actor),
               proposedAt: time,
               decidedBy: null,
@@ -529,6 +536,11 @@ export function createPhoneService(
           "giveaway_phone_decision",
           { ...b, campaignId, exclusionId },
           async () => {
+            if (
+              e.content.proposerPerson?.bindingId !== p.bindingId ||
+              e.content.proposerPerson?.version !== p.version
+            )
+              fail("exclusion_stale");
             if (e.version !== b.expectedVersion) fail("version_conflict");
             if (e.state !== "pending")
               fail(
@@ -605,6 +617,7 @@ export function createPhoneService(
               version: e.version + 1,
               state: b.decision === "approve" ? "approved" : "rejected",
               decidedBy: await actorProjection(db, actor),
+              approverPerson: a,
               decidedAt: (
                 await db.query("SELECT clock_timestamp() AS at")
               ).rows[0].at.toISOString(),

@@ -136,6 +136,8 @@ export async function readPhones(
       ).rows.map((r) => {
         const value = { ...r.content };
         delete value.proposerUserId;
+        delete value.proposerPerson;
+        delete value.approverPerson;
         return value;
       });
       if (action === "exclusion") {

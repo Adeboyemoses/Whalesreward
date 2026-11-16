@@ -558,3 +558,35 @@ it("P-30 supersession audit links both proposal and actual manager-change event"
     await f.close();
   }
 }, 30000);
+it("P-30 proposer identity rebinding cannot silently rebase an existing exclusion", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f);
+    const binding = (
+      await f.pool.query(
+        "SELECT * FROM held_release_person_binding WHERE user_id=(SELECT user_id FROM admin WHERE id=(SELECT manager_admin_id FROM giveaway_manager_designation WHERE id=(SELECT manager_designation_id FROM campaign WHERE id=$1))) ORDER BY version DESC LIMIT 1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    const person = newId();
+    await f.pool.query(
+      "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+      [person, binding.station_id],
+    );
+    await f.pool.query(
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+      [newId(), binding.station_id, binding.user_id, person],
+    );
+    await expect(
+      f.phones.decide(a.token, f.campaignId, String(p.result.exclusion.id), {
+        operationId: newId(),
+        expectedVersion: 1,
+        decision: "approve",
+        reason: "Fictional stale identity review",
+      }),
+    ).rejects.toMatchObject({ code: "exclusion_stale" });
+  } finally {
+    await f.close();
+  }
+}, 30000);
