@@ -93,3 +93,35 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER held_release_state_guard BEFORE UPDATE OR DELETE ON held_release_state FOR EACH ROW EXECUTE FUNCTION guard_held_release_state();
+
+ALTER TABLE review_evidence_approval DROP CONSTRAINT review_evidence_approval_release_check;
+ALTER TABLE review_evidence_approval ADD CONSTRAINT review_evidence_approval_release_check CHECK(release IN ('review-evidence-v1','review-evidence-v2'));
+CREATE OR REPLACE FUNCTION guard_review_evidence_configuration() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.configuration IS DISTINCT FROM jsonb_build_object(
+   'release', NEW.configuration->'release', 'digest', NEW.configuration->'digest',
+   'revision', to_jsonb(NEW.revision),
+   'scope', jsonb_build_object('stationId',NEW.station_id::text,'environment',NEW.environment),
+   'activation', NEW.configuration->'activation')
+   OR NOT coalesce(NEW.configuration->>'release' IN ('review-evidence-v1','review-evidence-v2'),false)
+   OR NOT coalesce(NEW.configuration->>'digest' ~ '^[a-f0-9]{64}$',false)
+   OR jsonb_typeof(NEW.configuration->'digest') IS DISTINCT FROM 'string'
+   OR jsonb_typeof(NEW.configuration->'revision') IS DISTINCT FROM 'number'
+ THEN RAISE EXCEPTION 'invalid review configuration' USING ERRCODE='23514'; END IF;
+ IF NEW.configuration->'activation'->>'state' = 'inactive' THEN
+   IF NEW.configuration->'activation' IS DISTINCT FROM '{"state":"inactive","approvalReference":null,"activatedAt":null}'::jsonb THEN
+    RAISE EXCEPTION 'invalid inactive activation' USING ERRCODE='23514'; END IF;
+ ELSIF NEW.configuration->'activation'->>'state' = 'active' THEN
+   IF NEW.configuration->'activation' IS DISTINCT FROM jsonb_build_object('state','active','approvalReference',NEW.configuration->'activation'->'approvalReference','activatedAt',NEW.configuration->'activation'->'activatedAt')
+      OR jsonb_typeof(NEW.configuration->'activation'->'approvalReference') IS DISTINCT FROM 'string'
+      OR jsonb_typeof(NEW.configuration->'activation'->'activatedAt') IS DISTINCT FROM 'string'
+      OR NOT coalesce(NEW.configuration->'activation'->>'approvalReference' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',false)
+   THEN RAISE EXCEPTION 'invalid active activation' USING ERRCODE='23514'; END IF;
+   PERFORM (NEW.configuration->'activation'->>'activatedAt')::timestamptz;
+ ELSE RAISE EXCEPTION 'invalid activation state' USING ERRCODE='23514'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('review-evidence:'||NEW.station_id::text||':'||NEW.environment,0));
+ IF EXISTS(SELECT 1 FROM review_evidence_configuration WHERE station_id=NEW.station_id AND environment=NEW.environment AND revision>=NEW.revision) THEN
+  RAISE EXCEPTION 'configuration revision must increase' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;

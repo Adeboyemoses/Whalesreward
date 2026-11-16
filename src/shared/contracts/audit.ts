@@ -129,7 +129,7 @@ export const auditFieldValues = {
     "confirm",
   ]),
   reviewEvaluationId: auditId,
-  reviewPolicyRelease: z.literal("review-evidence-v1"),
+  reviewPolicyRelease: z.enum(["review-evidence-v1", "review-evidence-v2"]),
   reviewPolicyRevision: positive,
   reviewConclusions: unique(
     z.enum([
@@ -198,7 +198,7 @@ export const auditFieldValues = {
   settingsVersionId: auditId,
   approvalId: auditId,
   configurationId: auditId,
-  policyRelease: z.literal("review-evidence-v1"),
+  policyRelease: z.enum(["review-evidence-v1", "review-evidence-v2"]),
   policyRevision: positive,
   policyEnvironment: z.enum(["development", "test", "staging", "production"]),
   policyState: z.enum(["active", "inactive"]),
