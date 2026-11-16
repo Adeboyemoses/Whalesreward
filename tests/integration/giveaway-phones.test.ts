@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { it, expect } from "vitest";
 import { giveawayFixture } from "../helpers/giveaway-fixture";
 import { historicalSale } from "../helpers/cards-adversarial-fixture";
@@ -668,7 +669,7 @@ it("M4 one transaction with receipt validation and revision writes advances gene
 it("P-30 non-superuser cannot attach another campaign census or omit its check entries", async () => {
   const f = await giveawayFixture();
   const role = `phone_${newId().replaceAll("-", "")}`;
-  let client: Awaited<ReturnType<typeof f.pool.connect>> | undefined;
+  let client: PoolClient | undefined;
   try {
     await f.check();
     const check = (
