@@ -87,3 +87,7 @@ The printed apply command includes the selected release. Review its scope, diges
 P-26 dependency choice: the existing meter release remains pinned to v1 and is **unconfigured under v2**. This package does not relabel its artifact or provenance. A future compatible meter release needs separate review and authorization.
 
 Deactivation may append an inactive v2 revision even if installation/person prerequisites are no longer satisfied; stopping approvals must remain possible. Pending proposals remain giveaway blockers after deactivation or return to v1. Current authorized independent reviewers may reject them; historical successful receipts retain their original results after current authority checks. No switch clears holds, erases paper evidence or rewrites snapshots. Pilot retention keeps rejected and superseded sheet assets too.
+
+### Staged delivery approval — WHR-155
+
+Earl approved Option A on 16 November 2026. WHR-153 delivers the tested blocker/generation hooks while the v2 complete-install gate remains unconfigured. WO-core-12 (WHR-22) owns the actual initial-finalization, snapshot-revision and unchanged-reconciliation SR-06 tests. Staged READY is neither end-to-end giveaway verification nor authorization to activate v2. V1 remains active; this delivery changes no runtime configuration.
