@@ -148,12 +148,6 @@ async function replay(
     throw new AuthError("operation_conflict", 409);
   return old;
 }
-async function markCampaigns(db: pg.PoolClient, id: string) {
-  await db.query(
-    "UPDATE campaign SET reconciliation_required=true,version=version+1 WHERE id IN (SELECT s.campaign_id FROM giveaway_snapshot s JOIN giveaway_snapshot_source x ON x.snapshot_id=s.id WHERE x.purchase_id=$1)",
-    [id],
-  );
-}
 async function cancel(
   db: pg.PoolClient,
   p: Purchase,
@@ -189,7 +183,6 @@ async function cancel(
     [p.id, p.version, reason, p.status],
   );
   if (result.rowCount !== 1) throw new AuthError("version_conflict", 409);
-  await markCampaigns(db, p.id);
 }
 /** Accept only a fully validated candidate; an unrelated decision never waives a gate. */
 async function accept(
@@ -241,7 +234,6 @@ async function accept(
   if (changed.rowCount !== 1) throw new AuthError("version_conflict", 409);
   if (!blocked && r.id !== p.current_revision_id)
     await enqueueDuplicateDetection(db, p.id);
-  await markCampaigns(db, p.id);
 }
 async function dateRevision(
   db: pg.PoolClient,
@@ -1087,5 +1079,4 @@ export const releaseSaleMutations = {
   cancel,
   accept,
   dateRevision,
-  markCampaigns,
 };

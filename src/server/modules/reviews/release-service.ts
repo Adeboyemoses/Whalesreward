@@ -722,7 +722,6 @@ export function createHeldReleaseService({
         "UPDATE purchase SET version=version+1 WHERE id=$1 AND version=$2",
         [purchaseId, p.version],
       );
-      await sale.markCampaigns(db, purchaseId);
       const response = await project(db, row);
       await saveReceipt(
         db,
@@ -1150,7 +1149,6 @@ export function createHeldReleaseService({
         decision,
         extra,
       );
-      await sale.markCampaigns(db, purchaseId);
       const response = {
         proposal: await project(
           db,

@@ -1,3 +1,4 @@
+import { recordedReconciliationPolicy } from "../giveaway/policy";
 import { recordedTimingPolicy } from "../settings/policy";
 import { meterHealth } from "../reviews/meter-config";
 import {
@@ -78,6 +79,10 @@ export async function getHealth(
       const db = configurationPool ?? database();
       configuration.policies.timing = await transaction(db, async (client) => {
         await client.query("SET LOCAL statement_timeout='1000ms'");
+        configuration.policies.reconciliation =
+          (await recordedReconciliationPolicy(client))
+            ? "configured"
+            : "unconfigured";
         return (await recordedTimingPolicy(client))
           ? "configured"
           : "unconfigured";

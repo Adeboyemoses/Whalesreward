@@ -332,56 +332,35 @@ describe("customer recovery adversarial invariants", () => {
       let submitting: ReturnType<typeof service.submit> | undefined;
       try {
         await gate.query("BEGIN");
+        const replace = () =>
+          recoveryWrite(
+            f.pool,
+            config,
+            s.actor.token,
+            "replace",
+            s.c.id,
+            replaceBody(s, ch, candidate.code),
+            s.options,
+          );
+        // M4 serializes intake with all result-changing writers. Hold the first
+        // operation inside that boundary, then start its competitor behind it.
         if (order === "replacement-first") {
+          await gate.query("SELECT id FROM card_batch WHERE id=$1 FOR UPDATE", [
+            fixtureId(28),
+          ]);
+          replacing = replace();
+          await f.waitForLock("card_batch");
+          submitting = service.submit(seller.token, seller.original);
+          await f.waitForLock("security_state");
+        } else {
           await gate.query(
             "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
             [`original:${fixtureId(6)}:${seller.original.operationId}`],
           );
           submitting = service.submit(seller.token, seller.original);
           await f.waitForLock("pg_advisory_xact_lock");
-        } else
-          await gate.query("SELECT id FROM card_batch WHERE id=$1 FOR UPDATE", [
-            fixtureId(28),
-          ]);
-        replacing = recoveryWrite(
-          f.pool,
-          config,
-          s.actor.token,
-          "replace",
-          s.c.id,
-          replaceBody(s, ch, candidate.code),
-          s.options,
-        );
-        if (order === "replacement-first") await replacing;
-        else {
-          await f.waitForLock("card_batch");
-          submitting = service.submit(seller.token, seller.original);
-          // A correct non-key customer lock lets receipt resolution finish;
-          // the previous UPDATE lock waits here after taking the card FK lock.
-          let completed = false,
-            observed = false;
-          void submitting.then(
-            () => {
-              completed = true;
-            },
-            () => {
-              completed = true;
-            },
-          );
-          for (let attempt = 0; attempt < 200; attempt++) {
-            const wait = (
-              await f.pool.query(
-                "SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock' AND position('UPDATE purchase SET card_id' in query)>0",
-                [f.schema],
-              )
-            ).rowCount;
-            if (completed || wait) {
-              observed = true;
-              break;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 10));
-          }
-          expect(observed).toBe(true);
+          replacing = replace();
+          await f.waitForLock("security_state");
         }
         await gate.query("COMMIT");
         const [, uploaded] = await Promise.all([replacing, submitting!]);

@@ -41,6 +41,7 @@ import {
   type Purchase,
 } from "./repo";
 import { validatePhoto } from "./photo";
+import { createHash } from "node:crypto";
 import { settle } from "./settle";
 function parsed<T>(
   schema: { safeParse: (v: unknown) => { success: boolean; data?: T } },
@@ -152,7 +153,7 @@ export function createSyncService({
       const body = parsed(lookupSchema, input);
       const code = body.source === "code" ? body.code : body.qr;
       return transaction(pool, async (db) => {
-        const auth = await authority(db, token);
+        const auth = await authority(db, token, true, false);
         const card = (
           await db.query<{ id: string; state: string; status: string }>(
             `SELECT c.id,c.state,b.status FROM card c JOIN card_batch b ON b.id=c.batch_id WHERE c.code=$1 FOR SHARE OF c,b`,
@@ -432,25 +433,69 @@ export function createSyncService({
       });
       if (staged.done) return staged.done;
       const { p, asset } = staged;
+      const priorObservation = (
+        await pool.query<{ sealed_key: string }>(
+          `SELECT sealed_key FROM photo_receipt_observation WHERE asset_id=$1
+         AND observed_digest=$2 AND observed_bytes=$3 ORDER BY receipt_at,id LIMIT 1`,
+          [body.uploadId, p!.expected_photo_digest, p!.expected_photo_bytes],
+        )
+      ).rows[0];
       let bytes: Buffer;
       try {
-        bytes = await storage.read(asset!.staging_key, SYNC_LIMITS.maxBytes);
+        bytes = await storage.read(
+          priorObservation?.sealed_key ?? asset!.staging_key,
+          SYNC_LIMITS.maxBytes,
+        );
       } catch (e) {
         if (e instanceof StorageSizeError)
           throw new SyncError("photo_invalid", 422, "size_exceeded");
         throw new SyncError("storage_unavailable", 503);
       }
+      const digest = createHash("sha256").update(bytes).digest("hex");
+      const finalKey = `final/${newId()}/${newId()}`;
+      try {
+        await storage.writeFinal(finalKey, bytes);
+        const sealed = await storage.read(finalKey, SYNC_LIMITS.maxBytes);
+        if (!sealed.equals(bytes)) throw new Error("seal verification failed");
+      } catch {
+        throw new SyncError("storage_unavailable", 503);
+      }
+      const observation = await transaction(pool, async (db) => {
+        const auth = await authority(db, token);
+        await ownedPurchase(db, purchaseId, auth.attendantId);
+        const row = await db.query<{ id: string; sealed_key: string }>(
+          `INSERT INTO photo_receipt_observation(id,station_id,purchase_id,asset_id,
+            declared_digest,observed_digest,observed_bytes,sealed_key,receipt_at)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,clock_timestamp())
+           ON CONFLICT(asset_id,observed_digest,observed_bytes) DO NOTHING
+           RETURNING id,sealed_key`,
+          [
+            newId(),
+            p!.station_id,
+            purchaseId,
+            body.uploadId,
+            p!.expected_photo_digest,
+            digest,
+            bytes.length,
+            finalKey,
+          ],
+        );
+        if (row.rows[0]) return row.rows[0];
+        return (
+          await db.query<{ id: string; sealed_key: string }>(
+            `SELECT id,sealed_key FROM photo_receipt_observation
+           WHERE asset_id=$1 AND observed_digest=$2 AND observed_bytes=$3`,
+            [body.uploadId, digest, bytes.length],
+          )
+        ).rows[0]!;
+      });
+      // Validate the exact immutable seal selected by the durable observation.
+      bytes = await storage.read(observation.sealed_key, SYNC_LIMITS.maxBytes);
       const photo = await validatePhoto(
         bytes,
         p!.expected_photo_digest,
         Number(p!.expected_photo_bytes),
       );
-      const finalKey = `final/${newId()}/${newId()}`;
-      try {
-        await storage.writeFinal(finalKey, bytes);
-      } catch {
-        throw new SyncError("storage_unavailable", 503);
-      }
       // No DB lock is held during storage. Revoke/disable wins before this authority check.
       return transaction(pool, async (db) => {
         const auth = await authority(db, token);
@@ -475,7 +520,7 @@ export function createSyncService({
           [
             body.uploadId,
             purchaseId,
-            finalKey,
+            observation.sealed_key,
             photo!.digest,
             photo!.bytes,
             photo!.width,
@@ -483,6 +528,13 @@ export function createSyncService({
           ],
         );
         if (validated.rowCount !== 1) throw new SyncError("stale_version", 409);
+        await db.query(
+          `INSERT INTO photo_receipt_fact(asset_id,observation_id,purchase_id,receipt_at)
+           SELECT $1,id,purchase_id,receipt_at FROM photo_receipt_observation
+           WHERE id=$2 AND observed_digest=$3 AND observed_bytes=$4
+           ON CONFLICT(asset_id) DO NOTHING`,
+          [body.uploadId, observation.id, photo!.digest, photo!.bytes],
+        );
         await settle(db, current, auth.userId, body.operationId, body.uploadId);
         await db.query(
           "UPDATE sync_finalize_operation SET completed_at=clock_timestamp() WHERE purchase_id=$1 AND operation_id=$2 AND completed_at IS NULL",

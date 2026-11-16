@@ -9,8 +9,11 @@ export async function authority(
   db: pg.PoolClient,
   token: string | undefined,
   write = true,
+  lockGeneration = true,
 ) {
   if (!token) throw new AuthError("unauthenticated", 401);
+  if (lockGeneration)
+    await db.query("SELECT id FROM security_state WHERE id=true FOR SHARE");
   const session = await requireSession(db, digest(token));
   const r = (
     await db.query<{ id: string; expired: boolean }>(
@@ -20,6 +23,16 @@ export async function authority(
   ).rows[0];
   if (!r) throw new AuthError("unauthenticated", 401);
   if (write && r.expired) throw new SyncError("online_sign_in_required", 403);
+  if (write && lockGeneration) {
+    await db.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('reporting:'||p.station_id::text,0)) FROM capture_context c JOIN assignment a ON a.id=c.assignment_id JOIN pump p ON p.id=a.pump_id WHERE c.id=$1",
+      [session.capture_context_id],
+    );
+    await db.query(
+      "SELECT r.station_id FROM station_reporting_state r JOIN pump p ON p.station_id=r.station_id JOIN assignment a ON a.pump_id=p.id JOIN capture_context c ON c.assignment_id=a.id WHERE c.id=$1 FOR UPDATE OF r",
+      [session.capture_context_id],
+    );
+  }
   return {
     attendantId: r.id,
     userId: session.user_id,

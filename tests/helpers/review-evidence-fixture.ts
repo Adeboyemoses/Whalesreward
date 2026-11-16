@@ -99,6 +99,17 @@ export async function resetReviewFixture(pool: pg.Pool) {
     await db.query("LOCK TABLE station IN ACCESS EXCLUSIVE MODE");
 
     const releaseTables = [
+      "photo_receipt_observation",
+      "photo_receipt_fact",
+      "giveaway_manager_designation",
+      "giveaway_phone_census",
+      "giveaway_phone_exclusion",
+      "giveaway_phone_exclusion_transition",
+      "giveaway_phone_check",
+      "giveaway_reconciliation",
+      "giveaway_preview",
+      "giveaway_preview_consumption",
+      "station_reconciliation_policy",
       "held_release_person",
       "held_release_person_binding",
       "held_release_sheet",
