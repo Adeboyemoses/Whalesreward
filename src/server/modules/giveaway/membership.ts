@@ -24,6 +24,19 @@ export function membership(f: MembershipFacts, c: CampaignBounds) {
     start =
       BigInt(c.start) > BigInt(c.launch) ? BigInt(c.start) : BigInt(c.launch),
     end = BigInt(c.cutoff);
+  if (
+    f.conclusions.some(
+      (v) =>
+        typeof v !== "object" ||
+        v === null ||
+        typeof v.inside !== "boolean" ||
+        !Array.isArray(v.campaignIds) ||
+        !v.campaignIds.every((id) => typeof id === "string") ||
+        !Array.isArray(v.configurationIds) ||
+        !v.configurationIds.every((id) => typeof id === "string"),
+    )
+  )
+    return "timing_unresolved" as const;
   const bound = f.conclusions.filter(
     (v) =>
       v.campaignIds.includes(c.id) &&

@@ -9,7 +9,7 @@ import {
 import { newId } from "../../src/server/lib/ids";
 const mutations = {
   cancellation: `UPDATE purchase SET status='cancelled',cancellation_reason='Fictional cancellation',version=version+1 WHERE id=$1`,
-  hold: `INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) SELECT gen_random_uuid(),id,'price','open',current_revision_id,'fictional_review',1 FROM purchase WHERE id=$1`,
+  hold: `UPDATE purchase_hold SET state='resolved',resolved_by=(SELECT id FROM admin ORDER BY id LIMIT 1),resolution_operation_id=gen_random_uuid(),resolution_reason='Fictional review',resolved_at=clock_timestamp(),resolution_revision_id=opened_revision_id,version=version+1 WHERE purchase_id=$1`,
   capture_block: `INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES(gen_random_uuid(),$1,'campaign_uncertain','fixture',clock_timestamp(),1)`,
   duplicate: `INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) SELECT gen_random_uuid(),least($1::uuid,id),greatest($1::uuid,id),'validated_photo','open',1 FROM purchase WHERE id<>$1 LIMIT 1`,
   customer_display: `UPDATE customer SET name='Amina Bello',version=version+1 WHERE id=(SELECT customer_id FROM purchase WHERE id=$1)`,
@@ -20,7 +20,10 @@ for (const [name, sql] of Object.entries(mutations))
     const f = await giveawayFixture();
     let writer;
     try {
-      const sale = await historicalSale(f.pool, {});
+      const sale = await historicalSale(
+        f.pool,
+        name === "hold" ? { state: "held" } : {},
+      );
       await historicalSale(f.pool, { amount: "3000000" });
       await f.check();
       const prepared = await prepareGiveaway(
@@ -115,5 +118,80 @@ it("I-46 every durable M3 source table participates in the shared reporting-gene
     for (const table of tables) expect(rows).toContain(table);
   } finally {
     await f.close();
+  }
+}, 30000);
+it("I-46 actual M3 duplicate clear and cancellation services invalidate reviewed snapshot guards", async () => {
+  const { createReviewsService } =
+    await import("../../src/server/modules/reviews/service");
+  const { evidenceStore } =
+    await import("../helpers/corrections-adversarial-fixture");
+  for (const outcome of ["keep_both", "cancel"] as const) {
+    const f = await giveawayFixture();
+    try {
+      const a = await historicalSale(f.pool, {}),
+        b = await historicalSale(f.pool, {}),
+        flag = newId();
+      await f.pool.query(
+        "INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) VALUES($1,$2,$3,'validated_photo','open',1)",
+        [flag, ...[a.id, b.id].sort()],
+      );
+      await f.check();
+      const prepared = await prepareGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          kind: "initial",
+          reason: "Fictional reviewed duplicate",
+          ...(await f.guard()),
+        },
+        config,
+      );
+      const p = z
+          .object({ id: z.string(), contentDigest: z.string() })
+          .parse(prepared.data),
+        guard = await f.guard();
+      const purchases = (
+        await f.pool.query(
+          "SELECT id,version,current_revision_id FROM purchase WHERE id=ANY($1::uuid[]) ORDER BY id",
+          [[a.id, b.id]],
+        )
+      ).rows.map((r) => ({
+        id: r.id,
+        expectedVersion: r.version,
+        expectedRevisionId: r.current_revision_id,
+      }));
+      await createReviewsService({
+        pool: f.pool,
+        storage: evidenceStore().storage,
+      }).decideDuplicate(f.token, flag, {
+        operationId: newId(),
+        expectedFlagVersion: 1,
+        purchases,
+        decision:
+          outcome === "cancel"
+            ? { outcome, cancelPurchaseId: a.id }
+            : { outcome },
+        reason: "Fictional duplicate review",
+      });
+      await expect(
+        confirmGiveaway(
+          f.pool,
+          f.token,
+          f.campaignId,
+          {
+            operationId: newId(),
+            previewId: p.id,
+            contentDigest: p.contentDigest,
+            ...guard,
+          },
+          undefined,
+          config,
+        ),
+      ).rejects.toMatchObject({ code: "version_conflict" });
+    } finally {
+      await f.close();
+    }
   }
 }, 30000);
