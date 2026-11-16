@@ -150,8 +150,11 @@ BEGIN
  LEFT JOIN held_release_transition t ON t.proposal_id=p.id AND t.version=s.version AND t.state='approved'
  WHERE p.purchase_id=purchase AND p.outcome='confirm' AND s.state='approved' LOOP
   a:=r.content->'attestation';
+  IF NOT coalesce((r.provenance->'evaluation'->'originalInterval') ?& ARRAY['L','U'],false) THEN RETURN false; END IF;
   IF a IS NULL OR NOT (a ?& ARRAY['decisionId','version','fromMicros','throughMicros','predicates','sourceIds'])
-    OR jsonb_array_length(a->'sourceIds')=0 OR jsonb_array_length(a->'predicates')=0 THEN RETURN false; END IF;
+    OR jsonb_array_length(a->'sourceIds')=0 OR jsonb_array_length(a->'predicates')=0
+    OR NOT coalesce(a->>'decisionId' ~ '^[a-f0-9-]{36}$',false) OR (a->>'version')::integer<1 THEN RETURN false; END IF;
+  IF EXISTS(SELECT 1 FROM jsonb_array_elements_text(a->'sourceIds') s(id) WHERE NOT coalesce(id ~ '^[a-f0-9-]{36}$',false)) THEN RETURN false; END IF;
   l:=(a->>'fromMicros')::numeric; u:=(a->>'throughMicros')::numeric;
   IF l>u OR l<(r.provenance->'evaluation'->'originalInterval'->>'L')::numeric OR u>(r.provenance->'evaluation'->'originalInterval'->>'U')::numeric THEN RETURN false; END IF;
   lo:=greatest(lo,l); hi:=least(hi,u); IF lo>hi THEN RETURN false; END IF;
