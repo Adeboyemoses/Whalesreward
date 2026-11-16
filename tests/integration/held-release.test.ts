@@ -109,6 +109,19 @@ describe("P-29 real-Postgres identity and retained history", () => {
       client.release();
     }
   });
+  it("SR-08 non-superuser cannot truncate retained person-binding history", async () => {
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`SET LOCAL ROLE ${role}`);
+      await expect(
+        client.query("TRUNCATE held_release_person_binding"),
+      ).rejects.toThrow();
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  });
 });
 
 describe("P-29 structural boundary admission", () => {
