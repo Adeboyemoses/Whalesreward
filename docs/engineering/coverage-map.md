@@ -255,7 +255,7 @@ Earl accepted WO-core-2 on 4 November 2026. Database constraints and pure helper
 | Admin 8 · Attendants and pump assignment | D01 D02 D04 D03 F04 F09 F10 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
 | Admin 9 · Station pumps | F01 F02 F03 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
 | Admin 10 · Product prices | F05 F06 F07 F08 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
-| Admin 11 · Leaderboards and finalization | E01 E02 E04 E03 | WO-app-11 Stage 2a (WHR-23/WHR-172), WO-spec-4 | tests/design-parity/leaderboards/REPORT.md (14 native captures, 1440/390/360; adaptations and height limit documented) | Stage 2a on-staging; Stage 2b checklist forms/per-check rows pending; Earl M4 smoke pending |
+| Admin 11 · Leaderboards and finalization | E01 E02 E04 E03 | WO-app-11, WO-spec-4 (spec only) |  | todo |
 | Admin 12 · Reports | E05 E06 E07 | WO-app-12 (WHR-25), WO-spec-4 | tests/design-parity/reports/REPORT.md (1440/390 px; runtime-data/contract differences documented) | on-staging; Earl M4 smoke pending |
 | Admin 13 · Audit history | G01 G02 G03 G04 G05 | WO-app-10 | | todo |
 | Admin 14 · Settings | B07 T01 T03 T02 T04 | WO-app-13, WO-spec-4 (spec only) |  | todo |
@@ -844,18 +844,3 @@ EM combined-head typecheck/lint/build, 885 unit and serial browser 384/four exis
 | Test isolation | `tests/settings/test.ts`: local-only migrated schema and real Next worker, environment restoration, schema cleanup and unchanged public campaign assertions | on-staging supporting fixture; no production code |
 
 EM typecheck/lint/build and 893 unit tests PASS; focused desktop/phone 40 and fidelity 1 PASS. CI: 1,154 PostgreSQL, timezone 5+5, browser 402/four existing skips/zero retries and storage 1 PASS. Complete local browser: 399 PASS/four skips; tracked WHR-123 and two native restart sandbox failures, all covered by green native CI. WHR-140/142 remain separate inherited fixture follow-ups. Smoke: `docs/qa/smoke-2026-11-16-campaign-timing.md`.
-
-## WO-app-11 Stage 2a leaderboard and giveaway UI (WHR-23 / WHR-172)
-
-[Feature PR #157](https://github.com/Adeboyemoses/Whalesreward/pull/157) merged green at `23e03b8`, head `8cd8923`, reviewed source `e230cdf`. Stage 2a is on staging; Earl's smoke is pending. Stage 2b manager designation, phone census, unavailable-phone proposals/approval and granular per-check rows remain pending. The current grouped endpoints and server authorization are unchanged.
-
-| Invariants | Named evidence | Status |
-|---|---|---|
-| I-07, I-09, I-11 | `leaderboards-real.spec.ts`: leaderboard-only viewer cannot inspect purchases/finalize; revoked authority clears pending preview; `src/client/admin-session.test.ts` session-epoch response guards | on-staging client permission boundaries; server authority unchanged |
-| I-40, I-41, I-46 | `leaderboards-real.spec.ts`: same-operation uncertain retry across navigation, owned preview/explicit save, immutable history after identity/accepted-source changes, unchanged reconciliation and stale history cursor recovery; `leaderboards-protocol.spec.ts`: real HTTP replay and byte-equal earlier sources | on-staging confirmation/revision client; existing server writes unchanged |
-| I-42, I-43, I-44 | `leaderboards-real.spec.ts`: exact spend, shared ranks, category paging, changed generations and separately labelled configured all-time query; adapter tests assert exact outgoing query fields | on-staging live ranking UI; no tie breaker or mixed-unit total |
-| I-45 | `leaderboards-real.spec.ts`: unset campaign, grouped actual blockers and honest unavailable checklist; native E02 captures show exact server timing/deadlines | on-staging grouped summary only; no fabricated per-check status |
-| I-49 | Authority-loss case clears protected pending state; adapter/session tests fence delayed responses; existing no-store and memory-only admin boundaries retained | on-staging scoped client behavior; no new persistent cache |
-| E01, E02, E04, E03 | `tests/design-parity/leaderboards/REPORT.md`: independent comparison of 14 captures at 1440/390/360; resolved E02 overflow and E03 native height limit disclosed | adapted Stage 2a parity on-staging; checklist forms/per-check rows remain Stage 2b |
-
-Verification: EM typecheck/lint/build, 981 unit and real HTTP protocol 1 PASS. Final CI: 1,445 PostgreSQL, timezone 5+5, browser 423 passed/three retry passes/four existing skips, storage 1 PASS. All 24 new desktop/attendant Stage 2a project cases passed. Existing fixture issues WHR-86/142/169 remain separate. WHR-173 narrows overstated interaction-coverage prose: width/control-height geometry is automated; keyboard/focus and horizontal table-scroll interactions remain manual acceptance checks. [Smoke](../qa/smoke-2026-11-16-giveaway-stage-2a.md).
