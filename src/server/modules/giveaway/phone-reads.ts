@@ -47,6 +47,11 @@ export async function readPhones(
   input: unknown = {},
 ) {
   const p = page.parse(input);
+  if (
+    ["exclusion", "check"].includes(action) &&
+    Object.keys(input as Record<string, unknown>).length
+  )
+    throw new AuthError("invalid_request", 400);
   return transaction(pool, async (db) => {
     await db.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
     await db.query("SELECT id FROM security_state WHERE id=true FOR SHARE");

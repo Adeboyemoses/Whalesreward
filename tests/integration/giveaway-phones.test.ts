@@ -440,3 +440,121 @@ it("P-30 changed incomplete purchase atomically supersedes a pending exact-sourc
     await f.close();
   }
 }, 30000);
+it("P-30 multiple phones retain every personal partition including disabled leavers", async () => {
+  const f = await giveawayFixture();
+  try {
+    const ids = (
+      await f.pool.query(
+        "SELECT DISTINCT attendant_id FROM assignment ORDER BY attendant_id",
+      )
+    ).rows.map((r) => r.attendant_id);
+    await f.pool.query(
+      "UPDATE auth_user SET enabled=false,auth_version=auth_version+1 WHERE id=(SELECT user_id FROM attendant WHERE id=$1)",
+      [ids[0]],
+    );
+    await expect(
+      f.phones.census(f.token, f.campaignId, {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional omitted leaver",
+        ...(await f.guard()),
+        expectedCensusVersion: 1,
+        phones: [
+          { label: "Fictional replacement", attendantIds: ids.slice(1) },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "census_incomplete" });
+    const result = await f.phones.census(f.token, f.campaignId, {
+      operationId: newId(),
+      kind: "initial",
+      reason: "Fictional complete physical census",
+      ...(await f.guard()),
+      expectedCensusVersion: 1,
+      phones: [
+        { label: "Fictional original", attendantIds: ids },
+        { label: "Fictional replacement", attendantIds: [ids[0]] },
+      ],
+    });
+    expect(result.census.version).toBe(2);
+    const row = (
+      await f.pool.query(
+        "SELECT content FROM giveaway_phone_census WHERE id=$1",
+        [result.census.id],
+      )
+    ).rows[0];
+    await expect(
+      f.phones.check(f.token, f.campaignId, {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional missed replacement phone",
+        ...(await f.guard()),
+        expectedCensusVersion: 2,
+        entries: [
+          {
+            phoneId: row.content.phones[0].id,
+            expectedPhoneVersion: 1,
+            result: "empty",
+            exclusionId: null,
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "census_incomplete" });
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 recovered phone needs a fresh census and keeps approved exclusion history", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f);
+    await f.phones.decide(
+      a.token,
+      f.campaignId,
+      String(p.result.exclusion.id),
+      {
+        operationId: newId(),
+        expectedVersion: 1,
+        decision: "approve",
+        reason: "Fictional unavailable approval",
+      },
+    );
+    await f.check();
+    expect(
+      (
+        await f.pool.query(
+          "SELECT state FROM giveaway_phone_exclusion_transition WHERE exclusion_id=$1 ORDER BY version DESC LIMIT 1",
+          [p.result.exclusion.id],
+        )
+      ).rows[0].state,
+    ).toBe("approved");
+    expect(
+      (await readReadiness(f.pool, f.token, f.campaignId)).phoneCheck.state,
+    ).toBe("complete");
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 supersession audit links both proposal and actual manager-change event", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f);
+    const change = await f.phones.designate(f.token, f.campaignId, {
+      operationId: newId(),
+      expectedVersion: (await f.guard()).expectedVersion,
+      managerAdminId: a.adminId,
+      reason: "Fictional replacement designation",
+    });
+    const event = (
+      await f.pool.query(
+        "SELECT related_event_ids FROM audit_event WHERE action='giveaway_phone_unavailable_superseded' AND target_id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    expect(event.related_event_ids).toContain(change.auditEventId);
+    expect(event.related_event_ids).toContain(p.result.exclusion.auditEventId);
+  } finally {
+    await f.close();
+  }
+}, 30000);
