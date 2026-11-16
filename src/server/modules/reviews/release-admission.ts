@@ -23,8 +23,16 @@ export async function classifyReleaseAdmission(
   rules.completeVersions(f.prices);
   rules.completeVersions(f.assignments, "assignment_version");
   rules.completeVersions(f.settings, "timing_history_version");
+  const orderedTiming = f.settings.filter(
+    (s) => BigInt(trustedMicros(s.effective_from)) <= BigInt(I.U),
+  );
+  const timingAnchor = orderedTiming.findLastIndex(
+    (s) => BigInt(trustedMicros(s.effective_from)) <= BigInt(I.L),
+  );
+  if (timingAnchor < 0) return insufficient();
+  const applicableTiming = orderedTiming.slice(timingAnchor);
   if (
-    f.settings.some(
+    applicableTiming.some(
       (s) =>
         s.timing_history_complete !== true ||
         !s.campaign_id ||
@@ -70,7 +78,30 @@ export async function classifyReleaseAdmission(
     return t > BigInt(I.L) && t <= BigInt(I.U);
   };
   let admitted = false;
-  const boundaries: string[] = [];
+  const boundaries: {
+    kind: string;
+    sourceId: string;
+    sourceVersion: string;
+    atMicros: string;
+    changeAtMicros: string;
+  }[] = [];
+  const addBoundary = (
+    kind: string,
+    sourceId: string,
+    at: unknown,
+    changeAt?: string,
+  ) => {
+    const source = f.sources.find((s) => s.id === sourceId);
+    if (!source) return insufficient();
+    const atMicros = trustedMicros(at);
+    boundaries.push({
+      kind,
+      sourceId,
+      sourceVersion: source.version,
+      atMicros,
+      changeAtMicros: changeAt ?? atMicros,
+    });
+  };
   const conclusions: TypedConclusion[] = [];
   switch (body.target.kind) {
     case "price": {
@@ -82,7 +113,7 @@ export async function classifyReleaseAdmission(
         const p = f.prices[n]!,
           previous = f.prices[n - 1]!;
         if (boundary(p.effective_from) && p.rate_kobo !== previous.rate_kobo)
-          boundaries.push(p.id);
+          addBoundary("price_activation", p.id, p.effective_from);
       }
       admitted = boundaries.length > 0;
       if (body.outcome === "confirm") conclusions.push(rules.price(f, J));
@@ -92,13 +123,32 @@ export async function classifyReleaseAdmission(
       if (!f.card?.retired_at || f.card.retirement_reason !== "replaced")
         return insufficient();
       admitted = boundary(f.card.retired_at);
-      boundaries.push(f.card.id);
+      if (admitted)
+        addBoundary("card_replacement", f.card.id, f.card.retired_at);
       if (body.outcome === "confirm")
         conclusions.push(rules.card(f, J, "confirm_earlier"));
       break;
     case "date":
       admitted = intervalDay(I.L, I.U) === null;
-      boundaries.push(f.context.id);
+      if (admitted) {
+        const day = 86400000000n,
+          offset = 3600000000n;
+        for (
+          let midnight = ((BigInt(I.L) + offset) / day + 1n) * day - offset;
+          midnight <= BigInt(I.U);
+          midnight += day
+        ) {
+          const source = f.sources.find((s) => s.id === f.context.id);
+          if (!source) return insufficient();
+          boundaries.push({
+            kind: "lagos_midnight",
+            sourceId: f.context.id,
+            sourceVersion: source.version,
+            atMicros: String(midnight),
+            changeAtMicros: String(midnight),
+          });
+        }
+      }
       if (body.outcome === "confirm")
         conclusions.push(rules.date(f, J, intervalDay(J.L, J.U) ?? undefined));
       break;
@@ -112,11 +162,49 @@ export async function classifyReleaseAdmission(
         (kinds.has("capture_authorization_unresolved") &&
           authorization === null) ||
         (kinds.has("capture_time_unresolved") && campaign === null);
-      boundaries.push(
-        ...f.assignments
-          .filter((a) => boundary(a.effective_from))
-          .map((a) => a.id),
-      );
+      if (kinds.has("capture_authorization_unresolved")) {
+        const assignment = f.assignment;
+        if (boundary(assignment.effective_from))
+          addBoundary(
+            "assignment_started",
+            assignment.id,
+            assignment.effective_from,
+          );
+        if (assignment.effective_until && boundary(assignment.effective_until))
+          addBoundary(
+            "assignment_ended",
+            assignment.id,
+            assignment.effective_until,
+          );
+        if (f.context.revoked_at && boundary(f.context.revoked_at))
+          addBoundary("context_revoked", f.context.id, f.context.revoked_at);
+      }
+      if (kinds.has("capture_time_unresolved")) {
+        for (const settings of applicableTiming) {
+          if (boundary(settings.effective_from))
+            addBoundary(
+              "campaign_settings_activated",
+              settings.id,
+              settings.effective_from,
+            );
+          for (const [field, kind] of [
+            ["launch_at", "campaign_launched"],
+            ["purchase_start", "campaign_started"],
+          ] as const) {
+            if (settings[field] && boundary(settings[field]))
+              addBoundary(kind, settings.id, settings[field]);
+          }
+          const cutoff = BigInt(trustedMicros(settings.purchase_cutoff));
+          if (cutoff >= BigInt(I.L) && cutoff < BigInt(I.U))
+            addBoundary(
+              "campaign_cutoff",
+              settings.id,
+              settings.purchase_cutoff,
+              String(cutoff + 1n),
+            );
+        }
+      }
+      if (admitted && !boundaries.length) return insufficient();
       if (body.outcome === "confirm")
         for (const b of body.target.blocks) {
           const c =

@@ -26,6 +26,7 @@ function invalid(): never {
 export function releaseConsistency(
   original: { L: string; U: string },
   applied: readonly AppliedAttestation[],
+  purchaseId?: string,
 ) {
   let lower: bigint, upper: bigint;
   try {
@@ -47,9 +48,17 @@ export function releaseConsistency(
       a.sourceIds.some(
         (id) =>
           !id ||
-          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
             id,
-          ),
+          ) &&
+            !(
+              purchaseId &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                purchaseId,
+              ) &&
+              id === `${purchaseId}:lookup` &&
+              a.sourceIds.includes(purchaseId)
+            )),
       ) ||
       !a.predicates.length
     )

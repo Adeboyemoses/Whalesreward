@@ -32,6 +32,7 @@ export async function assertAppliedReleaseConsistency(
   releaseConsistency(
     original,
     rows.map((r) => r.attestation!),
+    purchaseId,
   );
 }
 /** Union these purchase IDs with ordinary M4 blockers; never sum duplicate entries. */

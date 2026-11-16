@@ -154,7 +154,7 @@ BEGIN
   IF a IS NULL OR NOT (a ?& ARRAY['decisionId','version','fromMicros','throughMicros','predicates','sourceIds'])
     OR jsonb_array_length(a->'sourceIds')=0 OR jsonb_array_length(a->'predicates')=0
     OR NOT coalesce(a->>'decisionId' ~ '^[a-f0-9-]{36}$',false) OR (a->>'version')::integer<1 THEN RETURN false; END IF;
-  IF EXISTS(SELECT 1 FROM jsonb_array_elements_text(a->'sourceIds') s(id) WHERE NOT coalesce(id ~ '^[a-f0-9-]{36}$',false)) THEN RETURN false; END IF;
+  IF EXISTS(SELECT 1 FROM jsonb_array_elements_text(a->'sourceIds') s(id) WHERE NOT coalesce(id ~ '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' OR (id=purchase::text||':lookup' AND (a->'sourceIds') ? purchase::text),false)) THEN RETURN false; END IF;
   l:=(a->>'fromMicros')::numeric; u:=(a->>'throughMicros')::numeric;
   IF l>u OR l<(r.provenance->'evaluation'->'originalInterval'->>'L')::numeric OR u>(r.provenance->'evaluation'->'originalInterval'->>'U')::numeric THEN RETURN false; END IF;
   lo:=greatest(lo,l); hi:=least(hi,u); IF lo>hi THEN RETURN false; END IF;

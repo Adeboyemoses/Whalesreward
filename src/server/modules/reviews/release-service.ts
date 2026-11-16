@@ -163,7 +163,7 @@ async function independent(
 ) {
   const users = (
     await db.query<{ id: string }>(
-      `SELECT a.user_id id FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id WHERE p.id=$1 AND p.station_id=$2 UNION SELECT u.id FROM correction_request c JOIN auth_user u ON u.id IN(c.recovery_executor_id,c.recovery_authorizing_admin_id) JOIN purchase p ON p.id=c.purchase_id WHERE c.purchase_id=$1 AND p.station_id=$2 UNION SELECT a.user_id id FROM purchase p JOIN recovery_grant g ON g.originating_attendant_id=p.originating_attendant_id JOIN recovery_grant_item i ON i.grant_id=g.id AND i.operation_id=p.operation_id JOIN admin a ON a.id=g.admin_id WHERE p.id=$1 AND p.station_id=$2`,
+      `SELECT a.user_id id FROM purchase p JOIN attendant a ON a.id=p.originating_attendant_id WHERE p.id=$1 AND p.station_id=$2 UNION SELECT a.user_id FROM correction_request c JOIN admin a ON a.id IN(c.recovery_executor_id,c.recovery_authorizing_admin_id) JOIN purchase p ON p.id=c.purchase_id WHERE c.purchase_id=$1 AND p.station_id=$2 UNION SELECT a.user_id id FROM purchase p JOIN recovery_grant g ON g.originating_attendant_id=p.originating_attendant_id JOIN recovery_grant_item i ON i.grant_id=g.id AND i.operation_id=p.operation_id JOIN admin a ON a.id=g.admin_id WHERE p.id=$1 AND p.station_id=$2`,
       [purchaseId, stationId],
     )
   ).rows.map((r) => r.id);
@@ -458,7 +458,11 @@ async function consistency(
   // Cancellation supplies no affirmative conclusion. Check its range against retained
   // conclusions without inventing a date or letting it contradict an existing day.
   if (outcome === "cancel") {
-    const retained = releaseConsistency(e.originalInterval, applied);
+    const retained = releaseConsistency(
+      e.originalInterval,
+      applied,
+      purchaseId,
+    );
     const lower =
       BigInt(retained.fromMicros) > BigInt(current.fromMicros)
         ? retained.fromMicros
@@ -474,10 +478,11 @@ async function consistency(
       certificate: { ...retained, fromMicros: lower, throughMicros: upper },
     };
   }
-  const certificate = releaseConsistency(e.originalInterval, [
-    ...applied,
-    current,
-  ]);
+  const certificate = releaseConsistency(
+    e.originalInterval,
+    [...applied, current],
+    purchaseId,
+  );
   return { applied, current, certificate };
 }
 async function proposerCurrent(db: pg.PoolClient, p: ProposalRow) {
@@ -897,6 +902,10 @@ export function createHeldReleaseService({
         await proposerCurrent(db, r);
         const before = candidate.values;
         const saleDecisionId = newId();
+        const ordinaryReason =
+          r.outcome === "cancel"
+            ? "Held sale cancelled after independent review"
+            : "Held sale confirmed after independent review";
         if (r.outcome === "cancel")
           await sale.cancel(
             db,
@@ -904,7 +913,7 @@ export function createHeldReleaseService({
             a.user_id,
             a.admin_id,
             saleDecisionId,
-            body.reason,
+            ordinaryReason,
             candidate,
             body.operationId,
           );
@@ -922,7 +931,7 @@ export function createHeldReleaseService({
               body.operationId,
               hash,
               saleDecisionId,
-              body.reason,
+              ordinaryReason,
             );
           }
           if (t.kind === "capture")
@@ -938,14 +947,14 @@ export function createHeldReleaseService({
                 purchaseId,
                 a.admin_id,
                 body.operationId,
-                body.reason,
+                ordinaryReason,
                 candidate.id,
                 t.expectedHoldVersion,
               ],
             );
             if (changed.rowCount !== 1) return fail("version_conflict", 409);
           }
-          await sale.accept(db, p, candidate, a.user_id, body.reason);
+          await sale.accept(db, p, candidate, a.user_id, ordinaryReason);
         }
         const current = await sale.purchase(db, purchaseId, a.stationId);
         const holds = z
@@ -1033,7 +1042,7 @@ export function createHeldReleaseService({
           kind: "held_release",
           outcome: r.outcome,
           actor,
-          reason: body.reason,
+          reason: ordinaryReason,
           decidedAt: now.toISOString(),
           auditEventId: auditId,
           appliedPurchaseVersion: current.version,
@@ -1063,7 +1072,7 @@ export function createHeldReleaseService({
             JSON.stringify(before),
             JSON.stringify(candidate.values),
             r.content.meterAssetId,
-            body.reason,
+            ordinaryReason,
             now,
             auditId,
             JSON.stringify(result),
