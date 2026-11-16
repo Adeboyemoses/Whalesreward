@@ -46,9 +46,9 @@ CREATE TABLE giveaway_phone_check (
 );
 ALTER TABLE campaign ADD COLUMN manager_designation_id uuid REFERENCES giveaway_manager_designation(id),
  ADD COLUMN phone_census_id uuid REFERENCES giveaway_phone_census(id),
- ADD COLUMN phone_check_id uuid REFERENCES giveaway_phone_check(id),
- ADD COLUMN reconciled_data_version bigint CHECK(reconciled_data_version>=0),
- ADD COLUMN latest_snapshot_id uuid REFERENCES giveaway_snapshot(id);
+ ADD COLUMN phone_check_id uuid REFERENCES giveaway_phone_check(id);
+DROP TRIGGER guard_campaign_immutable ON campaign;
+CREATE TRIGGER guard_campaign_immutable BEFORE UPDATE OR DELETE ON campaign FOR EACH ROW EXECUTE FUNCTION guard_immutable_columns('name','version','reconciliation_required','current_timing_version_id','latest_snapshot_id','reconciled_data_version','manager_designation_id','phone_census_id','phone_check_id');
 CREATE TABLE giveaway_reconciliation (
  id uuid PRIMARY KEY, campaign_id uuid NOT NULL REFERENCES campaign(id),
  station_id uuid NOT NULL REFERENCES station(id),

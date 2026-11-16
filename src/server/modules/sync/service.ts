@@ -433,9 +433,19 @@ export function createSyncService({
       });
       if (staged.done) return staged.done;
       const { p, asset } = staged;
+      const priorObservation = (
+        await pool.query<{ sealed_key: string }>(
+          `SELECT sealed_key FROM photo_receipt_observation WHERE asset_id=$1
+         AND observed_digest=$2 AND observed_bytes=$3 ORDER BY receipt_at,id LIMIT 1`,
+          [body.uploadId, p!.expected_photo_digest, p!.expected_photo_bytes],
+        )
+      ).rows[0];
       let bytes: Buffer;
       try {
-        bytes = await storage.read(asset!.staging_key, SYNC_LIMITS.maxBytes);
+        bytes = await storage.read(
+          priorObservation?.sealed_key ?? asset!.staging_key,
+          SYNC_LIMITS.maxBytes,
+        );
       } catch (e) {
         if (e instanceof StorageSizeError)
           throw new SyncError("photo_invalid", 422, "size_exceeded");
