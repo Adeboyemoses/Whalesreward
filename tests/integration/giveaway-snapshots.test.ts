@@ -359,3 +359,138 @@ it("I-46 phantom purchase intake and confirmation serialize without silently los
     await f.close();
   }
 }, 30000);
+it("SR-06 pending proposal blocks unchanged reconciliation of identical snapshot sources", async () => {
+  const f = await giveawayFixture();
+  try {
+    const sale = await historicalSale(f.pool, {});
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional baseline",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+      .object({ id: z.string(), contentDigest: z.string() })
+      .parse(prepared.data);
+    await confirmGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        previewId: p.id,
+        contentDigest: p.contentDigest,
+        ...(await f.guard()),
+      },
+      undefined,
+      config,
+    );
+    const before = (
+      await f.pool.query(
+        "SELECT to_jsonb(s) content FROM giveaway_snapshot s WHERE campaign_id=$1",
+        [f.campaignId],
+      )
+    ).rows;
+    await pendingGiveawayProposal(f, sale.id);
+    await f.check("revision");
+    await expect(
+      prepareGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          kind: "revision",
+          reason: "Fictional unchanged attempt",
+          ...(await f.guard()),
+        },
+        config,
+      ),
+    ).rejects.toMatchObject({ code: "finalization_blocked" });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT to_jsonb(s) content FROM giveaway_snapshot s WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows,
+    ).toEqual(before);
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("I-46 non-superuser cannot update delete or truncate frozen snapshots", async () => {
+  const f = await giveawayFixture();
+  const role = `snapshot_${newId().replaceAll("-", "")}`;
+  let made = false;
+  const db = await f.pool.connect();
+  try {
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional immutable result",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+      .object({ id: z.string(), contentDigest: z.string() })
+      .parse(prepared.data);
+    await confirmGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        previewId: p.id,
+        contentDigest: p.contentDigest,
+        ...(await f.guard()),
+      },
+      undefined,
+      config,
+    );
+    const schema = (await db.query("SELECT current_schema() name")).rows[0]
+      .name;
+    await db.query(`CREATE ROLE ${role} NOSUPERUSER NOCREATEDB NOCREATEROLE`);
+    made = true;
+    await db.query(`GRANT USAGE ON SCHEMA ${schema} TO ${role}`);
+    await db.query(
+      `GRANT SELECT,UPDATE,DELETE,TRUNCATE ON ALL TABLES IN SCHEMA ${schema} TO ${role}`,
+    );
+    await db.query(`SET ROLE ${role}`);
+    await expect(
+      db.query("UPDATE giveaway_snapshot SET reason=$1 WHERE campaign_id=$2", [
+        "Changed",
+        f.campaignId,
+      ]),
+    ).rejects.toThrow();
+    await expect(
+      db.query("DELETE FROM giveaway_snapshot WHERE campaign_id=$1", [
+        f.campaignId,
+      ]),
+    ).rejects.toThrow();
+    await expect(
+      db.query("TRUNCATE giveaway_snapshot CASCADE"),
+    ).rejects.toThrow();
+  } finally {
+    await db.query("RESET ROLE");
+    if (made) {
+      await db.query(`DROP OWNED BY ${role}`);
+      await db.query(`DROP ROLE ${role}`);
+    }
+    db.release();
+    await f.close();
+  }
+}, 30000);
