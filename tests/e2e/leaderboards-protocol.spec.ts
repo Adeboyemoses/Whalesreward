@@ -29,6 +29,7 @@ test("I-46 real HTTP setup prepares, confirms, replays and preserves the prior s
   const actor = { request, url: () => leaderboardStack.origin };
   const f = await leaderboardRecords(actor, identity);
   try {
+    await f.isolateInstrumentationReads();
     const sale = await f.sale({ amount: "1370001" });
     const c = await f.configure();
     await f.phoneCheck();
@@ -59,8 +60,7 @@ test("I-46 real HTTP setup prepares, confirms, replays and preserves the prior s
     expect(
       await api(actor, `giveaway/${c.id}/snapshots`, confirmation),
     ).toEqual(initial);
-    const stored = await api(
-      actor,
+    const stored = await f.observe(
       `giveaway/${c.id}/snapshots/${initial.id}/sources`,
     );
     await f.changeAmount(sale.id, "1470001");
@@ -92,7 +92,7 @@ test("I-46 real HTTP setup prepares, confirms, replays and preserves the prior s
       previousSnapshotId: initial.id,
     });
     expect(
-      await api(actor, `giveaway/${c.id}/snapshots/${initial.id}/sources`),
+      await f.observe(`giveaway/${c.id}/snapshots/${initial.id}/sources`),
     ).toEqual(stored);
     await f.phoneCheck("revision");
     const unchanged = await api(actor, `giveaway/${c.id}/previews`, {

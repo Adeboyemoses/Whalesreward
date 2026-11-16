@@ -419,6 +419,7 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
 }) => {
   const f = await leaderboardFixture(page);
   try {
+    await f.isolateInstrumentationReads();
     const sale = await f.sale({ amount: "1370001" });
     await f.sale({
       customerId: seedId(27),
@@ -452,13 +453,12 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
     const initial = await confirm(page);
     expect(initial.number).toBe(1);
     await expect(page.getByRole("main")).toContainText("Snapshot 1 saved");
-    const stored = await api<unknown>(
-      page,
+    const stored = await f.observe<unknown>(
       `giveaway/${c.id}/snapshots/${initial.id}`,
     );
-    const frozenRows = await api<{
+    const frozenRows = await f.observe<{
       items: { name: string; rank: string; sharedRank: boolean }[];
-    }>(page, `giveaway/${c.id}/snapshots/${initial.id}/rows`);
+    }>(`giveaway/${c.id}/snapshots/${initial.id}/rows`);
     expect(frozenRows.items).toHaveLength(2);
     expect(frozenRows.items.every((r) => r.rank === "1" && r.sharedRank)).toBe(
       true,
@@ -481,11 +481,11 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
     });
     await expect(page.getByRole("main")).toContainText("Snapshot 2 saved");
     await capture(page, "E03");
-    expect(await api(page, `giveaway/${c.id}/snapshots/${initial.id}`)).toEqual(
+    expect(await f.observe(`giveaway/${c.id}/snapshots/${initial.id}`)).toEqual(
       stored,
     );
     expect(
-      await api(page, `giveaway/${c.id}/snapshots/${initial.id}/rows`),
+      await f.observe(`giveaway/${c.id}/snapshots/${initial.id}/rows`),
     ).toEqual(frozenRows);
     await page
       .getByLabel("Saved snapshot", { exact: true })
@@ -493,7 +493,15 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
     await expect(page.getByRole("main")).toContainText("Amina Bello");
     await expect(page.getByRole("main")).toContainText("₦13,700.01");
     await f.phoneCheck("revision");
-    await page.reload();
+    // Exercise the saved screen's refresh action rather than re-reading every
+    // historical source collection just to obtain current reconciliation guards.
+    const refreshed = page.waitForResponse((response) =>
+      response.url().endsWith(`/giveaway/${c.id}/readiness`),
+    );
+    await page
+      .getByRole("button", { name: "Refresh current readiness", exact: true })
+      .click();
+    expect((await refreshed).status()).toBe(200);
     const unchanged = (await prepare(
       page,
       "Fictional unchanged browser reconciliation",

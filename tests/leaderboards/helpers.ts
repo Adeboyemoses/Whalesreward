@@ -1,4 +1,11 @@
-import { expect, type Page } from "@playwright/test";
+import {
+  expect,
+  request,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
+import { randomBytes } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import pg from "pg";
 import { v7 } from "uuid";
 import { stationFixture, seedId } from "../station/helpers";
@@ -62,10 +69,57 @@ export async function leaderboardRecords(
     (await pool.query("SELECT current_schema() schema")).rows[0].schema,
   ).toBe(process.env.WHR_LEADERBOARD_TEST_SCHEMA);
   const ids: string[] = [];
+  let observer: APIRequestContext | undefined;
+  let reads = page;
+  // Passive instrumentation must not spend the UI actor's rate-limit budget.
+  // This is a separate real, least-privilege session in the guarded local schema;
+  // manager/checklist/finalization POSTs below still use the primary browser.
+  async function isolateInstrumentationReads() {
+    if (observer) throw new Error("Instrumentation reader already created");
+    const origin = new URL(page.url()).origin;
+    expect(new URL(origin).hostname).toBe("127.0.0.1");
+    const roleId = v7(),
+      userId = v7(),
+      adminId = v7();
+    const username = `observer.${userId.slice(-12)}`;
+    const password = randomBytes(24).toString("hex");
+    await pool.query(
+      "INSERT INTO role(id,name,is_owner,enabled,version) VALUES($1,$2,false,true,1)",
+      [roleId, `Fictional leaderboard observer ${roleId}`],
+    );
+    for (const permission of ["leaderboards", "sales"])
+      await pool.query(
+        "INSERT INTO role_permission(role_id,permission_code) VALUES($1,$2)",
+        [roleId, permission],
+      );
+    await pool.query(
+      "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'admin',$2,$2,'Fictional test observer',true,1,false,now())",
+      [userId, username],
+    );
+    await pool.query(
+      "INSERT INTO admin(id,user_id,admin_code,email_normalized,role_id,version) VALUES($1,$2,$3,$4,$5,1)",
+      [adminId, userId, `TEST-${adminId}`, `${username}@example.com`, roleId],
+    );
+    await pool.query(
+      "INSERT INTO auth_credential(id,user_id,provider,provider_account_id,password_hash,updated_at) VALUES($1,$2::uuid,'credential',$2::text,$3,now())",
+      [v7(), userId, await hashPassword(password)],
+    );
+    observer = await request.newContext({ baseURL: origin });
+    const login = await observer.post("/api/admin/sign-in", {
+      headers: { Origin: origin, "Idempotency-Key": v7() },
+      data: { username, password },
+    });
+    expect(login.status(), await login.text()).toBe(200);
+    reads = { request: observer, url: () => origin };
+  }
+  async function observe<T>(path: string): Promise<T> {
+    return api<T>(reads, path);
+  }
   let campaignId: string | null = null;
   async function campaign() {
-    return (await api<{ campaign: Campaign | null }>(page, "giveaway/campaign"))
-      .campaign!;
+    return (
+      await api<{ campaign: Campaign | null }>(reads, "giveaway/campaign")
+    ).campaign!;
   }
   async function sale(options: Parameters<typeof historicalSale>[1] = {}) {
     const row = await historicalSale(pool, options);
@@ -153,7 +207,7 @@ export async function leaderboardRecords(
       );
     }
     const existing = await api<{ census: { version: number } }>(
-      page,
+      reads,
       `giveaway/${campaignId}/reconciliation/phones`,
     );
     const attendants = (
@@ -174,7 +228,7 @@ export async function leaderboardRecords(
     );
     const phones = await api<{
       phones: { items: { id: string; version: number }[] };
-    }>(page, `giveaway/${campaignId}/reconciliation/phones`);
+    }>(reads, `giveaway/${campaignId}/reconciliation/phones`);
     await api(
       page,
       `giveaway/${campaignId}/reconciliation/phone-checks`,
@@ -241,6 +295,8 @@ export async function leaderboardRecords(
     ...f,
     pool,
     ids,
+    isolateInstrumentationReads,
+    observe,
     sale,
     campaign,
     configure,
@@ -251,6 +307,7 @@ export async function leaderboardRecords(
       return campaignId;
     },
     async close() {
+      await observer?.dispose();
       await pool.end();
       await f.db.end();
     },
@@ -276,7 +333,20 @@ export async function prepare(page: Page, reason: string, revision = false) {
     .click();
   const response = await pending;
   expect([200, 201], await response.text()).toContain(response.status());
-  return (await response.json()).data as Preview;
+  const result = (await response.json()).data;
+  // A successful POST precedes navigation and E04's fresh readiness/preview reads.
+  // Mutate sources or authority only after the reviewed preview is actionable.
+  // Unchanged reconciliation is a receipt on E03, with no confirmation action.
+  if (result.state !== "unchanged")
+    await expect(
+      page.getByRole("button", {
+        name: revision
+          ? "Confirm and save revision"
+          : "Confirm and save snapshot",
+        exact: true,
+      }),
+    ).toBeEnabled();
+  return result as Preview;
 }
 export async function confirm(page: Page, revision = false) {
   const pending = page.waitForResponse(
