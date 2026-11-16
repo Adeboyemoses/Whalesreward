@@ -71,6 +71,18 @@ export type FrozenRetention = Readonly<{
 }>;
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
+/** Compare instants without discarding fractional digits below milliseconds. */
+export function exactInstant(value: string): bigint {
+  const match = /^(.*T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/.exec(
+    value,
+  );
+  if (!match || (match[2]?.length ?? 0) > 6)
+    throw new AdminError("invalid_response", 200);
+  const seconds = Date.parse(match[1] + match[3]!);
+  if (!Number.isFinite(seconds)) throw new AdminError("invalid_response", 200);
+  return BigInt(seconds) * 1000n + BigInt((match[2] ?? "").padEnd(6, "0"));
+}
+const instantKeys = ["launchAt", "purchaseStart", "purchaseCutoff"] as const;
 export class AdminSettingsApi {
   constructor(private request: typeof adminRequest = adminRequest) {}
   private async read<T>(path: string, schema: z.ZodType<T>, body?: unknown) {
@@ -99,9 +111,9 @@ export class AdminSettingsApi {
     const normalized = {
       kind: proposal.kind,
       campaignId: proposal.campaignId,
-      launchAt: new Date(proposal.launchAt).toISOString(),
-      purchaseStart: new Date(proposal.purchaseStart).toISOString(),
-      purchaseCutoff: new Date(proposal.purchaseCutoff).toISOString(),
+      launchAt: proposal.launchAt,
+      purchaseStart: proposal.purchaseStart,
+      purchaseCutoff: proposal.purchaseCutoff,
       timezone: proposal.timezone,
       graceHours: proposal.graceHours,
       reason: proposal.reason,
@@ -111,7 +123,26 @@ export class AdminSettingsApi {
       review.expectedVersion !== proposal.expectedVersion ||
       review.before.version !== proposal.expectedVersion ||
       review.expectedCampaignVersion !== proposal.expectedCampaignVersion ||
-      !same(review.proposal, normalized) ||
+      !same(
+        {
+          ...review.proposal,
+          ...Object.fromEntries(
+            instantKeys.map((key) => [
+              key,
+              exactInstant(review.proposal[key]).toString(),
+            ]),
+          ),
+        },
+        {
+          ...normalized,
+          ...Object.fromEntries(
+            instantKeys.map((key) => [
+              key,
+              exactInstant(normalized[key]).toString(),
+            ]),
+          ),
+        },
+      ) ||
       !campaign ||
       (proposal.kind === "create"
         ? review.before.campaign !== null || campaign.id !== null
@@ -129,10 +160,13 @@ export class AdminSettingsApi {
         "purchaseCutoff",
         "timezone",
         "graceHours",
-      ].some(
-        (key) =>
-          campaign.timing[key as keyof typeof campaign.timing] !==
-          normalized[key as keyof typeof normalized],
+      ].some((key) =>
+        instantKeys.includes(key as (typeof instantKeys)[number])
+          ? exactInstant(
+              campaign.timing[key as (typeof instantKeys)[number]]!,
+            ) !== exactInstant(normalized[key as (typeof instantKeys)[number]])
+          : campaign.timing[key as keyof typeof campaign.timing] !==
+            normalized[key as keyof typeof normalized],
       )
     )
       throw new AdminError("invalid_response", 200);
@@ -140,9 +174,10 @@ export class AdminSettingsApi {
     if (
       !timing.purchaseCutoff ||
       !timing.uploadDeadline ||
-      new Date(timing.uploadDeadline).getTime() !==
-        new Date(timing.purchaseCutoff).getTime() +
-          proposal.graceHours * 3600000 ||
+      !Number.isSafeInteger(proposal.graceHours) ||
+      exactInstant(timing.uploadDeadline) !==
+        exactInstant(timing.purchaseCutoff) +
+          BigInt(proposal.graceHours) * 3600000000n ||
       !Number.isSafeInteger(proposal.graceHours) ||
       proposal.graceHours < 0 ||
       review.before.timingLocked ||

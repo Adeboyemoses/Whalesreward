@@ -44,7 +44,7 @@ export function campaignTime(
       fractionalSecondDigits: 3,
       hour12: true,
       timeZoneName: "longOffset",
-    }).format(new Date(value)) + ` · ${timezone}`
+    }).format(new Date(value)) + ` · ${timezone} · ${value}`
   );
 }
 const fields = [

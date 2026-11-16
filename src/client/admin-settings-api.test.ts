@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   AdminSettingsApi,
+  exactInstant,
   parseRetentionDays,
   settingsUncertain,
 } from "./admin-settings-api";
@@ -228,6 +229,41 @@ describe("P-28 timing boundary", () => {
     policyVersions: { timing: "campaign-timing-v1", retention: null },
     asOf: "2026-11-16T01:00:00Z",
   };
+  it("compares six-digit server UTC and offset input without losing microseconds", async () => {
+    const changed = structuredClone(reviewed);
+    const precise = {
+      ...proposal,
+      launchAt: "2030-01-01T01:00:00.123456+01:00",
+      purchaseStart: "2030-01-02T01:00:00.000000+01:00",
+      purchaseCutoff: "2030-02-01T01:00:00.987654+01:00",
+    };
+    Object.assign(changed.proposal, {
+      launchAt: "2030-01-01T00:00:00.123456Z",
+      purchaseStart: "2030-01-02T00:00:00.000000Z",
+      purchaseCutoff: "2030-02-01T00:00:00.987654Z",
+    });
+    Object.assign(changed.after.campaign.timing, {
+      launchAt: changed.proposal.launchAt,
+      purchaseStart: changed.proposal.purchaseStart,
+      purchaseCutoff: changed.proposal.purchaseCutoff,
+      uploadDeadline: changed.proposal.purchaseCutoff,
+    });
+    await expect(
+      new AdminSettingsApi(
+        vi.fn().mockResolvedValue(changed) as typeof adminRequest,
+      ).reviewTiming(precise),
+    ).resolves.toEqual(changed);
+    changed.after.campaign.timing.uploadDeadline =
+      "2030-02-01T00:00:00.987655Z";
+    await expect(
+      new AdminSettingsApi(
+        vi.fn().mockResolvedValue(changed) as typeof adminRequest,
+      ).reviewTiming(precise),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+    expect(exactInstant("2030-01-01T00:00:00.123456Z")).not.toBe(
+      exactInstant("2030-01-01T00:00:00.123999Z"),
+    );
+  });
   it("accepts unsaved null ID and retries same confirmation after ambiguous transport", async () => {
     const receipt = {
       id,
