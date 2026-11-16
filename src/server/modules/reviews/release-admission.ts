@@ -134,7 +134,10 @@ async function structural(
   if (afterDeadline) return exclude("receipt_after_deadline");
   if (f.photo.state !== "validated")
     return exclude("original_evidence_unavailable");
-  if (target.kind === "card" && f.card?.retirement_reason !== "replaced")
+  if (
+    (target.kind === "card" || f.card?.retired_at) &&
+    f.card?.retirement_reason !== "replaced"
+  )
     return exclude("unsupported_retirement");
   const p = (await db.query("SELECT * FROM purchase WHERE id=$1", [purchaseId]))
     .rows[0];

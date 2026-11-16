@@ -127,6 +127,7 @@ export function createReleaseDiscoveryService({
         JOIN pump pu ON pu.id=p.pump_id AND pu.station_id=p.station_id AND pu.product_id=p.product_id
         JOIN product pr ON pr.id=p.product_id JOIN customer cu ON cu.id=p.customer_id
         JOIN card ca ON ca.id=p.card_id
+        JOIN card_customer_link cl ON cl.card_id=p.card_id AND cl.customer_id=p.customer_id
         JOIN purchase_revision r ON r.purchase_id=p.id AND r.kind='original'
         WHERE p.id=$1 AND p.station_id=$2`,
           [purchaseId, actor.stationId],
@@ -142,6 +143,8 @@ export function createReleaseDiscoveryService({
         if (e instanceof AuthError && e.code === "review_closed") return fail();
         throw e;
       }
+      if (candidate.evidence_asset_id !== original.meter_asset_id)
+        return fail();
       const classified = await classifyReleaseStructure(
         db,
         purchaseId,
