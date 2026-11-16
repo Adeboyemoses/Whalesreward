@@ -7,6 +7,8 @@ import {
   api,
   prepare,
   confirm,
+  guard,
+  type Preview,
   type Snapshot,
 } from "../leaderboards/helpers";
 import { seedId } from "../station/helpers";
@@ -192,6 +194,142 @@ test("I-43 I-44 exact all-time spend, shared ranks, category paging and changed 
     await page.getByRole("button", { name: /next/i }).first().click();
     await expect(main).toContainText(/changed|refresh/i);
     await expect(rows).toHaveCount(0);
+  } finally {
+    await f.close();
+  }
+});
+
+test("I-44 configured campaigns still allow a separately labelled all-time ranking with no campaign query parameter", async ({
+  page,
+}) => {
+  const f = await leaderboardFixture(page);
+  try {
+    await f.sale({ amount: "2876543" });
+    await f.configure();
+    await page.goto("/admin/leaderboards");
+    await expect(
+      page.getByRole("table", { name: "Overall spend ranking" }),
+    ).toContainText("₦28,765.43");
+    const pending = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        url.pathname === "/api/admin/leaderboards" &&
+        url.searchParams.get("basis") === "recorded_all_time"
+      );
+    });
+    await page
+      .getByLabel("Ranking basis", { exact: true })
+      .selectOption("recorded_all_time");
+    const response = await pending;
+    expect(response.status(), await response.text()).toBe(200);
+    const query = new URL(response.url()).searchParams;
+    expect(query.has("campaignId")).toBe(false);
+    expect(query.has("category")).toBe(false);
+    expect(query.has("cursor")).toBe(false);
+    await expect(page.getByRole("main")).toContainText(
+      "All-time recorded spend · not a giveaway result.",
+    );
+    await expect(
+      page.getByRole("table", { name: "Overall spend ranking" }),
+    ).toContainText("₦28,765.43");
+    await expect(
+      page.getByRole("link", { name: "Finalize leaderboard", exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await f.close();
+  }
+});
+
+test("I-46 a concurrent saved revision invalidates a history cursor and Retry restarts from the first page", async ({
+  page,
+}) => {
+  const f = await leaderboardFixture(page);
+  try {
+    const sale = await f.sale({ amount: "3100001" });
+    const c = await f.configure();
+    const save = async (kind: "initial" | "revision") => {
+      await f.phoneCheck(kind);
+      const preview = await api<Preview>(
+        page,
+        `giveaway/${c.id}/previews`,
+        {
+          operationId: v7(),
+          kind,
+          reason: "Fictional history pagination preparation",
+          ...guard(await f.campaign()),
+        },
+        201,
+      );
+      return api<Snapshot>(
+        page,
+        `giveaway/${c.id}/snapshots${preview.guard.expectedPreviousSnapshotId ? `/${preview.guard.expectedPreviousSnapshotId}/revisions` : ""}`,
+        {
+          operationId: v7(),
+          previewId: preview.id,
+          contentDigest: preview.contentDigest,
+          ...preview.guard,
+        },
+        201,
+      );
+    };
+    await save("initial");
+    await f.changeAmount(sale.id, "3200001");
+    const second = await save("revision");
+    const listPath = `/api/admin/giveaway/${c.id}/snapshots`;
+    // The first page is fetched from the actual server with a smaller legal
+    // page size. Its cursor and the later stale-generation 409 are real.
+    await page.route(`**${listPath}?*`, async (route) => {
+      const url = new URL(route.request().url());
+      if (!url.searchParams.has("cursor")) url.searchParams.set("limit", "1");
+      await route.fulfill({
+        response: await route.fetch({ url: url.toString() }),
+      });
+    });
+    await page.goto("/admin/leaderboards/finalize");
+    const history = page
+      .locator("section")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Snapshot and revision history",
+          exact: true,
+        }),
+      })
+      .first();
+    await expect(
+      history.getByRole("button", { name: "Revision 2", exact: true }),
+    ).toBeVisible();
+    await expect(
+      history.getByRole("button", { name: "Next", exact: true }),
+    ).toBeEnabled();
+    await f.changeAmount(sale.id, "3300001");
+    const third = await save("revision");
+    expect(third.number).toBe(3);
+    const refused = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        url.pathname === listPath &&
+        url.searchParams.has("cursor") &&
+        response.status() === 409
+      );
+    });
+    await history.getByRole("button", { name: "Next", exact: true }).click();
+    expect((await (await refused).json()).error.code).toBe("read_view_stale");
+    await expect(history.getByRole("alert")).toContainText(/changed|refresh/i);
+    const retried = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === listPath &&
+        response.status() === 200,
+    );
+    await history.getByRole("button", { name: "Retry", exact: true }).click();
+    const response = await retried;
+    expect(new URL(response.url()).searchParams.has("cursor")).toBe(false);
+    const result = (await response.json()).data as { items: Snapshot[] };
+    expect(result.items[0]?.id).toBe(third.id);
+    expect(result.items[0]?.id).not.toBe(second.id);
+    await expect(
+      history.getByRole("button", { name: "Revision 3", exact: true }),
+    ).toBeVisible();
+    await expect(history.getByRole("alert")).toHaveCount(0);
   } finally {
     await f.close();
   }
