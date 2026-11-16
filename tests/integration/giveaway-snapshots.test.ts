@@ -494,3 +494,127 @@ it("I-46 non-superuser cannot update delete or truncate frozen snapshots", async
     await f.close();
   }
 }, 30000);
+it("I-11 snapshot confirmation checks owner actor and live grant before replay or mutation", async () => {
+  const f = await giveawayFixture();
+  try {
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional authority checks",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+        .object({ id: z.string(), contentDigest: z.string() })
+        .parse(prepared.data),
+      body = {
+        operationId: newId(),
+        previewId: p.id,
+        contentDigest: p.contentDigest,
+        ...(await f.guard()),
+      };
+    const other = await f.actor(["leaderboards", "giveawayFinalize"]);
+    await expect(
+      confirmGiveaway(
+        f.pool,
+        other.token,
+        f.campaignId,
+        body,
+        undefined,
+        config,
+      ),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    const saved = await confirmGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      body,
+      undefined,
+      config,
+    );
+    await expect(
+      confirmGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        { ...body, contentDigest: "b".repeat(64) },
+        undefined,
+        config,
+      ),
+    ).rejects.toMatchObject({ code: "operation_conflict" });
+    expect(saved.replayed).toBe(false);
+    await f.pool.query(
+      "DELETE FROM role_permission WHERE permission_code='giveawayFinalize'",
+    );
+    await expect(
+      confirmGiveaway(f.pool, f.token, f.campaignId, body, undefined, config),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe("1");
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("I-11 revoked finalization grant after review leaves no snapshot or confirmation audit", async () => {
+  const f = await giveawayFixture();
+  try {
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional revoked authority",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+        .object({ id: z.string(), contentDigest: z.string() })
+        .parse(prepared.data),
+      body = {
+        operationId: newId(),
+        previewId: p.id,
+        contentDigest: p.contentDigest,
+        ...(await f.guard()),
+      };
+    await f.pool.query(
+      "DELETE FROM role_permission WHERE permission_code='giveawayFinalize'",
+    );
+    await expect(
+      confirmGiveaway(f.pool, f.token, f.campaignId, body, undefined, config),
+    ).rejects.toMatchObject({ code: "permission_denied" });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe("0");
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::text n FROM audit_event WHERE action='giveaway_finalized' AND target_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe("0");
+  } finally {
+    await f.close();
+  }
+}, 30000);
