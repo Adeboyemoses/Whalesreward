@@ -311,6 +311,25 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         .admission,
     ).toEqual({ state: "not_admissible", reason: "invalid_capture_bounds" });
   });
+  it("RD-02 missing replacement audit precedes invalid capture bounds", async () => {
+    const x = await discoveryFixture(db, "card");
+    await seedHistorical(
+      db.pool,
+      "audit_event",
+      "DELETE FROM audit_event WHERE target_id=$1 AND action IN ('card_replaced','card_replacement')",
+      [fixtureId(29)],
+    );
+    await seedHistorical(
+      db.pool,
+      "purchase",
+      "UPDATE purchase SET server_received_at='2026-11-09T00:00:00Z' WHERE id=$1",
+      [x.sale.purchaseId],
+    );
+    expect(
+      (await x.discovery.prepare(x.token, x.sale.purchaseId, { kind: "card" }))
+        .admission,
+    ).toEqual({ state: "not_admissible", reason: "history_incomplete" });
+  });
   it.each(["assignment", "settings", "audit", "price"] as const)(
     "RD-02 incomplete %s history takes precedence over contradictions and invalid bounds",
     async (missing) => {

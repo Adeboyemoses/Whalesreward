@@ -49,6 +49,16 @@ async function structural(
   ] as const;
   // Inspect every history before choosing a categorical reason. A malformed
   // earlier array must not mask missing data in a later one (T-20 enum order).
+  // Replacement linkage and its audit must also be complete before reporting
+  // contradictions or invalid bounds; reuse the ordinary card predicate's closure.
+  if (f.card?.retirement_reason === "replaced") {
+    try {
+      rules.cardHistory(f);
+    } catch (e) {
+      if (e instanceof AuthError) return exclude("history_incomplete");
+      throw e;
+    }
+  }
   const capturedPrice = f.prices.find(
     (p) => p.id === f.original.price_version_id,
   );
