@@ -611,6 +611,7 @@ export function GiveawayPage({
         ) : (
           campaign && (
             <History
+              key={campaign.id + ":" + campaign.latestSnapshotId}
               campaign={campaign}
               selectedId={draft.savedId}
               onSelect={(id) => {
@@ -785,7 +786,13 @@ function History({
   const selected = selectedId ?? campaign.latestSnapshotId;
   return (
     <Sheet title="Snapshot and revision history">
-      <GiveawayReadState {...result} />
+      <GiveawayReadState
+        {...result}
+        reload={() => {
+          pages.reset();
+          result.reload();
+        }}
+      />
       {result.data && (
         <>
           {!result.data.items.length && (

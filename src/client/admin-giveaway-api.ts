@@ -113,7 +113,9 @@ export class AdminGiveawayApi {
       limit: 25,
     });
     const search = new URLSearchParams(
-      Object.entries(q).map(([k, v]) => [k, String(v)]),
+      Object.entries(q).flatMap(([k, v]) =>
+        v === undefined ? [] : [[k, String(v)]],
+      ),
     );
     const r = await this.read(`leaderboards?${search}`, rankingPageSchema);
     if (

@@ -70,7 +70,11 @@ export function LeaderboardsPage({ session }: { session: AdminSession }) {
           <LiveRanking
             key={basis + ":" + category + ":" + result.data?.campaign?.id}
             basis={basis}
-            campaignId={result.data?.campaign?.id}
+            campaignId={
+              basis === "campaign_qualifying"
+                ? result.data?.campaign?.id
+                : undefined
+            }
             category={category}
             sales={!!session.permissions?.includes("sales")}
           />

@@ -5,6 +5,7 @@ import {
   matchingPreview,
 } from "./admin-giveaway-api";
 import { AdminError, type adminRequest } from "./admin-api";
+import { leaderboardQuery } from "../shared/contracts/giveaway";
 const id = "019ab100-0000-7000-8000-000000000001";
 const other = "019ab100-0000-7000-8000-000000000002";
 const at = "2026-11-16T10:00:00Z";
@@ -104,6 +105,54 @@ const snapshot = {
   auditEventId: id,
 };
 describe("giveaway client boundary", () => {
+  for (const basis of ["campaign_qualifying", "recorded_all_time"] as const) {
+    for (const category of [undefined, "car_owner"] as const) {
+      for (const cursor of [undefined, "opaque+cursor/value="] as const) {
+        it(`sends a strict ${basis} URL with category ${category ?? "absent"} and cursor ${cursor ? "present" : "absent"}`, async () => {
+          const request = vi.fn(async (path: string) => {
+            const url = new URL(path, "https://example.com/api/admin/");
+            const actual = Object.fromEntries(url.searchParams);
+            const parsed = leaderboardQuery.parse(actual);
+            expect(parsed).toEqual({
+              basis,
+              ...(basis === "campaign_qualifying" ? { campaignId: id } : {}),
+              ...(category ? { category } : {}),
+              ...(cursor ? { cursor } : {}),
+              limit: 25,
+            });
+            expect(url.searchParams.has("category")).toBe(
+              category !== undefined,
+            );
+            expect(url.searchParams.has("cursor")).toBe(cursor !== undefined);
+            expect(url.searchParams.has("campaignId")).toBe(
+              basis === "campaign_qualifying",
+            );
+            return {
+              items: [],
+              nextCursor: null,
+              asOf: at,
+              dataVersion: "7",
+              basis,
+              category: category ?? null,
+              campaign: basis === "campaign_qualifying" ? campaign : null,
+              state:
+                basis === "campaign_qualifying" ? "provisional" : "recorded",
+              summary: totals,
+              customers: "0",
+              tieRule: "competition_v1",
+            };
+          });
+          await new AdminGiveawayApi(request as typeof adminRequest).rankings(
+            basis,
+            basis === "campaign_qualifying" ? id : undefined,
+            category,
+            cursor,
+          );
+          expect(request).toHaveBeenCalledOnce();
+        });
+      }
+    }
+  }
   it("keeps exact aggregate kobo and shared ranks from the full server ranking", async () => {
     const row = {
       customerId: id,
@@ -115,21 +164,19 @@ describe("giveaway client boundary", () => {
       sharedRank: true,
       totals,
     };
-    const request = vi
-      .fn()
-      .mockResolvedValue({
-        items: [row],
-        nextCursor: "next",
-        asOf: at,
-        dataVersion: "7",
-        basis: "campaign_qualifying",
-        category: null,
-        campaign,
-        state: "provisional",
-        summary: totals,
-        customers: "3",
-        tieRule: "competition_v1",
-      });
+    const request = vi.fn().mockResolvedValue({
+      items: [row],
+      nextCursor: "next",
+      asOf: at,
+      dataVersion: "7",
+      basis: "campaign_qualifying",
+      category: null,
+      campaign,
+      state: "provisional",
+      summary: totals,
+      customers: "3",
+      tieRule: "competition_v1",
+    });
     const result = await new AdminGiveawayApi(
       request as typeof adminRequest,
     ).rankings("campaign_qualifying", id);
@@ -193,18 +240,16 @@ describe("giveaway client boundary", () => {
   });
   it("does not call an unchanged reconciliation a new snapshot", async () => {
     const previous = { ...campaign, latestSnapshotId: other };
-    const request = vi
-      .fn()
-      .mockResolvedValue({
-        state: "unchanged",
-        campaign: { ...previous, version: 5 },
-        currentSnapshotId: other,
-        reconciliationId: id,
-        phoneCheckId: id,
-        checkedAt: at,
-        reason: preview.reason,
-        auditEventId: id,
-      });
+    const request = vi.fn().mockResolvedValue({
+      state: "unchanged",
+      campaign: { ...previous, version: 5 },
+      currentSnapshotId: other,
+      reconciliationId: id,
+      phoneCheckId: id,
+      checkedAt: at,
+      reason: preview.reason,
+      auditEventId: id,
+    });
     const api = new AdminGiveawayApi(request as typeof adminRequest);
     expect(
       await api.prepare(
