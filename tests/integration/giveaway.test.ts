@@ -1,3 +1,4 @@
+import { flagPair, lateRequest } from "../helpers/reports-adversarial-fixture";
 import { beforeEach, afterEach, describe, it, expect } from "vitest";
 import {
   cardsFixture,
@@ -53,6 +54,32 @@ describe("M4 exact leaderboards", () => {
     expect(second.items[0].sharedRank).toBe(true);
     expect(first.items[0].customerId).not.toBe(second.items[0].customerId);
     expect(first.summary).toEqual(second.summary);
+  });
+  it("I-40/I-44 duplicates and pending corrections count live with unit-separated quantities", async () => {
+    const one = await historicalSale(f.pool, { amount: "2000000" });
+    const two = await historicalSale(f.pool, {
+      amount: "3000000",
+      product: "cooking_gas",
+    });
+    await flagPair(f.pool, one.id, two.id);
+    await lateRequest(f.pool, one.id);
+    const r = await ranking();
+    expect(r.summary).toMatchObject({
+      purchases: "2",
+      litres: "2",
+      kilograms: "3",
+      spend: [{ currency: "NGN", amountKobo: "5000000" }],
+    });
+  });
+  it("M4 changed data generation rejects a live leaderboard cursor", async () => {
+    await historicalSale(f.pool, { customerId: fixtureId(26) });
+    await historicalSale(f.pool, { customerId: fixtureId(27) });
+    const first = await ranking({ limit: 1 });
+    expect(first.nextCursor).not.toBeNull();
+    await historicalSale(f.pool, { amount: "1000000" });
+    await expect(
+      ranking({ limit: 1, cursor: first.nextCursor }),
+    ).rejects.toMatchObject({ code: "read_view_stale" });
   });
   it("I-07 live permission revocation denies the next leaderboard read", async () => {
     await f.pool.query(
