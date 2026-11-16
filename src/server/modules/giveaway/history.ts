@@ -155,7 +155,9 @@ export async function readGiveawayHistory(
               purchaseId: s.purchaseId,
               before: beforeWire,
               after,
-              decisionEventIds: [],
+              decisionEventIds: s.decisionEventIds.filter(
+                (id) => !before?.decisionEventIds?.includes(id),
+              ),
             },
           ];
     });

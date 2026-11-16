@@ -280,7 +280,9 @@ export async function prepareGiveaway(
                   purchaseId: after.purchaseId,
                   before,
                   after,
-                  decisionEventIds: [],
+                  decisionEventIds: after.decisionEventIds.filter(
+                    (id) => !before?.decisionEventIds?.includes(id),
+                  ),
                 },
               ];
         });

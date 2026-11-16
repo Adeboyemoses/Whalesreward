@@ -87,6 +87,7 @@ export type Contribution = Pick<
   ReportSource,
   "product" | "amountKobo" | "currency" | "quantity" | "unit"
 > & {
+  decisionEventIds: string[];
   purchaseId: string;
   revisionId: string | null;
   purchaseVersion: number;
@@ -114,7 +115,7 @@ export async function contributions(
     await db.query(
       `SELECT p.id,p.version,p.status,p.customer_id,r.id revision_id,coalesce(r.amount_kobo,p.amount_kobo)::text amount,trim_scale(coalesce(r.quantity,p.quantity))::text quantity,coalesce(r.currency,p.currency) currency,coalesce(r.unit,p.unit) unit,pr.code product,r.evidence_asset_id,
  c.customer_code,c.name,c.category,(SELECT cc.code FROM card cc JOIN card_customer_link cl ON cl.card_id=cc.id WHERE cl.customer_id=c.id AND cl.ended_at IS NULL AND cc.retired_at IS NULL ORDER BY cc.id LIMIT 1) card_code,
- p.server_received_at,rf.receipt_at,
+ p.server_received_at,rf.receipt_at, ARRAY(SELECT d.audit_event_id::text FROM sale_decision d WHERE d.purchase_id=p.id ORDER BY d.decided_at,d.id) decision_event_ids,
  (${acceptedContribution} AND EXISTS(SELECT 1 FROM sync_validation v WHERE v.purchase_id=p.id)) accepted,
  (extract(epoch FROM greatest(ctx.signed_in_at,coalesce(p.capture_lower_bound,ctx.signed_in_at)))*1000000)::bigint::text lower_us,
  (extract(epoch FROM least(p.server_received_at,ctx.offline_expires_at))*1000000)::bigint::text upper_us,
@@ -138,7 +139,7 @@ export async function contributions(
       );
     const exclusion = exclusions.find((e) => e.purchaseId === r.id);
     if (exclusion) reasons.push("phone_unavailable");
-    else if (bounds) {
+    else if (bounds && r.status !== "cancelled") {
       const result = membership(
         {
           lower: r.lower_us,
@@ -152,6 +153,7 @@ export async function contributions(
       if (result) reasons.push(result);
     }
     return {
+      decisionEventIds: r.decision_event_ids,
       purchaseId: r.id,
       revisionId: r.revision_id,
       purchaseVersion: r.version,
