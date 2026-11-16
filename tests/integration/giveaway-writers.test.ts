@@ -195,3 +195,80 @@ it("I-46 actual M3 duplicate clear and cancellation services invalidate reviewed
     }
   }
 }, 30000);
+it.each(["approved", "rejected", "superseded"] as const)(
+  "SR-06 persisted %s transition invalidates real giveaway confirmation even after pending blocker closes",
+  async (state) => {
+    const { pendingGiveawayProposal } =
+      await import("../helpers/giveaway-fixture");
+    const f = await giveawayFixture();
+    try {
+      const sale = await historicalSale(f.pool, {});
+      await f.check();
+      const prepared = await prepareGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          kind: "initial",
+          reason: "Fictional release race",
+          ...(await f.guard()),
+        },
+        config,
+      );
+      const preview = z
+          .object({ id: z.string(), contentDigest: z.string() })
+          .parse(prepared.data),
+        guard = await f.guard();
+      const proposal = await pendingGiveawayProposal(f, sale.id),
+        before = await f.guard();
+      const db = await f.pool.connect();
+      try {
+        await db.query("BEGIN");
+        await db.query(
+          "UPDATE held_release_state SET state=$2,version=version+1 WHERE proposal_id=$1",
+          [proposal, state],
+        );
+        await db.query(
+          "INSERT INTO held_release_transition(id,proposal_id,version,state,actor_id,content) SELECT $1,$2,2,$3,proposer_id,'{}' FROM held_release_proposal WHERE id=$2",
+          [newId(), proposal, state],
+        );
+        await db.query("COMMIT");
+      } catch (e) {
+        await db.query("ROLLBACK");
+        throw e;
+      } finally {
+        db.release();
+      }
+      expect(BigInt((await f.guard()).expectedDataVersion)).toBeGreaterThan(
+        BigInt(before.expectedDataVersion),
+      );
+      await expect(
+        confirmGiveaway(
+          f.pool,
+          f.token,
+          f.campaignId,
+          {
+            operationId: newId(),
+            previewId: preview.id,
+            contentDigest: preview.contentDigest,
+            ...guard,
+          },
+          undefined,
+          config,
+        ),
+      ).rejects.toMatchObject({ code: "version_conflict" });
+      expect(
+        (
+          await f.pool.query(
+            "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
+            [f.campaignId],
+          )
+        ).rows[0].n,
+      ).toBe("0");
+    } finally {
+      await f.close();
+    }
+  },
+  30000,
+);

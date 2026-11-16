@@ -449,6 +449,15 @@ export async function confirmGiveaway(
         const before = predecessor
           ? {
               ...fields,
+              phoneCheckId: predecessor.content.phoneCheckId,
+              reconciliationId: predecessor.content.reconciliationId,
+              reconciliationPolicyVersion:
+                predecessor.content.reconciliationPolicyVersion,
+              previousSnapshotId: predecessor.content.previousSnapshotId,
+              sourceDataVersion: predecessor.content.sourceDataVersion,
+              settingsVersionId: predecessor.content.settingsVersionId,
+              currency: predecessor.content.totals.spend[0]?.currency ?? "NGN",
+              tieRule: predecessor.content.tieRule,
               snapshotId: previousSnapshotId!,
               snapshotNumber: String(number - 1),
               campaignVersion: String(c.version),
