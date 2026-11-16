@@ -556,7 +556,30 @@ export function createHeldReleaseService({
     purchaseId: string,
     input: unknown,
   ) {
-    const body = releaseProposalInputSchema.parse(input),
+    const parsed = releaseProposalInputSchema.safeParse(input);
+    if (!parsed.success) {
+      const raw = input as {
+        facts?: { observedCapture?: Record<string, unknown> };
+      } | null;
+      const precisionOnly = parsed.error.issues.every((issue) => {
+        if (
+          issue.path.length !== 3 ||
+          issue.path[0] !== "facts" ||
+          issue.path[1] !== "observedCapture" ||
+          !["from", "through"].includes(String(issue.path[2]))
+        )
+          return false;
+        const value = raw?.facts?.observedCapture?.[String(issue.path[2])];
+        return (
+          typeof value === "string" &&
+          z.iso.datetime({ offset: true }).safeParse(value).success &&
+          /\.\d{4,}(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+        );
+      });
+      if (precisionOnly) return fail();
+      throw parsed.error;
+    }
+    const body = parsed.data,
       hash = payloadDigest({ purchaseId, ...body });
     safeReason(body.reason);
     const preflight = await transaction(pool, async (db) => {
@@ -1180,37 +1203,49 @@ export function createHeldReleaseService({
     input: unknown,
   ) {
     const body = releasePhotoAccessSchema.parse(input);
-    return transaction(pool, async (db) => {
+    const inspect = (db: pg.PoolClient) =>
+      db.query<{ display_key: string }>(
+        "SELECT v.display_key FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.id=$1 AND s.purchase_id=$2 AND s.station_id=$3 AND s.purpose='held_release_sheet'",
+        [body.assetId, purchaseId, preflightStation],
+      );
+    let preflightStation = "";
+    const preflight = await transaction(pool, async (db) => {
       const a = await authority(db, token, env);
       await sale.purchase(db, purchaseId, a.stationId);
       const p = await scopedProposal(db, proposalId, purchaseId, a.stationId);
       requirePermission(a, permissions[p.target_kind]);
       if (p.sheet_asset_id !== body.assetId)
         return fail("evidence_unavailable", 404);
-      const asset = (
-        await db.query<{ display_key: string }>(
-          "SELECT v.display_key FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.id=$1 AND s.purchase_id=$2 AND s.station_id=$3 AND s.purpose='held_release_sheet'",
-          [body.assetId, purchaseId, a.stationId],
-        )
-      ).rows[0];
+      preflightStation = a.stationId;
+      const asset = (await inspect(db)).rows[0];
       if (!asset) return fail("evidence_unavailable", 404);
-      try {
-        const reader = readerFactory();
-        await reader.read(asset.display_key, SYNC_LIMITS.maxBytes);
-        const expiresAt = new Date(Date.now() + 60000);
-        const url = await reader.signGet(asset.display_key, expiresAt);
-        await authority(db, token, env, p.target_kind);
-        return {
-          url,
-          expiresAt: expiresAt.toISOString(),
-          assetId: body.assetId,
-        };
-      } catch (e) {
-        if (e instanceof AuthError) throw e;
-        if (e instanceof StorageNotFoundError)
-          return fail("evidence_unavailable", 404);
+      return { key: asset.display_key, kind: p.target_kind };
+    });
+    let url: string;
+    const expiresAt = new Date(Date.now() + 60000);
+    try {
+      const reader = readerFactory();
+      await reader.read(preflight.key, SYNC_LIMITS.maxBytes);
+      url = await reader.signGet(preflight.key, expiresAt);
+    } catch (e) {
+      if (e instanceof AuthError) throw e;
+      if (e instanceof StorageNotFoundError)
+        return fail("evidence_unavailable", 404);
+      return fail("storage_unavailable", 503);
+    }
+    return transaction(pool, async (db) => {
+      const a = await authority(db, token, env, preflight.kind);
+      if (a.stationId !== preflightStation) return fail("not_found", 404);
+      await sale.purchase(db, purchaseId, a.stationId);
+      const p = await scopedProposal(db, proposalId, purchaseId, a.stationId);
+      if (p.sheet_asset_id !== body.assetId || p.target_kind !== preflight.kind)
+        return fail("evidence_unavailable", 404);
+      const current = (await inspect(db)).rows[0];
+      if (!current || current.display_key !== preflight.key)
+        return fail("evidence_unavailable", 404);
+      if (expiresAt.getTime() <= Date.now())
         return fail("storage_unavailable", 503);
-      }
+      return { url, expiresAt: expiresAt.toISOString(), assetId: body.assetId };
     });
   }
   return { propose, decide, get, list, photoAccess };
