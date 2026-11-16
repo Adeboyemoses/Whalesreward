@@ -17,7 +17,7 @@ export async function giveawayFixture() {
     [campaignId, fixtureId(8)],
   );
   await f.pool.query(
-    "INSERT INTO settings_version(id,station_id,campaign_id,version,section,launch_at,purchase_start,purchase_cutoff,grace_hours,upload_deadline,timezone,effective_from,actor_id,reason,timing_policy_version) VALUES($1,$2,$3,1,'giveaway',clock_timestamp()-interval '3 days',clock_timestamp()-interval '2 days',clock_timestamp()-interval '1 day',0,clock_timestamp()-interval '1 day','Africa/Lagos',clock_timestamp()-interval '4 days',$4,'Fictional completed campaign','campaign-timing-v1')",
+    "INSERT INTO settings_version(id,station_id,campaign_id,version,section,launch_at,purchase_start,purchase_cutoff,grace_hours,upload_deadline,timezone,effective_from,actor_id,reason,timing_policy_version) VALUES($1,$2,$3,1,'giveaway',statement_timestamp()-interval '3 days',statement_timestamp()-interval '2 days',statement_timestamp()-interval '1 day',0,statement_timestamp()-interval '1 day','Africa/Lagos',statement_timestamp()-interval '4 days',$4,'Fictional completed campaign','campaign-timing-v1')",
     [settingsId, fixtureId(8), campaignId, fixtureId(5)],
   );
   await f.pool.query(
