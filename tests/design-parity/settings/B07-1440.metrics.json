@@ -5,15 +5,15 @@
   "brandLines": 1,
   "controls": [
     {
-      "label": "View giveaway settings",
+      "label": "Edit giveaway settings",
       "rect": {
         "x": 309,
-        "y": 537,
-        "width": 185,
+        "y": 603,
+        "width": 178,
         "height": 40,
-        "top": 537,
-        "right": 494,
-        "bottom": 577,
+        "top": 603,
+        "right": 487,
+        "bottom": 643,
         "left": 309
       }
     },
@@ -29,6 +29,19 @@
         "bottom": 448,
         "left": 967.65625
       }
+    },
+    {
+      "label": "More history",
+      "rect": {
+        "x": 288,
+        "y": 3321,
+        "width": 1112,
+        "height": 40,
+        "top": 3321,
+        "right": 1400,
+        "bottom": 3361,
+        "left": 288
+      }
     }
   ],
   "sheets": [
@@ -36,30 +49,30 @@
       "x": 288,
       "y": 203,
       "width": 634.65625,
-      "height": 429,
+      "height": 495,
       "top": 203,
       "right": 922.65625,
-      "bottom": 632,
+      "bottom": 698,
       "left": 288
     },
     {
       "x": 946.65625,
       "y": 203,
       "width": 453.328125,
-      "height": 429,
+      "height": 495,
       "top": 203,
       "right": 1399.984375,
-      "bottom": 632,
+      "bottom": 698,
       "left": 946.65625
     },
     {
       "x": 288,
-      "y": 656,
+      "y": 722,
       "width": 1112,
       "height": 296,
-      "top": 656,
+      "top": 722,
       "right": 1400,
-      "bottom": 952,
+      "bottom": 1018,
       "left": 288
     }
   ],

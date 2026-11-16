@@ -12,7 +12,6 @@ import {
   confirmIntent,
   daysLabel,
   reasonLabel,
-  timingLocked,
   changeCatalogPrecision,
   rejectedMetadataReview,
   type RetentionReview,
@@ -54,7 +53,7 @@ test("I-45 I-51 settings display explicit server timing and unset retention with
     if (grace === null) await expect(graceValue).not.toHaveText("24 hours");
     for (const path of ["giveaway", "giveaway/confirm"]) {
       await page.goto(`/admin/settings/${path}`);
-      await expect(page.getByRole("main")).toContainText(timingLocked);
+      await expect(page.getByRole("main")).toContainText(/Owner/);
       await expect(
         page.getByRole("main").locator("input, textarea"),
       ).toHaveCount(0);
