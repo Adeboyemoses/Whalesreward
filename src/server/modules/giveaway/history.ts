@@ -12,6 +12,10 @@ const query = z.strictObject({
   ...giveawayPage,
   category: categorySchema.optional(),
   kind: z.enum(["purchases", "customers"]).optional(),
+  included: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
 });
 export const publicSource = (s: Contribution) => ({
   purchaseId: s.purchaseId,
@@ -47,7 +51,8 @@ export async function readGiveawayHistory(
   if (
     (id && !child && keys.length) ||
     (child !== "rows" && q.category !== undefined) ||
-    (child !== "changes" && q.kind !== undefined)
+    (child !== "changes" && q.kind !== undefined) ||
+    (child !== "sources" && q.included !== undefined)
   )
     throw new AuthError("invalid_request", 400);
   return transaction(pool, async (db) => {
@@ -66,6 +71,7 @@ export async function readGiveawayHistory(
       child ?? null,
       q.category ?? null,
       q.kind ?? null,
+      q.included ?? null,
     ]);
     if (!id) {
       if (collection !== "snapshots" || child)
@@ -110,7 +116,9 @@ export async function readGiveawayHistory(
       );
     if (child === "sources")
       return page(
-        record.sources.map(publicSource),
+        (record.sources as Contribution[])
+          .filter((s) => q.included === undefined || s.included === q.included)
+          .map(publicSource),
         q.limit,
         config.secret,
         scope,

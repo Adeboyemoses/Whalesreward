@@ -140,7 +140,7 @@ export async function contributions(
       );
     const exclusion = exclusions.find((e) => e.purchaseId === r.id);
     if (exclusion) reasons.push("phone_unavailable");
-    else if (bounds && r.status !== "cancelled") {
+    if (bounds && r.status !== "cancelled") {
       const result = membership(
         {
           lower: r.lower_us,
@@ -151,7 +151,8 @@ export async function contributions(
         },
         bounds,
       );
-      if (result) reasons.push(result);
+      if (result && !(exclusion && result === "evidence_deadline_unresolved"))
+        reasons.push(result);
     }
     return {
       decisionEventIds: r.decision_event_ids,
