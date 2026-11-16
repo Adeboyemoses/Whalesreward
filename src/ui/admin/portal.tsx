@@ -10,6 +10,7 @@ import { SalesPortal } from "./sales";
 import { SettingsPortal } from "./settings";
 import { ReportsPortal } from "./reports";
 import { OverviewPortal } from "./overview";
+import { LeaderboardsPortal } from "./giveaway";
 const customerSections = [
   { grant: "customers", label: "Customers", href: "/admin/customers" },
   { grant: "cards", label: "Loyalty cards", href: "/admin/cards" },
@@ -19,6 +20,7 @@ const portalSections = [
   { grant: "reports", label: "Reports", href: "/admin/reports" } as const,
   { grant: "audit", label: "Audit history", href: "/admin/audit" } as const,
   { grant: "sales", label: "Sales", href: "/admin/sales" } as const,
+  { grant: "leaderboards", label: "Leaderboards", href: "/admin/leaderboards" } as const,
   ...stationSections,
   ...customerSections,
   { grant: "settings", label: "Settings", href: "/admin/settings" } as const,
@@ -74,6 +76,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
   const settingsRoute = path[0] === "settings";
   const overviewRoute = !route || path[0] === "overview";
   const reportsRoute = path[0] === "reports";
+  const leaderboardsRoute = path[0] === "leaderboards";
   const stationRoute = ["pumps", "prices", "attendants"].includes(
     path[0] ?? "",
   );
@@ -183,7 +186,9 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
       <AdminShell
         station={session.station?.name ?? ""}
         active={
-          reportsRoute
+          leaderboardsRoute
+            ? "Leaderboards"
+            : reportsRoute
             ? "Reports"
             : overviewRoute && grants.includes("overview")
               ? "Overview"
@@ -233,6 +238,7 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
           !customerRoute &&
           !settingsRoute &&
           !reportsRoute &&
+          !leaderboardsRoute &&
           !(overviewRoute && grants.includes("overview")) && (
             <div className="wr-pagehead">
               <div>
@@ -252,7 +258,9 @@ export function AdminPortal({ path: initialPath }: { path: string[] }) {
             {error}
           </p>
         )}
-        {reportsRoute ? (
+        {leaderboardsRoute ? (
+          <LeaderboardsPortal key={epoch} path={path} session={session} />
+        ) : reportsRoute ? (
           <ReportsPortal key={epoch} session={session} />
         ) : overviewRoute && grants.includes("overview") ? (
           <OverviewPortal key={epoch} session={session} />

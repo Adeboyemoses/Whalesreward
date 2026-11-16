@@ -1,0 +1,133 @@
+{
+  "captureMethod": "Native Chrome DevTools responsive capture",
+  "productionSourceHead": "c5952d9",
+  "equivalentTestWorktreeHead": "e1daa8e",
+  "images": [
+    {
+      "file": "E01-1440.built.png",
+      "cssWidth": 1440,
+      "dpr": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 2000,
+      "nativeHeightCap": false,
+      "sha256": "33046a064c41106aba4190de88bf8dc4813d8ca4657a0500824e98910526674e"
+    },
+    {
+      "file": "E01-360.built.png",
+      "cssWidth": 360,
+      "dpr": 2,
+      "pixelWidth": 720,
+      "pixelHeight": 4852,
+      "nativeHeightCap": false,
+      "sha256": "a8054ae81f0c21bf4d93d72b5e73a69a57c3c09a7e9c16569449480ff97f271e"
+    },
+    {
+      "file": "E01-390.built.png",
+      "cssWidth": 390,
+      "dpr": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 4776,
+      "nativeHeightCap": false,
+      "sha256": "78108dc37933573a4c8cdf7dced9bdc1344dc8ac4717728231df257e95d5c4c4"
+    },
+    {
+      "file": "E02-1440.built.png",
+      "cssWidth": 1440,
+      "dpr": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 4852,
+      "nativeHeightCap": false,
+      "sha256": "564129aa4ecb32e762a12291e9cfab34a32c8489bf562c76da43cd52c200285a"
+    },
+    {
+      "file": "E02-360.built.png",
+      "cssWidth": 360,
+      "dpr": 2,
+      "pixelWidth": 720,
+      "pixelHeight": 10040,
+      "nativeHeightCap": false,
+      "sha256": "6f041ced2ebb40c2225de4d5a5c23dd513c4684de30ebfdbf6257bd6079af5b2"
+    },
+    {
+      "file": "E02-390.built.png",
+      "cssWidth": 390,
+      "dpr": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 9636,
+      "nativeHeightCap": false,
+      "sha256": "e93c9ad574d1b6d849db9cd823c258f657f764c3232cd13082e02b4725a774f9"
+    },
+    {
+      "file": "E03-1440.built.png",
+      "cssWidth": 1440,
+      "dpr": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 9970,
+      "nativeHeightCap": false,
+      "sha256": "0662aaa83706cd0e6ad852fe2c027c0c6ca47f741160a2181116656396c02e5f"
+    },
+    {
+      "file": "E03-360-bottom.built.png",
+      "cssWidth": 360,
+      "dpr": 2,
+      "pixelWidth": 720,
+      "pixelHeight": 2000,
+      "nativeHeightCap": false,
+      "sha256": "a937bf2bc66fcbf48959bf9f663b605baced34e8c93e9e91836d58efc9e9c985"
+    },
+    {
+      "file": "E03-360.built.png",
+      "cssWidth": 360,
+      "dpr": 2,
+      "pixelWidth": 720,
+      "pixelHeight": 16384,
+      "nativeHeightCap": true,
+      "sha256": "b911e5618017bd2395e1fe5d97174eeefbd49b18cdcadc96dc0b8434ec34011f"
+    },
+    {
+      "file": "E03-390-bottom.built.png",
+      "cssWidth": 390,
+      "dpr": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 2000,
+      "nativeHeightCap": false,
+      "sha256": "470c4f8e396bc567561759d6d91723bb4ab981fdf3ffba45286e9bd4dd8d1d62"
+    },
+    {
+      "file": "E03-390.built.png",
+      "cssWidth": 390,
+      "dpr": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 16384,
+      "nativeHeightCap": true,
+      "sha256": "e068d22ebc0af81d74718d95127f5a3942c8a1adf8af5719a36da40bd78d83da"
+    },
+    {
+      "file": "E04-1440.built.png",
+      "cssWidth": 1440,
+      "dpr": 2,
+      "pixelWidth": 2880,
+      "pixelHeight": 6996,
+      "nativeHeightCap": false,
+      "sha256": "1d398944b1cd0b073d655732aacfc93c0eab5eec11a25edb8a8b3ee5a652f7d8"
+    },
+    {
+      "file": "E04-360.built.png",
+      "cssWidth": 360,
+      "dpr": 2,
+      "pixelWidth": 720,
+      "pixelHeight": 15084,
+      "nativeHeightCap": false,
+      "sha256": "c20fd0cea66e906aa2505bef25c966f35baa6171200cb7b054b5880eff6ff205"
+    },
+    {
+      "file": "E04-390.built.png",
+      "cssWidth": 390,
+      "dpr": 2,
+      "pixelWidth": 780,
+      "pixelHeight": 14592,
+      "nativeHeightCap": false,
+      "sha256": "ed04b679bf8453c6b0ce3d26d72e42ece45042e22e8ff469bdeda8dda62f69a2"
+    }
+  ]
+}
