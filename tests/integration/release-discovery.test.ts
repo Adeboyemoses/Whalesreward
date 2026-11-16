@@ -382,7 +382,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         operationId: newId(),
       }),
     ).rejects.toThrow();
-    expect((await x.discovery.pending(x.token, {})).summary.pending).toBe(1);
+    expect((await x.discovery.pending(x.token, {})).summary.pending).toBe("1");
   });
   it("RD-03 preparation sees permission revocation committed while waiting for serialization", async () => {
     const x = await discoveryFixture(db),
@@ -415,7 +415,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       id = await propose(x);
     await addPending(x, id, 105);
     let page = await x.discovery.pending(x.token, { limit: 17 });
-    expect(page.summary.pending).toBe(106);
+    expect(page.summary.pending).toBe("106");
     const seen = page.items.map((r) => r.proposalId);
     const firstCursor = page.nextCursor!;
     const newRows = await addPending(x, id, 1);
@@ -437,7 +437,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         limit: 17,
         cursor: page.nextCursor,
       });
-      expect(page.summary.pending).toBe(106);
+      expect(page.summary.pending).toBe("106");
       seen.push(...page.items.map((r) => r.proposalId));
     }
     expect(new Set(seen).size).toBe(105);
@@ -606,7 +606,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       await waitForBlockedReader();
       await writer.query("COMMIT");
       const result = await pending;
-      expect(result.summary.pending).toBe(2);
+      expect(result.summary.pending).toBe("2");
       expect(result.items.map((r) => r.proposalId)).toContain(
         inserted.proposal,
       );
@@ -674,7 +674,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       );
       const page = await x.discovery.pending(x.token, { limit: 1 });
       expect(page.summary.pending).toBe(
-        allowed.reduce((n, k) => n + 3 + (k === "card" ? 1 : 0), 0),
+        String(allowed.reduce((n, k) => n + 3 + (k === "card" ? 1 : 0), 0)),
       );
       expect(allowed).toContain(page.items[0]!.kind);
       for (const kind of kinds)
