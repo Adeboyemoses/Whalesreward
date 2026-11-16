@@ -19,12 +19,13 @@ import { adminTime } from "@/client/admin-display";
 import { Button, DataTable, KeyValueList, Notice, TextField } from "@/ui";
 import { PageHead, Sheet, productNames } from "./station-common";
 import { useAdminSession } from "./session";
-const locked =
-  "Campaign dates can't be changed until Whales approves the timing rules";
+import {
+  GiveawayEditor,
+  timingReason,
+  campaignTime,
+} from "./settings-giveaway";
 const daysText = (days: number | null) =>
   days === null ? "Not set" : `${days} ${days === 1 ? "day" : "days"}`;
-const instantText = (value: string | null | undefined) =>
-  value ? adminTime(value) : "Not set";
 const copyText = (value: Settings["retention"]["storedCopyPolicy"]) =>
   ({
     unconfigured: "Not configured",
@@ -41,11 +42,23 @@ function Timing({
   return (
     <KeyValueList
       items={[
-        { label: "Launch", value: instantText(timing?.launchAt) },
-        { label: "Purchase start", value: instantText(timing?.purchaseStart) },
+        {
+          label: "Launch",
+          value: campaignTime(timing?.launchAt, timing?.timezone ?? timezone),
+        },
+        {
+          label: "Purchase start",
+          value: campaignTime(
+            timing?.purchaseStart,
+            timing?.timezone ?? timezone,
+          ),
+        },
         {
           label: "Purchase cutoff",
-          value: instantText(timing?.purchaseCutoff),
+          value: campaignTime(
+            timing?.purchaseCutoff,
+            timing?.timezone ?? timezone,
+          ),
         },
         {
           label: "Upload grace period",
@@ -56,7 +69,10 @@ function Timing({
         },
         {
           label: "Upload deadline (derived)",
-          value: instantText(timing?.uploadDeadline),
+          value: campaignTime(
+            timing?.uploadDeadline,
+            timing?.timezone ?? timezone,
+          ),
         },
         { label: "Time zone", value: timing?.timezone ?? timezone },
       ]}
@@ -364,6 +380,18 @@ function SettingsContent({
               before starting another change.
             </Notice>
           )}
+          {store.lists.has("settings:giveaway") &&
+          (store.lists.get("settings:giveaway") as { pending?: unknown })
+            ?.pending &&
+          !giveaway ? (
+            <Notice role="alert">
+              A campaign confirmation is unresolved.{" "}
+              <Link href="/admin/settings/giveaway/confirm">
+                Return to confirmation
+              </Link>{" "}
+              before starting another timing change.
+            </Notice>
+          ) : null}
           {overview ? (
             <>
               <Notice tone="warning">
@@ -375,9 +403,11 @@ function SettingsContent({
                   title="Giveaway timing"
                   badge={
                     <span className="wr-pill wr-sm">
-                      {settings.campaign?.timing.policyVersion
+                      {settings.timingLocked
                         ? "Locked"
-                        : "Not configured"}
+                        : settings.campaign
+                          ? "Editable before start"
+                          : "Not configured"}
                     </span>
                   }
                 >
@@ -389,9 +419,15 @@ function SettingsContent({
                     className="wr-btn wr-btn-secondary wr-settings-inline-action"
                     href="/admin/settings/giveaway"
                   >
-                    View giveaway settings
+                    {session.role?.isOwner &&
+                    settings.timingPolicyVersion &&
+                    !settings.timingLocked
+                      ? settings.campaign
+                        ? "Edit giveaway settings"
+                        : "Create campaign"
+                      : "View giveaway settings"}
                   </Link>
-                  <p className="wr-help">{locked}</p>
+                  <p className="wr-help">{timingReason(settings, session)}</p>
                 </Sheet>
                 <Sheet
                   title="Photo retention"
@@ -490,7 +526,9 @@ function SettingsContent({
                       setting:
                         change.section === "retention"
                           ? "Photo retention"
-                          : "Giveaway timing",
+                          : change.kind === "create"
+                            ? "Campaign creation"
+                            : "Giveaway timing",
                       before: <HistoryValue change={change} side="before" />,
                       after: <HistoryValue change={change} side="after" />,
                       by: (
@@ -523,23 +561,16 @@ function SettingsContent({
               )}
             </>
           ) : giveaway ? (
-            <div className="wr-two-col">
-              <Sheet title="Campaign dates">
-                <Notice role="status">{locked}</Notice>
-                <Timing
-                  timing={settings.campaign?.timing}
-                  timezone={settings.station.timezone}
-                />
-              </Sheet>
-              <Sheet quiet title="Separate purchase and upload deadlines">
-                <p>
-                  A grace period does not extend the purchase cutoff. Complete
-                  evidence, eligibility checks and final reconciliation are
-                  required before announcing winners.
-                </p>
-                <p>Timing settings alone do not finalize a leaderboard.</p>
-              </Sheet>
-            </div>
+            <GiveawayEditor
+              settings={settings}
+              session={session}
+              api={api}
+              confirming={path[2] === "confirm"}
+              onSaved={(message) => {
+                setSuccess(message);
+                reload((x) => x + 1);
+              }}
+            />
           ) : (
             draft && (
               <div className="wr-two-col wr-settings-editor">
@@ -804,16 +835,16 @@ function HistoryValue({
   if (value === null) return <span>Not set</span>;
   return (
     <span>
-      Launch: {instantText(value.launchAt)}
+      Launch: {campaignTime(value.launchAt, value.timezone)}
       <br />
-      Start: {instantText(value.purchaseStart)}
+      Start: {campaignTime(value.purchaseStart, value.timezone)}
       <br />
-      Cutoff: {instantText(value.purchaseCutoff)}
+      Cutoff: {campaignTime(value.purchaseCutoff, value.timezone)}
       <br />
       Grace:{" "}
       {value.graceHours === null ? "Not set" : `${value.graceHours} hours`}
       <br />
-      Deadline: {instantText(value.uploadDeadline)}
+      Deadline: {campaignTime(value.uploadDeadline, value.timezone)}
       <br />
       {value.timezone}
     </span>

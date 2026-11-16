@@ -78,6 +78,7 @@ export class AdminSessionStore {
           s.account.id,
           s.state,
           s.role?.id,
+          s.role?.isOwner,
           [...(s.permissions ?? [])].sort(),
         ])
       : "";

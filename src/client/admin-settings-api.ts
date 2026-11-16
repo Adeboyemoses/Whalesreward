@@ -2,6 +2,10 @@ import { z } from "zod";
 import { adminRequest, AdminError, adminOperationId } from "./admin-api";
 import {
   settingsSchema,
+  timingReviewSchema,
+  timingConfirmSchema,
+  reviewedSettingsSchema,
+  timingSchema,
   settingsChangeSchema,
   retentionReviewSchema,
   retentionConfirmSchema,
@@ -24,6 +28,36 @@ const reviewSchema = z.strictObject({
   }),
   asOf: z.iso.datetime({ offset: true }),
 });
+const timingReviewResult = z.strictObject({
+  section: z.literal("giveaway"),
+  expectedVersion: z.number().int().positive(),
+  expectedCampaignVersion: z.number().int().positive().nullable(),
+  before: settingsSchema,
+  after: reviewedSettingsSchema,
+  proposal: z.strictObject({
+    kind: z.enum(["create", "update"]),
+    campaignId: z.string().uuid().nullable(),
+    launchAt: z.string(),
+    purchaseStart: z.string(),
+    purchaseCutoff: z.string(),
+    timezone: z.string(),
+    graceHours: z.number(),
+    reason: z.string(),
+  }),
+  reviewDigest: retentionConfirmSchema.shape.reviewDigest,
+  policyVersions: z.strictObject({
+    timing: z.string().nullable(),
+    retention: z.string().nullable(),
+  }),
+  asOf: z.iso.datetime({ offset: true }),
+});
+export type TimingReview = z.infer<typeof timingReviewResult>;
+export type TimingProposal = z.infer<typeof timingReviewSchema>;
+export type FrozenTiming = Readonly<{
+  body: Readonly<z.infer<typeof timingConfirmSchema>>;
+  before: z.infer<typeof timingSchema> | null;
+  after: z.infer<typeof timingSchema>;
+}>;
 const historySchema = z.strictObject({
   items: z.array(settingsChangeSchema),
   nextCursor: z.string().nullable(),
@@ -54,6 +88,110 @@ export class AdminSettingsApi {
       ...(input.cursor ? { cursor: input.cursor } : {}),
     });
     return this.read(`settings/history?${query}`, historySchema);
+  }
+  async reviewTiming(input: TimingProposal): Promise<TimingReview> {
+    const proposal = timingReviewSchema.parse(input);
+    const review = await this.read(
+      "settings/giveaway/review",
+      timingReviewResult,
+      proposal,
+    );
+    const normalized = {
+      kind: proposal.kind,
+      campaignId: proposal.campaignId,
+      launchAt: new Date(proposal.launchAt).toISOString(),
+      purchaseStart: new Date(proposal.purchaseStart).toISOString(),
+      purchaseCutoff: new Date(proposal.purchaseCutoff).toISOString(),
+      timezone: proposal.timezone,
+      graceHours: proposal.graceHours,
+      reason: proposal.reason,
+    };
+    const campaign = review.after.campaign;
+    if (
+      review.expectedVersion !== proposal.expectedVersion ||
+      review.before.version !== proposal.expectedVersion ||
+      review.expectedCampaignVersion !== proposal.expectedCampaignVersion ||
+      !same(review.proposal, normalized) ||
+      !campaign ||
+      (proposal.kind === "create"
+        ? review.before.campaign !== null || campaign.id !== null
+        : review.before.campaign?.id !== proposal.campaignId ||
+          review.before.campaign.version !== proposal.expectedCampaignVersion ||
+          campaign.id !== proposal.campaignId) ||
+      !same(review.after, { ...review.before, campaign }) ||
+      !same(review.after.retention, review.before.retention) ||
+      review.policyVersions.timing !== review.before.timingPolicyVersion ||
+      !review.policyVersions.timing ||
+      campaign.timing.policyVersion !== review.policyVersions.timing ||
+      [
+        "launchAt",
+        "purchaseStart",
+        "purchaseCutoff",
+        "timezone",
+        "graceHours",
+      ].some(
+        (key) =>
+          campaign.timing[key as keyof typeof campaign.timing] !==
+          normalized[key as keyof typeof normalized],
+      )
+    )
+      throw new AdminError("invalid_response", 200);
+    const timing = campaign.timing;
+    if (
+      !timing.purchaseCutoff ||
+      !timing.uploadDeadline ||
+      new Date(timing.uploadDeadline).getTime() !==
+        new Date(timing.purchaseCutoff).getTime() +
+          proposal.graceHours * 3600000 ||
+      !Number.isSafeInteger(proposal.graceHours) ||
+      proposal.graceHours < 0 ||
+      review.before.timingLocked ||
+      (review.before.campaign &&
+        !same(campaign, { ...review.before.campaign, timing }))
+    )
+      throw new AdminError("invalid_response", 200);
+    return review;
+  }
+  freezeTiming(review: TimingReview): FrozenTiming {
+    return Object.freeze({
+      body: Object.freeze(
+        timingConfirmSchema.parse({
+          ...review.proposal,
+          expectedVersion: review.expectedVersion,
+          expectedCampaignVersion: review.expectedCampaignVersion,
+          reviewDigest: review.reviewDigest,
+          operationId: adminOperationId(),
+        }),
+      ),
+      before: review.before.campaign
+        ? Object.freeze({ ...review.before.campaign.timing })
+        : null,
+      after: Object.freeze({ ...review.after.campaign!.timing }),
+    });
+  }
+  async confirmTiming(frozen: FrozenTiming): Promise<SettingsChange> {
+    const parsed = settingsChangeSchema.safeParse(
+      await this.request<unknown>(
+        "settings/giveaway/confirm",
+        frozen.body,
+        "POST",
+        frozen.body.operationId,
+      ),
+    );
+    if (!parsed.success) throw new AdminError("invalid_response", 201);
+    const result = parsed.data;
+    if (
+      result.section !== "giveaway" ||
+      result.kind !== frozen.body.kind ||
+      (frozen.body.kind === "update" &&
+        result.campaignId !== frozen.body.campaignId) ||
+      result.reason !== frozen.body.reason ||
+      result.version !== frozen.body.expectedVersion + 1 ||
+      !same(result.before, frozen.before) ||
+      !same(result.after, frozen.after)
+    )
+      throw new AdminError("invalid_response", 201);
+    return result;
   }
   async review(input: RetentionProposal) {
     const proposal = retentionReviewSchema.parse(input);
@@ -149,13 +287,21 @@ export function settingsMessage(error: unknown): string {
         version_conflict:
           "These settings changed. Reload the current settings and review your changes again before confirming.",
         no_change:
-          "The proposed retention period is already saved. No settings change was recorded.",
+          "The proposed values are already saved. No settings change was recorded.",
+        owner_required:
+          "Only an Owner with settings permission can create or change campaign timing.",
+        campaign_exists:
+          "A campaign has already been created. Reload settings and review the saved campaign.",
+        timing_locked:
+          "Campaign timing is locked because purchases have started or a result has been saved.",
+        timing_invalid:
+          "Check the launch, start, cutoff, timezone and whole grace hours. Start must be in the future and cutoff must follow start.",
         retention_invalid:
           "Enter positive whole days, or leave blank for Not set.",
         invalid_request:
           "Check the retention period and reason. Use a reason without phone numbers or secrets.",
         timing_policy_unconfigured:
-          "Campaign dates can't be changed until Whales approves the timing rules",
+          "Campaign timing policy is not configured. An Owner can enter dates once it is available.",
       } as Record<string, string>
     )[code] ??
     (error instanceof Error
