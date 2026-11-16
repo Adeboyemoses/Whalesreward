@@ -1,3 +1,8 @@
+import { newId } from "../../src/server/lib/ids";
+import {
+  readReadiness,
+  prepareGiveaway,
+} from "../../src/server/modules/giveaway/service";
 import { flagPair, lateRequest } from "../helpers/reports-adversarial-fixture";
 import { beforeEach, afterEach, describe, it, expect } from "vitest";
 import {
@@ -37,7 +42,7 @@ describe("M4 exact leaderboards", () => {
     ]);
   });
   it("I-42 equal spend shares rank across pages despite different transaction counts", async () => {
-    await historicalSale(f.pool, { amount: "2000000" });
+    await historicalSale(f.pool, { amount: "2000000", lateProposal: true });
     await historicalSale(f.pool, {
       amount: "1000000",
       customerId: fixtureId(27),
@@ -56,7 +61,10 @@ describe("M4 exact leaderboards", () => {
     expect(first.summary).toEqual(second.summary);
   });
   it("I-40/I-44 duplicates and pending corrections count live with unit-separated quantities", async () => {
-    const one = await historicalSale(f.pool, { amount: "2000000" });
+    const one = await historicalSale(f.pool, {
+      amount: "2000000",
+      lateProposal: true,
+    });
     const two = await historicalSale(f.pool, {
       amount: "3000000",
       product: "cooking_gas",
@@ -80,6 +88,66 @@ describe("M4 exact leaderboards", () => {
     await expect(
       ranking({ limit: 1, cursor: first.nextCursor }),
     ).rejects.toMatchObject({ code: "read_view_stale" });
+  });
+  it("I-46 missing policy timing and phone checks block initial preparation without audit", async () => {
+    const campaignId = newId();
+    await f.pool.query(
+      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional giveaway',1,true)",
+      [campaignId, fixtureId(8)],
+    );
+    const r = await readReadiness(f.pool, token, campaignId);
+    expect(r.canPrepare).toBe(false);
+    expect(r.canConfirm).toBe(false);
+    expect(r.blockers).toEqual(
+      expect.arrayContaining([
+        "campaign_unconfigured",
+        "reconciliation_policy_unconfigured",
+        "phone_check_required",
+      ]),
+    );
+    const actor = await f.actor(["leaderboards", "giveawayFinalize"]);
+    const before = (
+      await f.pool.query("SELECT count(*)::text n FROM audit_event")
+    ).rows[0].n;
+    await expect(
+      prepareGiveaway(
+        f.pool,
+        actor.token,
+        campaignId,
+        {
+          operationId: newId(),
+          kind: "initial",
+          reason: "Fictional blocked preparation",
+          expectedVersion: r.campaign.version,
+          expectedSettingsVersionId: r.campaign.settingsVersionId,
+          expectedDataVersion: r.campaign.dataVersion,
+          expectedPreviousSnapshotId: null,
+        },
+        config,
+      ),
+    ).rejects.toMatchObject({ code: "reconciliation_policy_unconfigured" });
+    expect(
+      (await f.pool.query("SELECT count(*)::text n FROM audit_event")).rows[0]
+        .n,
+    ).toBe(before);
+  });
+  it("I-46 duplicate and late-correction work remains in readiness blockers", async () => {
+    const one = await historicalSale(f.pool, {
+      amount: "2000000",
+      lateProposal: true,
+    });
+    const two = await historicalSale(f.pool, { amount: "1000000" });
+    await flagPair(f.pool, one.id, two.id);
+    await lateRequest(f.pool, one.id);
+    const campaignId = newId();
+    await f.pool.query(
+      "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional giveaway',1,true)",
+      [campaignId, fixtureId(8)],
+    );
+    const r = await readReadiness(f.pool, token, campaignId);
+    expect(r.counts.corrections).toBe("1");
+    expect(r.counts.duplicateFlags).toBe("1");
+    expect(r.blockers).toContain("reviews_unresolved");
   });
   it("I-07 live permission revocation denies the next leaderboard read", async () => {
     await f.pool.query(
