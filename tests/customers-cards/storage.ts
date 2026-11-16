@@ -3,8 +3,15 @@ import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
 export async function ensureLocalCardBucket() {
   const endpoint =
     process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000";
-  if (!["127.0.0.1", "localhost"].includes(new URL(endpoint).hostname))
-    throw new Error("Storage fixtures require loopback");
+  const local = new URL(endpoint);
+  if (
+    local.protocol !== "http:" ||
+    local.hostname !== "127.0.0.1" ||
+    local.username ||
+    local.password ||
+    !["9000", "19000"].includes(local.port)
+  )
+    throw new Error("Fictional storage requires an approved loopback endpoint");
   const bucket = "whr-e2e-cards";
   const client = new S3Client({
     endpoint,

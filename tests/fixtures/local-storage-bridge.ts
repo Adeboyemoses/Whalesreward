@@ -8,6 +8,19 @@ import type { Page } from "@playwright/test";
  * The calling test must disable traces, screenshots and video.
  */
 export async function installLocalStorageBridge(page: Page) {
+  const endpoint = new URL(
+    process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+  );
+  if (
+    endpoint.protocol !== "http:" ||
+    endpoint.hostname !== "127.0.0.1" ||
+    endpoint.username ||
+    endpoint.password ||
+    !["9000", "19000"].includes(endpoint.port)
+  )
+    throw new Error(
+      "Local storage bridge requires an approved loopback endpoint",
+    );
   await page.route(
     /\/api\/sync\/sales\/[^/]+\/upload-permission$/,
     async (route) => {
@@ -18,7 +31,7 @@ export async function installLocalStorageBridge(page: Page) {
       if (
         url.protocol !== "http:" ||
         url.hostname !== "127.0.0.1" ||
-        url.port !== "9000" ||
+        url.port !== endpoint.port ||
         url.username ||
         url.password
       )
@@ -28,7 +41,7 @@ export async function installLocalStorageBridge(page: Page) {
       await route.fulfill({ response, json });
     },
   );
-  await page.route("https://127.0.0.1:9000/**", async (route) => {
+  await page.route(`https://127.0.0.1:${endpoint.port}/**`, async (route) => {
     const request = route.request();
     const headers = {
       "access-control-allow-origin": "http://127.0.0.1:3000",

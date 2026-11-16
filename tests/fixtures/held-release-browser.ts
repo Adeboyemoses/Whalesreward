@@ -278,6 +278,10 @@ export async function releaseFixture(
     await f.db.query("ROLLBACK");
     throw error;
   }
+  if (browser) {
+    await installReleaseStorageBridge(page);
+    await installReleaseStorageBridge(reviewer);
+  }
   return {
     ...f,
     reviewer,
@@ -308,6 +312,8 @@ export async function boundarySale(
     kind === "card" ? "ambiguous" : "before",
     undefined,
     f.browserBased,
+    entry.basis ?? "amount",
+    entry.medium ?? "vehicle",
   );
   if (kind === "date") {
     await historical(
@@ -366,6 +372,13 @@ export async function boundarySale(
       ],
     );
   }
+  // Fixtures represent original held purchases, before any accepted revision or credit.
+  await historical(
+    f.db,
+    "purchase",
+    "UPDATE purchase SET current_revision_id=NULL WHERE id=$1",
+    [sale.id],
+  );
   return sale;
 }
 
@@ -493,4 +506,52 @@ export async function post(
   const json = await response.json();
   expect(response.status(), json.error?.code ?? "HTTP status").toBe(status);
   return json.data;
+}
+export async function installReleaseStorageBridge(page: Page) {
+  await page.route(
+    /\/api\/admin\/sales\/[^/]+\/(?:release-sheet-uploads\/[^/]+\/upload-url|release-proposals\/[^/]+\/photo-access|photo-access)$/,
+    async (route) => {
+      const response = await route.fetch({ maxRedirects: 0 });
+      if (response.status() !== 200) return route.fulfill({ response });
+      const json = await response.json();
+      const local = new URL(json.data.url);
+      if (
+        local.hostname !== "127.0.0.1" ||
+        local.port !==
+          new URL(
+            process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+          ).port
+      )
+        throw new Error("Unexpected release fixture storage endpoint");
+      local.protocol = "https:";
+      json.data.url = local.href;
+      await route.fulfill({ response, json });
+    },
+  );
+  await page.route(
+    `https://127.0.0.1:${new URL(process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000").port}/**`,
+    async (route) => {
+      const url = new URL(route.request().url());
+      url.protocol = "http:";
+      if (route.request().method() === "OPTIONS")
+        return route.fulfill({
+          status: 204,
+          headers: {
+            "access-control-allow-origin": origin,
+            "access-control-allow-methods": "GET, PUT, OPTIONS",
+            "access-control-allow-headers": "content-type",
+          },
+        });
+      if (!["GET", "PUT"].includes(route.request().method()))
+        return route.abort("blockedbyclient");
+      const response = await route.fetch({ url: url.href, maxRedirects: 0 });
+      await route.fulfill({
+        response,
+        headers: {
+          ...response.headers(),
+          "access-control-allow-origin": origin,
+        },
+      });
+    },
+  );
 }
