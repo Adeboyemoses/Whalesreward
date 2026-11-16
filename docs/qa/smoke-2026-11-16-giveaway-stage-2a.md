@@ -1,0 +1,17 @@
+# WO-app-11 Stage 2a smoke
+
+Use a local fictional station or Earl's authorized pilot setup. This runbook does not authorize configuring deployed data or certifying phones. Stage 2b checklist screens are absent by design. Record browser, build SHA, actor grants, exact server outcome and pass/fail per step.
+
+1. Sign in with leaderboards permission. Open Leaderboards at 1440, 390 and 360px. With no configured campaign, verify “Not configured”, no sample rankings and no finalization. All-time figures, if selected, must be separately labelled recorded totals.
+2. With an explicitly configured fictional campaign and accepted sources, check overall/category spend, equal-spend Shared rank, transactions, separate litres/kilograms and exact currency amounts. Navigate pages; rank is global to the selected category. Empty cooking-gas category stays empty. Change source data between pages: refresh is required, never combine generations.
+3. With sales permission, View purchases opens exact customer-filtered Sales; Back to leaderboard preserves category. Without sales permission, no protected source/purchase link or data appears.
+4. Open Finalize leaderboard. Verify exact launch/start/cutoff/upload deadline/timezone and server as-of. Before cutoff/grace, the server blockers disable preparation. Read the five grouped counts and every returned blocker; do not expect nine granular outcomes. Held/release counts overlap and have no sum. Follow permitted resolution links. Checklist says “not available yet”. Unknown phone-only queues are never zero.
+5. When current API canPrepare is true, supply a non-sensitive reason and Review final snapshot. Reconciliation_required alone must not disable it. This records reconciliation/preview only. Review frozen totals/rows, exclusions, reason, creator, expiry, predecessor and evidence IDs. Keep reviewing does not save a result. Direct confirmation URL without reviewed context explains the missing review.
+6. Confirm explicitly. Verify receipt “Snapshot N saved”, actor/time/reason, frozen ranks/names, source revision IDs, quantities/currencies, evidence/deadline facts and lineage. Reload: saved result remains. No prize action exists.
+7. Simulate a lost response in local tests only: pending action is uncertain, conflicting edits locked, same request retry returns historical receipt and creates no second result. Navigate away/back while pending. Never claim saved on network or malformed response alone. Changed data/expired preview/permission revocation requires the appropriate refusal and fresh review.
+8. With giveawayRevise (independent from finalize), accept a normal source correction using its existing flow, then prepare audited revision with a reason and confirm the frozen change comparison. Select predecessor: earlier names/ranks/sources/timing/reason are unchanged. A cleared flag/rejected proposal with identical effective result returns unchanged reconciliation, no extra snapshot.
+9. Sign out or change authority during a pending request: content/draft clears and delayed responses do not restore it. Check keyboard focus, reason labels, visible error/status announcements, wrapping IDs and 48px phone controls; no page horizontal overflow.
+
+## Execution record
+
+Pending implementation and final-head verification. Automated cases and fidelity report will be linked here before READY-2a. Real station phone/pilot smoke remains Earl's acceptance step.
