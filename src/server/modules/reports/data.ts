@@ -112,7 +112,12 @@ const decimal = (v: bigint) => {
     .replace(/0+$/, "")
     .replace(/\.$/, "");
 };
-export function totals(rows: ReportSource[]): Totals {
+export function totals(
+  rows: Pick<
+    ReportSource,
+    "amountKobo" | "currency" | "quantity" | "product" | "unit"
+  >[],
+): Totals {
   const money = new Map<string, bigint>(),
     products = new Map<
       string,

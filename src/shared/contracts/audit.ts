@@ -1094,9 +1094,235 @@ export const m4ReportAuditSchema = z
     }
   });
 export type M4ReportAuditEvent = z.infer<typeof m4ReportAuditSchema>;
+const giveawayAuditValues = {
+  previewId: auditId,
+  reconciliationId: auditId,
+  snapshotId: auditId,
+  previousSnapshotId: auditId,
+  settingsVersionId: auditId,
+  phoneCheckId: auditId,
+  phoneCensusId: auditId,
+  phoneId: auditId,
+  phoneExclusionId: auditId,
+  managerAdminId: auditId,
+  proposerAdminId: auditId,
+  approverAdminId: auditId,
+  campaignVersion: positive,
+  snapshotNumber: positive,
+  censusVersion: positive,
+  phoneVersion: positive,
+  exclusionVersion: positive,
+  phoneExclusionState: z.enum([
+    "pending",
+    "approved",
+    "rejected",
+    "superseded",
+  ]),
+  actionKind: z.enum(["initial", "revision"]),
+  sourceDataVersion: reportAuditValues.sourceDataVersion,
+  reconciliationPolicyVersion: text,
+  qualifyingSpendKobo: z.string().regex(/^(0|[1-9][0-9]{0,29})$/),
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  litres: z.string().regex(/^(0|[1-9][0-9]{0,23})(\.[0-9]{1,6})?$/),
+  kilograms: z.string().regex(/^(0|[1-9][0-9]{0,23})(\.[0-9]{1,6})?$/),
+  purchaseCount: z.string().regex(/^(0|[1-9][0-9]*)$/),
+  customerCount: z.string().regex(/^(0|[1-9][0-9]*)$/),
+  tieRule: z.literal("competition_v1"),
+};
+export const giveawayAuditMapping = {
+  giveaway_review_prepared: [
+    "phoneCheckId",
+    "previewId",
+    "reconciliationId",
+    "previousSnapshotId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "settingsVersionId",
+    "reconciliationPolicyVersion",
+  ],
+  giveaway_reconciled_unchanged: [
+    "phoneCheckId",
+    "reconciliationId",
+    "snapshotId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "settingsVersionId",
+    "reconciliationPolicyVersion",
+  ],
+  giveaway_finalized: [
+    "phoneCheckId",
+    "reconciliationId",
+    "reconciliationPolicyVersion",
+    "snapshotId",
+    "previousSnapshotId",
+    "snapshotNumber",
+    "campaignVersion",
+    "sourceDataVersion",
+    "settingsVersionId",
+    "qualifyingSpendKobo",
+    "currency",
+    "litres",
+    "kilograms",
+    "purchaseCount",
+    "customerCount",
+    "tieRule",
+  ],
+  giveaway_revised: [
+    "phoneCheckId",
+    "reconciliationId",
+    "reconciliationPolicyVersion",
+    "snapshotId",
+    "previousSnapshotId",
+    "snapshotNumber",
+    "campaignVersion",
+    "sourceDataVersion",
+    "settingsVersionId",
+    "qualifyingSpendKobo",
+    "currency",
+    "litres",
+    "kilograms",
+    "purchaseCount",
+    "customerCount",
+    "tieRule",
+  ],
+  giveaway_manager_designated: ["managerAdminId", "campaignVersion"],
+  giveaway_phone_census_recorded: [
+    "phoneCensusId",
+    "censusVersion",
+    "managerAdminId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "actionKind",
+  ],
+  giveaway_phone_check_recorded: [
+    "phoneCheckId",
+    "phoneCensusId",
+    "censusVersion",
+    "managerAdminId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "settingsVersionId",
+    "reconciliationPolicyVersion",
+    "actionKind",
+  ],
+  giveaway_phone_unavailable_proposed: [
+    "phoneExclusionId",
+    "phoneId",
+    "censusVersion",
+    "phoneVersion",
+    "exclusionVersion",
+    "phoneExclusionState",
+    "proposerAdminId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "actionKind",
+  ],
+  giveaway_phone_unavailable_approved: [
+    "phoneExclusionId",
+    "phoneId",
+    "exclusionVersion",
+    "phoneExclusionState",
+    "proposerAdminId",
+    "approverAdminId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "actionKind",
+  ],
+  giveaway_phone_unavailable_rejected: [
+    "phoneExclusionId",
+    "phoneId",
+    "exclusionVersion",
+    "phoneExclusionState",
+    "proposerAdminId",
+    "approverAdminId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "actionKind",
+  ],
+  giveaway_phone_unavailable_superseded: [
+    "phoneExclusionId",
+    "phoneId",
+    "exclusionVersion",
+    "phoneExclusionState",
+    "proposerAdminId",
+    "campaignVersion",
+    "sourceDataVersion",
+    "actionKind",
+  ],
+} as const;
+const giveawayChanges = Object.entries(giveawayAuditValues).map(
+  ([field, value]) =>
+    z.strictObject({
+      field: z.literal(field),
+      before: value.nullable(),
+      after: value.nullable(),
+    }),
+);
+export const m4GiveawayAuditSchema = z
+  .strictObject({
+    ...base,
+    schemaVersion: z.literal(2),
+    area: z.literal("giveaway"),
+    action: z.enum(
+      Object.keys(giveawayAuditMapping) as [
+        keyof typeof giveawayAuditMapping,
+        ...(keyof typeof giveawayAuditMapping)[],
+      ],
+    ),
+    actor: auditActorSchema,
+    originatingSeller: z.null(),
+    target: z.strictObject({
+      kind: z.literal("campaign"),
+      id: auditId,
+      code,
+      subjectAtEvent: z.null(),
+    }),
+    correlationId: auditId,
+    changes: z
+      .array(
+        z.discriminatedUnion(
+          "field",
+          giveawayChanges as [
+            (typeof giveawayChanges)[number],
+            ...typeof giveawayChanges,
+          ],
+        ),
+      )
+      .max(100),
+  })
+  .superRefine((v, ctx) => {
+    const required: readonly string[] = giveawayAuditMapping[v.action],
+      fields = v.changes.map((c) => c.field);
+    if (
+      fields.length !== required.length ||
+      new Set(fields).size !== fields.length ||
+      required.some((f) => !fields.includes(f))
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Invalid giveaway audit mapping",
+      });
+    if (
+      v.action === "giveaway_phone_unavailable_superseded"
+        ? v.actor.kind !== "system" || v.actor.service !== "reconciliation"
+        : v.actor.kind !== "admin" || !v.operationId
+    )
+      ctx.addIssue({ code: "custom", message: "Invalid giveaway actor" });
+    for (const c of v.changes)
+      if (
+        c.after === null &&
+        !["previousSnapshotId", "settingsVersionId"].includes(c.field)
+      )
+        ctx.addIssue({
+          code: "custom",
+          message: "Invalid absent giveaway value",
+        });
+  });
+export type M4GiveawayAuditEvent = z.infer<typeof m4GiveawayAuditSchema>;
 export const m4AuditSchema = z.union([
   m4SettingsAuditSchema,
   m4ReportAuditSchema,
+  m4GiveawayAuditSchema,
 ]);
 export const auditEventSchema = z.union([
   m4AuditSchema,
