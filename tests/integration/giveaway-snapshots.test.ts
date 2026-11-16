@@ -1,3 +1,4 @@
+import { seedHistorical } from "../helpers/review-evidence-fixture";
 import { z } from "zod";
 import { it, expect } from "vitest";
 import {
@@ -610,6 +611,74 @@ it("I-11 revoked finalization grant after review leaves no snapshot or confirmat
       (
         await f.pool.query(
           "SELECT count(*)::text n FROM audit_event WHERE action='giveaway_finalized' AND target_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe("0");
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("I-46 stale settings predecessor digest and expired review cannot confirm a snapshot", async () => {
+  const f = await giveawayFixture();
+  try {
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional stale guards",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+        .object({ id: z.string(), contentDigest: z.string() })
+        .parse(prepared.data),
+      body = {
+        previewId: p.id,
+        contentDigest: p.contentDigest,
+        ...(await f.guard()),
+      };
+    for (const [patch, code] of [
+      [{ expectedSettingsVersionId: newId() }, "version_conflict"],
+      [{ expectedPreviousSnapshotId: newId() }, "snapshot_superseded"],
+      [{ contentDigest: "b".repeat(64) }, "preview_mismatch"],
+    ] as const) {
+      await expect(
+        confirmGiveaway(
+          f.pool,
+          f.token,
+          f.campaignId,
+          { operationId: newId(), ...body, ...patch },
+          undefined,
+          config,
+        ),
+      ).rejects.toMatchObject({ code });
+    }
+    await seedHistorical(
+      f.pool,
+      "giveaway_preview",
+      "UPDATE giveaway_preview SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",
+      [p.id],
+    );
+    await expect(
+      confirmGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        { operationId: newId(), ...body },
+        undefined,
+        config,
+      ),
+    ).rejects.toMatchObject({ code: "preview_expired" });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
           [f.campaignId],
         )
       ).rows[0].n,
