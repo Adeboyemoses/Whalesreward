@@ -65,3 +65,16 @@ Parameterized names below expand `%s` with the listed cases. Service, policy and
 Giveaway integration and its actual SR-06 finalization/revision/unchanged-reconciliation tests remain with WO-core-12 (WHR-22), per Earl’s WHR-155 staged-delivery decision; the real complete-install gate stays unconfigured. The outside-campaign test proves the retained conclusion only, not giveaway filtering. No helper/mocked installation test is counted as initial/revision/unchanged-finalization evidence.
 
 HTTP boundary unit suite `src/server/modules/reviews/release-http.test.ts` covers all eight actions: session/route IDs, safe errors, rate retry, mutating origin checks, 32 KiB JSON ceiling, duplicate query rejection, replay status and purchase URL limit. These units supplement rather than replace domain PostgreSQL tests.
+
+## Retained SR-06 hooks — staged delivery
+
+`tests/integration/held-release-hooks.test.ts` directly exercises `pendingReleaseBlockers` and the PostgreSQL reporting-generation trigger (nine cases):
+
+- `SR-06 hook %s transition removes pending blocker and advances generation with dirty reconciliation` (approved, rejected, superseded).
+- `SR-06 hook stale pending and deactivated policy remain blocking without generation reinterpretation`.
+- `SR-06 hook %s rollback restores generation dirty bit blocker history and receipts` (proposal, approval).
+- `SR-06 hook upload reservation alone does not dirty campaign advance generation or add blocker`.
+- `SR-06 hook blocker union counts each purchase once by kind and excludes other stations`.
+- `SR-06 state trigger alone advances exactly one station generation and rolls back with its transition`.
+
+These tests use real PostgreSQL, with only the dormant installation gate mocked. Snapshot rows are fixtures used to assert dirty-generation propagation and retained bytes; no finalization, revision or unchanged-reconciliation endpoint is implemented or verified. Those actual SR-06 workflows remain with WHR-22.
