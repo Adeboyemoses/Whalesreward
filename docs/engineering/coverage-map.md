@@ -851,7 +851,7 @@ EM typecheck/lint/build and 893 unit tests PASS; focused desktop/phone 40 and fi
 
 | Invariants | Named evidence | Status |
 |---|---|---|
-| I-07, I-09, I-11 | `leaderboards-real.spec.ts`: leaderboard-only viewer cannot inspect purchases/finalize; revoked authority clears pending preview; `admin-giveaway-api.test.ts` session-epoch response guards | on-staging client permission boundaries; server authority unchanged |
+| I-07, I-09, I-11 | `leaderboards-real.spec.ts`: leaderboard-only viewer cannot inspect purchases/finalize; revoked authority clears pending preview; `src/client/admin-session.test.ts` session-epoch response guards | on-staging client permission boundaries; server authority unchanged |
 | I-40, I-41, I-46 | `leaderboards-real.spec.ts`: same-operation uncertain retry across navigation, owned preview/explicit save, immutable history after identity/accepted-source changes, unchanged reconciliation and stale history cursor recovery; `leaderboards-protocol.spec.ts`: real HTTP replay and byte-equal earlier sources | on-staging confirmation/revision client; existing server writes unchanged |
 | I-42, I-43, I-44 | `leaderboards-real.spec.ts`: exact spend, shared ranks, category paging, changed generations and separately labelled configured all-time query; adapter tests assert exact outgoing query fields | on-staging live ranking UI; no tie breaker or mixed-unit total |
 | I-45 | `leaderboards-real.spec.ts`: unset campaign, grouped actual blockers and honest unavailable checklist; native E02 captures show exact server timing/deadlines | on-staging grouped summary only; no fabricated per-check status |

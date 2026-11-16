@@ -23,6 +23,6 @@ WO-app-11 (WHR-23), Stage 2a only: READY-2a since 2026-11-16
 - Earl's station/phone smoke remains pending. Checklist forms are unavailable; current endpoints expose grouped evidence only.
 - Existing CI fixture defects: WHR-86 exact 24-hour timestamps, WHR-142 shared settings race, WHR-169 waiting-worker retry. Assertions/constraints/timeouts unchanged.
 - WHR-173 corrects overstated QA prose in this separate records PR: keyboard/focus and horizontal table-scroll interactions remain manual checks; CI covers width/control-height geometry and exercised flows.
-- Feature dispatches 18 exceed the high-tier flag of eight; final review stayed within three rounds, no escalation. Records review is separate. Two inherited image lint warnings remain.
+- Feature dispatches 18 exceed the high-tier flag of eight; final review stayed within three rounds, no escalation. Records review is separate; its test-file attribution fix was checked in round 2. Two inherited image lint warnings remain.
 
-dispatches=19 prs=2 rounds_max=3 escalations=0 model=unknown
+dispatches=20 prs=2 rounds_max=3 escalations=0 model=unknown
