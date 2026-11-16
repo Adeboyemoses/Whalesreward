@@ -138,6 +138,45 @@ describe("P-30 trusted complete-photo receipt", () => {
       receipt_at: before[0].receipt_at,
     });
   });
+  it("P-30 non-superuser cannot rewrite or truncate trusted receipt history", async () => {
+    const p = await pending();
+    await p.h.sync.finalize(p.f.token, p.purchaseId, p.body);
+    const role = `receipt_${newId().replaceAll("-", "")}`;
+    const schema = (await db.pool.query("SELECT current_schema() AS name"))
+      .rows[0].name;
+    await db.pool.query(
+      `CREATE ROLE ${role} NOSUPERUSER NOCREATEDB NOCREATEROLE`,
+    );
+    const client = await db.pool.connect();
+    try {
+      await client.query(`GRANT USAGE ON SCHEMA ${schema} TO ${role}`);
+      await client.query(
+        `GRANT SELECT,UPDATE,DELETE,TRUNCATE ON photo_receipt_fact,photo_receipt_observation TO ${role}`,
+      );
+      await client.query(`SET ROLE ${role}`);
+      for (const table of ["photo_receipt_fact", "photo_receipt_observation"]) {
+        await expect(
+          client.query(
+            `UPDATE ${table} SET receipt_at=clock_timestamp() WHERE purchase_id=$1`,
+            [p.purchaseId],
+          ),
+        ).rejects.toThrow("append-only");
+        await expect(
+          client.query(`DELETE FROM ${table} WHERE purchase_id=$1`, [
+            p.purchaseId,
+          ]),
+        ).rejects.toThrow("append-only");
+      }
+      await expect(
+        client.query("TRUNCATE photo_receipt_fact,photo_receipt_observation"),
+      ).rejects.toThrow("append-only");
+    } finally {
+      await client.query("RESET ROLE");
+      await client.query(`DROP OWNED BY ${role}`);
+      await client.query(`DROP ROLE ${role}`);
+      client.release();
+    }
+  });
   it("P-30 concurrent same-byte retries retain one observation and one final fact", async () => {
     const p = await pending();
     const results = await Promise.allSettled([
