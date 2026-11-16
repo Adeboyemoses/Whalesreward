@@ -26,7 +26,7 @@ export async function handleReleaseDiscovery(
     Vary: "Cookie",
   });
   try {
-    const query: Record<string, string> = {};
+    const query: Record<string, string> = Object.create(null);
     for (const [key, value] of new URL(request.url).searchParams) {
       if (Object.hasOwn(query, key))
         throw new AuthError("invalid_request", 400);

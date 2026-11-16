@@ -6,7 +6,11 @@ import type {
 } from "../../../shared/contracts/held-release";
 import { parseQuantity } from "../../../shared/quantity";
 import { AuthError } from "../auth/errors";
-import { resolveEvidenceSources, trustedMicros } from "./evidence-resolvers";
+import {
+  resolveEvidenceSources,
+  trustedMicros,
+  priceAuditMatches,
+} from "./evidence-resolvers";
 import {
   releaseEvidencePredicates as rules,
   intervalDay,
@@ -38,36 +42,58 @@ async function structural(
 ) {
   const f = await resolveEvidenceSources(db, purchaseId, meterAssetId, false);
   if (!f.original.customer_id) return exclude("history_incomplete");
-  for (const [history, field] of [
+  const histories = [
     [f.prices, "version"],
     [f.assignments, "assignment_version"],
     [f.settings, "timing_history_version"],
-  ] as const) {
-    if (
-      (field !== "timing_history_version" && !history.length) ||
-      history.some((row, i) => row[field] !== i + 1)
-    )
-      return exclude("history_incomplete");
-    if (
+  ] as const;
+  // Inspect every history before choosing a categorical reason. A malformed
+  // earlier array must not mask missing data in a later one (T-20 enum order).
+  const incomplete =
+    histories.some(
+      ([history, field]) =>
+        (field !== "timing_history_version" && !history.length) ||
+        history.some((row, i) => row[field] !== i + 1),
+    ) ||
+    f.settings.some((s) => s.timing_history_complete !== true) ||
+    !f.prices.some((p) => p.id === f.original.price_version_id) ||
+    f.prices.some(
+      (p) =>
+        f.audits.filter(
+          (a) =>
+            a.action === "price_activated" &&
+            a.target_id === f.original.product_id &&
+            priceAuditMatches(a, p),
+        ).length !== 1,
+    );
+  if (incomplete) return exclude("history_incomplete");
+  const contradictory =
+    histories.some(([history]) =>
       history.some(
         (row, i) =>
           i > 0 &&
           BigInt(trustedMicros(row.effective_from)) <=
             BigInt(trustedMicros(history[i - 1]!.effective_from)),
-      )
-    )
-      return exclude("history_contradictory");
-  }
-  if (
+      ),
+    ) ||
     f.assignments.some(
       (row, i) =>
         i < f.assignments.length - 1 &&
         (!row.effective_until ||
           BigInt(trustedMicros(row.effective_until)) >
             BigInt(trustedMicros(f.assignments[i + 1]!.effective_from))),
-    )
-  )
-    return exclude("history_contradictory");
+    ) ||
+    f.settings.some(
+      (s) =>
+        s.purchase_start &&
+        s.purchase_cutoff &&
+        s.upload_deadline &&
+        (BigInt(trustedMicros(s.purchase_start)) >
+          BigInt(trustedMicros(s.purchase_cutoff)) ||
+          BigInt(trustedMicros(s.upload_deadline)) <
+            BigInt(trustedMicros(s.purchase_cutoff))),
+    );
+  if (contradictory) return exclude("history_contradictory");
   let I;
   try {
     I = rules.intervalFor(f).interval;
@@ -288,7 +314,10 @@ async function structural(
     let ordinary = false;
     try {
       if (target.kind === "price") {
-        rules.price(f, I, false);
+        // P-26 is explicitly unconfigured in the installed v2 package. A
+        // uniform historical rate alone is not an available correct-meter
+        // outcome; only a lawful accept-captured conclusion proves settlement.
+        rules.price(f, I);
         ordinary = true;
       } else if (target.kind === "date") {
         rules.date(f, I, intervalDay(I.L, I.U) ?? undefined);
