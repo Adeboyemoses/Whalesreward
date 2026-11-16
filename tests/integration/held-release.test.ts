@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { evidenceDatabase } from "../helpers/review-evidence-fixture";
 import { fixtureId } from "../helpers/sync-fixture";
 import { newId } from "../../src/server/lib/ids";
@@ -109,4 +109,68 @@ describe("P-29 real-Postgres identity and retained history", () => {
       client.release();
     }
   });
+});
+
+describe("P-29 structural boundary admission", () => {
+  let database: Awaited<ReturnType<typeof evidenceDatabase>>;
+  beforeAll(async () => {
+    vi.stubEnv("WHR_ENV", "test");
+    vi.stubEnv("NEXT_PHASE", "phase-production-build");
+    vi.stubEnv("BETTER_AUTH_SECRET", randomBytes(32).toString("hex"));
+    database = await evidenceDatabase();
+  }, 30000);
+  afterAll(async () => {
+    await database?.close();
+    vi.unstubAllEnvs();
+  });
+  it.each(["card", "price"] as const)(
+    "SR-01 %s material boundary admits only its independently valid paper range",
+    async (kind) => {
+      const { heldReleaseFixture } =
+        await import("../helpers/held-release-fixture");
+      const { releaseProposalInputSchema } =
+        await import("../../src/shared/contracts/held-release");
+      const { classifyReleaseAdmission } =
+        await import("../../src/server/modules/reviews/release-admission");
+      const x = await heldReleaseFixture(database, kind);
+      const body = releaseProposalInputSchema.parse({
+        ...(await x.h.guard(x.sale.purchaseId)),
+        target: x.target,
+        outcome: "confirm",
+        sheetAssetId: newId(),
+        meterAssetId: x.sale.assetId,
+        facts: x.facts,
+      });
+      const client = await database.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const admission = await classifyReleaseAdmission(
+          client,
+          x.sale.purchaseId,
+          body,
+        );
+        expect(admission.boundaries.length).toBeGreaterThan(0);
+        expect(admission.originalInterval.L).not.toEqual(
+          admission.attestedInterval.L,
+        );
+        expect(admission.conclusions).toHaveLength(1);
+        const disjoint = {
+          ...body,
+          facts: {
+            ...body.facts,
+            observedCapture: {
+              ...body.facts.observedCapture,
+              from: "2026-11-12T12:00:00.000Z",
+              through: "2026-11-12T12:10:00.000Z",
+            },
+          },
+        };
+        await expect(
+          classifyReleaseAdmission(client, x.sale.purchaseId, disjoint),
+        ).rejects.toMatchObject({ code: "evidence_insufficient" });
+      } finally {
+        client.release();
+      }
+    },
+  );
 });

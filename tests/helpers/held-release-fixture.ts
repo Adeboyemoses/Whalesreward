@@ -14,7 +14,22 @@ export async function heldReleaseFixture(
   kind: Kind = "card",
 ) {
   const x = await evidenceFixture(db, kind);
-  const actors = [fixtureId(2), fixtureId(5), x.f.userId];
+  const secondUser = newId();
+  await db.pool.query(
+    "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'admin',$2,$2,'Amina Bello',true,1,false,now())",
+    [secondUser, `reviewer.${secondUser}`],
+  );
+  await db.pool.query(
+    "INSERT INTO admin(id,user_id,admin_code,email_normalized,role_id,version) VALUES($1,$2,$3,$4,$5,1)",
+    [
+      newId(),
+      secondUser,
+      `ADMIN-${secondUser}`,
+      `${secondUser}@example.com`,
+      fixtureId(1),
+    ],
+  );
+  const actors = [fixtureId(2), secondUser, x.f.userId];
   const people = [] as string[];
   for (const user of actors) {
     const person = newId();
@@ -33,7 +48,7 @@ export async function heldReleaseFixture(
     const price = newId();
     await db.pool.query(
       "INSERT INTO product_price_version(id,station_id,product_id,version,rate_kobo,currency,quantity_precision,effective_from,actor_id,reason) VALUES($1,$2,$3,2,110000,'NGN',2,'2026-11-10T12:30:00Z',$4,'Fictional boundary')",
-      [price, x.f.stationId, fixtureId(9), fixtureId(2)],
+      [price, x.f.stationId, fixtureId(9), fixtureId(5)],
     );
     await sourceAudit(
       db.pool,
