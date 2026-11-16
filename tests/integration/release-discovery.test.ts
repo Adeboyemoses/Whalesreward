@@ -311,6 +311,106 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         .admission,
     ).toEqual({ state: "not_admissible", reason: "invalid_capture_bounds" });
   });
+  it.each(["assignment", "settings", "audit", "price"] as const)(
+    "RD-02 incomplete %s history takes precedence over contradictions and invalid bounds",
+    async (missing) => {
+      const x = await discoveryFixture(db, "price");
+      if (missing === "assignment")
+        await seedHistorical(
+          db.pool,
+          "assignment",
+          "UPDATE assignment SET assignment_version=2 WHERE id=$1",
+          [x.f.assignmentId],
+        );
+      if (missing === "settings")
+        await seedHistorical(
+          db.pool,
+          "settings_version",
+          "UPDATE settings_version SET version=3 WHERE station_id=$1",
+          [x.f.stationId],
+        );
+      if (missing === "audit")
+        await seedHistorical(
+          db.pool,
+          "audit_event",
+          "DELETE FROM audit_event WHERE id=$1",
+          [x.priceAudit],
+        );
+      if (missing === "price")
+        await seedHistorical(
+          db.pool,
+          "product_price_version",
+          "UPDATE product_price_version SET version=3 WHERE station_id=$1 AND version=2",
+          [x.f.stationId],
+        );
+      if (missing !== "price")
+        await seedHistorical(
+          db.pool,
+          "product_price_version",
+          "UPDATE product_price_version SET effective_from='2026-11-08T00:00:00Z' WHERE station_id=$1 AND version=2",
+          [x.f.stationId],
+        );
+      await seedHistorical(
+        db.pool,
+        "purchase",
+        "UPDATE purchase SET server_received_at='2026-11-08T00:00:00Z' WHERE id=$1",
+        [x.sale.purchaseId],
+      );
+      expect(
+        (
+          await x.discovery.prepare(x.token, x.sale.purchaseId, {
+            kind: "price",
+          })
+        ).admission,
+      ).toEqual({ state: "not_admissible", reason: "history_incomplete" });
+    },
+  );
+  it("RD-02 uniformly wrong captured price with no meter policy or profile is no material boundary rather than v1 settleable", async () => {
+    const x = await discoveryFixture(db, "price");
+    await seedHistorical(
+      db.pool,
+      "product_price_version",
+      "UPDATE product_price_version SET effective_from='2026-11-09T12:00:00Z' WHERE station_id=$1 AND version=2",
+      [x.f.stationId],
+    );
+    await seedHistorical(
+      db.pool,
+      "audit_event",
+      "UPDATE audit_event SET occurred_at='2026-11-09T12:00:00Z' WHERE action='price_activated' AND after->>'version'='2'",
+    );
+    expect(
+      (
+        await db.pool.query(
+          "SELECT count(*)::int n FROM meter_configuration WHERE station_id=$1",
+          [x.f.stationId],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await db.pool.query(
+          "SELECT count(*)::int n FROM meter_profile_approval",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (await x.discovery.prepare(x.token, x.sale.purchaseId, { kind: "price" }))
+        .admission,
+    ).toEqual({ state: "not_admissible", reason: "no_material_boundary" });
+    await expect(
+      x.svc.propose(x.token, x.sale.purchaseId, x.body),
+    ).rejects.toMatchObject({ code: "evidence_insufficient" });
+  });
+  it("RD-03 preparation preserves the two verified independent admin installation minimum", async () => {
+    const x = await discoveryFixture(db);
+    await db.pool.query(
+      "UPDATE auth_user SET enabled=false WHERE kind='admin' AND id<>$1",
+      [x.actors[0]],
+    );
+    await expect(
+      x.discovery.prepare(x.token, x.sale.purchaseId, { kind: "card" }),
+    ).rejects.toMatchObject({ code: "release_policy_unconfigured" });
+  });
   it("RD-02 positive advisory admission never bypasses invalid sheet facts or disjoint J", async () => {
     const x = await discoveryFixture(db);
     expect(
@@ -449,11 +549,12 @@ describe("T-20 protected preparation and complete pending discovery on real Post
     ).toBe(newRows[0]!.proposal);
     expect(firstCursor).toBeTruthy();
   });
-  it.each(["target", "candidate", "policy", "person"] as const)(
+  it.each(["target", "candidate", "policy", "person", "history"] as const)(
     "RD-03 preparation coherently observes %s change committed before its locked read",
     async (change) => {
       const x = await discoveryFixture(db),
         writer = await db.pool.connect();
+      const candidateId = newId();
       await writer.query("BEGIN");
       await writer.query(
         "SELECT id FROM security_state WHERE id=true FOR UPDATE",
@@ -471,11 +572,34 @@ describe("T-20 protected preparation and complete pending discovery on real Post
             "UPDATE purchase_hold SET state='cancelled',version=version+1 WHERE id=$1",
             [x.holdId],
           );
-        if (change === "candidate")
+        if (change === "candidate") {
           await writer.query(
-            "UPDATE purchase SET version=version+1 WHERE id=$1",
-            [x.sale.purchaseId],
+            "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','price_resolution','based_on_revision_id',r.id,'amount_kobo',1900000,'quantity',19,'calculation_mode','meter_evidence'))).* FROM purchase_revision r WHERE r.id=$1",
+            [x.original, candidateId, newId()],
           );
+          await writer.query(
+            "UPDATE purchase SET resolution_candidate_revision_id=$2,version=version+1 WHERE id=$1",
+            [x.sale.purchaseId, candidateId],
+          );
+        }
+        if (change === "history") {
+          for (const table of ["card", "card_customer_link", "audit_event"])
+            await writer.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+          await writer.query(
+            "UPDATE card SET retired_at='2026-11-10T11:59:00Z' WHERE id=$1",
+            [x.facts.cardId],
+          );
+          await writer.query(
+            "UPDATE card_customer_link SET ended_at='2026-11-10T11:59:00Z' WHERE card_id=$1 AND ended_at IS NOT NULL",
+            [x.facts.cardId],
+          );
+          await writer.query(
+            "UPDATE audit_event SET occurred_at='2026-11-10T11:59:00Z' WHERE target_id=$1 AND action='card_replaced'",
+            [x.facts.cardId],
+          );
+          for (const table of ["card", "card_customer_link", "audit_event"])
+            await writer.query(`ALTER TABLE ${table} ENABLE TRIGGER USER`);
+        }
         if (change === "person")
           await writer.query(
             "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
@@ -508,8 +632,37 @@ describe("T-20 protected preparation and complete pending discovery on real Post
           });
         if (change === "candidate")
           expect(result).toMatchObject({
-            value: { guard: { expectedVersion: x.body.expectedVersion + 1 } },
+            value: {
+              guard: {
+                expectedVersion: x.body.expectedVersion + 1,
+                expectedRevisionId: null,
+              },
+              currentCandidate: {
+                revisionId: candidateId,
+                source: "resolution_candidate",
+                values: {
+                  amountKobo: "1900000",
+                  quantity: "19",
+                  calculation: "meter_evidence",
+                },
+              },
+              original: { amountKobo: "2000000" },
+            },
           });
+        if (change === "history") {
+          expect(result).toMatchObject({
+            value: {
+              guard: { expectedVersion: x.body.expectedVersion },
+              admission: {
+                state: "ordinary_review_required",
+                reason: "v1_settleable",
+              },
+            },
+          });
+          await expect(
+            x.svc.propose(x.token, x.sale.purchaseId, x.body),
+          ).rejects.toMatchObject({ code: "release_not_required" });
+        }
         if (change === "person")
           expect(result).toMatchObject({
             value: {
@@ -713,6 +866,10 @@ describe("T-20 protected preparation and complete pending discovery on real Post
     const x = await discoveryFixture(db);
     for (const [query, purchaseId] of [
       ["kind=card&kind=price", x.sale.purchaseId],
+      ["kind=card&__proto__=anything", x.sale.purchaseId],
+      ["kind=card&__proto__=one&__proto__=two", x.sale.purchaseId],
+      ["__proto__=anything", undefined],
+      ["__proto__=one&__proto__=two", undefined],
       ["kind=card&extra=1", x.sale.purchaseId],
       ["kind=unknown", x.sale.purchaseId],
       ["limit=1&limit=2", undefined],
@@ -933,14 +1090,59 @@ describe("T-20 protected preparation and complete pending discovery on real Post
           config,
         );
         await f.check("revision");
+        if (stage === "unchanged") {
+          const control = await prepareGiveaway(
+            db.pool,
+            x.token,
+            f.campaignId,
+            {
+              operationId: newId(),
+              kind: "revision",
+              reason: "Fictional unchanged baseline",
+              ...(await f.guard()),
+            },
+            config,
+          );
+          expect(control.data).toMatchObject({ state: "unchanged" });
+        }
       }
       await x.svc.propose(x.token, x.sale.purchaseId, {
         ...x.body,
         ...(await x.h.guard(x.sale.purchaseId)),
       });
-      await db.pool.query("UPDATE purchase SET version=version+1 WHERE id=$1", [
-        x.sale.purchaseId,
-      ]);
+      await db.pool.query(
+        stage === "revision"
+          ? "UPDATE purchase SET status='cancelled',version=version+1 WHERE id=$1"
+          : "UPDATE purchase SET version=version+1 WHERE id=$1",
+        [x.sale.purchaseId],
+      );
+      await db.pool.query(
+        "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) VALUES($1,$2,'test',3,$3,'Fictional deactivation')",
+        [
+          newId(),
+          x.f.stationId,
+          {
+            ...x.policy,
+            revision: 3,
+            activation: {
+              state: "inactive",
+              approvalReference: null,
+              activatedAt: null,
+            },
+          },
+        ],
+      );
+      const persisted = () =>
+        Promise.all(
+          [
+            "SELECT to_jsonb(c) data FROM campaign c WHERE id=$1",
+            "SELECT to_jsonb(s) data FROM giveaway_snapshot s WHERE campaign_id=$1 ORDER BY id",
+            "SELECT to_jsonb(r) data FROM giveaway_reconciliation r WHERE campaign_id=$1 ORDER BY id",
+            "SELECT to_jsonb(a) data FROM audit_event a WHERE target_id=$1 ORDER BY id",
+            "SELECT to_jsonb(g) data FROM station_reporting_state g WHERE station_id=(SELECT station_id FROM campaign WHERE id=$1)",
+          ].map(async (sql) => (await db.pool.query(sql, [f.campaignId])).rows),
+        );
+      const before = await persisted();
       await grants([
         "sales",
         "priceReview",
@@ -990,6 +1192,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
           ],
         }),
       ).rejects.toMatchObject({ code: "exclusion_source_invalid" });
+      expect(await persisted()).toEqual(before);
       await restoreGrants();
     },
   );

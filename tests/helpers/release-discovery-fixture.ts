@@ -8,6 +8,31 @@ export async function discoveryFixture(
   kind: Kind = "card",
 ) {
   const x = await heldReleaseRuntimeFixture(db, kind);
+  // Keep the complete-install two-person minimum while separately exercising an unknown viewer.
+  const thirdAdmin = newId(),
+    thirdPerson = newId();
+  await db.pool.query(
+    "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'admin',$2,$2,'Tunde Adebayo',true,1,false,now())",
+    [thirdAdmin, `reviewer.${thirdAdmin}`],
+  );
+  await db.pool.query(
+    "INSERT INTO admin(id,user_id,admin_code,email_normalized,role_id,version) SELECT $1,$2,$3,$4,role_id,1 FROM admin WHERE user_id=$5",
+    [
+      newId(),
+      thirdAdmin,
+      `ADMIN-${thirdAdmin}`,
+      `${thirdAdmin}@example.com`,
+      x.actors[0],
+    ],
+  );
+  await db.pool.query(
+    "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+    [thirdPerson, x.f.stationId],
+  );
+  await db.pool.query(
+    "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,1,true)",
+    [newId(), x.f.stationId, thirdAdmin, thirdPerson],
+  );
   const env = {
     ...process.env,
     WHR_ENV: "test",
@@ -15,6 +40,8 @@ export async function discoveryFixture(
   };
   return {
     ...x,
+    thirdAdmin,
+    thirdPerson,
     discovery: createReleaseDiscoveryService({ pool: db.pool, env }),
     env,
   };
