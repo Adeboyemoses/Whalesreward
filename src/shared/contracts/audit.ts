@@ -67,6 +67,18 @@ const permissions = z.enum([
   "roles",
 ]);
 export const auditFieldValues = {
+  releaseProposalId: auditId,
+  releaseDecisionId: auditId,
+  releaseState: z.enum(["pending", "approved", "rejected", "superseded"]),
+  releaseTargetKind: z.enum(["price", "card", "date", "capture"]),
+  releaseOutcome: z.enum(["confirm", "cancel"]),
+  releaseConclusion: z.enum([
+    "sheet_attested_confirm",
+    "sheet_attested_cancel",
+  ]),
+  sheetAssetId: auditId,
+  proposerId: auditId,
+  approverId: auditId,
   state: z.enum([
     "received",
     "photo_pending",
@@ -129,7 +141,7 @@ export const auditFieldValues = {
     "confirm",
   ]),
   reviewEvaluationId: auditId,
-  reviewPolicyRelease: z.literal("review-evidence-v1"),
+  reviewPolicyRelease: z.enum(["review-evidence-v1", "review-evidence-v2"]),
   reviewPolicyRevision: positive,
   reviewConclusions: unique(
     z.enum([
@@ -198,7 +210,7 @@ export const auditFieldValues = {
   settingsVersionId: auditId,
   approvalId: auditId,
   configurationId: auditId,
-  policyRelease: z.literal("review-evidence-v1"),
+  policyRelease: z.enum(["review-evidence-v1", "review-evidence-v2"]),
   policyRevision: positive,
   policyEnvironment: z.enum(["development", "test", "staging", "production"]),
   policyState: z.enum(["active", "inactive"]),
@@ -293,6 +305,69 @@ const rule = (
   optional?: Rule["optional"],
 ): Rule => ({ area, targets: [target], actors, fields, optional });
 export const auditRules = {
+  held_release_proposed: rule(
+    "sales",
+    "purchase",
+    ["admin"],
+    [
+      "releaseProposalId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+      "sheetAssetId",
+      "proposerId",
+      "reviewPolicyRelease",
+      "reviewPolicyRevision",
+    ],
+  ),
+  held_release_approved: rule(
+    "sales",
+    "purchase",
+    ["admin"],
+    [
+      "releaseProposalId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+      "sheetAssetId",
+      "proposerId",
+      "reviewPolicyRelease",
+      "reviewPolicyRevision",
+      "releaseDecisionId",
+      "approverId",
+      "releaseConclusion",
+      "decisionId",
+      "reviewEvaluationId",
+      ...V,
+      ...G,
+    ],
+    ["verifiedSaleDate"],
+  ),
+  held_release_rejected: rule(
+    "sales",
+    "purchase",
+    ["admin"],
+    [
+      "releaseProposalId",
+      "releaseDecisionId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+      "sheetAssetId",
+      "proposerId",
+    ],
+  ),
+  held_release_superseded: rule(
+    "sales",
+    "purchase",
+    ["system:validation"],
+    [
+      "releaseProposalId",
+      "releaseState",
+      "releaseTargetKind",
+      "releaseOutcome",
+    ],
+  ),
   sale_received: rule(
     "sales",
     "purchase",
@@ -739,7 +814,17 @@ export const currentAuditEventSchema = z
       ctx.addIssue({ code: "custom", message: "Invalid audit shape" });
     if (v.action === "password_changed" && v.actor.kind !== v.target.kind)
       ctx.addIssue({ code: "custom", message: "Invalid actor" });
-    for (const group of [reviewFields, meterFields])
+    const requiredReviewGroup =
+      v.action === "held_release_proposed"
+        ? (["reviewPolicyRelease", "reviewPolicyRevision"] as const)
+        : v.action === "held_release_approved"
+          ? ([
+              "reviewPolicyRelease",
+              "reviewPolicyRevision",
+              "reviewEvaluationId",
+            ] as const)
+          : reviewFields;
+    for (const group of [requiredReviewGroup, meterFields])
       if (
         group.some((f) => fields.includes(f)) &&
         !group.every((f) => fields.includes(f))

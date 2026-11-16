@@ -9,17 +9,29 @@ import {
 } from "../../src/server/modules/audit/write.ts";
 import { reviewEvidenceReleaseArtifact } from "../../src/server/modules/reviews/release.ts";
 
+import {
+  reviewEvidenceV2ReleaseArtifact,
+  assertReleaseV2Installation,
+} from "../../src/server/modules/reviews/release-v2.ts";
+
+export const releaseV2Digest = createHash("sha256")
+  .update(reviewEvidenceV2ReleaseArtifact, "utf8")
+  .digest("hex");
+
 export const releaseDigest = createHash("sha256")
   .update(reviewEvidenceReleaseArtifact, "utf8")
   .digest("hex");
 export const usage = `Usage: pnpm ops:review-evidence activate|deactivate
   --station UUID --environment development|test|staging|production
-  --digest SHA256 --authorization REFERENCE
+  [--release review-evidence-v1|review-evidence-v2] --digest SHA256 --authorization REFERENCE
   [--activated-at ISO_INSTANT (activate only)] [--dry-run | --apply --expected-revision N]
 Default: dry run. DATABASE_URL must already be set in your shell; never pass it as an argument.`;
 
 class OperatorError extends Error {}
 const inputSchema = z.strictObject({
+  release: z
+    .enum(["review-evidence-v1", "review-evidence-v2"])
+    .default("review-evidence-v1"),
   action: z.enum(["activate", "deactivate"]),
   stationId: z.uuid().transform((value) => value.toLowerCase()),
   environment: z.enum(["development", "test", "staging", "production"]),
@@ -45,6 +57,7 @@ export function parseArguments(args) {
   const [action, ...flags] = args;
   const values = new Map();
   const valued = new Set([
+    "--release",
     "--station",
     "--environment",
     "--digest",
@@ -68,6 +81,7 @@ export function parseArguments(args) {
     throw new OperatorError("Invalid expected revision.");
   const parsed = inputSchema.safeParse({
     action,
+    release: values.get("--release"),
     stationId: values.get("--station"),
     environment: values.get("--environment"),
     digest: values.get("--digest"),
@@ -84,7 +98,12 @@ export function parseArguments(args) {
     throw new OperatorError(
       "Invalid or missing input. Authorization must be a non-secret reference ID. Use --help.",
     );
-  if (parsed.data.digest !== releaseDigest)
+  if (
+    parsed.data.digest !==
+    (parsed.data.release === "review-evidence-v2"
+      ? releaseV2Digest
+      : releaseDigest)
+  )
     throw new OperatorError(
       "Release digest does not match the built-in artifact.",
     );
@@ -116,14 +135,17 @@ export async function checkDatabaseEnvironment(db, environment) {
 
 /**
  * @param {import('pg').Pool} pool
- * @param {ReturnType<typeof parseArguments>} input
+ * @param {Omit<ReturnType<typeof parseArguments>, "release"> & { release?: "review-evidence-v1" | "review-evidence-v2" }} input
  */
 export async function operate(pool, input) {
   // Validate again at this exported boundary, before opening a connection.
   const parsed = inputSchema.safeParse(input);
   if (
     !parsed.success ||
-    input.digest !== releaseDigest ||
+    input.digest !==
+      (parsed.success && parsed.data.release === "review-evidence-v2"
+        ? releaseV2Digest
+        : releaseDigest) ||
     (input.action === "activate") !== (input.activatedAt !== null) ||
     (input.apply && input.expectedRevision === null)
   )
@@ -146,6 +168,8 @@ export async function operate(pool, input) {
         .rowCount !== 1
     )
       throw new OperatorError("Station does not exist in this database.");
+    if (input.release === "review-evidence-v2" && input.action === "activate")
+      await assertReleaseV2Installation(db, input.stationId);
     const found = await db.query(
       `SELECT coalesce(max(revision),0)::text AS revision FROM (
       SELECT revision FROM review_evidence_configuration WHERE station_id=$1 AND environment=$2
@@ -164,8 +188,8 @@ export async function operate(pool, input) {
     const approvalId = input.action === "activate" ? newId() : null;
     const configurationId = newId();
     const policy = {
-      release: "review-evidence-v1",
-      digest: releaseDigest,
+      release: input.release,
+      digest: input.digest,
       revision,
       scope: { stationId: input.stationId, environment: input.environment },
       activation: approvalId
@@ -297,7 +321,7 @@ export async function operate(pool, input) {
       approval,
       configuration,
       policy,
-      applyCommand: `pnpm ops:review-evidence ${input.action} --station ${input.stationId} --environment ${input.environment} --digest ${input.digest} --authorization ${input.authorizationReference}${input.activatedAt ? ` --activated-at ${input.activatedAt}` : ""} --apply --expected-revision ${revision}`,
+      applyCommand: `pnpm ops:review-evidence ${input.action} --release ${input.release} --station ${input.stationId} --environment ${input.environment} --digest ${input.digest} --authorization ${input.authorizationReference}${input.activatedAt ? ` --activated-at ${input.activatedAt}` : ""} --apply --expected-revision ${revision}`,
     };
   } catch (error) {
     await db.query("ROLLBACK").catch(() => {});
