@@ -33,11 +33,21 @@ export async function readiness(
     bounds,
     phone.partialExclusions,
   );
+  const excludedTargets = new Set(
+    (
+      await db.query<{ id: string }>(
+        `SELECT DISTINCT source->>'purchaseId' id FROM giveaway_phone_exclusion e CROSS JOIN LATERAL jsonb_array_elements(e.content->'partialSources') source WHERE e.campaign_id=$1`,
+        [c.id],
+      )
+    ).rows.map((r) => r.id),
+  );
   const relevant = sources
     .filter(
       (s) =>
-        !s.reasons.includes("outside_period") &&
-        !s.reasons.includes("before_launch"),
+        s.phoneExclusionId ||
+        excludedTargets.has(s.purchaseId) ||
+        (!s.reasons.includes("outside_period") &&
+          !s.reasons.includes("before_launch")),
     )
     .map((s) => s.purchaseId);
   const ordinary = (

@@ -153,7 +153,7 @@ export function createSyncService({
       const body = parsed(lookupSchema, input);
       const code = body.source === "code" ? body.code : body.qr;
       return transaction(pool, async (db) => {
-        const auth = await authority(db, token);
+        const auth = await authority(db, token, true, false);
         const card = (
           await db.query<{ id: string; state: string; status: string }>(
             `SELECT c.id,c.state,b.status FROM card c JOIN card_batch b ON b.id=c.batch_id WHERE c.code=$1 FOR SHARE OF c,b`,
