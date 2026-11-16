@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { authId } from "./auth";
-import { saleValuesSchema } from "./sales";
+import { saleValuesSchema, decisionSchema } from "./sales";
 import { SYNC_LIMITS } from "./sync";
 
 const version = z.number().int().min(1).max(2147483647);
@@ -106,3 +106,45 @@ export const releasePhotoAccessSchema = z.strictObject({ assetId: authId });
 export type ReleaseTarget = z.infer<typeof releaseTargetSchema>;
 export type AttestedFacts = z.infer<typeof attestedFactsSchema>;
 export type ReleaseProposalInput = z.infer<typeof releaseProposalInputSchema>;
+
+export const releaseActorSchema = z.strictObject({
+  id: authId,
+  code: z.string().min(1).max(120),
+  name: z.string().min(1).max(200),
+});
+export const releaseDecisionSchema = z.strictObject({
+  id: authId,
+  proposalId: authId,
+  operationId: authId,
+  outcome: z.enum(["approve", "reject"]),
+  actor: releaseActorSchema,
+  reason,
+  decidedAt: z.iso.datetime({ offset: true }),
+  auditEventId: authId,
+  result: decisionSchema.nullable(),
+});
+export const releaseProposalSchema = z.strictObject({
+  id: authId,
+  purchaseId: authId,
+  version,
+  target: releaseTargetSchema,
+  outcome: z.enum(["confirm", "cancel"]),
+  facts: attestedFactsSchema,
+  sheetAssetId: authId,
+  meterAssetId: authId,
+  proposedBy: releaseActorSchema,
+  proposedAt: z.iso.datetime({ offset: true }),
+  reason,
+  state: z.enum(["pending", "approved", "rejected", "superseded"]),
+  policy: z.strictObject({
+    release: z.literal("review-evidence-v2"),
+    digest: z.string().regex(/^[a-f0-9]{64}$/),
+    revision: version,
+  }),
+  guardAtProposal: z.strictObject(guard),
+  decision: releaseDecisionSchema.nullable(),
+});
+export const releaseDecisionResponseSchema = z.strictObject({
+  proposal: releaseProposalSchema,
+  decision: releaseDecisionSchema,
+});

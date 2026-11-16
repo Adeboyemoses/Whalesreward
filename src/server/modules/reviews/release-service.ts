@@ -10,6 +10,8 @@ import {
   releaseProposalInputSchema,
   releaseDecisionInputSchema,
   releasePhotoAccessSchema,
+  releaseProposalSchema,
+  releaseDecisionResponseSchema,
   type ReleaseProposalInput,
 } from "../../../shared/contracts/held-release";
 import * as wire from "../../../shared/contracts/sales";
@@ -220,7 +222,7 @@ async function project(db: pg.PoolClient, p: ProposalRow) {
       [p.id],
     )
   ).rows[0];
-  return {
+  return releaseProposalSchema.parse({
     id: p.id,
     purchaseId: p.purchase_id,
     version: p.version,
@@ -243,7 +245,7 @@ async function project(db: pg.PoolClient, p: ProposalRow) {
       expectedRevisionId: p.content.expectedRevisionId,
     },
     decision: terminal?.content.decision ?? null,
-  };
+  });
 }
 async function target(
   db: pg.PoolClient,
@@ -574,7 +576,10 @@ export function createHeldReleaseService({
       return { historical: undefined, person, actorId: a.user_id };
     });
     if (preflight.historical !== undefined)
-      return { proposal: preflight.historical, replayed: true };
+      return {
+        proposal: releaseProposalSchema.parse(preflight.historical),
+        replayed: true,
+      };
     // Storage work does not hold the security lock: revocation can commit, and the
     // final transaction below must load authority again before applying anything.
     const photos = await transaction(pool, (db) =>
@@ -598,7 +603,11 @@ export function createHeldReleaseService({
         body.operationId,
         hash,
       );
-      if (old) return { proposal: old.response, replayed: true };
+      if (old)
+        return {
+          proposal: releaseProposalSchema.parse(old.response),
+          replayed: true,
+        };
       const policy = await pinReleaseV2Policy(db, a.stationId, env);
       sale.guard(p, body);
       await target(db, purchaseId, body.target);
@@ -732,7 +741,8 @@ export function createHeldReleaseService({
       }
       return { historical: undefined, row: r };
     });
-    if (preflight.historical !== undefined) return preflight.historical;
+    if (preflight.historical !== undefined)
+      return releaseDecisionResponseSchema.parse(preflight.historical);
     const checkedPhotos =
       body.outcome === "approve"
         ? await transaction(pool, (db) =>
@@ -765,7 +775,7 @@ export function createHeldReleaseService({
         body.operationId,
         hash,
       );
-      if (old) return old.response;
+      if (old) return releaseDecisionResponseSchema.parse(old.response);
       if (
         p.version !== body.expectedVersion ||
         p.current_revision_id !== body.expectedRevisionId ||
@@ -1086,7 +1096,7 @@ export function createHeldReleaseService({
         hash,
         response,
       );
-      return response;
+      return releaseDecisionResponseSchema.parse(response);
     });
   }
   async function get(
