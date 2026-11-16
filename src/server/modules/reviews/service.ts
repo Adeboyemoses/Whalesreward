@@ -1074,6 +1074,7 @@ const duplicateResponse = z.strictObject({
 
 /** Shared sale mutations for the independently authorized P-29 service. */
 export const releaseSaleMutations = {
+  authority,
   purchase,
   guard,
   candidate,
