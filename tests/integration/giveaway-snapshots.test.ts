@@ -253,3 +253,109 @@ it("I-46 changed source lineage saves a linked revision without rewriting its pr
     await f.close();
   }
 }, 30000);
+it("SR-06 a new pending proposal invalidates an already reviewed initial preview", async () => {
+  const f = await giveawayFixture();
+  try {
+    const sale = await historicalSale(f.pool, {});
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional pending race",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+        .object({ id: z.string(), contentDigest: z.string() })
+        .parse(prepared.data),
+      guard = await f.guard();
+    await pendingGiveawayProposal(f, sale.id);
+    await expect(
+      confirmGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          previewId: p.id,
+          contentDigest: p.contentDigest,
+          ...guard,
+        },
+        undefined,
+        config,
+      ),
+    ).rejects.toMatchObject({ code: "version_conflict" });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe("0");
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("I-46 phantom purchase intake and confirmation serialize without silently losing source history", async () => {
+  const f = await giveawayFixture();
+  try {
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional intake race",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const p = z
+        .object({ id: z.string(), contentDigest: z.string() })
+        .parse(prepared.data),
+      guard = await f.guard();
+    const [confirm, intake] = await Promise.allSettled([
+      confirmGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          previewId: p.id,
+          contentDigest: p.contentDigest,
+          ...guard,
+        },
+        undefined,
+        config,
+      ),
+      historicalSale(f.pool, { state: "received" }),
+    ]);
+    expect(intake.status).toBe("fulfilled");
+    const c = (
+      await f.pool.query(
+        "SELECT reconciliation_required FROM campaign WHERE id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    expect(c.reconciliation_required).toBe(true);
+    const count = (
+      await f.pool.query(
+        "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
+        [f.campaignId],
+      )
+    ).rows[0].n;
+    expect(count).toBe(confirm.status === "fulfilled" ? "1" : "0");
+    const r = await readReadiness(f.pool, f.token, f.campaignId);
+    expect(r.canConfirm).toBe(false);
+  } finally {
+    await f.close();
+  }
+}, 30000);
