@@ -231,10 +231,42 @@ describe("station activation and credit share committed price history", () => {
         test.code,
       );
       let finished = false;
+      let submission: ReturnType<typeof sync.submit> | undefined;
       let finalization: ReturnType<typeof sync.finalize> | undefined;
       try {
         await barrier.paused;
-        const submitted = await sync.submit(f.token, f.original);
+        // Original intake shares the M4 writer boundary, so it now waits too.
+        submission = sync.submit(f.token, f.original);
+        const blocked = async () => {
+          for (let i = 0; i < 200; i++) {
+            if (finished) return false;
+            const waiting = (
+              await pool.query(
+                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock') AS waiting",
+                [readerName],
+              )
+            ).rows[0].waiting;
+            if (waiting) return true;
+            await delay(5);
+          }
+          return false;
+        };
+        expect(
+          await blocked(),
+          "settlement must wait behind the uncommitted activation",
+        ).toBe(true);
+        expect(finished).toBe(false);
+        expect(
+          (
+            await pool.query(
+              "SELECT 1 FROM sync_validation WHERE purchase_id IN (SELECT id FROM purchase WHERE operation_id=$1)",
+              [f.original.operationId],
+            )
+          ).rowCount,
+        ).toBe(0);
+        barrier.resume();
+        await activation;
+        const submitted = await submission;
         const receivedBefore = (
           await pool.query(
             "SELECT server_received_at::text AS r FROM purchase WHERE id=$1",
@@ -256,35 +288,6 @@ describe("station activation and credit share committed price history", () => {
             finished = true;
             return result;
           });
-        const blocked = async () => {
-          for (let i = 0; i < 200; i++) {
-            if (finished) return false;
-            const waiting = (
-              await pool.query(
-                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND wait_event='advisory') AS waiting",
-                [readerName],
-              )
-            ).rows[0].waiting;
-            if (waiting) return true;
-            await delay(5);
-          }
-          return false;
-        };
-        expect(
-          await blocked(),
-          "settlement must wait behind the uncommitted activation",
-        ).toBe(true);
-        expect(finished).toBe(false);
-        expect(
-          (
-            await pool.query(
-              "SELECT 1 FROM sync_validation WHERE purchase_id=$1",
-              [submitted.status.purchaseId],
-            )
-          ).rowCount,
-        ).toBe(0);
-        barrier.resume();
-        await activation;
         const result = await finalization;
         expect(result.credited).toBe(!test.held);
         expect(result.state).toBe(test.held ? "held" : "credited");
@@ -306,6 +309,7 @@ describe("station activation and credit share committed price history", () => {
       } finally {
         barrier.resume();
         await activation;
+        await submission;
         await finalization;
         await writerPool.end();
         await readerPool.end();

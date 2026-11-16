@@ -184,6 +184,9 @@ export async function prepareGiveaway(
             ).rows[0]
           : null;
         const reconciliationAuditId = newId();
+        const checkedAt = (
+          await db.query("SELECT clock_timestamp() now")
+        ).rows[0].now.toISOString();
         const checkNames = [
           "timing",
           "holds",
@@ -203,7 +206,7 @@ export async function prepareGiveaway(
           checkNames,
         );
         await db.query(
-          "INSERT INTO giveaway_reconciliation(id,campaign_id,station_id,phone_check_id,source_data_version,content) VALUES($1,$2,$3,$4,$5,$6::jsonb)",
+          "INSERT INTO giveaway_reconciliation(id,campaign_id,station_id,phone_check_id,source_data_version,content,checked_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::timestamptz)",
           [
             reconciliationId,
             c.id,
@@ -217,9 +220,7 @@ export async function prepareGiveaway(
               operationId: p.operationId,
               reason: p.reason,
               auditEventId: reconciliationAuditId,
-              checkedAt: (
-                await db.query("SELECT clock_timestamp() now")
-              ).rows[0].now.toISOString(),
+              checkedAt,
               timingPolicyVersion: c.timing_policy_version,
               outcome:
                 predecessor &&
@@ -234,11 +235,12 @@ export async function prepareGiveaway(
               policyVersion: policy,
               settingsVersionId: c.current_timing_version_id,
             }),
+            checkedAt,
           ],
         );
         await db.query(
-          "UPDATE campaign SET reconciliation_required=false,reconciled_data_version=$2,version=version+1 WHERE id=$1",
-          [c.id, c.data_version],
+          "UPDATE campaign SET reconciliation_required=false,reconciled_data_version=$2,reconciliation_id=$3,version=version+1 WHERE id=$1",
+          [c.id, c.data_version, reconciliationId],
         );
         c.version++;
         c.reconciliation_required = false;

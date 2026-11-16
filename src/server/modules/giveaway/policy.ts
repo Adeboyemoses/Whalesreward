@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 /** Registry identity is persisted and scoped. Environment strings never activate it. */
 export async function recordedReconciliationPolicy(
   db: Pick<pg.PoolClient, "query">,
@@ -12,8 +13,8 @@ export async function recordedReconciliationPolicy(
   if (!installed) return null;
   const rows = (
     await db.query(
-      `SELECT s.id,p.policy_version FROM station s LEFT JOIN station_reconciliation_policy b ON b.station_id=s.id LEFT JOIN reconciliation_policy_definition p ON p.policy_version=b.policy_version AND p.policy_version='reconciliation-v1' AND p.evaluator_identity='reconciliation-v1' AND p.partial_uploads='exact_incomplete' AND p.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' WHERE ($1::uuid IS NULL OR s.id=$1) ORDER BY s.id LIMIT 2`,
-      [stationId ?? null],
+      `SELECT s.id,p.policy_version FROM station s LEFT JOIN station_reconciliation_policy b ON b.station_id=s.id LEFT JOIN reconciliation_policy_definition p ON p.policy_version=b.policy_version AND p.policy_version='reconciliation-v1' AND p.evaluator_identity='reconciliation-v1' AND p.semantics_digest=$2 AND p.partial_uploads='exact_incomplete' AND p.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' WHERE ($1::uuid IS NULL OR s.id=$1) ORDER BY s.id LIMIT 2`,
+      [stationId ?? null, RECONCILIATION_DIGEST],
     )
   ).rows;
   return rows.length === 1 && rows[0]?.policy_version === "reconciliation-v1"

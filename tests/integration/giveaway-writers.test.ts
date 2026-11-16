@@ -272,3 +272,84 @@ it.each(["approved", "rejected", "superseded"] as const)(
   },
   30000,
 );
+it("I-46 real cancellation of a frozen source advances campaign and source generation once", async () => {
+  const { createReviewsService } =
+    await import("../../src/server/modules/reviews/service");
+  const { evidenceStore } =
+    await import("../helpers/corrections-adversarial-fixture");
+  const f = await giveawayFixture();
+  try {
+    const a = await historicalSale(f.pool, {}),
+      b = await historicalSale(f.pool, {});
+    await f.check();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional frozen source",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const preview = z
+      .object({ id: z.string(), contentDigest: z.string() })
+      .parse(prepared.data);
+    await confirmGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        previewId: preview.id,
+        contentDigest: preview.contentDigest,
+        ...(await f.guard()),
+      },
+      undefined,
+      config,
+    );
+    const flag = newId();
+    await f.pool.query(
+      "INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) VALUES($1,$2,$3,'validated_photo','open',1)",
+      [flag, ...[a.id, b.id].sort()],
+    );
+    const before = (
+      await f.pool.query(
+        "SELECT version,reconciled_data_version,(SELECT data_version FROM station_reporting_state WHERE station_id=campaign.station_id) AS data_version FROM campaign WHERE id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    const purchases = (
+      await f.pool.query(
+        "SELECT id,version,current_revision_id FROM purchase WHERE id=ANY($1::uuid[]) ORDER BY id",
+        [[a.id, b.id]],
+      )
+    ).rows.map((r) => ({
+      id: r.id,
+      expectedVersion: r.version,
+      expectedRevisionId: r.current_revision_id,
+    }));
+    await createReviewsService({
+      pool: f.pool,
+      storage: evidenceStore().storage,
+    }).decideDuplicate(f.token, flag, {
+      operationId: newId(),
+      expectedFlagVersion: 1,
+      purchases,
+      decision: { outcome: "cancel", cancelPurchaseId: a.id },
+      reason: "Fictional cancellation",
+    });
+    const after = (
+      await f.pool.query(
+        "SELECT version,(SELECT data_version FROM station_reporting_state WHERE station_id=campaign.station_id) AS data_version FROM campaign WHERE id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    expect(BigInt(after.version) - BigInt(before.version)).toBe(1n);
+    expect(BigInt(after.data_version) - BigInt(before.data_version)).toBe(1n);
+  } finally {
+    await f.close();
+  }
+}, 30000);

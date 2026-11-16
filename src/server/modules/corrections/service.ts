@@ -267,12 +267,6 @@ async function inspect(
     throw new AuthError("evidence_unavailable", 422);
   }
 }
-async function markCampaigns(db: pg.PoolClient, purchaseId: string) {
-  await db.query(
-    `UPDATE campaign SET reconciliation_required=true,version=version+1 WHERE id IN (SELECT DISTINCT s.campaign_id FROM giveaway_snapshot s JOIN giveaway_snapshot_source x ON x.snapshot_id=s.id WHERE x.purchase_id=$1)`,
-    [purchaseId],
-  );
-}
 /** Existing original validation is immutable. Corrections never rerun settle or clear its gates. */
 async function apply(
   db: pg.PoolClient,
@@ -315,7 +309,6 @@ async function apply(
     [p.station_id],
   );
   await enqueueDuplicateDetection(db, p.id);
-  await markCampaigns(db, p.id);
 }
 const auditValuesSchema = z.strictObject({
   calculation: z.enum(["captured_rate", "meter_evidence"]),
