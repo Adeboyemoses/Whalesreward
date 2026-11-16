@@ -419,9 +419,11 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       (await x.discovery.prepare(x.token, x.sale.purchaseId, { kind: "price" }))
         .admission,
     ).toEqual({ state: "not_admissible", reason: "no_material_boundary" });
+    const before = await state(x);
     await expect(
       x.svc.propose(x.token, x.sale.purchaseId, x.body),
-    ).rejects.toMatchObject({ code: "evidence_insufficient" });
+    ).rejects.toMatchObject({ code: "release_not_required", status: 409 });
+    expect(await state(x)).toEqual(before);
   });
   it("RD-03 preparation preserves the two verified independent admin installation minimum", async () => {
     const x = await discoveryFixture(db);

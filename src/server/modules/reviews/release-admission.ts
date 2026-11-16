@@ -431,7 +431,14 @@ export async function classifyReleaseAdmission(
     body.target,
     body.meterAssetId,
   );
-  if (result.admission.state === "ordinary_review_required")
+  // Preserve WHR-153's mutation error for a target with no material boundary.
+  // Preparation distinguishes that exclusion from actual v1 settlement; neither
+  // result grants admission or changes the existing mutation protocol.
+  if (
+    result.admission.state === "ordinary_review_required" ||
+    (result.admission.state === "not_admissible" &&
+      result.admission.reason === "no_material_boundary")
+  )
     throw new AuthError("release_not_required", 409);
   if (!result.evaluation) return insufficient();
   const { f, I, boundaries } = result.evaluation;
