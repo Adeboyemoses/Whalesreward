@@ -68,6 +68,9 @@ async function capture(page: Page, name: string) {
     fullPage: true,
   });
   expect(metrics.document).toBeLessThanOrEqual(metrics.viewport);
+  if (name.startsWith("T03"))
+    for (const table of metrics.tables)
+      expect(table.scrollWidth).toBeLessThanOrEqual(table.width + 1);
   if (metrics.brandLines !== null) expect(metrics.brandLines).toBe(1);
   if (metrics.viewport < 900) {
     for (const control of metrics.controls)

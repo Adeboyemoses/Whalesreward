@@ -8,12 +8,12 @@
       "label": "Back to settings",
       "rect": {
         "x": 16,
-        "y": -29,
+        "y": -38,
         "width": 137,
         "height": 48,
-        "top": -29,
+        "top": -38,
         "right": 153,
-        "bottom": 19,
+        "bottom": 10,
         "left": 16
       }
     },
@@ -21,12 +21,12 @@
       "label": "",
       "rect": {
         "x": 37,
-        "y": 132,
+        "y": 123,
         "width": 253,
         "height": 48,
-        "top": 132,
+        "top": 123,
         "right": 290,
-        "bottom": 180,
+        "bottom": 171,
         "left": 37
       }
     },
@@ -34,12 +34,12 @@
       "label": "Reason for change",
       "rect": {
         "x": 37,
-        "y": 384,
+        "y": 375,
         "width": 316,
         "height": 96,
-        "top": 384,
+        "top": 375,
         "right": 353,
-        "bottom": 480,
+        "bottom": 471,
         "left": 37
       }
     },
@@ -47,12 +47,12 @@
       "label": "Review changes",
       "rect": {
         "x": 37,
-        "y": 522,
+        "y": 513,
         "width": 138,
         "height": 48,
-        "top": 522,
+        "top": 513,
         "right": 175,
-        "bottom": 570,
+        "bottom": 561,
         "left": 37
       }
     },
@@ -60,12 +60,12 @@
       "label": "Cancel",
       "rect": {
         "x": 183,
-        "y": 522,
+        "y": 513,
         "width": 78,
         "height": 48,
-        "top": 522,
+        "top": 513,
         "right": 261,
-        "bottom": 570,
+        "bottom": 561,
         "left": 183
       }
     }
@@ -73,22 +73,22 @@
   "sheets": [
     {
       "x": 16,
-      "y": 43,
+      "y": 34,
       "width": 358,
       "height": 548,
-      "top": 43,
+      "top": 34,
       "right": 374,
-      "bottom": 591,
+      "bottom": 582,
       "left": 16
     },
     {
       "x": 16,
-      "y": 615,
+      "y": 606,
       "width": 358,
       "height": 218,
-      "top": 615,
+      "top": 606,
       "right": 374,
-      "bottom": 833,
+      "bottom": 824,
       "left": 16
     }
   ],

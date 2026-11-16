@@ -1,0 +1,88 @@
+{
+  "overflow": [],
+  "viewport": 360,
+  "document": 360,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "Back to settings",
+      "rect": {
+        "x": 16,
+        "y": -624,
+        "width": 137,
+        "height": 48,
+        "top": -624,
+        "right": 153,
+        "bottom": -576,
+        "left": 16
+      }
+    },
+    {
+      "label": "Confirm changes",
+      "rect": {
+        "x": 37,
+        "y": 1064,
+        "width": 143,
+        "height": 48,
+        "top": 1064,
+        "right": 180,
+        "bottom": 1112,
+        "left": 37
+      }
+    },
+    {
+      "label": "Keep editing",
+      "rect": {
+        "x": 188,
+        "y": 1064,
+        "width": 115,
+        "height": 48,
+        "top": 1064,
+        "right": 303,
+        "bottom": 1112,
+        "left": 188
+      }
+    },
+    {
+      "label": "Cancel",
+      "rect": {
+        "x": 37,
+        "y": 1120,
+        "width": 78,
+        "height": 48,
+        "top": 1120,
+        "right": 115,
+        "bottom": 1168,
+        "left": 37
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 16,
+      "y": -552,
+      "width": 328,
+      "height": 1741,
+      "top": -552,
+      "right": 344,
+      "bottom": 1189,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 1213,
+      "width": 328,
+      "height": 242,
+      "top": 1213,
+      "right": 344,
+      "bottom": 1455,
+      "left": 16
+    }
+  ],
+  "tables": [
+    {
+      "width": 284,
+      "scrollWidth": 284
+    }
+  ]
+}

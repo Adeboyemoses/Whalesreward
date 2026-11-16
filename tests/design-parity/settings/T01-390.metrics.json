@@ -1,0 +1,57 @@
+{
+  "overflow": [],
+  "viewport": 390,
+  "document": 390,
+  "brandLines": 1,
+  "controls": [
+    {
+      "label": "Back to settings",
+      "rect": {
+        "x": 16,
+        "y": 276,
+        "width": 137,
+        "height": 48,
+        "top": 276,
+        "right": 153,
+        "bottom": 324,
+        "left": 16
+      }
+    },
+    {
+      "label": "Review giveaway changes",
+      "rect": {
+        "x": 37,
+        "y": 489,
+        "width": 316,
+        "height": 48,
+        "top": 489,
+        "right": 353,
+        "bottom": 537,
+        "left": 37
+      }
+    }
+  ],
+  "sheets": [
+    {
+      "x": 16,
+      "y": 348,
+      "width": 358,
+      "height": 210,
+      "top": 348,
+      "right": 374,
+      "bottom": 558,
+      "left": 16
+    },
+    {
+      "x": 16,
+      "y": 582,
+      "width": 358,
+      "height": 242,
+      "top": 582,
+      "right": 374,
+      "bottom": 824,
+      "left": 16
+    }
+  ],
+  "tables": []
+}

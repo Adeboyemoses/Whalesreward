@@ -65,6 +65,24 @@ test("I-45 Owner creates or edits explicit timing through review and history; ca
   const f = await settingsFixture(page, null);
   try {
     const before = await readSettings(page);
+    if (!before.campaign) {
+      await page.goto("/admin/settings");
+      await expect(
+        page.getByRole("link", { name: "Create campaign", exact: true }),
+      ).toBeVisible();
+      await page
+        .getByRole("link", { name: "Create campaign", exact: true })
+        .click();
+      for (const label of [
+        "Launch",
+        "Purchase start",
+        "Purchase cutoff",
+        "Campaign timezone",
+        "Upload grace period (hours)",
+        "Reason for change",
+      ])
+        await expect(page.getByLabel(label, { exact: true })).toHaveValue("");
+    }
     await page.goto("/admin/settings/giveaway/confirm");
     await expect(
       page.getByRole("button", { name: "Confirm changes", exact: true }),
@@ -84,7 +102,7 @@ test("I-45 Owner creates or edits explicit timing through review and history; ca
     ).toHaveValue("Fictional timing cancellation");
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     expect((await readSettings(page)).version).toBe(before.version);
-    const reason = `Fictional campaign timing ${v7()}`;
+    const reason = "Fictional campaign timing confirmed";
     await editTiming(
       page,
       reason,
@@ -145,6 +163,9 @@ test("I-45 uncertain campaign confirmation retries the same body through navigat
   const f = await settingsFixture(page, null);
   try {
     const state = await readSettings(page);
+    const priorLost = (await readHistory(page)).items.filter(
+      (x) => x.reason === "Fictional lost campaign response",
+    ).length;
     await editTiming(
       page,
       "Fictional lost campaign response",
@@ -167,9 +188,12 @@ test("I-45 uncertain campaign confirmation retries the same body through navigat
     await page
       .getByRole("button", { name: "Confirm changes", exact: true })
       .click();
+    await expect(page.getByRole("main")).toContainText(
+      "The confirmation result is uncertain.",
+    );
     await expect(
       page.getByRole("button", { name: "Retry confirmation", exact: true }),
-    ).toBeVisible();
+    ).toBeEnabled();
     await page
       .getByRole("link", { name: "Settings", exact: true })
       .first()
@@ -178,9 +202,15 @@ test("I-45 uncertain campaign confirmation retries the same body through navigat
       .getByRole("link", { name: /giveaway settings/i })
       .first()
       .click();
+    await page
+      .getByRole("link", { name: "Return to confirmation", exact: true })
+      .click();
+    await expect(page.getByRole("main")).toContainText(
+      "The confirmation result is uncertain.",
+    );
     await expect(
       page.getByRole("button", { name: "Retry confirmation", exact: true }),
-    ).toBeVisible();
+    ).toBeEnabled();
     const response = page.waitForResponse((r) =>
       r.url().endsWith("/settings/giveaway/confirm"),
     );
@@ -194,7 +224,7 @@ test("I-45 uncertain campaign confirmation retries the same body through navigat
       (await readHistory(page)).items.filter(
         (x) => x.reason === "Fictional lost campaign response",
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(priorLost + 1);
   } finally {
     await f.close();
   }
@@ -309,12 +339,20 @@ test("I-45 transient 429 retries the exact reviewed operation", async ({
         else await route.continue();
       },
     );
+    const throttled = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/settings/giveaway/confirm") && r.status() === 429,
+    );
     await page
       .getByRole("button", { name: "Confirm changes", exact: true })
       .click();
+    await throttled;
+    await expect(page.getByRole("main")).toContainText(
+      "The confirmation result is uncertain.",
+    );
     await expect(
       page.getByRole("button", { name: "Retry confirmation", exact: true }),
-    ).toBeVisible();
+    ).toBeEnabled();
     const pending = page.waitForResponse((r) =>
       r.url().endsWith("/settings/giveaway/confirm"),
     );
@@ -363,3 +401,39 @@ for (const lock of ["start", "snapshot"] as const) {
     }
   });
 }
+
+test("I-45 crossing-start confirmation refusal projection clears mutation actions", async ({
+  page,
+}) => {
+  const f = await settingsFixture(page, null);
+  try {
+    const state = await readSettings(page);
+    await editTiming(
+      page,
+      "Fictional crossed-start refusal",
+      state.campaign?.timing.graceHours === 12 ? 13 : 12,
+    );
+    await reviewTiming(page);
+    await page.route("**/api/admin/settings/giveaway/confirm", (route) =>
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: { code: "timing_locked", retryable: false },
+        }),
+      }),
+    );
+    await page
+      .getByRole("button", { name: "Confirm changes", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Confirm changes", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("main")).toContainText(
+      /locked|started|result/i,
+    );
+    expect((await readSettings(page)).version).toBe(state.version);
+  } finally {
+    await f.close();
+  }
+});
