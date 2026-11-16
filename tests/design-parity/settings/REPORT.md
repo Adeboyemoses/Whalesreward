@@ -21,3 +21,10 @@ Verification:
 - Initial browser testing exposed three-digit versus six-digit instant comparison; builder fixed it before the passing runs. Visual review found clipped timing comparison columns; the EM added scoped wrapping and this final capture verifies every column fits. Retry tests wait for the uncertain outcome before retrying and follow Return to confirmation after navigation.
 
 Reproduce with the normal `playwright.config.ts` and `tests/design-parity/settings/playwright.config.ts`; on this sandbox host set `PW_TEST_CONNECT_WS_ENDPOINT=ws://127.0.0.1:9323/` and `PW_TEST_CONNECT_EXPOSE_NETWORK=<loopback>` for the matching local browser container. Never point these fixtures at staging or production.
+
+
+## Full-suite isolation follow-up
+
+Campaign timing browsers now opt into `tests/settings/test.ts`: a separately migrated local schema and real compiled Next server per worker (ports 3300 + worker index). Both authority and HTTP writes remain real. The fixture restores environment values, terminates only its own server and drops only its random schema. Teardown checks schema removal and unchanged public campaign IDs. The concurrent-retention helper uses the worker origin explicitly. Ordinary settings and unrelated review tests keep their normal stack.
+
+This fixes test pollution: entering future campaign dates in the shared fictional station changed unrelated capture-review assumptions. After the isolated desktop and attendant timing workers finished, direct SQL verified **public campaign count 0** and **no timing_browser_% schemas**. Focused timing + ordinary retention across both browser projects: **40 passed (1.2m), 0 failed**. No server behavior or protected history was changed to obtain this result.

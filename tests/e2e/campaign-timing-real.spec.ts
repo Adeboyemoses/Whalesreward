@@ -1,9 +1,9 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { test, expect } from "../settings/test";
 import {
   settingsFixture,
   readSettings,
   readHistory,
-  saveIntent,
 } from "../settings/helpers";
 
 import { v7 } from "uuid";
@@ -242,7 +242,7 @@ test("I-45 retention change invalidates a timing review and requires explicit re
       before.campaign?.timing.graceHours === 6 ? 7 : 6,
     );
     await reviewTiming(page);
-    await saveIntent(
+    await saveTimingRetention(
       page,
       before.retention.days === 39 ? 40 : 39,
       "Fictional concurrent retention intent",
@@ -437,3 +437,29 @@ test("I-45 crossing-start confirmation refusal projection clears mutation action
     await f.close();
   }
 });
+
+// The timing worker owns its migrated schema and origin; avoid the ordinary
+// settings fixture's intentionally fixed port-3000 mutation helper.
+async function saveTimingRetention(page: Page, days: number, reason: string) {
+  const state = await readSettings(page);
+  const origin = new URL(page.url()).origin;
+  const proposal = { days, reason, expectedVersion: state.version };
+  const response = await page.request.post(
+    "/api/admin/settings/retention/review",
+    { headers: { Origin: origin }, data: proposal },
+  );
+  expect(response.status()).toBe(200);
+  const review = (await response.json()).data;
+  const confirmed = await page.request.post(
+    "/api/admin/settings/retention/confirm",
+    {
+      headers: { Origin: origin },
+      data: {
+        ...proposal,
+        reviewDigest: review.reviewDigest,
+        operationId: v7(),
+      },
+    },
+  );
+  expect(confirmed.status()).toBe(201);
+}
