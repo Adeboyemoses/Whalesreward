@@ -15,6 +15,14 @@ const M =
   "meterPolicyRelease meterPolicyRevision meterProfileId meterEvaluationId meterConclusion";
 // Independent transcription of the normative M3 action/field matrix.
 const matrix: Record<string, string> = {
+  held_release_proposed:
+    "releaseProposalId releaseState releaseTargetKind releaseOutcome sheetAssetId proposerId reviewPolicyRelease reviewPolicyRevision",
+  held_release_approved: `releaseProposalId releaseState releaseTargetKind releaseOutcome sheetAssetId proposerId reviewPolicyRelease reviewPolicyRevision releaseDecisionId approverId releaseConclusion decisionId reviewEvaluationId ${V} ${G}`,
+  held_release_rejected:
+    "releaseProposalId releaseDecisionId releaseState releaseTargetKind releaseOutcome sheetAssetId proposerId",
+  held_release_superseded:
+    "releaseProposalId releaseState releaseTargetKind releaseOutcome",
+
   sale_received: "state detailsReceived",
   sale_credited: `${V} ${G} photoAssetId candidateRevisionId`,
   sale_held: `${V} ${G} photoAssetId candidateRevisionId`,
@@ -98,6 +106,13 @@ describe("M3 closed typed audit catalogue", () => {
     };
     expect(auditChangeSchema.safeParse(wrong).success).toBe(false);
     for (const bad of [
+      { field: "entryReference", before: null, after: "Sheet entry 7" },
+      { field: "personBindingId", before: null, after: id },
+      { field: "facts", before: null, after: { finding: "sale_recorded" } },
+      { field: "sheetDigest", before: null, after: "a".repeat(64) },
+      { field: "releaseConclusion", before: null, after: "server_proven" },
+      { field: "releaseState", before: null, after: "auto_approved" },
+
       { field: "oldCardCode", before: null, after: "A7K3M9Q" },
       { field: "manifestDigest", before: null, after: "a".repeat(64) },
       { field: "quantity", before: null, after: 0.1 },

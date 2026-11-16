@@ -1,3 +1,4 @@
+import { assertAppliedReleaseConsistency } from "../reviews/release-integrations";
 import { timingHistoryCte } from "../settings/timing-history";
 import { enqueueDuplicateDetection } from "../duplicates/service";
 import type pg from "pg";
@@ -25,6 +26,7 @@ export async function settle(
   operationId: string,
   assetId: string,
 ) {
+  await assertAppliedReleaseConsistency(db, p.id);
   // finalize has staged its in-transaction validation state already. Keep the
   // locked, previously committed state in the audit before-image.
   const beforeAudit = {

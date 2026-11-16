@@ -562,3 +562,14 @@ async function evaluate(
   }
   return result;
 }
+
+/** P-29 shares predicates without changing ordinary v1 evaluation semantics. */
+export const releaseEvidencePredicates = Object.freeze({
+  intervalFor,
+  price,
+  card,
+  date,
+  authorization,
+  campaign,
+  completeVersions,
+});

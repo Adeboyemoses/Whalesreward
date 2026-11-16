@@ -98,11 +98,27 @@ export async function resetReviewFixture(pool: pg.Pool) {
     // Then keep health's station -> policy order before fixture-only guards.
     await db.query("LOCK TABLE station IN ACCESS EXCLUSIVE MODE");
 
+    const releaseTables = [
+      "held_release_person",
+      "held_release_person_binding",
+      "held_release_sheet",
+      "held_release_sheet_validation",
+      "held_release_proposal",
+      "held_release_state",
+      "held_release_transition",
+      "held_release_receipt",
+    ];
+    for (const table of releaseTables) {
+      await db.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+    }
     await db.query("ALTER TABLE audit_event DISABLE TRIGGER USER");
     await db.query("ALTER TABLE station_timing_policy DISABLE TRIGGER USER");
     await db.query("TRUNCATE station,card CASCADE");
     await db.query("ALTER TABLE station_timing_policy ENABLE TRIGGER USER");
     await db.query("ALTER TABLE audit_event ENABLE TRIGGER USER");
+    for (const table of releaseTables) {
+      await db.query(`ALTER TABLE ${table} ENABLE TRIGGER USER`);
+    }
     await db.query("COMMIT");
   } catch (error) {
     await db.query("ROLLBACK");
