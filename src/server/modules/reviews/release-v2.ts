@@ -16,8 +16,8 @@ meter-dependency: meter-evidence-v1 is unconfigured under review-evidence-v2; no
 `;
 
 /** Installation inventory is code-owned, never asserted by an operator JSON blob.
- * M4 snapshot/revision/unchanged-reconciliation runtime is absent at this head.
- * This deliberate missing prerequisite keeps v2 inactive even with valid approval.
+ * M4 readiness/finalization/revision/reconciliation is installed by WHR-22.
+ * Installation is not policy activation: scoped approval and verified people remain required.
  */
 export const reviewEvidenceV2Installation = Object.freeze({
   proposals: true,
@@ -26,7 +26,7 @@ export const reviewEvidenceV2Installation = Object.freeze({
   independentDecisions: true,
   auditTransitions: true,
   contributionConsistency: true,
-  giveawayReadinessAndFinalization: false,
+  giveawayReadinessAndFinalization: true,
 });
 export async function assertReleaseV2Installation(
   db: Pick<pg.PoolClient, "query">,
@@ -38,7 +38,12 @@ export async function assertReleaseV2Installation(
     `SELECT to_regclass('held_release_proposal') IS NOT NULL
       AND to_regclass('held_release_transition') IS NOT NULL
       AND to_regclass('held_release_person_binding') IS NOT NULL
-      AND to_regclass('held_release_sheet_validation') IS NOT NULL AS installed`,
+      AND to_regclass('held_release_sheet_validation') IS NOT NULL
+      AND to_regclass('giveaway_reconciliation') IS NOT NULL
+      AND to_regclass('giveaway_preview') IS NOT NULL
+      AND to_regclass('giveaway_preview_consumption') IS NOT NULL
+      AND to_regclass('giveaway_phone_check') IS NOT NULL
+      AND to_regclass('photo_receipt_fact') IS NOT NULL AS installed`,
   );
   if (!tables.rows[0]?.installed)
     throw new Error("release_policy_unconfigured");

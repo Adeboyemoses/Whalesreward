@@ -47,6 +47,7 @@ export async function campaignData(
     await db.query(
       `SELECT c.*,s.launch_at,s.purchase_start,s.purchase_cutoff,s.upload_deadline,s.grace_hours,s.timezone,s.timing_policy_version,
  (extract(epoch FROM s.launch_at)*1000000)::bigint::text launch_us,(extract(epoch FROM s.purchase_start)*1000000)::bigint::text start_us,(extract(epoch FROM s.purchase_cutoff)*1000000)::bigint::text cutoff_us,(extract(epoch FROM s.upload_deadline)*1000000)::bigint::text deadline_us,
+ to_char(s.launch_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') launch_text,to_char(s.purchase_start AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') start_text,to_char(s.purchase_cutoff AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cutoff_text,to_char(s.upload_deadline AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') deadline_text,
  rs.data_version::text data_version,clock_timestamp() now,
  clock_timestamp()>s.purchase_cutoff after_cutoff,clock_timestamp()>s.upload_deadline after_deadline
  FROM campaign c LEFT JOIN settings_version s ON s.id=c.current_timing_version_id AND s.campaign_id=c.id AND s.station_id=c.station_id JOIN station_reporting_state rs ON rs.station_id=c.station_id WHERE c.station_id=$1 AND ($2::uuid IS NULL OR c.id=$2) FOR UPDATE OF c`,
@@ -66,11 +67,11 @@ export function campaignView(
     version: c.version as number,
     settingsVersionId: c.current_timing_version_id as string | null,
     timing: {
-      launchAt: instant(c.launch_at),
-      purchaseStart: instant(c.purchase_start),
-      purchaseCutoff: instant(c.purchase_cutoff),
+      launchAt: c.launch_text ?? instant(c.launch_at),
+      purchaseStart: c.start_text ?? instant(c.purchase_start),
+      purchaseCutoff: c.cutoff_text ?? instant(c.purchase_cutoff),
       graceHours: c.grace_hours as number | null,
-      uploadDeadline: instant(c.upload_deadline),
+      uploadDeadline: c.deadline_text ?? instant(c.upload_deadline),
       timezone: c.timezone ?? "Africa/Lagos",
       policyVersion: c.timing_policy_version as string | null,
     },
@@ -115,7 +116,7 @@ export async function contributions(
     await db.query(
       `SELECT p.id,p.version,p.status,p.customer_id,r.id revision_id,coalesce(r.amount_kobo,p.amount_kobo)::text amount,trim_scale(coalesce(r.quantity,p.quantity))::text quantity,coalesce(r.currency,p.currency) currency,coalesce(r.unit,p.unit) unit,pr.code product,r.evidence_asset_id,
  c.customer_code,c.name,c.category,(SELECT cc.code FROM card cc JOIN card_customer_link cl ON cl.card_id=cc.id WHERE cl.customer_id=c.id AND cl.ended_at IS NULL AND cc.retired_at IS NULL ORDER BY cc.id LIMIT 1) card_code,
- p.server_received_at,rf.receipt_at, ARRAY(SELECT d.audit_event_id::text FROM sale_decision d WHERE d.purchase_id=p.id ORDER BY d.decided_at,d.id) decision_event_ids,
+ p.server_received_at,rf.receipt_at,to_char(p.server_received_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') details_text,to_char(rf.receipt_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') photo_text, ARRAY(SELECT d.audit_event_id::text FROM sale_decision d WHERE d.purchase_id=p.id ORDER BY d.decided_at,d.id) decision_event_ids,
  (${acceptedContribution} AND EXISTS(SELECT 1 FROM sync_validation v WHERE v.purchase_id=p.id)) accepted,
  (extract(epoch FROM greatest(ctx.signed_in_at,coalesce(p.capture_lower_bound,ctx.signed_in_at)))*1000000)::bigint::text lower_us,
  (extract(epoch FROM least(p.server_received_at,ctx.offline_expires_at))*1000000)::bigint::text upper_us,
@@ -171,8 +172,8 @@ export async function contributions(
       product: r.product,
       valuesSource: r.revision_id ? "accepted_revision" : "original",
       photoAssetId: r.evidence_asset_id,
-      detailsReceivedAt: r.server_received_at.toISOString(),
-      photoReceiptAt: r.receipt_at?.toISOString() ?? null,
+      detailsReceivedAt: r.details_text,
+      photoReceiptAt: r.photo_text,
       timingPolicyVersion: bounds ? "campaign-timing-v1" : null,
       phoneExclusionId: exclusion?.phoneExclusionId ?? null,
     };
