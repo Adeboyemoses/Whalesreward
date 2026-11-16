@@ -135,7 +135,7 @@ export async function checkDatabaseEnvironment(db, environment) {
 
 /**
  * @param {import('pg').Pool} pool
- * @param {ReturnType<typeof parseArguments>} input
+ * @param {Omit<ReturnType<typeof parseArguments>, "release"> & { release?: "review-evidence-v1" | "review-evidence-v2" }} input
  */
 export async function operate(pool, input) {
   // Validate again at this exported boundary, before opening a connection.

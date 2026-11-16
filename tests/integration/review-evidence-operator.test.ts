@@ -89,7 +89,6 @@ async function input(action = "activate", apply = false) {
     "test",
     "--digest",
     releaseDigest,
-    releaseV2Digest,
     "--authorization",
     "WHR-114",
     ...(action === "activate"
@@ -461,7 +460,6 @@ it("runs real CLI dry run and guarded production apply against persisted identit
     "production",
     "--digest",
     releaseDigest,
-    releaseV2Digest,
     "--authorization",
     "APPROVAL-114",
     "--activated-at",
@@ -534,7 +532,7 @@ it("SR-07 partial v2 installation or absent person bindings refuses preview/appl
   const ordinary = await input();
   const v2 = {
     ...ordinary,
-    release: "review-evidence-v2",
+    release: "review-evidence-v2" as const,
     digest: releaseV2Digest,
   };
   const before = await db.pool.query(
@@ -557,7 +555,7 @@ it("SR-07 v2 requires exact persisted database identity before any installation 
   const ordinary = await input();
   const v2 = {
     ...ordinary,
-    release: "review-evidence-v2",
+    release: "review-evidence-v2" as const,
     digest: releaseV2Digest,
   };
   for (const comment of [
@@ -579,12 +577,12 @@ it("SR-07 v2 deactivation remains available without installation and SR-08 write
   const ordinary = await input("deactivate", true);
   const inactive = {
     ...ordinary,
-    release: "review-evidence-v2",
+    release: "review-evidence-v2" as const,
     digest: releaseV2Digest,
   };
   const result = await operate(db.pool, inactive);
   expect(result.policy).toMatchObject({
-    release: "review-evidence-v2",
+    release: "review-evidence-v2" as const,
     digest: releaseV2Digest,
     revision: 1,
     activation: {
