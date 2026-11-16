@@ -23,3 +23,11 @@ CREATE FUNCTION immutable_photo_receipt() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'photo receipt is append-only'; END $$;
 CREATE TRIGGER photo_observation_immutable BEFORE UPDATE OR DELETE ON photo_receipt_observation FOR EACH ROW EXECUTE FUNCTION immutable_photo_receipt();
 CREATE TRIGGER photo_fact_immutable BEFORE UPDATE OR DELETE ON photo_receipt_fact FOR EACH ROW EXECUTE FUNCTION immutable_photo_receipt();
+CREATE TRIGGER photo_observation_no_truncate BEFORE TRUNCATE ON photo_receipt_observation FOR EACH STATEMENT EXECUTE FUNCTION immutable_photo_receipt();
+CREATE TRIGGER photo_fact_no_truncate BEFORE TRUNCATE ON photo_receipt_fact FOR EACH STATEMENT EXECUTE FUNCTION immutable_photo_receipt();
+ALTER TABLE photo_asset ADD CONSTRAINT photo_asset_purchase_identity UNIQUE(purchase_id,id);
+ALTER TABLE purchase ADD CONSTRAINT purchase_station_identity_receipt UNIQUE(station_id,id);
+ALTER TABLE photo_receipt_observation ADD CONSTRAINT receipt_observation_purchase_station FOREIGN KEY(station_id,purchase_id) REFERENCES purchase(station_id,id),
+ ADD CONSTRAINT receipt_observation_asset_purchase FOREIGN KEY(purchase_id,asset_id) REFERENCES photo_asset(purchase_id,id),
+ ADD CONSTRAINT receipt_observation_fact_identity UNIQUE(id,purchase_id,asset_id,receipt_at);
+ALTER TABLE photo_receipt_fact ADD CONSTRAINT receipt_fact_exact_observation FOREIGN KEY(observation_id,purchase_id,asset_id,receipt_at) REFERENCES photo_receipt_observation(id,purchase_id,asset_id,receipt_at);
