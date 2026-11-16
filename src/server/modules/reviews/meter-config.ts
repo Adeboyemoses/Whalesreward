@@ -45,6 +45,9 @@ export async function meterApprovalValid(
   if (
     policy.activation.state !== "active" ||
     !resolver ||
+    // WHR-148: no new meter dependency release is installed by P-29.
+    // V2 deliberately leaves meter reconciliation unconfigured.
+    resolver.release !== "review-evidence-v1" ||
     !reviewEvidenceV1Installed() ||
     resolver.scope.stationId !== policy.scope.stationId ||
     resolver.scope.environment !== policy.scope.environment ||
