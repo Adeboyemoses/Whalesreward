@@ -3,16 +3,17 @@ branch: core/WHR-153-stuck-hold
 linear: WHR-153
 tier: high
 builder: backend-engineer
-reviewed_head: a1db6f898bed148323feb51fe472bb6d6d73293b
-rounds: 2
+reviewed_head: a673238c601845842eab7a1f5e3e8fab86d0e7d3
+rounds: 4
+escalation: Earl approved round 4 on 2026-11-16 for PR 148, test-only nine hook tests at a673238, with fresh code/security/integrity verdicts; stop on any new finding or production change, no round 5
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
-  integrity-reviewer: FAIL
+  integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 20
+dispatches: 27
 invariants: [I-07, I-22, I-25, I-26, I-28, I-31, I-33, I-34, I-35, I-41, I-46, I-48]
-p1: [WHR-155]
+p1: []
 tickets: [WHR-123, WHR-155]
 plan:
   goal: implement inactive two-person stuck-hold release under immutable review-evidence-v2
@@ -21,17 +22,23 @@ plan:
   tests: real-Postgres SR-01 through SR-08 including SR-02a, non-superuser role checks, full existing gates and independent code/security/integrity reviews
   risks: credit and cancellation races, alias-account self-approval, evidence privacy, partial policy installation and stale giveaway snapshots; v1 remains active and meter stays unconfigured under v2
 ---
-DRAFT / NOT READY. Integrity review fails acceptance because WHR-155 is unresolved.
-The missing giveaway service belongs to draft WHR-22; WHR-54 policy remains unresolved.
-V2 complete installation stays false; no deployment or real database activation occurred.
-Round 1 found recovery admin/user identity confusion, private-reason disclosure,
-synthetic lookup provenance rejection, obsolete deadline handling and missing boundary lineage.
-Round 2 confirmed those code defects corrected; code/security PASS, integrity FAIL solely
-for absent initial/revision/unchanged giveaway integration and executable SR-06 evidence.
-EM typecheck, lint (two existing warnings), 947 unit tests, build and both timezone runs pass.
-Targeted PostgreSQL suites: service 96, upload 31, policy 11, lifecycle 9, foundation 7,
-consistency 2; operator 32. Positive dormant-service tests explicitly mock installation only.
-Full integration/browser final runs and limitations are recorded in the PR, not claimed green here.
-The browser preview-download failure also reproduces on unchanged base 09e2c86 (WHR-123).
-Exact named SR evidence and remaining dependency: tests/integration/held-release-matrix.md.
-No STATUS, coverage-map or lane files changed. This draft must not merge as completed work.
+Round 4: code, security and integrity PASS at a673238; no new findings or production changes.
+Earl approved this test-only fourth round on 2026-11-16; no fifth round is authorized.
+Round 1 identity, private-reason disclosure, synthetic provenance, obsolete deadline and
+boundary-lineage findings were corrected before round 2; code/security passed thereafter.
+WHR-155 Option A amends WHR-153: tested blocker/generation hooks ship now;
+actual initial/revision/unchanged giveaway SR-06 workflows move to WHR-22.
+Round 3 identified missing direct hook tests. Nine PostgreSQL hook tests close that gap:
+terminal transitions, stale pending blockers, station isolation, distinct counts,
+rollback, generation changes, reconciliation flags and unchanged fixture snapshots.
+All three round-4 reviewers found no new issues. Their local PostgreSQL reruns could
+not connect to the stopped disposable database; execution evidence is the EM and CI runs.
+EM gates and CI run 43802667522: typecheck, lint (two existing warnings), build,
+955 unit tests and 1322 PostgreSQL tests pass; both prior timeout cases pass in the full suite.
+Timezone tests: 5 UTC + 5 America/New_York. Browser: 401 passed, 1 passed on retry,
+4 existing skips; separate storage browser test: 1 passed. Review/guard self-tests pass.
+Exact named SR-01 through SR-08 (including SR-02a): tests/integration/held-release-matrix.md.
+V2 installation stays unconfigured; v1 remains active; meter remains unconfigured under v2.
+No end-to-end giveaway verification is claimed. WHR-22 owns the remaining real SR-06 tests.
+No activation, cloud change, real database access, screens or feature changes to STATUS,
+coverage-map or lane files. WHR-123 records the pre-existing browser preview-download issue.
