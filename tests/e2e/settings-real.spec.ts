@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../settings/retention-test";
 import { randomBytes } from "node:crypto";
 import { stationFixture } from "../station/helpers";
 import {
@@ -533,7 +533,7 @@ test("I-45 settings history is newest first and continues without duplicating en
 }) => {
   const f = await settingsFixture(page);
   const otherContext = await browser.newContext({
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: new URL(page.url()).origin,
   });
   let closeOther = async () => {};
   try {
