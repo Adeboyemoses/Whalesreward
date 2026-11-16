@@ -11,7 +11,8 @@ const reason = z
   .max(1000)
   .regex(/^[^\u0000-\u001f\u007f]*$/u);
 const instant = z.iso
-  .datetime({ offset: true, precision: 3 })
+  .datetime({ offset: true })
+  .refine((v) => !/\.\d{4,}/.test(v))
   .transform((v) => new Date(v).toISOString());
 const guard = {
   expectedVersion: version,

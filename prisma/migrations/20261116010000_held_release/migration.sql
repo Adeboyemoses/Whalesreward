@@ -167,3 +167,23 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN RETURN false;
 END $$;
 CREATE TRIGGER reports_held_release AFTER INSERT OR UPDATE OR DELETE ON held_release_state FOR EACH ROW EXECUTE FUNCTION advance_report_generation();
+CREATE FUNCTION guard_held_release_initial_state() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.state<>'pending' OR NEW.version<>1 THEN RAISE EXCEPTION 'proposal starts pending' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER held_release_initial BEFORE INSERT ON held_release_state FOR EACH ROW EXECUTE FUNCTION guard_held_release_initial_state();
+CREATE FUNCTION check_held_release_transition_chain() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE s RECORD; n INTEGER; last_state TEXT;
+BEGIN
+ SELECT * INTO s FROM held_release_state WHERE proposal_id=NEW.proposal_id;
+ SELECT count(*) INTO n FROM held_release_transition WHERE proposal_id=NEW.proposal_id;
+ SELECT state INTO last_state FROM held_release_transition WHERE proposal_id=NEW.proposal_id AND version=s.version;
+ IF s IS NULL OR n<>s.version OR last_state IS DISTINCT FROM s.state OR
+ NOT EXISTS(SELECT 1 FROM held_release_transition WHERE proposal_id=NEW.proposal_id AND version=1 AND state='pending') OR
+ EXISTS(SELECT 1 FROM held_release_transition WHERE proposal_id=NEW.proposal_id AND version>1 AND state='pending') THEN
+ RAISE EXCEPTION 'release transition chain missing or inconsistent' USING ERRCODE='23514'; END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER held_release_state_chain AFTER INSERT OR UPDATE ON held_release_state DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_held_release_transition_chain();
+CREATE CONSTRAINT TRIGGER held_release_transition_chain AFTER INSERT ON held_release_transition DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_held_release_transition_chain();
