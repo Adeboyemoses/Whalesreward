@@ -104,6 +104,40 @@ describe("P-30 trusted complete-photo receipt", () => {
       ).rows,
     ).toHaveLength(0);
   });
+  it("P-30 retry after durable observation uses retained sealed bytes despite staging overwrite", async () => {
+    const p = await pending();
+    const read = p.h.storage.read;
+    let finalReads = 0;
+    p.h.storage.read = async (key, max) => {
+      if (key.startsWith("final/") && ++finalReads === 2)
+        throw new Error("simulated crash after durable observation");
+      return read(key, max);
+    };
+    await expect(
+      p.h.sync.finalize(p.f.token, p.purchaseId, p.body),
+    ).rejects.toThrow();
+    const before = (
+      await db.pool.query(
+        "SELECT id,receipt_at FROM photo_receipt_observation WHERE purchase_id=$1",
+        [p.purchaseId],
+      )
+    ).rows;
+    expect(before).toHaveLength(1);
+    p.h.storage.read = read;
+    p.h.objects.set(p.key, await p.h.image("#000000"));
+    await p.h.sync.finalize(p.f.token, p.purchaseId, p.body);
+    expect(
+      (
+        await db.pool.query(
+          "SELECT observation_id,receipt_at FROM photo_receipt_fact WHERE purchase_id=$1",
+          [p.purchaseId],
+        )
+      ).rows[0],
+    ).toEqual({
+      observation_id: before[0].id,
+      receipt_at: before[0].receipt_at,
+    });
+  });
   it("P-30 concurrent same-byte retries retain one observation and one final fact", async () => {
     const p = await pending();
     const results = await Promise.allSettled([
