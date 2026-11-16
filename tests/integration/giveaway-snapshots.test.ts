@@ -136,3 +136,120 @@ it("SR-06 stale pending proposal with inactive policy and resolved-looking targe
     await f.close();
   }
 }, 30000);
+it("I-46 distinct simultaneous confirmations save one numbered snapshot", async () => {
+  const f = await giveawayFixture();
+  try {
+    await f.check();
+    const p = await prepareGiveaway(
+      f.pool,
+      f.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional concurrent results",
+        ...(await f.guard()),
+      },
+      config,
+    );
+    const preview = z
+        .object({ id: z.string(), contentDigest: z.string() })
+        .parse(p.data),
+      guard = await f.guard();
+    const results = await Promise.allSettled(
+      [1, 2].map(() =>
+        confirmGiveaway(
+          f.pool,
+          f.token,
+          f.campaignId,
+          {
+            operationId: newId(),
+            previewId: preview.id,
+            contentDigest: preview.contentDigest,
+            ...guard,
+          },
+          undefined,
+          config,
+        ),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::text n FROM giveaway_snapshot WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe("1");
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("I-46 changed source lineage saves a linked revision without rewriting its predecessor", async () => {
+  const f = await giveawayFixture();
+  try {
+    async function save(kind: "initial" | "revision") {
+      await f.check(kind);
+      const p = await prepareGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          kind,
+          reason: "Fictional source reconciliation",
+          ...(await f.guard()),
+        },
+        config,
+      );
+      const preview = z
+          .object({ id: z.string(), contentDigest: z.string() })
+          .parse(p.data),
+        guard = await f.guard();
+      return confirmGiveaway(
+        f.pool,
+        f.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          previewId: preview.id,
+          contentDigest: preview.contentDigest,
+          ...guard,
+        },
+        guard.expectedPreviousSnapshotId ?? undefined,
+        config,
+      );
+    }
+    await save("initial");
+    const before = (
+      await f.pool.query(
+        "SELECT id,to_jsonb(s) content FROM giveaway_snapshot s WHERE campaign_id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    await historicalSale(f.pool, {});
+    await save("revision");
+    const rows = (
+      await f.pool.query(
+        "SELECT id,snapshot_number,previous_snapshot_id FROM giveaway_snapshot WHERE campaign_id=$1 ORDER BY snapshot_number",
+        [f.campaignId],
+      )
+    ).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toMatchObject({
+      snapshot_number: 2,
+      previous_snapshot_id: before.id,
+    });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT to_jsonb(s) content FROM giveaway_snapshot s WHERE id=$1",
+          [before.id],
+        )
+      ).rows[0].content,
+    ).toEqual(before.content);
+  } finally {
+    await f.close();
+  }
+}, 30000);
