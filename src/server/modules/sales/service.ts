@@ -46,6 +46,17 @@ export async function salesAuthority(
       userId: actor.user_id,
       stationId: stations[0]!.id,
       attendantId: null,
+      releaseKinds: (["capture", "card", "date", "price"] as const).filter(
+        (kind) =>
+          actor.permissions.includes(
+            {
+              capture: "dateReview",
+              card: "cardEligibility",
+              date: "dateReview",
+              price: "priceReview",
+            }[kind] as "dateReview" | "cardEligibility" | "priceReview",
+          ),
+      ),
     };
   }
   const actor = await requireSession(db, digest(token ?? ""));
@@ -60,6 +71,7 @@ export async function salesAuthority(
     userId: actor.user_id,
     stationId: scope.station_id,
     attendantId: scope.id,
+    releaseKinds: [],
   };
 }
 const bundle = z.strictObject({
@@ -167,6 +179,10 @@ export async function readSales(
           : wire.salePageInputSchema.parse(input);
   return transaction(pool, async (db) => {
     const actor = await salesAuthority(db, token, audience);
+    const pendingFilter =
+      "status" in parsed && parsed.status === "pending_release";
+    if (pendingFilter && !actor.releaseKinds.length)
+      throw new AuthError("permission_denied", 403);
     const scope = JSON.stringify([
       audience,
       actor.userId,
@@ -174,7 +190,11 @@ export async function readSales(
       actor.attendantId,
       action,
       purchaseId ?? null,
-      { ...parsed, cursor: undefined },
+      {
+        ...parsed,
+        cursor: undefined,
+        ...(pendingFilter ? { permittedKinds: actor.releaseKinds } : {}),
+      },
     ]);
     const position = decodeCursor(
       config.secret,
@@ -216,13 +236,15 @@ export async function readSales(
         : ["revisions", "corrections", "decisions", "duplicateFlags"];
       const result = (
         await db.query<Record<string, unknown>>(
-          `SELECT ${sql.row(own)} data,${sql.values("p", true)} original,
+          `SELECT ${sql.row(own, "$4::text[]")} data,${sql.values("p", true)} original,
    p.correction_cutoff_at,p.correction_date_reliable,p.correction_time_policy_version,p.status,p.current_revision_id,r.calculation_mode,ctx.signed_in_at,ctx.offline_expires_at,p.server_received_at,
    (SELECT jsonb_build_object('assetId',ph.id,'state',CASE WHEN ph.deleted_at IS NOT NULL OR ph.state='deleted' THEN 'deleted' WHEN ph.state='validated' THEN 'validated' ELSE 'pending' END,'sha256',ph.validated_digest,'validatedAt',ph.validated_at) FROM photo_asset ph WHERE ph.purchase_id=p.id ORDER BY (ph.state='validated') DESC,ph.created_at DESC,ph.id DESC LIMIT 1) evidence,
    ${kinds.map((k) => `${historySql(k, own, 25)} "${k}"`).join(",")},
    ${own ? "NULL" : "(SELECT " + priceJson() + " FROM product_price_version v WHERE v.id=p.price_version_id AND v.station_id=p.station_id)"} price_reference,
    clock_timestamp() now FROM purchase p ${sql.joins} JOIN capture_context ctx ON ctx.id=p.capture_context_id WHERE ${where} AND p.id=$3`,
-          params.slice(0, 3),
+          own
+            ? params.slice(0, 3)
+            : [...params.slice(0, 3), actor.releaseKinds],
         )
       ).rows[0];
       if (!result) throw new AuthError("not_found", 404);
@@ -299,12 +321,13 @@ export async function readSales(
       filter.status ?? "all",
       filter.day ?? null,
       limit + 1,
+      actor.releaseKinds,
     );
     const filtered = `${where} AND ($6::text IS NULL OR c.name ILIKE '%'||$6||'%' OR p.card_code ILIKE '%'||$6||'%' OR p.sale_code ILIKE '%'||$6||'%' OR p.seller_name ILIKE '%'||$6||'%' OR p.seller_username ILIKE '%'||$6||'%' OR a.staff_code ILIKE '%'||$6||'%') AND ($7::uuid IS NULL OR p.customer_id=$7) AND ($9::date IS NULL OR coalesce(p.verified_sale_date,(p.app_captured_at AT TIME ZONE 'Africa/Lagos')::date)=$9) AND (
-   $8='all' OR ($8='completed' AND p.status='credited' AND r.id IS NOT NULL) OR ($8='incomplete' AND p.status IN ('received','photo_pending','finalizing')) OR ($8='cancelled' AND p.status='cancelled') OR ($8='duplicate' AND EXISTS(SELECT 1 FROM duplicate_flag f WHERE (f.purchase_id=p.id OR f.other_purchase_id=p.id) AND f.state='open')) OR ($8='late_correction' AND EXISTS(SELECT 1 FROM correction_request cr WHERE cr.purchase_id=p.id AND cr.state='awaiting_review')) OR ($8 IN ('price_review','card_review','date_review') AND EXISTS(SELECT 1 FROM purchase_hold h WHERE h.purchase_id=p.id AND h.state='open' AND h.kind=split_part($8,'_',1))) OR ($8='policy_review' AND (EXISTS(SELECT 1 FROM purchase_validation_block b WHERE b.purchase_id=p.id AND b.resolved_at IS NULL) OR EXISTS(SELECT 1 FROM correction_request cr WHERE cr.purchase_id=p.id AND cr.state IN ('pending_validation','awaiting_review') AND cardinality(cr.policy_blocks)>0))))`;
+   $8='all' OR ($8='pending_release' AND EXISTS(SELECT 1 FROM held_release_proposal hp JOIN held_release_state hs ON hs.proposal_id=hp.id WHERE hp.purchase_id=p.id AND hp.station_id=p.station_id AND hs.state='pending' AND hp.target_kind=ANY($11::text[]))) OR ($8='completed' AND p.status='credited' AND r.id IS NOT NULL) OR ($8='incomplete' AND p.status IN ('received','photo_pending','finalizing')) OR ($8='cancelled' AND p.status='cancelled') OR ($8='duplicate' AND EXISTS(SELECT 1 FROM duplicate_flag f WHERE (f.purchase_id=p.id OR f.other_purchase_id=p.id) AND f.state='open')) OR ($8='late_correction' AND EXISTS(SELECT 1 FROM correction_request cr WHERE cr.purchase_id=p.id AND cr.state='awaiting_review')) OR ($8 IN ('price_review','card_review','date_review') AND EXISTS(SELECT 1 FROM purchase_hold h WHERE h.purchase_id=p.id AND h.state='open' AND h.kind=split_part($8,'_',1))) OR ($8='policy_review' AND (EXISTS(SELECT 1 FROM purchase_validation_block b WHERE b.purchase_id=p.id AND b.resolved_at IS NULL) OR EXISTS(SELECT 1 FROM correction_request cr WHERE cr.purchase_id=p.id AND cr.state IN ('pending_validation','awaiting_review') AND cardinality(cr.policy_blocks)>0))))`;
     const result = (
       await db.query<{ items: unknown; summary: unknown; as_of: Date }>(
-        `WITH filtered AS MATERIALIZED (SELECT p.id,p.server_received_at,${sql.row(own)} data,p.status='credited' AND r.id IS NOT NULL credited,r.amount_kobo,r.quantity,r.currency,r.unit,pr.code product FROM purchase p ${sql.joins} WHERE ${filtered}), paged AS (SELECT * FROM filtered WHERE ($4::timestamptz IS NULL OR (server_received_at,id)<($4::timestamptz,$5::uuid)) ORDER BY server_received_at DESC,id DESC LIMIT $10)
+        `WITH filtered AS MATERIALIZED (SELECT p.id,p.server_received_at,${sql.row(own, "$11::text[]")} data,p.status='credited' AND r.id IS NOT NULL credited,r.amount_kobo,r.quantity,r.currency,r.unit,pr.code product FROM purchase p ${sql.joins} WHERE ${filtered}), paged AS (SELECT * FROM filtered WHERE ($4::timestamptz IS NULL OR (server_received_at,id)<($4::timestamptz,$5::uuid)) ORDER BY server_received_at DESC,id DESC LIMIT $10)
    SELECT (SELECT coalesce(jsonb_agg(jsonb_build_object('data',data,'id',id,'at',server_received_at) ORDER BY server_received_at DESC,id DESC),'[]') FROM paged) items,
    jsonb_build_object('records',(SELECT count(*)::text FROM filtered),'completed',(SELECT count(*)::text FROM filtered WHERE credited),'spend',(SELECT coalesce(jsonb_agg(jsonb_build_object('currency',currency,'amountKobo',amount::text)),'[]') FROM (SELECT currency,sum(amount_kobo) amount FROM filtered WHERE credited GROUP BY currency) s),'quantities',(SELECT coalesce(jsonb_agg(jsonb_build_object('product',product,'unit',unit,'quantity',trim_scale(quantity)::text)),'[]') FROM (SELECT product,unit,sum(quantity) quantity FROM filtered WHERE credited GROUP BY product,unit) q)) summary,statement_timestamp() as_of`,
         params,

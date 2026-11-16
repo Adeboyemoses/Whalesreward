@@ -6,6 +6,7 @@ import { priceSchema } from "./station";
 import { cardCode } from "./sync";
 import { MAX_KOBO } from "../money";
 import { amountToQuantity, parseQuantity, quantityToAmount } from "../quantity";
+import { pendingReleaseSummarySchema } from "./pending-release";
 
 const version = z.number().int().min(1).max(2147483647);
 const instant = z.iso
@@ -314,6 +315,7 @@ const rowFields = {
 export const saleRowSchema = z.strictObject({
   ...rowFields,
   holds: z.array(holdDetailSchema),
+  pendingRelease: pendingReleaseSummarySchema.nullable(),
 });
 export const attendantSaleRowSchema = z.strictObject({
   ...rowFields,
@@ -379,6 +381,7 @@ export const saleFilterSchema = salePageInputSchema
         "date_review",
         "cancelled",
         "policy_review",
+        "pending_release",
       ])
       .optional(),
     day: saleDateSchema.optional(),

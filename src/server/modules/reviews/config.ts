@@ -88,11 +88,12 @@ export async function pinReviewEvidencePolicy(
 export async function reviewEvidenceApprovalValid(
   db: Pick<pg.PoolClient, "query">,
   policy: ReviewEvidenceConfiguration,
+  purpose: "mutation" | "preparation" = "mutation",
 ) {
   if (policy.activation.state !== "active") return false;
   if (policy.release === "review-evidence-v2") {
     try {
-      await assertReleaseV2Installation(db, policy.scope.stationId);
+      await assertReleaseV2Installation(db, policy.scope.stationId, purpose);
     } catch {
       return false;
     }
@@ -121,6 +122,7 @@ export async function pinReleaseV2Policy(
   db: pg.PoolClient,
   stationId: string,
   env: ReviewEnvironment = process.env,
+  purpose: "mutation" | "preparation" = "mutation",
 ) {
   const policy = reviewEvidenceConfiguration(env);
   if (
@@ -134,7 +136,7 @@ export async function pinReleaseV2Policy(
     "SELECT pg_advisory_xact_lock(hashtextextended('review-evidence:'||$1::text||':'||$2::text,0))",
     [stationId, policy.scope.environment],
   );
-  if (!(await reviewEvidenceApprovalValid(db, policy)))
+  if (!(await reviewEvidenceApprovalValid(db, policy, purpose)))
     throw new AuthError("release_policy_unconfigured", 409);
   return policy;
 }

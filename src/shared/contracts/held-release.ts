@@ -148,3 +148,68 @@ export const releaseDecisionResponseSchema = z.strictObject({
   proposal: releaseProposalSchema,
   decision: releaseDecisionSchema,
 });
+
+export const structuralAdmissionSchema = z.discriminatedUnion("state", [
+  z.strictObject({
+    state: z.literal("structurally_admissible"),
+    reason: z.literal("temporal_boundary"),
+  }),
+  z.strictObject({
+    state: z.literal("ordinary_review_required"),
+    reason: z.literal("v1_settleable"),
+  }),
+  z.strictObject({
+    state: z.literal("not_admissible"),
+    reason: z.enum([
+      "history_incomplete",
+      "history_contradictory",
+      "invalid_capture_bounds",
+      "campaign_unconfigured",
+      "receipt_after_deadline",
+      "original_evidence_unavailable",
+      "unsupported_retirement",
+      "no_material_boundary",
+      "candidate_incompatible",
+      "other_policy_block",
+    ]),
+  }),
+]);
+export type StructuralAdmission = z.infer<typeof structuralAdmissionSchema>;
+export const releasePreparationQuerySchema = z.strictObject({
+  kind: z.enum(["price", "card", "date", "capture"]),
+});
+export const releasePreparationSchema = z
+  .strictObject({
+    purchaseId: authId,
+    kind: releasePreparationQuerySchema.shape.kind,
+    asOf: z.iso.datetime({ offset: true }),
+    guard: z.strictObject(guard),
+    target: releaseTargetSchema,
+    originalContext: z.strictObject({
+      stationId: authId,
+      accountId: authId,
+      pumpId: authId,
+      product: attestedFactsSchema.shape.product,
+      customerId: authId,
+      cardId: authId,
+    }),
+    original: saleValuesSchema,
+    meterAssetId: authId,
+    currentCandidate: z.strictObject({
+      revisionId: authId,
+      source: z.enum(["original", "resolution_candidate", "accepted_revision"]),
+      values: saleValuesSchema,
+    }),
+    admission: structuralAdmissionSchema,
+    proposerAccess: z.discriminatedUnion("allowed", [
+      z.strictObject({ allowed: z.literal(true), reason: z.null() }),
+      z.strictObject({
+        allowed: z.literal(false),
+        reason: z.enum([
+          "independence_unverifiable",
+          "independent_reviewer_required",
+        ]),
+      }),
+    ]),
+  })
+  .refine((v) => v.kind === v.target.kind);

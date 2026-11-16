@@ -197,11 +197,7 @@ function price(
     sourceIds: [p.id, captured.id, ...segments.map((v) => v.id), ...auditIds],
   };
 }
-function card(
-  f: ResolvedEvidence,
-  i: EvidenceInterval,
-  outcome: string,
-): TypedConclusion {
+function cardHistory(f: ResolvedEvidence) {
   const p = f.original,
     c = f.card;
   if (
@@ -216,17 +212,10 @@ function card(
   if (
     l.customer_id !== p.customer_id ||
     !l.ended_at ||
-    trustedMicros(l.ended_at) !== trustedMicros(c.retired_at) ||
-    BigInt(trustedMicros(l.linked_at)) > BigInt(i.L)
+    trustedMicros(l.ended_at) !== trustedMicros(c.retired_at)
   )
     return insufficient();
-  const E = trustedMicros(c.retired_at),
-    relation = cardRelation(i.L, i.U, E, i.R);
-  if (
-    (outcome === "cancel" && relation !== "after") ||
-    (outcome === "confirm_earlier" && relation !== "before")
-  )
-    return insufficient();
+  const E = trustedMicros(c.retired_at);
   const matches = f.audits.filter((a) => {
     const before = record(a.before),
       after = record(a.after);
@@ -242,6 +231,21 @@ function card(
     );
   });
   if (matches.length !== 1) return insufficient();
+  return { p, c, l, E, auditId: matches[0]!.id };
+}
+function card(
+  f: ResolvedEvidence,
+  i: EvidenceInterval,
+  outcome: string,
+): TypedConclusion {
+  const { p, c, l, E, auditId } = cardHistory(f);
+  if (BigInt(trustedMicros(l.linked_at)) > BigInt(i.L)) return insufficient();
+  const relation = cardRelation(i.L, i.U, E, i.R);
+  if (
+    (outcome === "cancel" && relation !== "after") ||
+    (outcome === "confirm_earlier" && relation !== "before")
+  )
+    return insufficient();
   return {
     tag:
       relation === "before"
@@ -253,7 +257,7 @@ function card(
     replacementAt: E,
     precision: "microsecond",
     interval: i,
-    sourceIds: [p.id, c.id, l.id, matches[0]!.id],
+    sourceIds: [p.id, c.id, l.id, auditId],
   };
 }
 function authorization(
@@ -568,6 +572,7 @@ export const releaseEvidencePredicates = Object.freeze({
   intervalFor,
   price,
   card,
+  cardHistory,
   date,
   authorization,
   campaign,

@@ -1285,3 +1285,6 @@ export function createHeldReleaseService({
   }
   return { propose, decide, get, list, photoAccess };
 }
+
+/** Shared guarded read authority and person exclusions; no mutation capability. */
+export const releaseReadInternals = { authority, independent };

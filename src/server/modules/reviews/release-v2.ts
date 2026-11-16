@@ -31,6 +31,7 @@ export const reviewEvidenceV2Installation = Object.freeze({
 export async function assertReleaseV2Installation(
   db: Pick<pg.PoolClient, "query">,
   stationId: string,
+  purpose: "mutation" | "preparation" = "mutation",
 ): Promise<void> {
   if (!Object.values(reviewEvidenceV2Installation).every(Boolean))
     throw new Error("release_policy_unconfigured");
@@ -52,10 +53,10 @@ export async function assertReleaseV2Installation(
       (SELECT count(DISTINCT b.person_id) FROM auth_user u JOIN admin a ON a.user_id=u.id
        JOIN LATERAL (SELECT person_id,verified FROM held_release_person_binding WHERE station_id=$1 AND user_id=u.id ORDER BY version DESC LIMIT 1) b ON b.verified
        WHERE u.enabled) >= 2 AND
-      NOT EXISTS(SELECT 1 FROM auth_user u WHERE u.enabled AND NOT EXISTS(
+      ($2::boolean OR NOT EXISTS(SELECT 1 FROM auth_user u WHERE u.enabled AND NOT EXISTS(
        SELECT 1 FROM held_release_person_binding b WHERE b.station_id=$1 AND b.user_id=u.id AND b.verified
-       AND b.version=(SELECT max(x.version) FROM held_release_person_binding x WHERE x.station_id=b.station_id AND x.user_id=b.user_id))) AS ready`,
-    [stationId],
+       AND b.version=(SELECT max(x.version) FROM held_release_person_binding x WHERE x.station_id=b.station_id AND x.user_id=b.user_id)))) AS ready`,
+    [stationId, purpose === "preparation"],
   );
   if (!people.rows[0]?.ready) throw new Error("release_policy_unconfigured");
 }

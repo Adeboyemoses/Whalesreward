@@ -89,6 +89,7 @@ export async function resolveEvidenceSources(
   db: pg.PoolClient,
   purchaseId: string,
   assetId: string,
+  requirePhoto = true,
 ): Promise<ResolvedEvidence> {
   await db.query(
     "LOCK TABLE product_price_version, assignment, capture_context, card, card_customer_link, settings_version, campaign, audit_event IN SHARE MODE",
@@ -167,7 +168,7 @@ export async function resolveEvidenceSources(
       [assetId, purchaseId, original.expected_photo_digest],
     )
   )[0];
-  if (!photo) throw new AuthError("evidence_unavailable", 422);
+  if (!photo && requirePhoto) throw new AuthError("evidence_unavailable", 422);
   const candidateAudits = await rows(
     db,
     `SELECT jsonb_build_object('id',id,'occurred_at',occurred_at,'action',action,'target_type',target_type,'target_id',target_id,'before',before,'after',after) fact FROM audit_event WHERE (target_type='product' AND target_id=$1 AND action='price_activated') OR (target_type='card' AND target_id=$2 AND action IN ('card_linked','card_replaced','card_replacement')) OR (target_type='attendant' AND target_id=$3 AND action IN ('assignment_ended','assignment_changed','attendant_disabled')) OR (target_type IN ('station','campaign') AND (target_id=$4 OR target_id=ANY($5::uuid[])) AND action IN ('settings_changed','campaign_configured','settings_updated')) ORDER BY occurred_at,id LIMIT 2049`,
@@ -263,7 +264,7 @@ export async function resolveEvidenceSources(
   };
   add("original_purchase", original);
   add("capturing_context", context);
-  add("validated_photo", photo);
+  if (photo) add("validated_photo", photo);
   for (const f of prices) add("price_history", f);
   for (const f of assignments) add("assignment_history", f);
   // Legacy campaign snapshots are a durable protocol, not the current table shape.
@@ -302,7 +303,7 @@ export async function resolveEvidenceSources(
     links,
     card,
     audits,
-    photo,
+    photo: photo ?? { id: assetId, state: "unavailable" },
     sources,
     historyGeneration,
     derived: [],

@@ -1,28 +1,123 @@
 import type pg from "pg";
-import type { ReleaseProposalInput } from "../../../shared/contracts/held-release";
+import type {
+  ReleaseProposalInput,
+  ReleaseTarget,
+  StructuralAdmission,
+} from "../../../shared/contracts/held-release";
+import { parseQuantity } from "../../../shared/quantity";
 import { AuthError } from "../auth/errors";
-import { resolveEvidenceSources, trustedMicros } from "./evidence-resolvers";
+import {
+  resolveEvidenceSources,
+  trustedMicros,
+  priceAuditMatches,
+} from "./evidence-resolvers";
 import {
   releaseEvidencePredicates as rules,
   intervalDay,
 } from "./evidence-evaluator";
+import { releaseSaleMutations as sale } from "./service";
 import type { TypedConclusion } from "./evidence-types";
 
+type NegativeReason = Extract<
+  StructuralAdmission,
+  { state: "not_admissible" }
+>["reason"];
+class StructuralExclusion extends Error {
+  constructor(readonly reason: NegativeReason) {
+    super(reason);
+  }
+}
+const exclude = (reason: NegativeReason): never => {
+  throw new StructuralExclusion(reason);
+};
 const insufficient = (): never => {
   throw new AuthError("evidence_insufficient", 422);
 };
 /** The caller supplies no reference subset. All applicable original sources are loaded. */
-export async function classifyReleaseAdmission(
+async function structural(
   db: pg.PoolClient,
   purchaseId: string,
-  body: ReleaseProposalInput,
+  target: ReleaseTarget,
+  meterAssetId: string,
 ) {
-  const f = await resolveEvidenceSources(db, purchaseId, body.meterAssetId);
-  const { interval: I } = rules.intervalFor(f);
-  if (!f.original.customer_id || !f.settings.length) return insufficient();
-  rules.completeVersions(f.prices);
-  rules.completeVersions(f.assignments, "assignment_version");
-  rules.completeVersions(f.settings, "timing_history_version");
+  const f = await resolveEvidenceSources(db, purchaseId, meterAssetId, false);
+  if (!f.original.customer_id) return exclude("history_incomplete");
+  const histories = [
+    [f.prices, "version"],
+    [f.assignments, "assignment_version"],
+    [f.settings, "timing_history_version"],
+  ] as const;
+  // Inspect every history before choosing a categorical reason. A malformed
+  // earlier array must not mask missing data in a later one (T-20 enum order).
+  // Replacement linkage and its audit must also be complete before reporting
+  // contradictions or invalid bounds; reuse the ordinary card predicate's closure.
+  if (f.card?.retirement_reason === "replaced") {
+    try {
+      rules.cardHistory(f);
+    } catch (e) {
+      if (e instanceof AuthError) return exclude("history_incomplete");
+      throw e;
+    }
+  }
+  const capturedPrice = f.prices.find(
+    (p) => p.id === f.original.price_version_id,
+  );
+  const incomplete =
+    histories.some(
+      ([history, field]) =>
+        (field !== "timing_history_version" && !history.length) ||
+        history.some((row, i) => row[field] !== i + 1),
+    ) ||
+    f.settings.some((s) => s.timing_history_complete !== true) ||
+    !capturedPrice ||
+    capturedPrice.rate_kobo !== f.original.rate_kobo ||
+    capturedPrice.currency !== f.original.currency ||
+    capturedPrice.quantity_precision !== f.original.quantity_precision ||
+    f.prices.some(
+      (p) =>
+        f.audits.filter(
+          (a) =>
+            a.action === "price_activated" &&
+            a.target_id === f.original.product_id &&
+            priceAuditMatches(a, p),
+        ).length !== 1,
+    );
+  if (incomplete) return exclude("history_incomplete");
+  const contradictory =
+    histories.some(([history]) =>
+      history.some(
+        (row, i) =>
+          i > 0 &&
+          BigInt(trustedMicros(row.effective_from)) <=
+            BigInt(trustedMicros(history[i - 1]!.effective_from)),
+      ),
+    ) ||
+    f.assignments.some(
+      (row, i) =>
+        i < f.assignments.length - 1 &&
+        (!row.effective_until ||
+          BigInt(trustedMicros(row.effective_until)) >
+            BigInt(trustedMicros(f.assignments[i + 1]!.effective_from))),
+    ) ||
+    f.settings.some(
+      (s) =>
+        s.purchase_start &&
+        s.purchase_cutoff &&
+        s.upload_deadline &&
+        (BigInt(trustedMicros(s.purchase_start)) >
+          BigInt(trustedMicros(s.purchase_cutoff)) ||
+          BigInt(trustedMicros(s.upload_deadline)) <
+            BigInt(trustedMicros(s.purchase_cutoff))),
+    );
+  if (contradictory) return exclude("history_contradictory");
+  let I;
+  try {
+    I = rules.intervalFor(f).interval;
+  } catch (e) {
+    if (e instanceof AuthError) return exclude("invalid_capture_bounds");
+    throw e;
+  }
+  if (!f.settings.length) return exclude("campaign_unconfigured");
   const orderedTiming = f.settings.filter(
     (s) => BigInt(trustedMicros(s.effective_from)) <= BigInt(I.U),
   );
@@ -31,18 +126,31 @@ export async function classifyReleaseAdmission(
   );
   if (timingAnchor < 0) return insufficient();
   const applicableTiming = orderedTiming.slice(timingAnchor);
+  if (applicableTiming.some((s) => s.timing_history_complete !== true))
+    return exclude("history_incomplete");
   if (
     applicableTiming.some(
       (s) =>
-        s.timing_history_complete !== true ||
         !s.campaign_id ||
         !s.purchase_start ||
         !s.purchase_cutoff ||
-        !s.upload_deadline ||
-        BigInt(trustedMicros(s.upload_deadline)) < BigInt(I.R),
+        !s.upload_deadline,
     )
   )
-    return insufficient();
+    return exclude("campaign_unconfigured");
+  if (
+    applicableTiming.some(
+      (s) =>
+        BigInt(trustedMicros(s.purchase_start)) >
+          BigInt(trustedMicros(s.purchase_cutoff)) ||
+        BigInt(trustedMicros(s.upload_deadline)) <
+          BigInt(trustedMicros(s.purchase_cutoff)),
+    )
+  )
+    return exclude("history_contradictory");
+  const afterDeadline = applicableTiming.some(
+    (s) => BigInt(trustedMicros(s.upload_deadline)) < BigInt(I.R),
+  );
   // Validate all relevant historical segments independently of whether a uniform
   // conclusion exists. A boundary is not permission to overlook missing audits.
   const points = new Set<string>([I.L, I.U]);
@@ -65,6 +173,30 @@ export async function classifyReleaseAdmission(
         BigInt(at) < BigInt(E) ? "confirm_earlier" : "cancel",
       );
   }
+  if (afterDeadline) return exclude("receipt_after_deadline");
+  if (f.photo.state !== "validated")
+    return exclude("original_evidence_unavailable");
+  if (
+    (target.kind === "card" || f.card?.retired_at) &&
+    f.card?.retirement_reason !== "replaced"
+  )
+    return exclude("unsupported_retirement");
+  const p = (await db.query("SELECT * FROM purchase WHERE id=$1", [purchaseId]))
+    .rows[0];
+  const candidate = await sale.candidate(db, p);
+  const incompatible =
+    target.kind === "price" &&
+    (candidate.values.amountKobo !== f.original.amount_kobo ||
+      parseQuantity(candidate.values.quantity) !==
+        parseQuantity(String(f.original.quantity)) ||
+      candidate.values.rateKobo !== f.original.rate_kobo ||
+      candidate.values.calculation !== "captured_rate");
+  const otherBlocks = (
+    await db.query(
+      "SELECT id FROM purchase_validation_block WHERE purchase_id=$1 AND resolved_at IS NULL AND code NOT IN ('capture_authorization_unresolved','capture_time_unresolved')",
+      [purchaseId],
+    )
+  ).rowCount;
   const boundary = (at: unknown) => {
     const t = BigInt(trustedMicros(at));
     return t > BigInt(I.L) && t <= BigInt(I.U);
@@ -94,8 +226,7 @@ export async function classifyReleaseAdmission(
       changeAtMicros: changeAt ?? atMicros,
     });
   };
-  const conclusions: TypedConclusion[] = [];
-  switch (body.target.kind) {
+  switch (target.kind) {
     case "price": {
       const anchor = f.prices.findLastIndex(
         (p) => BigInt(trustedMicros(p.effective_from)) <= BigInt(I.L),
@@ -144,7 +275,7 @@ export async function classifyReleaseAdmission(
         campaign = rules.campaign(f, I);
       if (authorization?.tag === "capture_unauthorized_throughout")
         throw new AuthError("release_not_required", 409);
-      const kinds = new Set(body.target.blocks.map((b) => b.code));
+      const kinds = new Set(target.blocks.map((b) => b.code));
       admitted =
         (kinds.has("capture_authorization_unresolved") &&
           authorization === null) ||
@@ -195,7 +326,123 @@ export async function classifyReleaseAdmission(
       break;
     }
   }
-  if (!admitted) throw new AuthError("release_not_required", 409);
+  if (!admitted) {
+    let ordinary = false;
+    try {
+      if (target.kind === "price") {
+        // P-26 is explicitly unconfigured in the installed v2 package. A
+        // uniform historical rate alone is not an available correct-meter
+        // outcome; only a lawful accept-captured conclusion proves settlement.
+        rules.price(f, I);
+        ordinary = true;
+      } else if (target.kind === "date") {
+        rules.date(f, I, intervalDay(I.L, I.U) ?? undefined);
+        ordinary = true;
+      } else if (target.kind === "card") {
+        for (const outcome of ["confirm_earlier", "cancel"]) {
+          try {
+            rules.card(f, I, outcome);
+            ordinary = true;
+          } catch (e) {
+            if (!(e instanceof AuthError)) throw e;
+          }
+        }
+      } else if (target.kind === "capture") {
+        const authorization = rules.authorization(f, I);
+        ordinary =
+          authorization?.tag === "capture_unauthorized_throughout" ||
+          target.blocks.every((b) =>
+            b.code === "capture_authorization_unresolved"
+              ? authorization?.tag === "capture_authorized_throughout"
+              : rules.campaign(f, I) !== null,
+          );
+      }
+    } catch (e) {
+      if (!(e instanceof AuthError)) throw e;
+    }
+    if (ordinary) throw new AuthError("release_not_required", 409);
+    return exclude("no_material_boundary");
+  }
+  if (incompatible) return exclude("candidate_incompatible");
+  if (otherBlocks) return exclude("other_policy_block");
+  return { f, I, boundaries };
+}
+
+/** One structural algorithm shared by preparation, creation and approval. No sheet facts. */
+export async function classifyReleaseStructure(
+  db: pg.PoolClient,
+  purchaseId: string,
+  target: ReleaseTarget,
+  meterAssetId: string,
+): Promise<{
+  admission: StructuralAdmission;
+  evaluation?: Awaited<ReturnType<typeof structural>>;
+}> {
+  try {
+    const evaluation = await structural(db, purchaseId, target, meterAssetId);
+    return {
+      admission: {
+        state: "structurally_admissible",
+        reason: "temporal_boundary",
+      },
+      evaluation,
+    };
+  } catch (error) {
+    if (error instanceof StructuralExclusion)
+      return { admission: { state: "not_admissible", reason: error.reason } };
+    if (!(error instanceof AuthError)) throw error;
+    if (error.code === "release_not_required")
+      return {
+        admission: {
+          state: "ordinary_review_required",
+          reason: "v1_settleable",
+        },
+      };
+    if (error.code === "evidence_unavailable")
+      return {
+        admission: {
+          state: "not_admissible",
+          reason: "original_evidence_unavailable",
+        },
+      };
+    if (error.code === "policy_review_required")
+      return {
+        admission: {
+          state: "not_admissible",
+          reason: "unsupported_retirement",
+        },
+      };
+    if (error.code === "evidence_insufficient")
+      return {
+        admission: { state: "not_admissible", reason: "history_incomplete" },
+      };
+    throw error;
+  }
+}
+
+export async function classifyReleaseAdmission(
+  db: pg.PoolClient,
+  purchaseId: string,
+  body: ReleaseProposalInput,
+) {
+  const result = await classifyReleaseStructure(
+    db,
+    purchaseId,
+    body.target,
+    body.meterAssetId,
+  );
+  // Preserve WHR-153's mutation error for a target with no material boundary.
+  // Preparation distinguishes that exclusion from actual v1 settlement; neither
+  // result grants admission or changes the existing mutation protocol.
+  if (
+    result.admission.state === "ordinary_review_required" ||
+    (result.admission.state === "not_admissible" &&
+      result.admission.reason === "no_material_boundary")
+  )
+    throw new AuthError("release_not_required", 409);
+  if (!result.evaluation) return insufficient();
+  const { f, I, boundaries } = result.evaluation;
+  const conclusions: TypedConclusion[] = [];
   const from = BigInt(trustedMicros(body.facts.observedCapture.from));
   const through = BigInt(trustedMicros(body.facts.observedCapture.through));
   const J = {
