@@ -828,3 +828,19 @@ Register-ready questions are in [the PROPOSAL](proposals/m4-client-decisions.md)
 | Test infrastructure | `tests/unit/reports-database.test.ts`: six no-network WHR-149 guard cases; worker-specific real Next/schema fixtures keep parallel report prices/generations separate | on-staging supporting tests; no production change |
 
 EM combined-head typecheck/lint/build, 885 unit and serial browser 384/four existing skips PASS. CI: 1,154 PostgreSQL, timezone 5+5, browser 384/four skips/zero retries and storage 1 PASS. Focused reports 24 PASS; fidelity capture 1 PASS. WHR-142 remains the inherited Settings fixture coupling: two local parallel metadata-stale refusals exhausted bounds, four isolated reruns and full CI/serial verification passed unchanged. No assertion, retry/timeout bound or production guard was weakened. WHR-149 is fixed; WHR-151 starts in a new session.
+
+
+## WO-app-13b / WHR-151 Owner campaign timing READY — 16 Nov 2026
+
+[Feature PR #147](https://github.com/Adeboyemoses/Whalesreward/pull/147) merged at `b8d78d8` with five green checks. Feature head `482fcc6`; reviewed head `93d7857`. Code/security/integrity PASS through Earl-authorized round 3; final round changed test isolation only. This separate records PR completes READY; Earl’s end-of-M4 smoke remains pending.
+
+| Invariants / boards | Named tests and independent evidence | Status |
+|---|---|---|
+| I-07, I-09 | `campaign-timing-real.spec.ts`: non-Owner read-only and retention access; Owner demotion during review; session authority includes isOwner | on-staging UI/API integration; server authorization unchanged |
+| I-41, I-45 | `campaign-timing-real.spec.ts`: Owner create/edit, cancellation, history, direct confirm, stale review, same-body lost-response/navigation and 429 retries; explicit start/snapshot/cross-start UI projections | on-staging; actual server locks additionally verified by 57 P-28 PostgreSQL tests |
+| I-45 | `admin-settings-api.test.ts`: real six-digit responses, exact offset equivalence, microsecond deadline mismatch, strict target/field verification and frozen confirmation | on-staging exact review boundary; no browser-clock lock authority or board defaults |
+| I-45, I-51 | `settings-real.spec.ts`: 22 desktop/phone retention regressions; deletion remains disabled | on-staging unchanged retention intent behavior |
+| B07, T01, T03; T02/T04 regression | `tests/design-parity/settings/REPORT.md`: 16 current captures/metrics at 1440/390/360 px, wrapped exact comparisons, keyboard focus and 48 px phone controls | on-staging contract-adjusted fidelity; Earl smoke pending |
+| Test isolation | `tests/settings/test.ts`: local-only migrated schema and real Next worker, environment restoration, schema cleanup and unchanged public campaign assertions | on-staging supporting fixture; no production code |
+
+EM typecheck/lint/build and 893 unit tests PASS; focused desktop/phone 40 and fidelity 1 PASS. CI: 1,154 PostgreSQL, timezone 5+5, browser 402/four existing skips/zero retries and storage 1 PASS. Complete local browser: 399 PASS/four skips; tracked WHR-123 and two native restart sandbox failures, all covered by green native CI. WHR-140/142 remain separate inherited fixture follow-ups. Smoke: `docs/qa/smoke-2026-11-16-campaign-timing.md`.
