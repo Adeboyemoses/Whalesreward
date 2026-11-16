@@ -365,6 +365,16 @@ export async function confirmGiveaway(
       { ...p, campaignId, previousSnapshotId: previousSnapshotId ?? null },
       async () => {
         replayed = false;
+        if (
+          previousSnapshotId &&
+          !(
+            await db.query(
+              "SELECT 1 FROM giveaway_snapshot WHERE id=$1 AND campaign_id=$2",
+              [previousSnapshotId, c.id],
+            )
+          ).rowCount
+        )
+          throw new AuthError("not_found", 404);
         guard(c, p);
         if (!previousSnapshotId && c.latest_snapshot_id)
           throw new AuthError("snapshot_exists", 409);

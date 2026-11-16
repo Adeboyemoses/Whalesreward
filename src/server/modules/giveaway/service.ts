@@ -17,7 +17,16 @@ export async function readReadiness(
   return transaction(pool, async (db) => {
     const { actor, station } = await authority(db, token);
     const c = await campaignData(db, station.id, campaignId);
-    return (await readiness(db, c!, actor.admin_id)).view;
+    const view = (await readiness(db, c!, actor.admin_id)).view;
+    if (
+      !actor.permissions.includes(
+        c!.latest_snapshot_id ? "giveawayRevise" : "giveawayFinalize",
+      )
+    ) {
+      view.canPrepare = false;
+      view.canConfirm = false;
+    }
+    return view;
   });
 }
 export { prepareGiveaway, confirmGiveaway } from "./mutations";

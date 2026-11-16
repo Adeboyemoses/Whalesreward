@@ -43,6 +43,13 @@ export async function readGiveawayHistory(
   input: unknown = {},
 ) {
   const q = query.parse(input);
+  const keys = Object.keys(input as Record<string, unknown>);
+  if (
+    (id && !child && keys.length) ||
+    (child !== "rows" && q.category !== undefined) ||
+    (child !== "changes" && q.kind !== undefined)
+  )
+    throw new AuthError("invalid_request", 400);
   return transaction(pool, async (db) => {
     const { actor, station } = await authority(db, token);
     await campaignData(db, station.id, campaignId);
