@@ -64,6 +64,7 @@ import {
   SaleStatus,
 } from "./sales-common";
 import { useMemory } from "./customers-common";
+import { HeldRelease } from "./held-release";
 const RecordedContext = createContext<
   ((receipt: Decision, label: string) => void) | null
 >(null);
@@ -715,6 +716,9 @@ function ReviewRecord({
         />
       ) : (
         <HoldReview sale={sale} kind={kind} session={session} reload={reload} />
+      )}
+      {kind !== "duplicate" && !outcome && (
+        <HeldRelease sale={sale} kind={kind} session={session} reload={reload} />
       )}
       {current && (
         <AdminSaleHistory
