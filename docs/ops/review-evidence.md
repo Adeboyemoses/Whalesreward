@@ -77,3 +77,14 @@ Use bound SQL parameters, never concatenate operator values. No application or h
 `review_evaluation` is protected append-only domain provenance, linked one-to-one to its decision. It contains policy identity, original/evaluated target, interval and lookup fallback, source snapshots and dependency edges, typed conclusions and result. It must not be exposed through general audit, attendant projections, logs or health. Retain it with immutable decision history.
 
 The present implementation stores campaign membership in protected evaluation provenance. Existing `sync_validation.campaign_eligible` remains immutable and false for held originals; confirming an outside interval never changes that to true. Future campaign aggregation must consume the typed membership and independently enforce receipt deadlines and remaining eligibility gates. This release adds no campaign report or snapshot implementation.
+
+
+## Two-person release v2 (WHR-153)
+
+Installation does not activate v2. V1 remains the default when `--release` is omitted. Earl must separately authorize the exact environment, station, reviewed v2 artifact digest, higher revision and activation instant. Preview and apply v2 by adding `--release review-evidence-v2` to the command above and supplying the SHA-256 of `reviewEvidenceV2ReleaseArtifact` in `src/server/modules/reviews/release-v2.ts`. Never substitute the v1 digest. Both preview and apply require the installed proposal, identity, sheet-photo, decision and giveaway integrations and canonical person bindings. A partially installed package refuses activation. The exact owner-written database-comment identity remains mandatory for both releases.
+
+The printed apply command includes the selected release. Review its scope, digest and expected revision against Earl's authorization, then deploy only the JSON from successful apply. Future activation remains unconfigured until its instant. The operator never writes runtime settings or reevaluates sales. Reconcile uncertain commits through immutable approval/configuration history before retrying.
+
+P-26 dependency choice: the existing meter release remains pinned to v1 and is **unconfigured under v2**. This package does not relabel its artifact or provenance. A future compatible meter release needs separate review and authorization.
+
+Deactivation may append an inactive v2 revision even if installation/person prerequisites are no longer satisfied; stopping approvals must remain possible. Pending proposals remain giveaway blockers after deactivation or return to v1. Current authorized independent reviewers may reject them; historical successful receipts retain their original results after current authority checks. No switch clears holds, erases paper evidence or rewrites snapshots. Pilot retention keeps rejected and superseded sheet assets too.

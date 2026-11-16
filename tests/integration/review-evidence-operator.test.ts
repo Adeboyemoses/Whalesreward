@@ -7,6 +7,7 @@ import {
   operate,
   parseArguments,
   releaseDigest,
+  releaseV2Digest,
   formatResult,
   checkDatabaseEnvironment,
 } from "../../scripts/ops/review-evidence.mjs";
@@ -88,6 +89,7 @@ async function input(action = "activate", apply = false) {
     "test",
     "--digest",
     releaseDigest,
+  releaseV2Digest,
     "--authorization",
     "WHR-114",
     ...(action === "activate"
@@ -459,6 +461,7 @@ it("runs real CLI dry run and guarded production apply against persisted identit
     "production",
     "--digest",
     releaseDigest,
+  releaseV2Digest,
     "--authorization",
     "APPROVAL-114",
     "--activated-at",
@@ -525,4 +528,16 @@ it("runs real CLI dry run and guarded production apply against persisted identit
     activatedAt: null,
   });
   expect(await counts(request.stationId)).toEqual([1, 2]);
+});
+
+
+it("SR-07 partial v2 installation or absent person bindings refuses preview/apply with no SR-08 audit", async () => {
+  const ordinary = await input();
+  const v2 = { ...ordinary, release: "review-evidence-v2", digest: releaseV2Digest };
+  const before = await db.pool.query("SELECT count(*)::int AS count FROM audit_event WHERE station_id=$1", [v2.stationId]);
+  await expect(operate(db.pool, v2)).rejects.toThrow();
+  await expect(operate(db.pool, { ...v2, apply: true, expectedRevision: 1 })).rejects.toThrow();
+  expect(await counts(v2.stationId)).toEqual([0, 0]);
+  const after = await db.pool.query("SELECT count(*)::int AS count FROM audit_event WHERE station_id=$1", [v2.stationId]);
+  expect(after.rows).toEqual(before.rows);
 });
