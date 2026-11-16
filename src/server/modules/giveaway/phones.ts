@@ -38,7 +38,7 @@ type CampaignRow = {
   phone_check_id: string | null;
   manager_admin_id: string | null;
   census_version: number | null;
-  upload_deadline: Date | null;
+
   policy_version: string | null;
 };
 export type PhoneAudit = (
@@ -96,7 +96,7 @@ async function context(
   ]);
   const c = (
     await db.query<CampaignRow>(
-      `SELECT c.*,r.data_version::text,d.manager_admin_id,pc.version AS census_version,t.upload_deadline,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.semantics_digest='${RECONCILIATION_DIGEST}' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
+      `SELECT c.*,r.data_version::text,d.manager_admin_id,pc.version AS census_version,CASE WHEN pd.evaluator_identity='reconciliation-v1' AND pd.semantics_digest='${RECONCILIATION_DIGEST}' AND pd.partial_uploads='exact_incomplete' AND pd.approval_reference='WHR-158 / WHR-162 / Earl 16 Nov 2026' THEN sp.policy_version END AS policy_version
  FROM campaign c JOIN station_reporting_state r ON r.station_id=c.station_id
  LEFT JOIN giveaway_manager_designation d ON d.id=c.manager_designation_id
  LEFT JOIN giveaway_phone_census pc ON pc.id=c.phone_census_id
@@ -125,15 +125,14 @@ async function manager(db: pg.PoolClient, actor: LiveAdmin, c: CampaignRow) {
 async function readyTime(db: pg.PoolClient, c: CampaignRow, kind: Kind) {
   if (c.policy_version !== "reconciliation-v1")
     fail("reconciliation_policy_unconfigured");
-  if (
-    !c.upload_deadline ||
-    !(
-      await db.query("SELECT clock_timestamp()>$1::timestamptz AS passed", [
-        c.upload_deadline,
-      ])
-    ).rows[0].passed
-  )
-    fail("finalization_blocked");
+  const passed = (
+    await db.query<{ passed: boolean }>(
+      `SELECT clock_timestamp()>s.upload_deadline AS passed
+     FROM settings_version s WHERE s.id=$1 AND s.campaign_id=$2 AND s.station_id=$3`,
+      [c.current_timing_version_id, c.id, c.station_id],
+    )
+  ).rows[0]?.passed;
+  if (!passed) fail("finalization_blocked");
   if (kind === "initial" && c.latest_snapshot_id) fail("snapshot_exists");
   if (kind === "revision" && !c.latest_snapshot_id) fail("snapshot_missing");
 }
@@ -286,8 +285,21 @@ export function createPhoneService(
             if (c.manager_admin_id === b.managerAdminId) fail("no_change");
             const target = (
               await db.query(
-                `SELECT a.id FROM admin a JOIN auth_user u ON u.id=a.user_id JOIN role r ON r.id=a.role_id WHERE a.id=$1 AND u.enabled AND r.enabled AND NOT u.must_change_password`,
-                [b.managerAdminId],
+                `SELECT a.id FROM admin a JOIN auth_user u ON u.id=a.user_id JOIN role r ON r.id=a.role_id
+                 JOIN LATERAL (SELECT verified FROM held_release_person_binding WHERE station_id=$2 AND user_id=u.id ORDER BY version DESC LIMIT 1) person ON person.verified
+                 WHERE a.id=$1 AND u.enabled AND u.kind='admin' AND r.enabled AND NOT u.must_change_password
+                 AND (SELECT count(DISTINCT permission_code) FROM role_permission WHERE role_id=r.id AND permission_code=ANY($3::text[]))=3`,
+                [
+                  b.managerAdminId,
+                  c.station_id,
+                  [
+                    "sales",
+                    "leaderboards",
+                    c.latest_snapshot_id
+                      ? "giveawayRevise"
+                      : "giveawayFinalize",
+                  ],
+                ],
               )
             ).rows[0];
             if (!target) fail("manager_invalid", 422);
@@ -318,7 +330,7 @@ export function createPhoneService(
               "UPDATE campaign SET manager_designation_id=$2,version=version+1,reconciliation_required=true WHERE id=$1",
               [c.id, id],
             );
-            await advance(db, c);
+            await advance(db, c, true);
             return { campaign: await project(db, c.id), auditEventId };
           },
         );

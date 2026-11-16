@@ -45,6 +45,42 @@ export const phoneAudit: PhoneAudit = async (
     reconciliationPolicyVersion: c.policy_version,
     ...fields,
   };
+  const census = c.phone_census_id
+    ? (
+        await db.query(
+          "SELECT version FROM giveaway_phone_census WHERE id=$1 AND campaign_id=$2",
+          [c.phone_census_id, c.id],
+        )
+      ).rows[0]
+    : null;
+  const exclusion = fields.phoneExclusionId
+    ? (
+        await db.query(
+          `SELECT e.content,t.version,t.state,t.content AS transition FROM giveaway_phone_exclusion e
+    JOIN LATERAL(SELECT version,state,content FROM giveaway_phone_exclusion_transition WHERE exclusion_id=e.id ORDER BY version DESC LIMIT 1)t ON true
+    WHERE e.id=$1 AND e.campaign_id=$2`,
+          [fields.phoneExclusionId, c.id],
+        )
+      ).rows[0]
+    : null;
+  const before: Record<string, unknown> = {
+    campaignVersion: c.version,
+    sourceDataVersion: c.data_version,
+    managerAdminId: manager,
+    settingsVersionId: c.current_timing_version_id,
+    reconciliationPolicyVersion: c.policy_version,
+    phoneCensusId: c.phone_census_id,
+    censusVersion: census?.version ?? 1,
+    phoneCheckId: c.phone_check_id,
+    actionKind: fields.actionKind,
+    phoneId: fields.phoneId ?? null,
+    phoneVersion: fields.phoneVersion ?? null,
+    phoneExclusionId: exclusion ? fields.phoneExclusionId : null,
+    exclusionVersion: exclusion?.version ?? null,
+    phoneExclusionState: exclusion?.state ?? null,
+    proposerAdminId: exclusion?.content.proposedBy.id ?? null,
+    approverAdminId: exclusion?.transition.decidedBy?.id ?? null,
+  };
   const mapping =
     giveawayAuditMapping[action as keyof typeof giveawayAuditMapping];
   const id = newId(),
@@ -71,7 +107,10 @@ export const phoneAudit: PhoneAudit = async (
       reason: reasons[action],
       changes: mapping.map((field) => ({
         field,
-        before: null,
+        before:
+          typeof before[field] === "number"
+            ? String(before[field])
+            : (before[field] ?? null),
         after:
           typeof values[field] === "number"
             ? String(values[field])

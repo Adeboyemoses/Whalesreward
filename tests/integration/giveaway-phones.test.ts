@@ -733,3 +733,228 @@ it("P-30 non-superuser cannot attach another campaign census or omit its check e
     await f.close();
   }
 }, 30000);
+it("P-30 manager designation advances campaign and data exactly once and audits actual before values", async () => {
+  const f = await giveawayFixture();
+  try {
+    const a = await reviewer(f),
+      before = await f.guard(),
+      old = (
+        await f.pool.query(
+          "SELECT manager_admin_id FROM giveaway_manager_designation WHERE id=(SELECT manager_designation_id FROM campaign WHERE id=$1)",
+          [f.campaignId],
+        )
+      ).rows[0].manager_admin_id;
+    const result = await f.phones.designate(f.token, f.campaignId, {
+      operationId: newId(),
+      expectedVersion: before.expectedVersion,
+      managerAdminId: a.adminId,
+      reason: "Fictional designated successor",
+    });
+    const after = await f.guard();
+    expect(after.expectedVersion).toBe(before.expectedVersion + 1);
+    expect(BigInt(after.expectedDataVersion)).toBe(
+      BigInt(before.expectedDataVersion) + 1n,
+    );
+    const event = (
+      await f.pool.query("SELECT changes FROM audit_event WHERE id=$1", [
+        result.auditEventId,
+      ])
+    ).rows[0];
+    expect(event.changes).toContainEqual({
+      field: "managerAdminId",
+      before: old,
+      after: a.adminId,
+    });
+    expect(event.changes).toContainEqual({
+      field: "campaignVersion",
+      before: String(before.expectedVersion),
+      after: String(after.expectedVersion),
+    });
+    await f.phones.designate(f.token, f.campaignId, {
+      operationId: newId(),
+      expectedVersion: after.expectedVersion,
+      managerAdminId: old,
+      reason: "Fictional later designation",
+    });
+    expect(
+      (
+        await f.pool.query("SELECT changes FROM audit_event WHERE id=$1", [
+          result.auditEventId,
+        ])
+      ).rows[0],
+    ).toEqual(event);
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 invalid manager grants or missing canonical identity leave state and audit unchanged", async () => {
+  const f = await giveawayFixture();
+  try {
+    const missingGrant = await f.actor(["sales", "leaderboards"]),
+      missingIdentity = await f.actor([
+        "sales",
+        "leaderboards",
+        "giveawayFinalize",
+      ]);
+    const before = await f.guard(),
+      audit = (await f.pool.query("SELECT count(*)::text n FROM audit_event"))
+        .rows[0].n;
+    for (const a of [missingGrant, missingIdentity])
+      await expect(
+        f.phones.designate(f.token, f.campaignId, {
+          operationId: newId(),
+          expectedVersion: before.expectedVersion,
+          managerAdminId: a.adminId,
+          reason: "Fictional invalid manager",
+        }),
+      ).rejects.toMatchObject({ code: "manager_invalid" });
+    expect(await f.guard()).toEqual(before);
+    expect(
+      (await f.pool.query("SELECT count(*)::text n FROM audit_event")).rows[0]
+        .n,
+    ).toBe(audit);
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 unavailable decision audit freezes pending state and exact version transition", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f),
+      before = await f.guard();
+    const approved = await f.phones.decide(
+      a.token,
+      f.campaignId,
+      String(p.result.exclusion.id),
+      {
+        operationId: newId(),
+        expectedVersion: 1,
+        decision: "approve",
+        reason: "Fictional approval audit",
+      },
+    );
+    const event = (
+      await f.pool.query("SELECT changes FROM audit_event WHERE id=$1", [
+        approved.exclusion.auditEventId,
+      ])
+    ).rows[0];
+    expect(event.changes).toContainEqual({
+      field: "phoneExclusionState",
+      before: "pending",
+      after: "approved",
+    });
+    expect(event.changes).toContainEqual({
+      field: "exclusionVersion",
+      before: "1",
+      after: "2",
+    });
+    expect(event.changes).toContainEqual({
+      field: "campaignVersion",
+      before: String(before.expectedVersion),
+      after: String(before.expectedVersion + 1),
+    });
+    const c = (
+      await f.pool.query(
+        "SELECT version FROM giveaway_phone_census WHERE campaign_id=$1 ORDER BY version DESC LIMIT 1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    await f.phones.check(f.token, f.campaignId, {
+      operationId: newId(),
+      kind: "initial",
+      reason: "Fictional later phone check",
+      ...(await f.guard()),
+      expectedCensusVersion: c.version,
+      entries: [
+        {
+          phoneId: p.phoneId,
+          expectedPhoneVersion: 1,
+          result: "unavailable",
+          exclusionId: p.result.exclusion.id,
+        },
+      ],
+    });
+    expect(
+      (
+        await f.pool.query("SELECT changes FROM audit_event WHERE id=$1", [
+          approved.exclusion.auditEventId,
+        ])
+      ).rows[0],
+    ).toEqual(event);
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("P-30 phone certification compares PostgreSQL microseconds strictly after the exact deadline", async () => {
+  const f = await giveawayFixture();
+  const originalConnect = f.pool.connect;
+  let now = "2030-01-01T00:00:00.000500Z";
+  try {
+    const c = (
+        await f.pool.query(
+          "SELECT station_id,current_timing_version_id FROM campaign WHERE id=$1",
+          [f.campaignId],
+        )
+      ).rows[0],
+      s = newId();
+    await f.pool.query(
+      `INSERT INTO settings_version(id,station_id,campaign_id,version,section,launch_at,purchase_start,purchase_cutoff,grace_hours,upload_deadline,timezone,effective_from,actor_id,reason,timing_policy_version) SELECT $1,station_id,campaign_id,version+1,'giveaway',launch_at,purchase_start,'2030-01-01T00:00:00.000999Z',0,'2030-01-01T00:00:00.000999Z',timezone,clock_timestamp(),actor_id,'Fictional exact deadline',timing_policy_version FROM settings_version WHERE id=$2`,
+      [s, c.current_timing_version_id],
+    );
+    await f.pool.query(
+      "UPDATE campaign SET current_timing_version_id=$2,version=version+1 WHERE id=$1",
+      [f.campaignId, s],
+    );
+    const guard = await f.guard(),
+      ids = (
+        await f.pool.query("SELECT DISTINCT attendant_id FROM assignment")
+      ).rows.map((r) => r.attendant_id);
+    // Only the test clock expression is fixed. PostgreSQL still compares the stored microsecond deadline.
+    f.pool.connect = new Proxy(originalConnect, {
+      apply(target, thisArg, args) {
+        return Promise.resolve(Reflect.apply(target, thisArg, args)).then(
+          (client) => {
+            const query = client.query;
+            client.query = new Proxy(query, {
+              apply(q, receiver, parameters) {
+                if (
+                  typeof parameters[0] === "string" &&
+                  parameters[0].includes(" AS passed")
+                )
+                  parameters[0] = parameters[0].replace(
+                    "clock_timestamp()",
+                    `'${now}'::timestamptz`,
+                  );
+                return Reflect.apply(q, receiver, parameters);
+              },
+            });
+            return client;
+          },
+        );
+      },
+    });
+    const request = {
+      operationId: newId(),
+      kind: "initial",
+      reason: "Fictional precise phone check",
+      ...guard,
+      expectedCensusVersion: 1,
+      phones: [{ label: "Fictional phone", attendantIds: ids }],
+    };
+    await expect(
+      f.phones.census(f.token, f.campaignId, request),
+    ).rejects.toMatchObject({ code: "finalization_blocked" });
+    now = "2030-01-01T00:00:00.000999Z";
+    await expect(
+      f.phones.census(f.token, f.campaignId, request),
+    ).rejects.toMatchObject({ code: "finalization_blocked" });
+    now = "2030-01-01T00:00:00.001000Z";
+    await expect(
+      f.phones.census(f.token, f.campaignId, request),
+    ).resolves.toMatchObject({ census: { version: 2 } });
+  } finally {
+    f.pool.connect = originalConnect;
+    await f.close();
+  }
+}, 30000);
