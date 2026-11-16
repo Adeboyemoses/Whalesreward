@@ -347,7 +347,7 @@ test("R16 R18 protected failure is never empty and permission loss clears paper 
         exact: true,
       })
       .click();
-    await addPhoto(page);
+    await addPhoto(page, await preparation(page, sale.id, "date"));
     await page
       .getByLabel("Entry reference", { exact: true })
       .fill("PRIVATE-DRAFT-REFERENCE");
