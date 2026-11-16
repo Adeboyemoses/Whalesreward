@@ -974,4 +974,336 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       );
     },
   );
+  it.each(["card", "price", "date", "capture"] as const)(
+    "SR-01 %s v1-sufficient target refuses the exception route",
+    async (kind) => {
+      const x = await fixture(kind);
+      const from =
+        kind === "card"
+          ? "2026-11-10T12:40:00.000Z"
+          : x.facts.observedCapture.from;
+      const through =
+        kind === "card"
+          ? "2026-11-10T13:00:00.000Z"
+          : x.facts.observedCapture.through;
+      if (kind === "card")
+        x.body.facts.observedCapture = {
+          ...x.body.facts.observedCapture,
+          from: "2026-11-10T12:45:00.000Z",
+          through: "2026-11-10T12:50:00.000Z",
+        };
+      await seedHistorical(
+        db.pool,
+        "capture_context",
+        "UPDATE capture_context SET signed_in_at=$2,offline_expires_at=$2::timestamptz+interval '24 hours' WHERE id=$1",
+        [x.f.contextId, from],
+      );
+      await seedHistorical(
+        db.pool,
+        "purchase",
+        "UPDATE purchase SET capture_lower_bound=$2,server_received_at=$3 WHERE id=$1",
+        [x.sale.purchaseId, from, through],
+      );
+      await expect(
+        x.svc.propose(x.token, x.sale.purchaseId, x.body),
+      ).rejects.toMatchObject({ code: "release_not_required", status: 409 });
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM held_release_proposal WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    },
+  );
+  it.each(["card", "price", "date", "capture"] as const)(
+    "SR-01 %s missing customer or incomplete settings never becomes paper admission",
+    async (kind) => {
+      for (const defect of ["customer", "settings"]) {
+        const x = await fixture(kind);
+        if (defect === "customer")
+          await seedHistorical(
+            db.pool,
+            "purchase",
+            "UPDATE purchase SET customer_id=NULL WHERE id=$1",
+            [x.sale.purchaseId],
+          );
+        else
+          await seedHistorical(
+            db.pool,
+            "settings_version",
+            "UPDATE settings_version SET purchase_cutoff=NULL,upload_deadline=NULL WHERE station_id=$1",
+            [x.f.stationId],
+          );
+        await expect(
+          x.svc.propose(x.token, x.sale.purchaseId, x.body),
+        ).rejects.toMatchObject({ code: "evidence_insufficient" });
+        expect(
+          (
+            await db.pool.query(
+              "SELECT count(*)::int n FROM held_release_proposal WHERE purchase_id=$1",
+              [x.sale.purchaseId],
+            )
+          ).rows[0].n,
+        ).toBe(0);
+      }
+    },
+  );
+  it.each(["card", "price", "date", "capture"] as const)(
+    "SR-04 %s missing original meter or sheet bytes cannot approve paper evidence",
+    async (kind) => {
+      for (const asset of ["meter", "sheet"]) {
+        const x = await fixture(kind);
+        const key =
+          asset === "sheet"
+            ? `final/${x.body.sheetAssetId}`
+            : (
+                await db.pool.query(
+                  "SELECT final_key FROM photo_asset WHERE id=$1",
+                  [x.sale.assetId],
+                )
+              ).rows[0].final_key;
+        x.h.objects.delete(key);
+        await expect(
+          x.svc.propose(x.token, x.sale.purchaseId, x.body),
+        ).rejects.toThrow();
+        expect(
+          (
+            await db.pool.query(
+              "SELECT count(*)::int n FROM held_release_proposal WHERE purchase_id=$1",
+              [x.sale.purchaseId],
+            )
+          ).rows[0].n,
+        ).toBe(0);
+      }
+    },
+  );
+  it("SR-01 a uniformly wrong captured rate cannot be rescued by paper attestation", async () => {
+    const x = await fixture("price");
+    await seedHistorical(
+      db.pool,
+      "capture_context",
+      "UPDATE capture_context SET signed_in_at='2026-11-10T12:40:00Z',offline_expires_at='2026-11-11T12:40:00Z' WHERE id=$1",
+      [x.f.contextId],
+    );
+    await seedHistorical(
+      db.pool,
+      "purchase",
+      "UPDATE purchase SET capture_lower_bound='2026-11-10T12:40:00Z' WHERE id=$1",
+      [x.sale.purchaseId],
+    );
+    const facts = {
+      ...x.facts,
+      observedCapture: {
+        ...x.facts.observedCapture,
+        from: "2026-11-10T12:45:00.000Z",
+        through: "2026-11-10T12:50:00.000Z",
+      },
+    };
+    await expect(
+      x.svc.propose(x.token, x.sale.purchaseId, { ...x.body, facts }),
+    ).rejects.toMatchObject({ code: "evidence_insufficient" });
+  });
+  it.each(["card", "price", "capture"] as const)(
+    "SR-02 %s paper interval touching the material upper boundary remains ambiguous",
+    async (kind) => {
+      const x = await fixture(kind);
+      const facts = {
+        ...x.facts,
+        observedCapture: {
+          ...x.facts.observedCapture,
+          through: "2026-11-10T12:30:00.000Z",
+        },
+      };
+      await expect(
+        x.svc.propose(x.token, x.sale.purchaseId, { ...x.body, facts }),
+      ).rejects.toMatchObject({ code: "evidence_insufficient" });
+    },
+  );
+  it("SR-02 date paper range spanning Lagos midnight remains ambiguous", async () => {
+    const x = await fixture("date");
+    const facts = {
+      ...x.facts,
+      observedCapture: {
+        ...x.facts.observedCapture,
+        from: "2026-11-10T22:59:59.999Z",
+        through: "2026-11-10T23:00:00.000Z",
+      },
+    };
+    await expect(
+      x.svc.propose(x.token, x.sale.purchaseId, { ...x.body, facts }),
+    ).rejects.toMatchObject({ code: "evidence_insufficient" });
+  });
+  it("SR-08 protected proposal pagination is bounded, ordered and cursor-scoped", async () => {
+    const x = await fixture();
+    const ids: string[] = [];
+    for (let n = 0; n < 3; n++) {
+      const { proposal } = await x.svc.propose(x.token, x.sale.purchaseId, {
+        ...x.body,
+        ...(await x.h.guard(x.sale.purchaseId)),
+      });
+      ids.push(proposal.id);
+      await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "reject",
+      });
+    }
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await x.svc.list(x.reviewerToken, x.sale.purchaseId, {
+        limit: 1,
+        cursor,
+      });
+      expect(page.items).toHaveLength(1);
+      seen.push(page.items[0]!.id);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    expect(seen).toEqual(ids.reverse());
+    await expect(
+      x.svc.list(x.reviewerToken, x.sale.purchaseId, { limit: 101 }),
+    ).rejects.toThrow();
+    await expect(
+      x.svc.list(x.reviewerToken, x.sale.purchaseId, {
+        limit: 1,
+        cursor: "tampered",
+      }),
+    ).rejects.toThrow();
+  });
+  it("SR-03 sales-only and audit-only authority cannot read paper proposals or images", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const grants = (
+      await db.pool.query(
+        "SELECT permission_code FROM role_permission WHERE role_id=$1",
+        [fixtureId(1)],
+      )
+    ).rows.map((r) => r.permission_code);
+    try {
+      for (const only of ["sales", "audit"]) {
+        await db.pool.query("DELETE FROM role_permission WHERE role_id=$1", [
+          fixtureId(1),
+        ]);
+        await db.pool.query(
+          "INSERT INTO role_permission(role_id,permission_code) VALUES($1,$2)",
+          [fixtureId(1), only],
+        );
+        await expect(
+          x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id),
+        ).rejects.toMatchObject({ code: "permission_denied" });
+        await expect(
+          x.svc.photoAccess(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+            assetId: x.body.sheetAssetId,
+          }),
+        ).rejects.toMatchObject({ code: "permission_denied" });
+      }
+    } finally {
+      await db.pool.query("DELETE FROM role_permission WHERE role_id=$1", [
+        fixtureId(1),
+      ]);
+      for (const grant of grants)
+        await db.pool.query(
+          "INSERT INTO role_permission(role_id,permission_code) VALUES($1,$2)",
+          [fixtureId(1), grant],
+        );
+    }
+  });
+  it("SR-03 first-password sessions and unrelated resource IDs cannot expose paper evidence", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    await expect(
+      x.svc.get(x.reviewerToken, x.sale.purchaseId, newId()),
+    ).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await expect(
+      x.svc.get(x.reviewerToken, newId(), proposal.id),
+    ).rejects.toMatchObject({ code: "not_found", status: 404 });
+    await db.pool.query(
+      "UPDATE auth_user SET must_change_password=true WHERE id=$1",
+      [x.actors[1]],
+    );
+    await expect(
+      x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id),
+    ).rejects.toMatchObject({ code: "password_change_required" });
+  });
+  it("SR-05 changed sheet, outcome and guards cannot reuse a successful proposal operation", async () => {
+    const x = await fixture();
+    await x.svc.propose(x.token, x.sale.purchaseId, x.body);
+    for (const patch of [
+      { sheetAssetId: newId() },
+      { meterAssetId: newId() },
+      { expectedVersion: x.body.expectedVersion + 1 },
+      { expectedRevisionId: newId() },
+      {
+        outcome: "cancel",
+        facts: { ...x.facts, finding: "entry_marked_void" },
+      },
+    ])
+      await expect(
+        x.svc.propose(x.token, x.sale.purchaseId, { ...x.body, ...patch }),
+      ).rejects.toMatchObject({ code: "operation_conflict" });
+  });
+  it.each([
+    "unknown_release",
+    "bad_digest",
+    "wrong_station",
+    "wrong_environment",
+    "stale_revision",
+    "inactive",
+  ])(
+    "SR-07 %s configuration cannot admit a release proposal",
+    async (defect) => {
+      const x = await fixture();
+      const config = structuredClone(x.policy);
+      if (defect === "unknown_release") config.release = "review-evidence-v99";
+      if (defect === "bad_digest") config.digest = "0".repeat(64);
+      if (defect === "wrong_station") config.scope.stationId = newId();
+      if (defect === "wrong_environment")
+        config.scope.environment = "production";
+      if (defect === "stale_revision") config.revision = 1;
+      const policy =
+        defect === "inactive"
+          ? {
+              ...config,
+              activation: {
+                state: "inactive",
+                approvalReference: null,
+                activatedAt: null,
+              },
+            }
+          : config;
+      const svc = createHeldReleaseService({
+        pool: db.pool,
+        storage: x.h.storage,
+        env: {
+          ...process.env,
+          WHR_ENV: "test",
+          WHR_REVIEW_EVIDENCE_POLICY: JSON.stringify(policy),
+        },
+      });
+      await expect(
+        svc.propose(x.token, x.sale.purchaseId, x.body),
+      ).rejects.toMatchObject({
+        code: "release_policy_unconfigured",
+        status: 409,
+      });
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM held_release_proposal WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    },
+  );
 });
