@@ -22,7 +22,7 @@ vi.mock(
   }),
 );
 let db: Awaited<ReturnType<typeof evidenceDatabase>>;
-async function fixture(kind: "card" | "price" = "card") {
+async function fixture(kind: "card" | "price" | "date" | "capture" = "card") {
   const x = await heldReleaseFixture(db, kind);
   const approval = newId();
   const policy = {
@@ -90,6 +90,11 @@ async function fixture(kind: "card" | "price" = "card") {
     pool: db.pool,
     storage: x.h.storage,
     env,
+    readerFactory: () => ({
+      read: x.h.storage.read,
+      available: async () => true,
+      signGet: async () => "https://evidence.example.test/fictional",
+    }),
   });
   const proposalResponse = z
     .object({
@@ -134,7 +139,7 @@ describe("P-29 dormant two-person service on real Postgres", () => {
     await db?.close();
     vi.unstubAllEnvs();
   });
-  it.each(["card", "price"] as const)(
+  it.each(["card", "price", "date", "capture"] as const)(
     "SR-05 %s approval and lost response replay apply one immutable decision",
     async (kind) => {
       const x = await fixture(kind);
@@ -590,4 +595,153 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).toBe("held");
     },
   );
+  it("SR-04 photo access is per-kind, bound to proposal and expires within sixty seconds", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const before = Date.now();
+    const access = await x.svc.photoAccess(
+      x.reviewerToken,
+      x.sale.purchaseId,
+      proposal.id,
+      { assetId: x.body.sheetAssetId },
+    );
+    expect(new Date(access.expiresAt).getTime() - before).toBeLessThanOrEqual(
+      61000,
+    );
+    await expect(
+      x.svc.photoAccess(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        assetId: x.sale.assetId,
+      }),
+    ).rejects.toMatchObject({ code: "evidence_unavailable" });
+    await db.pool.query(
+      "DELETE FROM role_permission WHERE role_id=$1 AND permission_code='cardEligibility'",
+      [fixtureId(1)],
+    );
+    try {
+      await expect(
+        x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+      await expect(
+        x.svc.photoAccess(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          assetId: x.body.sheetAssetId,
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+      expect(
+        (await x.svc.list(x.reviewerToken, x.sale.purchaseId, { limit: 25 }))
+          .items,
+      ).toHaveLength(0);
+    } finally {
+      await db.pool.query(
+        "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'cardEligibility') ON CONFLICT DO NOTHING",
+        [fixtureId(1)],
+      );
+    }
+  });
+  it("SR-07 actual incomplete installation gate denies even while dormant service tests use a mock", async () => {
+    const actual = await vi.importActual<
+      typeof import("../../src/server/modules/reviews/release-v2")
+    >("../../src/server/modules/reviews/release-v2");
+    await expect(
+      actual.assertReleaseV2Installation(db.pool, newId()),
+    ).rejects.toThrow("release_policy_unconfigured");
+  });
+  it.each(["card", "price", "date", "capture"] as const)(
+    "SR-02 %s cancel requires void-marked paper and preserves terminal zero contribution",
+    async (kind) => {
+      const x = await fixture(kind);
+      await expect(
+        x.svc.propose(x.token, x.sale.purchaseId, {
+          ...x.body,
+          outcome: "cancel",
+        }),
+      ).rejects.toMatchObject({ code: "evidence_insufficient" });
+      const { proposal } = await x.svc.propose(x.token, x.sale.purchaseId, {
+        ...x.body,
+        operationId: newId(),
+        outcome: "cancel",
+        facts: { ...x.body.facts, finding: "entry_marked_void" },
+      });
+      const result = await x.svc.decide(
+        x.reviewerToken,
+        x.sale.purchaseId,
+        proposal.id,
+        {
+          ...(await x.h.guard(x.sale.purchaseId)),
+          expectedProposalVersion: 1,
+          outcome: "approve",
+        },
+      );
+      expect(result.proposal.state).toBe("approved");
+      expect(
+        (
+          await db.pool.query(
+            "SELECT status,current_revision_id FROM purchase WHERE id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].status,
+      ).toBe("cancelled");
+      expect(
+        (
+          await db.pool.query(
+            kind === "capture"
+              ? "SELECT closure_kind AS state FROM purchase_validation_block WHERE id=$1"
+              : "SELECT state FROM purchase_hold WHERE id=$1",
+            [x.holdId],
+          )
+        ).rows[0].state,
+      ).toBe("cancelled");
+    },
+  );
+  it("SR-04 revoked reviewer cannot receive a sheet URL after slow storage read", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const read = x.h.storage.read.bind(x.h.storage);
+    let revoked = false;
+    x.h.storage.read = async (...args) => {
+      if (!revoked) {
+        revoked = true;
+        await db.pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
+          x.actors[1],
+        ]);
+      }
+      return read(...args);
+    };
+    await expect(
+      x.svc.photoAccess(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        assetId: x.body.sheetAssetId,
+      }),
+    ).rejects.toThrow();
+    expect(revoked).toBe(true);
+  });
+  it("SR-02 unsupported paper submillisecond precision returns evidence_insufficient without proposal", async () => {
+    const x = await fixture();
+    await expect(
+      x.svc.propose(x.token, x.sale.purchaseId, {
+        ...x.body,
+        facts: {
+          ...x.body.facts,
+          observedCapture: {
+            ...x.facts.observedCapture,
+            from: "2026-11-10T12:10:00.000001Z",
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: "evidence_insufficient", status: 422 });
+    expect(
+      (
+        await db.pool.query(
+          "SELECT count(*)::int n FROM held_release_proposal WHERE purchase_id=$1",
+          [x.sale.purchaseId],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  });
 });

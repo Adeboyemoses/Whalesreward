@@ -4,6 +4,7 @@ import {
   evidenceFixture,
   replacement,
   sourceAudit,
+  seedHistorical,
   type evidenceDatabase,
   type Kind,
 } from "./review-evidence-fixture";
@@ -64,6 +65,27 @@ export async function heldReleaseFixture(
       "2026-11-10T12:30:00Z",
     );
   }
+  if (kind === "capture")
+    await seedHistorical(
+      db.pool,
+      "assignment",
+      "UPDATE assignment SET effective_until='2026-11-10T12:30:00Z' WHERE id=$1",
+      [x.f.assignmentId],
+    );
+  if (kind === "date") {
+    await seedHistorical(
+      db.pool,
+      "capture_context",
+      "UPDATE capture_context SET signed_in_at='2026-11-10T22:30:00Z',offline_expires_at='2026-11-11T22:30:00Z' WHERE id=$1",
+      [x.f.contextId],
+    );
+    await seedHistorical(
+      db.pool,
+      "purchase",
+      "UPDATE purchase SET server_received_at='2026-11-10T23:30:00Z',capture_lower_bound='2026-11-10T22:30:00Z' WHERE id=$1",
+      [x.sale.purchaseId],
+    );
+  }
   const target =
     kind === "capture"
       ? {
@@ -96,5 +118,11 @@ export async function heldReleaseFixture(
     },
     finding: "sale_recorded" as const,
   };
+  if (kind === "date")
+    facts.observedCapture = {
+      ...facts.observedCapture,
+      from: "2026-11-10T23:10:00.000Z",
+      through: "2026-11-10T23:20:00.000Z",
+    };
   return { ...x, actors, people, target, facts };
 }
