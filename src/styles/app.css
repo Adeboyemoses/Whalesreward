@@ -759,6 +759,8 @@ body {
   .wr-settings .wr-row > .wr-btn, .wr-settings .wr-btn, .wr-settings .wr-input { min-height: var(--control-h); }
 }
 /* Keep table names accessible without repeating the review sheet title. */
+.wr-admin-shell .wr-settings-comparison .wr-table { min-width: 0; table-layout: fixed; }
+.wr-settings-comparison .wr-table td, .wr-settings-comparison .wr-table th { overflow-wrap: anywhere; white-space: normal; }
 .wr-settings-comparison .wr-table-cap { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .wr-settings-days-field .wr-row { max-width: 360px; flex-wrap: nowrap; }
 .wr-settings-days-field .wr-input { min-width: 0; }

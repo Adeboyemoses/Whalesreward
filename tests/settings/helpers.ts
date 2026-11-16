@@ -9,8 +9,7 @@ import { api, stationFixture, type StationFixture } from "../station/helpers";
 export const origin = "http://127.0.0.1:3000";
 export const daysLabel = "Photo retention period (days)";
 export const reasonLabel = "Reason for change";
-export const timingLocked =
-  "Campaign dates can't be changed until Whales approves the timing rules";
+export const timingLocked = "Only an Owner";
 export type RetentionReview = {
   section: "retention";
   expectedVersion: number;
