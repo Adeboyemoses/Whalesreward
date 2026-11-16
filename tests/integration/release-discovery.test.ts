@@ -54,6 +54,17 @@ async function state(x: DiscoveryFixture) {
     ),
   );
 }
+async function deleteOriginalAsset(x: DiscoveryFixture) {
+  const run = newId();
+  await db.pool.query(
+    "INSERT INTO maintenance_run(id,job,deduplication_key,status,fencing_version,attempts) VALUES($1::uuid,'retention',$1::text,'pending',0,0)",
+    [run],
+  );
+  await db.pool.query(
+    "UPDATE photo_asset SET state='deleted',deleted_at=clock_timestamp(),deletion_run_id=$2 WHERE id=$1",
+    [x.sale.assetId, run],
+  );
+}
 async function propose(x: DiscoveryFixture) {
   return (await x.svc.propose(x.token, x.sale.purchaseId, x.body)).proposal.id;
 }
@@ -171,7 +182,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
     const x = await discoveryFixture(db, "date"),
       candidate = newId();
     await db.pool.query(
-      "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','price_resolution','based_on_revision_id',r.id,'amount_kobo',1900000,'quantity',19,'calculation_mode','meter_evidence','verified_sale_date','2026-11-11'))).* FROM purchase_revision r WHERE r.id=$1",
+      "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','price_resolution','reason','Fictional staged meter candidate','based_on_revision_id',r.id,'amount_kobo',1900000,'quantity',19,'calculation_mode','meter_evidence','verified_sale_date','2026-11-11'))).* FROM purchase_revision r WHERE r.id=$1",
       [x.original, candidate, newId()],
     );
     await db.pool.query(
@@ -224,7 +235,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         await seedHistorical(
           db.pool,
           "capture_context",
-          "UPDATE capture_context SET signed_in_at='2026-11-10T23:01:00Z' WHERE id=$1",
+          "UPDATE capture_context SET signed_in_at='2026-11-10T23:01:00Z',offline_expires_at='2026-11-11T23:01:00Z' WHERE id=$1",
           [x.f.contextId],
         );
       if (kind === "capture")
@@ -254,11 +265,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
           "DELETE FROM audit_event WHERE id=$1",
           [x.priceAudit],
         );
-      if (defect === "photo")
-        await db.pool.query(
-          "UPDATE photo_asset SET deleted_at=clock_timestamp() WHERE id=$1",
-          [x.sale.assetId],
-        );
+      if (defect === "photo") await deleteOriginalAsset(x);
       if (defect === "settings")
         await seedHistorical(
           db.pool,
@@ -281,10 +288,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
   );
   it("RD-02 categorical reason precedence chooses history before unavailable photo and invalid bounds before photo", async () => {
     const x = await discoveryFixture(db);
-    await db.pool.query(
-      "UPDATE photo_asset SET deleted_at=clock_timestamp() WHERE id=$1",
-      [x.sale.assetId],
-    );
+    await deleteOriginalAsset(x);
     await seedHistorical(
       db.pool,
       "audit_event",
@@ -296,10 +300,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         .admission,
     ).toEqual({ state: "not_admissible", reason: "history_incomplete" });
     const y = await discoveryFixture(db);
-    await db.pool.query(
-      "UPDATE photo_asset SET deleted_at=clock_timestamp() WHERE id=$1",
-      [y.sale.assetId],
-    );
+    await deleteOriginalAsset(y);
     await seedHistorical(
       db.pool,
       "purchase",
@@ -588,12 +589,12 @@ describe("T-20 protected preparation and complete pending discovery on real Post
         await waitForBlockedReader();
         if (change === "target")
           await writer.query(
-            "UPDATE purchase_hold SET state='cancelled',version=version+1 WHERE id=$1",
-            [x.holdId],
+            "UPDATE purchase_hold SET state='cancelled',version=version+1,resolved_by=$2,resolution_operation_id=$3,resolution_reason='Fictional target closure',resolved_at=clock_timestamp(),resolution_revision_id=$4 WHERE id=$1",
+            [x.holdId, fixtureId(5), newId(), x.original],
           );
         if (change === "candidate") {
           await writer.query(
-            "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','price_resolution','based_on_revision_id',r.id,'amount_kobo',1900000,'quantity',19,'calculation_mode','meter_evidence'))).* FROM purchase_revision r WHERE r.id=$1",
+            "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','price_resolution','reason','Fictional staged meter candidate','based_on_revision_id',r.id,'amount_kobo',1900000,'quantity',19,'calculation_mode','meter_evidence'))).* FROM purchase_revision r WHERE r.id=$1",
             [x.original, candidateId, newId()],
           );
           await writer.query(
@@ -791,14 +792,12 @@ describe("T-20 protected preparation and complete pending discovery on real Post
     const x = await discoveryFixture(db),
       id = await propose(x);
     await db.pool.query(
-      "UPDATE purchase SET version=version+1,status='cancelled' WHERE id=$1",
+      "UPDATE purchase SET version=version+1,status='cancelled',cancellation_reason='Fictional cancellation' WHERE id=$1",
       [x.sale.purchaseId],
     );
-    await seedHistorical(
-      db.pool,
-      "purchase_hold",
-      "UPDATE purchase_hold SET state='cancelled' WHERE id=$1",
-      [x.holdId],
+    await db.pool.query(
+      "UPDATE purchase_hold SET state='cancelled',version=version+1,resolved_by=$2,resolution_operation_id=$3,resolution_reason='Fictional target closure',resolved_at=clock_timestamp(),resolution_revision_id=$4 WHERE id=$1",
+      [x.holdId, fixtureId(5), newId(), x.original],
     );
     const inactive = {
       ...x.policy,
@@ -1131,7 +1130,7 @@ describe("T-20 protected preparation and complete pending discovery on real Post
       });
       await db.pool.query(
         stage === "revision"
-          ? "UPDATE purchase SET status='cancelled',version=version+1 WHERE id=$1"
+          ? "UPDATE purchase SET status='cancelled',cancellation_reason='Fictional cancellation',version=version+1 WHERE id=$1"
           : "UPDATE purchase SET version=version+1 WHERE id=$1",
         [x.sale.purchaseId],
       );
