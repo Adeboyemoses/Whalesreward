@@ -1,5 +1,4 @@
 import type pg from "pg";
-import { AuthError } from "../auth/errors.ts";
 import { reviewEvidenceReleaseArtifact } from "./release.ts";
 
 /** New identity: the v1 artifact above remains byte-for-byte unchanged. */
@@ -25,5 +24,5 @@ export async function assertReleaseV2Installation(
 ): Promise<void> {
   void _db;
   void _stationId;
-  throw new AuthError("release_policy_unconfigured", 409);
+  throw new Error("release_policy_unconfigured");
 }
