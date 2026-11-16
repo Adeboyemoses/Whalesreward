@@ -85,6 +85,7 @@ export function SalesPortal({
 }) {
   const search = useSearchParams();
   const customer = search.get("customer") ?? search.get("customerId");
+  const leaderboardCategory = Object.keys(categories).includes(search.get("category") ?? "") ? search.get("category") : null;
   const suffix = customer ? `?customer=${encodeURIComponent(customer)}` : "";
   if (!session.permissions?.includes("sales"))
     return (
@@ -94,6 +95,9 @@ export function SalesPortal({
     );
   return (
     <div className="wr-sales">
+      {search.get("from") === "leaderboards" && session.permissions?.includes("leaderboards") && (
+        <Link className="wr-btn wr-btn-secondary" href={`/admin/leaderboards?${new URLSearchParams({basis: search.get("basis") === "recorded_all_time" ? "recorded_all_time" : "campaign_qualifying", ...(leaderboardCategory ? {category: leaderboardCategory} : {})})}`}>Back to leaderboard</Link>
+      )}
       {path[1] === "reviews" ? (
         <ReviewQueue customer={customer} suffix={suffix} />
       ) : path[1] && reviewKind(path[2] ?? "") ? (

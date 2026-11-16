@@ -926,6 +926,49 @@ body {
 
 /* Fidelity fixes: one visible grouping title and padded/stacked narrow states. */
 .wr-report-breakdown .wr-table-cap { display: none; }
+
+/* E01–E04 use the shared admin shell and tokens; long audit IDs wrap. */
+.wr-giveaway-page,
+.wr-giveaway-saved {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.wr-giveaway-page .wr-two-col { align-items: start; }
+.wr-giveaway-page .wr-sheet,
+.wr-giveaway-page .wr-two-col > *,
+.wr-giveaway-page .wr-section { min-width: 0; }
+.wr-giveaway-page .wr-section { margin: 0; }
+.wr-giveaway-page .wr-kv dd,
+.wr-giveaway-page .wr-mono,
+.wr-giveaway-page details,
+.wr-giveaway-page p { overflow-wrap: anywhere; }
+.wr-giveaway-page .wr-table td .wr-sub { white-space: normal; }
+.wr-giveaway-page .wr-sheet > p + p { margin-top: var(--space-4); }
+.wr-giveaway-page .wr-sheet h3 { margin-top: var(--space-5); }
+.wr-giveaway-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+.wr-giveaway-toolbar .wr-field { min-width: 0; }
+.wr-giveaway-actions { flex-wrap: wrap; gap: var(--space-3); }
+.wr-leaderboard-rank { color: var(--whale-700); }
+.wr-giveaway-history,
+.wr-giveaway-change { padding-block: var(--space-4); border-bottom: 1px solid var(--line-100); }
+.wr-giveaway-blockers { padding-left: var(--space-5); }
+.wr-giveaway-blockers li { margin-block: var(--space-3); }
+.wr-giveaway-page summary { cursor: pointer; min-height: var(--control-h); padding-block: var(--space-3); }
+@media (max-width: 900px) {
+  .wr-giveaway-toolbar { flex-direction: column; }
+  .wr-giveaway-actions { align-items: stretch; flex-direction: column; }
+  .wr-giveaway-actions > .wr-btn { width: 100%; }
+  .wr-giveaway-page .wr-kv-row { align-items: flex-start; gap: var(--space-2); }
+  .wr-giveaway-page .wr-kv-row dd { max-width: 60%; }
+  .wr-giveaway-page .wr-table-cap { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+}
 .wr-overview-customers > p { padding: var(--space-4); }
 @media (max-width: 900px) {
   .wr-report-chart > h2 { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
