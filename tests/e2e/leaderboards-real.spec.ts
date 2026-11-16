@@ -62,9 +62,9 @@ for (const state of ["before_cutoff", "grace_open"] as const) {
 }
 
 async function capture(page: Page, id: string) {
-  if (!process.env.WHR_CAPTURE_LEADERBOARDS) return;
+  const saveImages = Boolean(process.env.WHR_CAPTURE_LEADERBOARDS);
   const path = new URL("../design-parity/leaderboards/", import.meta.url);
-  await mkdir(path, { recursive: true });
+  if (saveImages) await mkdir(path, { recursive: true });
   for (const width of [1440, 390, 360]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.evaluate(() => document.fonts.ready);
@@ -82,15 +82,26 @@ async function capture(page: Page, id: string) {
           height: e.getBoundingClientRect().height,
         })),
     }));
-    expect(metrics.scrollWidth).toBeLessThanOrEqual(width);
-    await page.screenshot({
-      path: new URL(`${id}-${width}.built.png`, path).pathname,
-      fullPage: true,
-    });
-    await writeFile(
-      new URL(`${id}-${width}.metrics.json`, path),
-      JSON.stringify(metrics, null, 2) + "\n",
-    );
+    expect(
+      metrics.scrollWidth,
+      `${id} must fit its ${width}px viewport`,
+    ).toBeLessThanOrEqual(width);
+    if (width < 900)
+      for (const control of metrics.controls)
+        expect(
+          control.height,
+          `${id} ${width}px control ${control.label} must be at least 48px high`,
+        ).toBeGreaterThanOrEqual(48);
+    if (saveImages) {
+      await page.screenshot({
+        path: new URL(`${id}-${width}.built.png`, path).pathname,
+        fullPage: true,
+      });
+      await writeFile(
+        new URL(`${id}-${width}.metrics.json`, path),
+        JSON.stringify(metrics, null, 2) + "\n",
+      );
+    }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
 }
@@ -369,6 +380,35 @@ test("I-46 grouped readiness reports actual blockers and honest unavailable chec
     await expect(main).not.toContainText(
       /9 checks passed|0 unsent|all phones empty/i,
     );
+    for (const width of [390, 360]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const layout = await page.evaluate(() => ({
+        viewport: innerWidth,
+        pageWidth: document.documentElement.scrollWidth,
+        overlappingGroups: [
+          ...document.querySelectorAll(".wr-giveaway-page .wr-kv-row"),
+        ]
+          .filter((row) => {
+            const label = row.querySelector("dt")?.getBoundingClientRect();
+            const value = row.querySelector("dd")?.getBoundingClientRect();
+            return (
+              label &&
+              value &&
+              label.right > value.left + 1 &&
+              label.bottom > value.top + 1
+            );
+          })
+          .map((row) => row.textContent?.trim()),
+      }));
+      expect(
+        layout.pageWidth,
+        `${width}px readiness must not overflow the page`,
+      ).toBeLessThanOrEqual(layout.viewport);
+      expect(
+        layout.overlappingGroups,
+        `${width}px readiness labels and values must not overlap`,
+      ).toEqual([]);
+    }
   } finally {
     await f.close();
   }

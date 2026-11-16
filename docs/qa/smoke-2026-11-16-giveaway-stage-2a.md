@@ -14,4 +14,10 @@ Use a local fictional station or Earl's authorized pilot setup. This runbook doe
 
 ## Execution record
 
-Pending implementation and final-head verification. Automated cases and fidelity report will be linked here before READY-2a. Real station phone/pilot smoke remains Earl's acceptance step.
+16 November 2026: native Chrome 157.0.8103.52 on the local production build, with responsive 1440/390/360 CSS widths and DPR 2. Final production source `c5952d9` (test worktree equivalent `e1daa8e`). The EM performed the UI actions; the independent test engineer compared the screenshots with E01–E04 and the approved brief. See [the fidelity report and captures](../../tests/design-parity/leaderboards/REPORT.md).
+
+Observed: live exact-spend shared ranks with separate units; grouped blocked readiness and honest unavailable checklist; reasoned owned preview; explicit snapshot 1 save; accepted-source fixture change followed by reasoned revision preview and explicit snapshot 2 save; earlier revision selection retaining original identity, spend and quantities. The local fixtures use accepted revision and trusted photo-receipt facts in a disposable PostgreSQL schema. Actual snapshot writes use the unchanged HTTP endpoints.
+
+Independent HTTP protocol: 1 passed (3.9s), including same-key replay, immutable earlier sources and unchanged reconciliation. Typecheck and focused lint passed. There are 11 browser cases plus that HTTP case; browser assertions and measured geometry/keyboard behavior await CI because local Chromium fails before initialization with macOS Mach-service permission denial. No local browser pass count is claimed.
+
+The initial E02 360 px key/value overflow was found visually, fixed by the builder and independently checked in replacement 390/360 captures. Automated layout assertions now run without requiring screenshot output. Native E03 phone full-size screenshots reach Chrome's 16384 px height cap; the report records supplemental tail evidence. Real station phone/pilot smoke remains Earl's acceptance step.
