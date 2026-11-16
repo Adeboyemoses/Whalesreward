@@ -14,9 +14,13 @@ import {
 import { createReviewsService } from "../../src/server/modules/reviews/service";
 import { newId } from "../../src/server/lib/ids";
 import { config } from "../helpers/cards-adversarial-fixture";
-it.each(["approve", "reject", "supersede"] as const)(
-  "SR-06 real %s transition changes giveaway generation and invalidates prepared results",
-  async (outcome) => {
+it.each(
+  (["approve", "reject", "supersede"] as const).flatMap((outcome) =>
+    (["initial", "revision"] as const).map((stage) => ({ outcome, stage })),
+  ),
+)(
+  "SR-06 real $outcome transition races $stage reconciliation and preserves saved results",
+  async ({ outcome, stage }) => {
     const db = await evidenceDatabase();
     try {
       const x = await heldReleaseRuntimeFixture(db);
@@ -38,6 +42,29 @@ it.each(["approve", "reject", "supersede"] as const)(
           .object({ id: z.string(), contentDigest: z.string() })
           .parse(prepared.data),
         guard = await f.guard();
+      if (stage === "revision") {
+        await confirmGiveaway(
+          db.pool,
+          x.token,
+          f.campaignId,
+          {
+            operationId: newId(),
+            previewId: preview.id,
+            contentDigest: preview.contentDigest,
+            ...guard,
+          },
+          undefined,
+          config,
+        );
+        await f.check("revision");
+      }
+      const frozen = (
+        await db.pool.query(
+          "SELECT to_jsonb(s) content FROM giveaway_snapshot s WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows;
+      const revisionGuard = await f.guard();
       const proposed = await x.svc.propose(x.token, x.sale.purchaseId, {
         ...x.body,
         ...(await x.h.guard(x.sale.purchaseId)),
@@ -102,19 +129,32 @@ it.each(["approve", "reject", "supersede"] as const)(
       };
       const raced = await Promise.allSettled([
         transition(),
-        confirmGiveaway(
-          db.pool,
-          x.token,
-          f.campaignId,
-          {
-            operationId: newId(),
-            previewId: preview.id,
-            contentDigest: preview.contentDigest,
-            ...guard,
-          },
-          undefined,
-          config,
-        ),
+        stage === "revision"
+          ? prepareGiveaway(
+              db.pool,
+              x.token,
+              f.campaignId,
+              {
+                operationId: newId(),
+                kind: "revision",
+                reason: "Fictional pending revision race",
+                ...revisionGuard,
+              },
+              config,
+            )
+          : confirmGiveaway(
+              db.pool,
+              x.token,
+              f.campaignId,
+              {
+                operationId: newId(),
+                previewId: preview.id,
+                contentDigest: preview.contentDigest,
+                ...guard,
+              },
+              undefined,
+              config,
+            ),
       ]);
       expect(raced[0]!.status).toBe("fulfilled");
       expect(raced[1]!.status).toBe("rejected");
@@ -149,7 +189,9 @@ it.each(["approve", "reject", "supersede"] as const)(
           undefined,
           config,
         ),
-      ).rejects.toMatchObject({ code: "version_conflict" });
+      ).rejects.toMatchObject({
+        code: stage === "initial" ? "version_conflict" : "snapshot_superseded",
+      });
       expect(
         (
           await db.pool.query(
@@ -157,7 +199,33 @@ it.each(["approve", "reject", "supersede"] as const)(
             [f.campaignId],
           )
         ).rows[0].n,
-      ).toBe("0");
+      ).toBe(stage === "initial" ? "0" : "1");
+      expect(
+        (
+          await db.pool.query(
+            "SELECT to_jsonb(s) content FROM giveaway_snapshot s WHERE campaign_id=$1",
+            [f.campaignId],
+          )
+        ).rows,
+      ).toEqual(frozen);
+      if (stage === "revision") {
+        await f.check("revision");
+        const reconciled = await prepareGiveaway(
+          db.pool,
+          x.token,
+          f.campaignId,
+          {
+            operationId: newId(),
+            kind: "revision",
+            reason: "Fictional terminal reconciliation",
+            ...(await f.guard()),
+          },
+          config,
+        );
+        if (outcome === "reject")
+          expect(reconciled.data).toMatchObject({ state: "unchanged" });
+        else expect(reconciled.data).toMatchObject({ kind: "revision" });
+      }
     } finally {
       await db.close();
     }
