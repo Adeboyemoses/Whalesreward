@@ -290,6 +290,10 @@ export async function releaseFixture(
     second,
     browserBased: !apiOnlyPhone,
     async close() {
+      if (context) {
+        await page.unrouteAll({ behavior: "wait" });
+        await reviewer.unrouteAll({ behavior: "wait" });
+      }
       // Best-effort diagnostics for the separate reviewer page, before teardown.
       if (context && !reviewer.isClosed()) {
         try {
