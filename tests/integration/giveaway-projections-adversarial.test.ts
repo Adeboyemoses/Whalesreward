@@ -316,6 +316,9 @@ it(
       expect(c.readiness.counts).toEqual(grouped.counts);
       expect(c.readiness.blockers).toEqual(grouped.blockers);
       expect(grouped.counts.uploads).toBe("1");
+      expect(c.checks.find((x) => x.name === "uploads")?.reasonCodes).toContain(
+        "validation_pending",
+      );
     }),
   30000,
 );
@@ -332,6 +335,9 @@ it(
       ).toMatchObject({ blocking: "1", outcome: "unresolved" });
       expect(c.checks.find((x) => x.name === "uploads")?.outcome).toBe(
         "unresolved",
+      );
+      expect(c.checks.find((x) => x.name === "uploads")?.reasonCodes).not.toContain(
+        "validation_pending",
       );
     }),
   30000,
