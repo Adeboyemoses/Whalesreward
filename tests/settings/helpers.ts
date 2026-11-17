@@ -4,9 +4,20 @@ import type {
   Settings,
   SettingsChange,
 } from "../../src/shared/contracts/settings";
-import { api, stationFixture, type StationFixture } from "../station/helpers";
+import { stationFixture, type StationFixture } from "../station/helpers";
 
-export const origin = "http://127.0.0.1:3000";
+// Each isolated browser context and API client must target the same real server.
+async function api<T>(page: Page, path: string, input?: unknown) {
+  const response =
+    input === undefined
+      ? await page.request.get(`/api/admin/${path}`)
+      : await page.request.post(`/api/admin/${path}`, {
+          headers: { Origin: new URL(page.url()).origin },
+          data: input,
+        });
+  expect(response.status(), `HTTP ${path}`).toBe(200);
+  return (await response.json()).data as T;
+}
 export const daysLabel = "Photo retention period (days)";
 export const reasonLabel = "Reason for change";
 export const timingLocked = "Only an Owner";
@@ -28,6 +39,11 @@ export async function settingsFixture(
   grants: string[] | null = ["settings"],
 ) {
   const f = await stationFixture(page, grants ?? undefined);
+  if (process.env.WHR_RETENTION_TEST_SCHEMA) {
+    expect(
+      (await f.db.query("SELECT current_schema() schema")).rows[0].schema,
+    ).toBe(process.env.WHR_RETENTION_TEST_SCHEMA);
+  }
   await f.db.query("SELECT pg_advisory_lock(270014)");
   connections.set(page, f.db);
   return {
@@ -40,11 +56,10 @@ export async function settingsFixture(
     },
   };
 }
-export const readSettings = (page: Page) =>
-  api<Settings>(page.request, "settings");
+export const readSettings = (page: Page) => api<Settings>(page, "settings");
 export const readHistory = (page: Page, query = "") =>
   api<{ items: SettingsChange[]; nextCursor: string | null }>(
-    page.request,
+    page,
     `settings/history${query}`,
   );
 /** A canonical metadata change is a real refusal, never permission to replace guards blindly. */
@@ -106,7 +121,7 @@ export async function saveIntent(
   if (current.retention.days === days) return null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const review = await api<RetentionReview>(
-      page.request,
+      page,
       "settings/retention/review",
       {
         days,
@@ -118,7 +133,7 @@ export async function saveIntent(
     const response = await page.request.post(
       "/api/admin/settings/retention/confirm",
       {
-        headers: { Origin: origin },
+        headers: { Origin: new URL(page.url()).origin },
         data: {
           ...review.proposal,
           expectedVersion: review.expectedVersion,
@@ -233,7 +248,7 @@ export async function changeCatalogPrecision(
   const changed = await page.request.post(
     "/api/admin/prices/kerosene/activate",
     {
-      headers: { Origin: origin },
+      headers: { Origin: new URL(page.url()).origin },
       data: {
         operationId: v7(),
         expectedVersion: price.version,
