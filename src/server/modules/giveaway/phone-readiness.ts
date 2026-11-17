@@ -1,3 +1,4 @@
+import { hasConflictingPhoneExclusion } from "./phone-exclusion-conflicts";
 import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 import type pg from "pg";
 export type PhoneReadiness = {
@@ -102,6 +103,17 @@ export async function phoneReadiness(
       )
     ).rows[0];
     if (!exclusion || exclusion.state !== "approved") {
+      result.blockers.push("phone_check_required");
+      return result;
+    }
+    if (
+      await hasConflictingPhoneExclusion(
+        db,
+        campaignId,
+        entry.exclusionId,
+        exclusion.content,
+      )
+    ) {
       result.blockers.push("phone_check_required");
       return result;
     }

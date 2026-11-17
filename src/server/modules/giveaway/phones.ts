@@ -1,3 +1,4 @@
+import { hasConflictingPhoneExclusion } from "./phone-exclusion-conflicts";
 import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 import type pg from "pg";
 import {
@@ -626,6 +627,16 @@ export function createPhoneService(
               ),
               phone,
             );
+            if (
+              b.decision === "approve" &&
+              (await hasConflictingPhoneExclusion(
+                db,
+                c.id,
+                exclusionId,
+                e.content,
+              ))
+            )
+              fail("exclusion_stale");
             const auditEventId = await audit(
               db,
               actor,
@@ -715,6 +726,15 @@ export function createPhoneService(
                   e.content.settingsVersionId !== c.current_timing_version_id ||
                   e.content.previousSnapshotId !== c.latest_snapshot_id ||
                   e.content.kind !== b.kind
+                )
+                  fail("phone_check_stale");
+                if (
+                  await hasConflictingPhoneExclusion(
+                    db,
+                    c.id,
+                    entry.exclusionId,
+                    e.content,
+                  )
                 )
                   fail("phone_check_stale");
                 await partial(
