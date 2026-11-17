@@ -181,7 +181,7 @@ export async function releaseFixture(
   const apiOnlyPhone = !browser || !!options.pumpId;
   const f = apiOnlyPhone
     ? await apiReviewFixture(page.request, options.pumpId)
-    : await reviewFixture(page, browser!);
+    : await reviewFixture(page, browser!, false);
   const second = await fixture();
   await second.db.query(
     "UPDATE auth_user SET must_change_password=false WHERE id=$1",

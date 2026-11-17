@@ -15,28 +15,34 @@ export const saleDay = "2026-11-10";
 export type ReviewKind = "price" | "card" | "date" | "capture";
 export type Fixture = Awaited<ReturnType<typeof reviewFixture>>;
 
-export async function reviewFixture(page: Page, browser: Browser) {
+export async function reviewFixture(
+  page: Page,
+  browser: Browser,
+  configureReviewPolicy = true,
+) {
   const f = await salesFixture(page, browser);
-  const p = browserReviewPolicy;
-  await f.db.query("BEGIN");
-  await f.db.query("SELECT pg_advisory_xact_lock(9171701)");
-  await f.db.query(
-    "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,$2,$3,$4,$5,$6,$7,'Fictional local browser approval') ON CONFLICT DO NOTHING",
-    [
-      p.activation.approvalReference,
-      p.release,
-      p.digest,
-      p.revision,
-      p.scope.stationId,
-      p.scope.environment,
-      p.activation.activatedAt,
-    ],
-  );
-  await f.db.query(
-    "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) SELECT $1,$2,$3,$4,$5,'Fictional local browser approval' WHERE NOT EXISTS(SELECT 1 FROM review_evidence_configuration WHERE id=$1)",
-    [seedId(9171), p.scope.stationId, p.scope.environment, p.revision, p],
-  );
-  await f.db.query("COMMIT");
+  if (configureReviewPolicy) {
+    const p = browserReviewPolicy;
+    await f.db.query("BEGIN");
+    await f.db.query("SELECT pg_advisory_xact_lock(9171701)");
+    await f.db.query(
+      "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,$2,$3,$4,$5,$6,$7,'Fictional local browser approval') ON CONFLICT DO NOTHING",
+      [
+        p.activation.approvalReference,
+        p.release,
+        p.digest,
+        p.revision,
+        p.scope.stationId,
+        p.scope.environment,
+        p.activation.activatedAt,
+      ],
+    );
+    await f.db.query(
+      "INSERT INTO review_evidence_configuration(id,station_id,environment,revision,configuration,authorization_reference) SELECT $1,$2,$3,$4,$5,'Fictional local browser approval' WHERE NOT EXISTS(SELECT 1 FROM review_evidence_configuration WHERE id=$1)",
+      [seedId(9171), p.scope.stationId, p.scope.environment, p.revision, p],
+    );
+    await f.db.query("COMMIT");
+  }
   const customerId = v7(),
     cardId = v7(),
     batchId = v7(),
