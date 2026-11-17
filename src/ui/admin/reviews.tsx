@@ -621,6 +621,13 @@ function ReviewRecord({
   } | null>(null);
   const [current, setCurrent] = useState<AdminSaleDetail | null>(sale);
   const [currentError, setCurrentError] = useState("");
+  const releaseCurrent = useCallback(
+    (detail: AdminSaleDetail | null, failed = false) => {
+      setCurrent(detail);
+      setCurrentError(failed ? "release_refresh_failed" : "");
+    },
+    [],
+  );
   const recorded = (receipt: Decision, label: string) => {
     const live = capture();
     setOutcome({ receipt, label });
@@ -658,18 +665,22 @@ function ReviewRecord({
         <Notice>
           {kind === "duplicate"
             ? "Similarity alone does not confirm a duplicate. The flag does not change either sale's loyalty credit."
-            : "This sale needs admin review. Resolving one review does not clear other holds or guarantee loyalty credit."}
+            : current?.credited
+              ? "Current sale status: recorded spend included."
+              : current?.state === "cancelled"
+                ? "Sale cancelled. The original entry and history are retained."
+                : "This sale needs admin review. Resolving one review does not clear other holds or guarantee loyalty credit."}
         </Notice>
       )}
       {current ? (
         meterView && !outcome ? (
           pending ||
-          (sale.state !== "cancelled" &&
-            sale.holds.some(
+          (current.state !== "cancelled" &&
+            current.holds.some(
               (h) => h.kind === "price" && h.state === "open",
             )) ? (
             <DecisionForm
-              sale={sale}
+              sale={current}
               kind="price"
               meter
               session={session}
@@ -690,7 +701,9 @@ function ReviewRecord({
       ) : (
         <Notice role="status">
           {currentError
-            ? "The decision is recorded, but the current sale could not be refreshed. Use View updated record to retry the read."
+            ? currentError === "release_refresh_failed"
+              ? "Decision recorded. Current sale status couldn't be refreshed."
+              : "The decision is recorded, but the current sale could not be refreshed. Use View updated record to retry the read."
             : "Loading current sale after the recorded decision…"}
         </Notice>
       )}
@@ -700,25 +713,35 @@ function ReviewRecord({
           recordedLabel={outcome.label}
           reload={reload}
         />
-      ) : meterView ? null : pending ? (
+      ) : !current || meterView ? null : pending ? (
         <DecisionForm
-          sale={sale}
+          sale={current}
           kind={pending.kind}
           session={session}
           reload={reload}
         />
       ) : kind === "duplicate" ? (
         <DuplicateReview
-          sale={sale}
+          sale={current}
           session={session}
           suffix={suffix}
           reload={reload}
         />
       ) : (
-        <HoldReview sale={sale} kind={kind} session={session} reload={reload} />
+        <HoldReview
+          sale={current}
+          kind={kind}
+          session={session}
+          reload={reload}
+        />
       )}
       {kind !== "duplicate" && !outcome && (
-        <HeldRelease sale={sale} kind={kind} session={session} reload={reload} />
+        <HeldRelease
+          sale={current ?? sale}
+          kind={kind}
+          session={session}
+          onCurrentSale={releaseCurrent}
+        />
       )}
       {current && (
         <AdminSaleHistory

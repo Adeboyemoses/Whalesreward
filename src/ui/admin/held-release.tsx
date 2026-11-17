@@ -56,7 +56,7 @@ export function HeldRelease(props: {
   sale: AdminSaleDetail;
   kind: ReleaseKind;
   session: AdminSession;
-  reload: () => void;
+  onCurrentSale: (detail: AdminSaleDetail | null, failed?: boolean) => void;
 }) {
   const state = useAdminSession();
   const proposalId = useSearchParams().get("proposal");
@@ -83,11 +83,12 @@ function ReleaseView({
   sale,
   kind,
   session,
+  onCurrentSale,
 }: {
   sale: AdminSaleDetail;
   kind: ReleaseKind;
   session: AdminSession;
-  reload: () => void;
+  onCurrentSale: (detail: AdminSaleDetail | null, failed?: boolean) => void;
 }) {
   const { store } = useAdminSession(),
     capture = useViewGuard(),
@@ -246,15 +247,26 @@ function ReleaseView({
   async function refreshCurrent() {
     const live = capture();
     setCurrentFailed(false);
+    setCurrent(null);
+    onCurrentSale(null);
     try {
       const fresh = await api.detail(sale.id);
-      if (live()) setCurrent(fresh);
+      if (live()) {
+        setCurrent(fresh);
+        onCurrentSale(fresh);
+      }
     } catch {
       if (live()) {
         setCurrent(null);
         setCurrentFailed(true);
+        onCurrentSale(null, true);
       }
     }
+  }
+  function invalidatePreparation() {
+    setPreparation(null);
+    setLoading(true);
+    setSerial((s) => s + 1);
   }
   function report(e: unknown) {
     setError(releaseMessage(e));
@@ -481,6 +493,7 @@ function ReleaseView({
       setReplayed(retry);
       clearPhoto();
       setDraft(emptyReleaseDraft());
+      invalidatePreparation();
       void refreshCurrent();
     } catch (e) {
       if (live()) {
@@ -519,6 +532,7 @@ function ReleaseView({
       ]);
       if (!live()) return;
       setCurrent(fresh);
+      onCurrentSale(fresh);
       setSelected(p);
       if (p.state !== "pending") throw new AdminError("review_closed", 409);
       setFrozen(
@@ -533,8 +547,30 @@ function ReleaseView({
       if (live()) setBusy("");
     }
   }
+  function invalidateIndependentInspection() {
+    setIndependentInspected(false);
+    // A request already sent retains its frozen identity for uncertain-result recovery.
+    if (
+      !uncertain &&
+      !lock.current &&
+      frozen?.kind === "decide" &&
+      frozen.body.outcome === "approve"
+    ) {
+      setDecisionReview(null);
+      setFrozen(null);
+    }
+  }
+  const approvalReady =
+    independentInspected && meterSeen && sheetSeen && !policyOff && !stale;
   async function decide(retry = false) {
     if (lock.current || !frozen || frozen.kind !== "decide") return;
+    if (!retry && frozen.body.outcome === "approve" && !approvalReady) {
+      invalidateIndependentInspection();
+      setError(
+        "Required evidence is unavailable. This sale cannot be approved from this proposal.",
+      );
+      return;
+    }
     lock.current = true;
     const live = capture();
     setBusy("Recording decision…");
@@ -555,6 +591,7 @@ function ReleaseView({
       setIndependentInspected(false);
       setSheetSeen(false);
       setMeterSeen(false);
+      invalidatePreparation();
       void refreshCurrent();
     } catch (e) {
       if (live()) {
@@ -1241,6 +1278,7 @@ function ReleaseView({
               title="Original meter photo"
               alt={`Original meter evidence for sale ${sale.saleCode}`}
               onReady={setMeterSeen}
+              onInvalidated={invalidateIndependentInspection}
             />
             <PhotoViewer
               key={`sheet-${selected.id}`}
@@ -1248,6 +1286,7 @@ function ReleaseView({
               title="Sheet photo"
               alt={`Sheet entry for sale ${sale.saleCode}`}
               onReady={setSheetSeen}
+              onInvalidated={invalidateIndependentInspection}
             />
           </div>
           <div className="wr-release-timeline">
@@ -1315,7 +1354,13 @@ function ReleaseView({
                   </p>
                 )}
                 <div className="wr-release-actions">
-                  <Button disabled={disabled} onClick={() => void decide()}>
+                  <Button
+                    disabled={
+                      disabled ||
+                      (decisionReview === "approve" && !approvalReady)
+                    }
+                    onClick={() => void decide()}
+                  >
                     Confirm decision
                   </Button>
                   <Button
