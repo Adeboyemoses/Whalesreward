@@ -96,7 +96,9 @@ jobs:
         if: always()
         with:
           name: held-release-failures
-          path: test-results/**/error-context.md
+          path: |
+            test-results/**/error-context.md
+            test-results/**/reviewer-context.md
           if-no-files-found: ignore
       - run: pnpm test:e2e
         if: ${{ !cancelled() }}

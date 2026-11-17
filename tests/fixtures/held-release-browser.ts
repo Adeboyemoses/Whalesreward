@@ -1,11 +1,13 @@
 import {
   expect,
+  test,
   request as requestFactory,
   type Browser,
   type Page,
   type APIRequestContext,
 } from "@playwright/test";
 import { createHash, randomBytes } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { v7 } from "uuid";
 import { reviewFixture, heldSale, type ReviewKind } from "../reviews/helpers";
@@ -288,6 +290,17 @@ export async function releaseFixture(
     second,
     browserBased: !apiOnlyPhone,
     async close() {
+      // Best-effort diagnostics for the separate reviewer page, before teardown.
+      if (context && !reviewer.isClosed()) {
+        try {
+          await writeFile(
+            test.info().outputPath("reviewer-context.md"),
+            await reviewer.locator("body").ariaSnapshot({ timeout: 3000 }),
+          );
+        } catch {
+          // Diagnostic capture must not replace the original failure or skip cleanup.
+        }
+      }
       await context?.close();
       await secondRequest?.dispose();
       await second.db.end();
