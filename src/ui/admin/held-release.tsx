@@ -232,8 +232,21 @@ function ReleaseView({
     // capture is intentionally sampled once per read, not a reactive dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, sale.id, kind, requested, serial, pageIndex, cursors]);
+  const currentSale = current ?? sale;
+  const targetOpen =
+    !currentFailed &&
+    currentSale.state !== "cancelled" &&
+    (kind === "capture"
+      ? currentSale.policyBlocks.some(
+          (block) =>
+            block === "capture_authorization_unresolved" ||
+            block === "capture_time_unresolved",
+        )
+      : currentSale.holds.some(
+          (hold) => hold.kind === kind && hold.state === "open",
+        ));
   const pending =
-    !!(current ?? sale).pendingRelease ||
+    !!currentSale.pendingRelease ||
     proposals.some((p) => p.state === "pending") ||
     selected?.state === "pending";
   const canPropose =
@@ -656,7 +669,9 @@ function ReleaseView({
       {loading && (
         <>
           <Notice role="status">Loading release details…</Notice>
-          <Button disabled>Propose a release with a sheet photo</Button>
+          {targetOpen && (
+            <Button disabled>Propose a release with a sheet photo</Button>
+          )}
         </>
       )}
       {readError && (
@@ -710,7 +725,7 @@ function ReleaseView({
           </Button>
         </Notice>
       )}
-      {!loading && !form && !readError && (
+      {targetOpen && !loading && !form && !readError && (
         <Sheet title="Records can't settle this">
           <p>
             If a matching shift-sheet or sales-log entry can settle this review,
