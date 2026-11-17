@@ -1,7 +1,12 @@
 // SQL fragments contain only server-owned identifiers. Every exact numeric is
 // converted to text before PostgreSQL JSON conversion, never after JS parsing.
 export function values(alias: string, original = false) {
-  return `jsonb_build_object('amountKobo',${alias}.amount_kobo::text,'quantity',trim_scale(${alias}.quantity)::text,'currency',${alias}.currency,'unit',${alias}.unit,'basis',${alias}.basis,'enteredAmountKobo',${alias}.entered_amount_kobo::text,'enteredQuantity',trim_scale(${alias}.entered_quantity)::text,'rateKobo',${alias}.rate_kobo::text,'priceVersionId',${alias}.price_version_id,'quantityPrecision',${alias}.quantity_precision,'medium',${alias}.medium,'calculation',${original ? "'captured_rate'" : `${alias}.calculation_mode`},'verifiedSaleDate',${alias}.verified_sale_date::text)`;
+  // The aggregate date changes on resolution; only the original revision owns
+  // its captured value. A not-yet-settled purchase has no revision and no date.
+  const verifiedDate = original
+    ? `(SELECT original_revision.verified_sale_date FROM purchase_revision original_revision WHERE original_revision.purchase_id=${alias}.id AND original_revision.kind='original')`
+    : `${alias}.verified_sale_date`;
+  return `jsonb_build_object('amountKobo',${alias}.amount_kobo::text,'quantity',trim_scale(${alias}.quantity)::text,'currency',${alias}.currency,'unit',${alias}.unit,'basis',${alias}.basis,'enteredAmountKobo',${alias}.entered_amount_kobo::text,'enteredQuantity',trim_scale(${alias}.entered_quantity)::text,'rateKobo',${alias}.rate_kobo::text,'priceVersionId',${alias}.price_version_id,'quantityPrecision',${alias}.quantity_precision,'medium',${alias}.medium,'calculation',${original ? "'captured_rate'" : `${alias}.calculation_mode`},'verifiedSaleDate',${verifiedDate}::text)`;
 }
 export const actor = (user: string) =>
   `(SELECT jsonb_build_object('id',coalesce(a.id,t.id),'code',coalesce(a.admin_code,t.staff_code),'name',u.display_name) FROM auth_user u LEFT JOIN admin a ON a.user_id=u.id LEFT JOIN attendant t ON t.user_id=u.id WHERE u.id=${user})`;

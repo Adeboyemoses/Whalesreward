@@ -1,3 +1,5 @@
+import { readSales } from "../../src/server/modules/sales/service";
+import { saleDetailSchema } from "../../src/shared/contracts/sales";
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
@@ -190,6 +192,28 @@ describe("P-29 dormant two-person service on real Postgres", () => {
     "SR-05 %s approval and lost response replay apply one immutable decision",
     async (kind) => {
       const x = await fixture(kind);
+      const readDetail = async () =>
+        saleDetailSchema.parse(
+          await readSales(
+            db.pool,
+            {
+              secret: process.env.BETTER_AUTH_SECRET!,
+              origin: "https://reviews.example.test",
+            },
+            x.token,
+            "admin",
+            "detail",
+            {},
+            x.sale.purchaseId,
+          ),
+        );
+      const before = await readDetail();
+      const originalBefore = (
+        await db.pool.query(
+          "SELECT to_jsonb(r)-ARRAY['state','version','decision_actor_id','decision_reason','decided_at'] value FROM purchase_revision r WHERE id=$1",
+          [x.original],
+        )
+      ).rows[0]!.value;
       const proposed = await x.svc.propose(x.token, x.sale.purchaseId, x.body);
       expect(proposed.proposal.state).toBe("pending");
       const decision = {
@@ -204,6 +228,20 @@ describe("P-29 dormant two-person service on real Postgres", () => {
         decision,
       );
       expect(result.proposal.state).toBe("approved");
+      const after = await readDetail();
+      expect(after.original).toEqual(before.original);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT to_jsonb(r)-ARRAY['state','version','decision_actor_id','decision_reason','decided_at'] value FROM purchase_revision r WHERE id=$1",
+            [x.original],
+          )
+        ).rows[0]!.value,
+      ).toEqual(originalBefore);
+      if (kind === "date") {
+        expect(after.verifiedSaleDate).toBe("2026-11-11");
+        expect(after.displayedValues.verifiedSaleDate).toBe("2026-11-11");
+      }
       expect(
         await x.svc.decide(
           x.reviewerToken,
