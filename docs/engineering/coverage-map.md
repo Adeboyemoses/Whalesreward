@@ -859,3 +859,9 @@ EM typecheck/lint/build and 893 unit tests PASS; focused desktop/phone 40 and fi
 | E01, E02, E04, E03 | `tests/design-parity/leaderboards/REPORT.md`: independent comparison of 14 captures at 1440/390/360; resolved E02 overflow and E03 native height limit disclosed | adapted Stage 2a parity on-staging; checklist forms/per-check rows remain Stage 2b |
 
 Verification: EM typecheck/lint/build, 981 unit and real HTTP protocol 1 PASS. Final CI: 1,445 PostgreSQL, timezone 5+5, browser 423 passed/three retry passes/four existing skips, storage 1 PASS. All 24 new desktop/attendant Stage 2a project cases passed. Existing fixture issues WHR-86/142/169 remain separate. WHR-173 narrows overstated interaction-coverage prose: width/control-height geometry is automated; keyboard/focus and horizontal table-scroll interactions remain manual acceptance checks. [Smoke](../qa/smoke-2026-11-16-giveaway-stage-2a.md).
+
+## WHR-176 held-release sheet identifiers
+
+[Feature PR #162](https://github.com/Adeboyemoses/Whalesreward/pull/162) merged at `ab915e3`. `tests/release-e2e/sheet-identifiers.spec.ts` exercises real HTTP reserve → upload URL → PUT → finalize → propose against PostgreSQL and MinIO, carrying returned IDs unchanged. It asserts UUIDv7 persisted IDs, UUIDv4 private storage keys, rejection of UUIDv4 route identifiers, and a pending proposal with zero credit. This covers the identifier boundary supporting I-07, I-25, I-35, I-41 and I-48; it does not claim new authorization, audit or release-credit semantics. No deployed v2 activation.
+
+Before fix, the test reproduced upload URL HTTP400 after successful reservation. EM and CI each passed the repaired chain. CI also passed 1,445 PostgreSQL tests, 428 browser tests (four existing skips), storage 1 and timezone 5+5; EM unit 981 passed. UUID audit: `docs/qa/whr-176-uuid-audit.md`; no other production randomUUID value reaches a UUIDv7 contract. WHR-171 acceptance remains its own work order.
