@@ -53,10 +53,10 @@ export async function handleProjection(
       resourceId,
       Object.fromEntries(search),
     );
-    return Response.json(
-      { data, serverTime: new Date().toISOString(), requestId },
-      { headers },
-    );
+    const envelope = { data, serverTime: new Date().toISOString(), requestId };
+    if (Buffer.byteLength(JSON.stringify(envelope)) > 32768)
+      throw new AuthError("request_too_large", 413);
+    return Response.json(envelope, { headers });
   } catch (e) {
     const failure =
       e instanceof AuthError
