@@ -1,3 +1,9 @@
+import { GET as resultRoute } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/results/[reconciliationId]/route";
+import { GET as managerRoute } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/selection/managers/route";
+import { GET as attendantRoute } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/selection/attendants/route";
+import { GET as phoneRoute } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/selection/phones/route";
+import { GET as incompleteRoute } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/selection/phones/[phoneId]/incomplete-sources/route";
+import { GET as checklistRoute } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/checklist/route";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { giveawayFixture } from "../helpers/giveaway-fixture";
@@ -8,7 +14,7 @@ import {
   cardsFixture,
 } from "../helpers/cards-adversarial-fixture";
 import { readProjection } from "../../src/server/modules/giveaway/projections";
-import { handleProjection } from "../../src/server/modules/giveaway/projection-http";
+
 import {
   checkNames,
   checklistProjectionSchema,
@@ -27,6 +33,7 @@ let f: Awaited<ReturnType<typeof giveawayFixture>>,
   server: Server,
   origin: string,
   ip = 1;
+let storedResultId: string, selectedPhoneId: string;
 const read = (
   action: ProjectionAction,
   input: unknown = {},
@@ -57,15 +64,25 @@ beforeAll(async () => {
     const headers = new Headers();
     for (const [k, v] of Object.entries(req.headers))
       if (v) headers.set(k, Array.isArray(v) ? v.join(",") : v);
-    const response = await handleProjection(
-      new Request(`http://localhost${req.url}`, {
-        headers,
-        method: req.method,
+    const request = new Request(`http://localhost${req.url}`, {
+      headers,
+      method: req.method,
+    });
+    const context = {
+      params: Promise.resolve({
+        campaignId: campaign,
+        phoneId: id!,
+        reconciliationId: id!,
       }),
-      action,
-      campaign,
-      id,
-    );
+    };
+    const response = await {
+      checklist: checklistRoute,
+      results: resultRoute,
+      managers: managerRoute,
+      attendants: attendantRoute,
+      phones: phoneRoute,
+      "incomplete-sources": incompleteRoute,
+    }[action](request, context);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(await response.text());
   });
@@ -273,8 +290,10 @@ it("T-21 all six routes traverse real HTTP with strict envelopes no-store and ty
     ...(await f.guard()),
   });
   const resultId = prepared.data.reconciliationId;
+  storedResultId = resultId;
   const phonePage = phoneSelectionSchema.parse(await read("phones"));
   const phoneId = phonePage.items[0]!.id;
+  selectedPhoneId = phoneId;
   for (const [suffix, schema] of [
     ["checklist", checklistProjectionSchema],
     [`results/${resultId}`, storedChecklistSchema],
@@ -292,6 +311,30 @@ it("T-21 all six routes traverse real HTTP with strict envelopes no-store and ty
     expect(schema.safeParse(r.body.data).success).toBe(true);
   }
 });
+it.each([
+  "checklist",
+  "results",
+  "managers",
+  "attendants",
+  "phones",
+  "incomplete-sources",
+] as const)(
+  "T-21 real HTTP %s rejects no session, missing grants and unknown input",
+  async (action) => {
+    const suffix =
+      action === "results"
+        ? `results/${storedResultId}`
+        : action === "incomplete-sources"
+          ? `selection/phones/${selectedPhoneId}/incomplete-sources`
+          : action === "checklist"
+            ? "checklist"
+            : `selection/${action}`;
+    expect((await http(suffix, "")).status).toBe(401);
+    const denied = await f.actor([]);
+    expect((await http(suffix, denied.token)).status).toBe(403);
+    expect((await http(`${suffix}?unexpected=true`)).status).toBe(400);
+  },
+);
 it("T-21 malformed queries foreign parents and forged cursors fail without details", async () => {
   for (const suffix of [
     "checklist?kind=initial",
@@ -377,4 +420,32 @@ it("T-21 stored historical pass retains counts after later mutations and differs
   expect(JSON.stringify(stored)).not.toMatch(
     /sourceDigest|operationId|actorId|personId|bindingId/,
   );
+});
+
+it("T-21 grant revoked while waiting for security lock is reauthorized before HTTP success", async () => {
+  const db = await f.pool.connect();
+  const role = (
+    await f.pool.query("SELECT role_id FROM admin WHERE id=$1", [fixtureId(5)])
+  ).rows[0].role_id;
+  let pending: Promise<Awaited<ReturnType<typeof http>>> | undefined;
+  try {
+    await db.query("BEGIN");
+    await db.query("SELECT id FROM security_state WHERE id=true FOR UPDATE");
+    pending = http("selection/phones");
+    await f.waitForLock("security_state");
+    await db.query(
+      "DELETE FROM role_permission WHERE role_id=$1 AND permission_code='giveawayFinalize'",
+      [role],
+    );
+    await db.query("UPDATE role SET version=version+1 WHERE id=$1", [role]);
+    await db.query("COMMIT");
+    expect((await pending).status).toBe(403);
+  } finally {
+    await db.query("ROLLBACK");
+    db.release();
+    await f.pool.query(
+      "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'giveawayFinalize') ON CONFLICT DO NOTHING",
+      [role],
+    );
+  }
 });

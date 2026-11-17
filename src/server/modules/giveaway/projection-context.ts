@@ -60,6 +60,20 @@ export async function projectionContext(
     [station.id],
   );
   const c = await campaignData(db, station.id, campaignId);
+  // A session can expire while this request waits for reporting/campaign locks.
+  await requireAdminSession(db, token);
+  const observed = (
+    await db.query(
+      `WITH observed AS MATERIALIZED (SELECT clock_timestamp() at)
+    SELECT at, to_char(at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') text,
+      at > $1::timestamptz after_cutoff, at > $2::timestamptz after_deadline FROM observed`,
+      [c.cutoff_text, c.deadline_text],
+    )
+  ).rows[0];
+  c.now = observed.at;
+  c.after_cutoff = observed.after_cutoff;
+  c.after_deadline = observed.after_deadline;
+  c.projection_as_of = observed.text;
   const kind = c.latest_snapshot_id
     ? ("revision" as const)
     : ("initial" as const);
@@ -141,5 +155,5 @@ export async function projectionView(
     accounts,
     inventory,
   });
-  return { asOf: c.now.toISOString(), viewToken, ...pins };
+  return { asOf: c.projection_as_of as string, viewToken, ...pins };
 }

@@ -1,3 +1,8 @@
+import {
+  managerCandidatePredicate,
+  requiredAttendantsQuery,
+  incompleteCandidate,
+} from "./selection-predicates";
 import type pg from "pg";
 import { z } from "zod";
 import { AuthError } from "../auth/errors";
@@ -21,8 +26,9 @@ export function retained<T extends z.ZodType>(
 export async function managers(db: pg.PoolClient, ctx: ProjectionContext) {
   const rows = (
     await db.query(
-      `SELECT a.id AS "adminId",a.admin_code AS "adminCode",u.display_name AS name,true AS "personVerified",ARRAY(SELECT k FROM (VALUES ('initial','giveawayFinalize'),('revision','giveawayRevise')) AS kinds(k,p) WHERE EXISTS(SELECT 1 FROM role_permission WHERE role_id=r.id AND permission_code=kinds.p)) AS "eligibleFor" FROM admin a JOIN auth_user u ON u.id=a.user_id JOIN role r ON r.id=a.role_id JOIN LATERAL(SELECT verified FROM held_release_person_binding WHERE station_id=$1 AND user_id=u.id ORDER BY version DESC LIMIT 1)b ON b.verified WHERE u.enabled AND u.kind='admin' AND r.enabled AND NOT u.must_change_password AND (SELECT count(DISTINCT permission_code) FROM role_permission WHERE role_id=r.id AND permission_code=ANY($2::text[]))=3 ORDER BY a.id`,
+      `SELECT a.id AS "adminId",a.admin_code AS "adminCode",u.display_name AS name,true AS "personVerified",ARRAY(SELECT k FROM (VALUES ('initial','giveawayFinalize'),('revision','giveawayRevise')) AS kinds(k,p) WHERE EXISTS(SELECT 1 FROM role_permission WHERE role_id=r.id AND permission_code=kinds.p)) AS "eligibleFor" FROM admin a JOIN auth_user u ON u.id=a.user_id JOIN role r ON r.id=a.role_id JOIN LATERAL(SELECT verified FROM held_release_person_binding WHERE station_id=$2 AND user_id=u.id ORDER BY version DESC LIMIT 1)b ON b.verified WHERE ($1::uuid IS NULL OR a.id=$1) AND ${managerCandidatePredicate} ORDER BY a.id`,
       [
+        null,
         ctx.c.station_id,
         [
           "sales",
@@ -50,7 +56,7 @@ export async function managers(db: pg.PoolClient, ctx: ProjectionContext) {
 export async function attendants(db: pg.PoolClient, ctx: ProjectionContext) {
   const rows = (
     await db.query(
-      `WITH required AS (SELECT x.attendant_id id FROM assignment x JOIN pump p ON p.id=x.pump_id WHERE p.station_id=$1 UNION SELECT originating_attendant_id FROM purchase WHERE station_id=$1) SELECT q.id AS "attendantId",a.staff_code AS "staffCode",u.display_name AS name,u.username,u.enabled,EXISTS(SELECT 1 FROM assignment x JOIN pump p ON p.id=x.pump_id WHERE x.attendant_id=q.id AND p.station_id=$1 AND x.effective_until IS NULL) AS "hasCurrentAssignment",true AS required FROM required q LEFT JOIN attendant a ON a.id=q.id LEFT JOIN auth_user u ON u.id=a.user_id ORDER BY q.id`,
+      `WITH required AS (${requiredAttendantsQuery}) SELECT q.id AS "attendantId",a.staff_code AS "staffCode",u.display_name AS name,u.username,u.enabled,EXISTS(SELECT 1 FROM assignment x JOIN pump p ON p.id=x.pump_id WHERE x.attendant_id=q.id AND p.station_id=$1 AND x.effective_until IS NULL) AS "hasCurrentAssignment",true AS required FROM required q LEFT JOIN attendant a ON a.id=q.id LEFT JOIN auth_user u ON u.id=a.user_id ORDER BY q.id`,
       [ctx.c.station_id],
     )
   ).rows;
@@ -121,5 +127,18 @@ export async function incomplete(
       [ctx.c.station_id, phone.attendantIds],
     )
   ).rows;
-  return rows.map((r) => retained(incompleteChoiceSchema, r));
+  return rows
+    .filter((r) =>
+      incompleteCandidate(
+        {
+          originating_attendant_id: r.originatingAttendantId,
+          current_revision_id: null,
+          ever_accepted: r.everAccepted,
+          status: r.state,
+          observed: r.hasTrustedByteObservation,
+        },
+        phone.attendantIds,
+      ),
+    )
+    .map((r) => retained(incompleteChoiceSchema, r));
 }

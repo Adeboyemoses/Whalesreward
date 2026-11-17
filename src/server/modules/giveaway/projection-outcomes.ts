@@ -6,6 +6,7 @@ import { managers, attendants, phones } from "./projection-selections";
 export async function outcomes(db: pg.PoolClient, ctx: ProjectionContext) {
   const { c, actor } = ctx,
     ready = await readiness(db, c, actor.admin_id);
+  ready.view.asOf = c.projection_as_of;
   if (
     !actor.permissions.includes(
       ctx.kind === "initial" ? "giveawayFinalize" : "giveawayRevise",
@@ -95,7 +96,9 @@ export async function outcomes(db: pg.PoolClient, ctx: ProjectionContext) {
   const uploads = relevant.filter(
     (s) => !s.phoneExclusionId && !s.reasons.includes("cancelled"),
   );
-  const incomplete = uploads.filter((s) => s.reasons.includes("incomplete"));
+  const incomplete = uploads.filter((s) =>
+    ready.sets.uploads.has(s.purchaseId),
+  );
   if (!ctx.policy) row("uploads", null, null, ["policy_missing"]);
   else
     row(

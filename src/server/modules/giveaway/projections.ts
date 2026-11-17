@@ -34,6 +34,29 @@ const cursorSchema = z.strictObject({
   limit: z.number().int(),
   last: z.string(),
 });
+/** Lock waits can invalidate a repeatable-read snapshot. Retry the whole read,
+ * including current authority and expected-view checks, never only its serializer. */
+async function consistentRead<T>(
+  pool: pg.Pool,
+  run: (db: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await transaction(pool, run);
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "40001"
+      ) {
+        if (attempt < 2) continue;
+        throw new AuthError("temporarily_unavailable", 503);
+      }
+      throw error;
+    }
+  }
+}
 export async function readProjection(
   pool: pg.Pool,
   secret: string,
@@ -43,7 +66,7 @@ export async function readProjection(
   resourceId?: string,
   input: unknown = {},
 ) {
-  return transaction(pool, async (db) => {
+  return consistentRead(pool, async (db) => {
     const ctx = await projectionContext(db, token, campaignId, action);
     if (action === "results") {
       z.strictObject({}).parse(input);

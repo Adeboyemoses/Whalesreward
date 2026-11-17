@@ -1,3 +1,5 @@
+import { saleValuesSchema } from "./sales";
+import { safeAuditText } from "./audit-privacy";
 import { z } from "zod";
 import { authId } from "./auth";
 import { actorSchema } from "./admin";
@@ -88,19 +90,26 @@ export const checkOutcomeSchema = z
     reasonCodes: z.array(z.string()).max(12),
     links: z.array(
       z.strictObject({
-        href: z.enum([
-          "/admin/settings",
-          "/admin/sales",
-          "/admin/sales?status=late_correction",
-          "/admin/sales?status=duplicate",
-          "/admin/sales?status=incomplete",
-        ]),
+        href: z.enum(["/admin/settings", "/admin/sales"]),
         label,
       }),
     ),
     access: z.enum(["available", "restricted"]),
   })
   .superRefine((v, ctx) => {
+    const expectedUnit =
+      v.name === "timing"
+        ? "campaigns"
+        : v.name === "phone_census"
+          ? "phones"
+          : "purchases";
+    if (v.unit !== expectedUnit)
+      ctx.addIssue({ code: "custom", message: "Wrong count unit" });
+    if (v.outcome === "unresolved" && v.blocking === "0")
+      ctx.addIssue({
+        code: "custom",
+        message: "Unresolved count cannot be zero",
+      });
     if (
       v.reasonCodes.some(
         (r) =>
@@ -204,7 +213,7 @@ export const attendantChoiceSchema = z.strictObject({
 export const phoneChoiceSchema = z.strictObject({
   id: authId,
   version,
-  label: z.string().min(1).max(80),
+  label: z.string().min(1).max(80).refine(safeAuditText),
   attendantIds: z.array(authId).min(1).max(100),
   state: z.enum([
     "unchecked",
@@ -222,9 +231,9 @@ export const incompleteChoiceSchema = z.strictObject({
   originatingAttendantId: authId,
   state: z.enum(["received", "photo_pending"]),
   detailsReceivedAt: instant,
-  amountKobo: z.string().regex(/^[0-9]+$/),
-  currency: z.string().regex(/^[A-Z]{3}$/),
-  quantity: z.string().regex(/^[0-9]+(?:\.[0-9]{1,6})?$/),
+  amountKobo: saleValuesSchema.shape.amountKobo,
+  currency: saleValuesSchema.shape.currency,
+  quantity: saleValuesSchema.shape.quantity,
   unit: z.enum(["litre", "kilogram"]),
   everAccepted: z.literal(false),
   hasTrustedByteObservation: z.literal(false),
