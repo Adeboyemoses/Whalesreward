@@ -368,7 +368,9 @@ test("I-46 grouped readiness reports actual blockers and honest unavailable chec
     const main = page.getByRole("main");
     await expect(main).toContainText("Finalization checks");
     await expect(main).toContainText(/not available yet/i);
-    await expect(main).toContainText(/held sales|held.sale/i);
+    await expect(main).toContainText(
+      "Sales with holds or pending hold releases",
+    );
     await expect(main).toContainText(/upload/i);
     await expect(page.getByRole("checkbox")).toHaveCount(0);
     await expect(

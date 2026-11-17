@@ -98,8 +98,8 @@ for (const kind of ["price", "card", "date", "capture"] as const) {
         decision: { result: { creditedAfter: boolean } };
       };
       expect(result.proposal.state).toBe("approved");
-      expect(result.proposal.decision!.actor.id).toBe(f.second.userId);
-      expect(result.proposal.proposedBy.id).toBe(f.userId);
+      expect(result.proposal.decision!.actor.id).toBe(f.second.adminId);
+      expect(result.proposal.proposedBy.id).toBe(f.adminId);
       const replay = await post(
         f.reviewer.request,
         `/api/admin/sales/${x.sale.id}/release-proposals/${x.proposal.id}/decision`,

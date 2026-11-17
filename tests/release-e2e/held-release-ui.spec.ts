@@ -12,8 +12,10 @@ import {
   type Proposal,
   type ReleaseFixture,
   type Preparation,
+  type PaperCaptureRange,
 } from "../fixtures/held-release-browser";
 import { adminDetail } from "../reviews/helpers";
+import { data } from "../sales-history/helpers";
 
 test.use({
   trace: "off",
@@ -49,6 +51,9 @@ async function open(page: Page, id: string, kind: string, proposal?: string) {
   await page.goto(
     `/admin/sales/${id}/${kind}-review${proposal ? `?proposal=${proposal}` : ""}`,
   );
+  await expect(
+    page.getByLabel("Two-person release", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText("Loading release details…", { exact: true }),
   ).toHaveCount(0);
@@ -267,8 +272,8 @@ test("R2 R4–R11 minute attestation uploads, freezes lost proposal/decision res
     ).toBeVisible();
     await f.reviewer.getByLabel(reviewerAttestation, { exact: true }).check();
     await f.reviewer
+      .getByLabel("Two-person release", { exact: true })
       .getByLabel("Decision reason", { exact: true })
-      .last()
       .fill(
         "I independently inspected both images and verified the copied range and sale date",
       );
@@ -423,7 +428,7 @@ test("RD-07 complete server queue traverses over 100 tied-time stale proposals w
           code = `S-QUEUE-${n}-${purchase.slice(-6)}`;
         codes.push(code);
         await f.db.query(
-          `INSERT INTO purchase SELECT (jsonb_populate_record(NULL::purchase,to_jsonb(p)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'sale_code',$4::text,'current_revision_id',NULL,'resolution_candidate_revision_id',NULL,'status','cancelled'))).* FROM purchase p WHERE id=$1`,
+          `INSERT INTO purchase SELECT (jsonb_populate_record(NULL::purchase,to_jsonb(p)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'sale_code',$4::text,'current_revision_id',NULL,'resolution_candidate_revision_id',NULL,'status','cancelled','cancellation_reason','Fictional obsolete queue fixture'))).* FROM purchase p WHERE id=$1`,
           [x.sale.id, purchase, v7(), code],
         );
         await f.db.query(
@@ -577,11 +582,45 @@ test("R2 R7 R8 independent written-brief fidelity across all four kinds at 1440,
         }),
       ).toBeVisible();
       await captureView(page, `R3-${kind}`);
-      const sheet = await uploadSheet(page, sale.id, prep),
+      let paperRange: PaperCaptureRange | undefined;
+      if (kind === "price") {
+        const price = (
+          await f.db.query(
+            `SELECT p.effective_from,
+              (SELECT min(n.effective_from) FROM product_price_version n
+               WHERE n.product_id=p.product_id AND n.effective_from>p.effective_from) next_boundary
+             FROM product_price_version p WHERE p.id=$1`,
+            [prep.original.priceVersionId],
+          )
+        ).rows[0];
+        expect(price.next_boundary).not.toBeNull();
+        const from =
+          Math.ceil(
+            Math.max(
+              Date.parse("2026-11-10T12:10:00.000Z"),
+              new Date(price.effective_from).getTime() + 60000,
+            ) / 60000,
+          ) * 60000;
+        paperRange = {
+          from: new Date(from).toISOString(),
+          through: new Date(from + 59999).toISOString(),
+          timezone: "Africa/Lagos",
+        };
+        expect(Date.parse(paperRange.through)).toBeLessThan(
+          new Date(price.next_boundary).getTime(),
+        );
+      }
+      const sheet = await uploadSheet(
+          page,
+          sale.id,
+          prep,
+          "confirm",
+          paperRange,
+        ),
         proposal = (await post(
           page.request,
           `/api/admin/sales/${sale.id}/release-proposals`,
-          proposalBody(prep, sheet.assetId),
+          proposalBody(prep, sheet.assetId, "confirm", paperRange),
           201,
         )) as Proposal;
       await open(f.reviewer, sale.id, kind, proposal.id);
@@ -630,6 +669,16 @@ for (const denial of [
         },
       );
       await open(page, sale.id, "date");
+      await expect(
+        page.getByText(
+          denial === "ordinary_review_required"
+            ? "The records can settle this through the ordinary review."
+            : denial === "not_admissible"
+              ? "The records do not admit a two-person release. Continue ordinary review or leave the sale held."
+              : "We can't verify that you're an independent reviewer. Ask an authorized administrator to check staff identity records. This sale stays held.",
+          { exact: true },
+        ),
+      ).toBeVisible();
       await expect(
         page.getByRole("button", {
           name: "Propose a release with a sheet photo",
@@ -796,8 +845,8 @@ test("R8 retained-photo keyboard viewer restores focus and expired inspection di
       f.reviewer.getByRole("button", { name: "Approve proposal", exact: true }),
     ).toBeDisabled();
     await f.reviewer
+      .getByLabel("Two-person release", { exact: true })
       .getByLabel("Decision reason", { exact: true })
-      .last()
       .fill("The entry cannot be verified while access is expired");
     await expect(
       f.reviewer.getByRole("button", { name: "Reject proposal", exact: true }),
@@ -887,8 +936,8 @@ test("R14 stale decision remains pending until explicit fresh independent reject
     const x = await pendingFixture(page, f);
     await open(f.reviewer, x.sale.id, "date", x.proposal.id);
     await f.reviewer
+      .getByLabel("Two-person release", { exact: true })
       .getByLabel("Decision reason", { exact: true })
-      .last()
       .fill(
         "Reject this obsolete proposal after inspecting the current record",
       );
@@ -1040,8 +1089,8 @@ test("P1 regression: same-view independent rejection refreshes preparation befor
     const x = await pendingFixture(page, f);
     await open(f.reviewer, x.sale.id, "date", x.proposal.id);
     await f.reviewer
+      .getByLabel("Two-person release", { exact: true })
       .getByLabel("Decision reason", { exact: true })
-      .last()
       .fill("The original proposal needs a fresh transcription and review");
     await f.reviewer
       .getByRole("button", { name: "Reject proposal", exact: true })
@@ -1158,8 +1207,8 @@ for (const outcome of ["confirm", "cancel"] as const) {
           ? "The matching entry explicitly records this sale as void and erroneous"
           : "The independent inspection supports this sale date and complete entry range";
       await f.reviewer
+        .getByLabel("Two-person release", { exact: true })
         .getByLabel("Decision reason", { exact: true })
-        .last()
         .fill(reason);
       await f.reviewer
         .getByRole("button", { name: "Approve proposal", exact: true })
@@ -1196,9 +1245,26 @@ for (const outcome of ["confirm", "cancel"] as const) {
           { exact: true },
         ),
       ).toBeVisible();
-      const decision = fresh.decisions.find((d) => d.reason === reason);
+      const recorded = await data<Proposal>(
+        f.reviewer.request,
+        `/api/admin/sales/${sale.id}/release-proposals/${proposal.id}`,
+      );
+      expect(recorded.decision?.reason).toBe(reason);
+      const decision = fresh.decisions.find(
+        (d) => d.id === recorded.decision?.result?.id,
+      );
       expect(decision).toBeDefined();
-      await expect(history.getByText(reason, { exact: true })).toBeVisible();
+      const ordinaryReason =
+        outcome === "cancel"
+          ? "Held sale cancelled after independent review"
+          : "Held sale confirmed after independent review";
+      expect(decision!.reason).toBe(ordinaryReason);
+      await expect(
+        f.reviewer.getByText(`Decision reason: ${reason}`, { exact: true }),
+      ).toBeVisible();
+      await expect(
+        history.getByText(ordinaryReason, { exact: true }),
+      ).toBeVisible();
       await expect(
         history.getByText(decision!.auditEventId, { exact: true }),
       ).toBeVisible();
@@ -1241,6 +1307,17 @@ for (const photo of ["sheet", "meter"] as const) {
         photo === "sheet"
           ? `/api/admin/sales/${x.sale.id}/release-proposals/${x.proposal.id}/photo-access`
           : `/api/admin/sales/${x.sale.id}/photo-access`;
+      const ordinaryMeterRead =
+        photo === "meter"
+          ? f.reviewer.waitForResponse(
+              (response) =>
+                new URL(response.url()).pathname === accessPath &&
+                response.request().method() === "POST",
+            )
+          : null;
+      await open(f.reviewer, x.sale.id, "date", x.proposal.id);
+      if (ordinaryMeterRead)
+        expect((await ordinaryMeterRead).status()).toBe(200);
       let issued = 0;
       await f.reviewer.route(`**${accessPath}`, async (route) => {
         const response = await route.fetch();
@@ -1250,11 +1327,10 @@ for (const photo of ["sheet", "meter"] as const) {
           json.data.expiresAt = new Date(Date.now() + 5000).toISOString();
         await route.fulfill({ response, json });
       });
-      await open(f.reviewer, x.sale.id, "date", x.proposal.id);
       await inspectIndependentPhotos(f.reviewer, x.sale.detail.saleCode);
       await f.reviewer
+        .getByLabel("Two-person release", { exact: true })
         .getByLabel("Decision reason", { exact: true })
-        .last()
         .fill(
           "I independently inspected the copied facts and complete time range",
         );
@@ -1340,8 +1416,8 @@ test("P1 regression: uncertain approval retry retains its frozen request after p
     await open(f.reviewer, x.sale.id, "date", x.proposal.id);
     await inspectIndependentPhotos(f.reviewer, x.sale.detail.saleCode);
     await f.reviewer
+      .getByLabel("Two-person release", { exact: true })
       .getByLabel("Decision reason", { exact: true })
-      .last()
       .fill(
         "The independently checked entry supports this unchanged sale date",
       );
@@ -1653,8 +1729,8 @@ test("Matrix: release clears only the date hold and displays remaining price hol
     await open(f.reviewer, x.sale.id, "date", x.proposal.id);
     await inspectIndependentPhotos(f.reviewer, x.sale.detail.saleCode);
     await f.reviewer
+      .getByLabel("Two-person release", { exact: true })
       .getByLabel("Decision reason", { exact: true })
-      .last()
       .fill(
         "The entry settles only the date; the separate price hold remains open",
       );
@@ -1720,8 +1796,8 @@ for (const condition of ["demoted-proposer", "policy-off-transport"] as const) {
       }
       await open(f.reviewer, x.sale.id, "date", x.proposal.id);
       await f.reviewer
+        .getByLabel("Two-person release", { exact: true })
         .getByLabel("Decision reason", { exact: true })
-        .last()
         .fill(
           "Independently reject this proposal while its approval prerequisites are unavailable",
         );
@@ -1786,10 +1862,9 @@ test("Matrix: pending hold and proposal use a distinct-sale giveaway union and s
         prep.originalContext.stationId,
       ])
     ).rows[0].id;
-    const before = (await post(
+    const before = (await data(
       page.request,
       `/api/admin/giveaway/${campaign}/readiness`,
-      undefined,
     )) as { counts: { holds: string; policyBlocks: string } };
     const sheet = await uploadSheet(page, sale.id, prep),
       body = proposalBody(prep, sheet.assetId);
@@ -1799,10 +1874,9 @@ test("Matrix: pending hold and proposal use a distinct-sale giveaway union and s
       body,
       201,
     )) as Proposal;
-    const after = (await post(
+    const after = (await data(
       page.request,
       `/api/admin/giveaway/${campaign}/readiness`,
-      undefined,
     )) as {
       counts: { holds: string; policyBlocks: string };
       blockers: string[];
@@ -1824,10 +1898,9 @@ test("Matrix: pending hold and proposal use a distinct-sale giveaway union and s
     await expect(main).not.toContainText(body.reason);
     await expect(main).not.toContainText(body.facts.entryReference);
     await expect(main).not.toContainText(sheet.assetId);
-    const own = (await post(
+    const own = (await data(
       f.phone.request,
       `/api/attendant/sales/${sale.id}`,
-      undefined,
     )) as Record<string, unknown>;
     for (const field of [
       "pendingRelease",

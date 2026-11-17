@@ -24,6 +24,11 @@ import type {
 
 export type Preparation = z.infer<typeof releasePreparationSchema>;
 export type Proposal = z.infer<typeof releaseProposalSchema>;
+export type PaperCaptureRange = {
+  from: string;
+  through: string;
+  timezone: "Africa/Lagos";
+};
 export type ReleaseFixture = Awaited<ReturnType<typeof releaseFixture>>;
 
 export async function bindEnabledPeople(db: {
@@ -445,11 +450,28 @@ export async function uploadSheet(
   id: string,
   prep: Preparation,
   outcome: "confirm" | "cancel" = "confirm",
+  observedCapture?: PaperCaptureRange,
 ) {
+  const day = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Lagos",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const minute = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Lagos",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const supportedLabel = observedCapture
+    ? `${day.format(new Date(observedCapture.from))} · ${minute.format(new Date(observedCapture.from))}–${minute.format(new Date(observedCapture.through))}`
+    : undefined;
   const bytes = await sheetBytes(
     prep.kind,
     outcome,
     prep.currentCandidate.values,
+    supportedLabel,
   );
   const reservation = await data<{ uploadId: string; assetId: string }>(
     page.request,
@@ -490,6 +512,7 @@ export function proposalBody(
   prep: Preparation,
   sheetAssetId: string,
   outcome: "confirm" | "cancel" = "confirm",
+  observedCapture?: PaperCaptureRange,
 ) {
   return {
     ...prep.guard,
@@ -505,7 +528,7 @@ export function proposalBody(
       recordedAmountKobo: prep.currentCandidate.values.amountKobo,
       recordedQuantity: prep.currentCandidate.values.quantity,
       recordedRateKobo: prep.original.rateKobo,
-      observedCapture: {
+      observedCapture: observedCapture ?? {
         from:
           prep.kind === "date"
             ? "2026-11-10T23:10:00.000Z"
