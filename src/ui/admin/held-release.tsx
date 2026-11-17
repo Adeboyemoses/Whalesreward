@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -660,7 +661,7 @@ function ReleaseView({
       )}
       {readError && (
         <Notice tone="danger" role="alert">
-          {readError}
+          <p>{readError}</p>
           <Button variant="secondary" onClick={refresh} disabled={disabled}>
             Try again
           </Button>
@@ -1876,17 +1877,22 @@ function PhotoViewer({
     guard = useViewGuard(),
     dialog = useRef<HTMLDialogElement>(null),
     opener = useRef<HTMLButtonElement>(null),
-    pan = useRef<HTMLDivElement>(null);
+    pan = useRef<HTMLDivElement>(null),
+    preview = useRef<HTMLImageElement>(null);
   const ready = useRef(onReady);
   const invalidate = useRef(onInvalidated);
-  useEffect(() => {
+  useLayoutEffect(() => {
     ready.current = onReady;
     invalidate.current = onInvalidated;
   }, [onReady, onInvalidated]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     ready.current?.(false);
     return () => ready.current?.(false);
   }, []);
+  useLayoutEffect(() => {
+    const image = preview.current;
+    if (image?.complete && image.naturalWidth > 0) ready.current?.(true);
+  }, [photo]);
   useEffect(() => {
     if (!photo?.expiresAt) return;
     const delay = Math.max(0, Date.parse(photo.expiresAt) - Date.now());
@@ -1907,6 +1913,11 @@ function PhotoViewer({
       opener.current?.focus();
     }
   }, [full]);
+  const closePhoto = () => {
+    dialog.current?.close();
+    setFull(false);
+    opener.current?.focus();
+  };
   const retrieve = async () => {
     if (!load) return;
     const live = guard(),
@@ -1945,6 +1956,7 @@ function PhotoViewer({
         <>
           <div className="wr-photo wr-taken">
             <img
+              ref={preview}
               src={photo.url}
               alt={alt}
               referrerPolicy="no-referrer"
@@ -1990,18 +2002,17 @@ function PhotoViewer({
           ref={dialog}
           className="wr-sales-lightbox wr-release-lightbox"
           aria-label={`Full size ${title.toLowerCase()}`}
-          onCancel={() => setFull(false)}
+          onCancel={(event) => {
+            event.preventDefault();
+            closePhoto();
+          }}
           onClose={() => {
             setFull(false);
             opener.current?.focus();
           }}
         >
           <div className="wr-release-actions">
-            <Button
-              autoFocus
-              variant="secondary"
-              onClick={() => setFull(false)}
-            >
+            <Button autoFocus variant="secondary" onClick={closePhoto}>
               Close photo
             </Button>
             <Button
