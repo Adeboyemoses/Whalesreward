@@ -942,6 +942,7 @@ function ReleaseView({
                           <Button
                             key={p.id}
                             variant="secondary"
+                            className="wr-release-retained-photo"
                             onClick={() => void reuse(p)}
                           >
                             Use sheet photo proposed {adminTime(p.proposedAt)}
@@ -971,8 +972,9 @@ function ReleaseView({
                     },
                     {
                       label: "Currently recorded",
-                      value: valuePair(preparation.currentCandidate.values),
+                      value: valuePair(sale.displayedValues),
                     },
+                    ...resolutionCandidateItems(preparation),
                   ]}
                 />
                 <Choice
@@ -1651,6 +1653,24 @@ function Impact({
     </Notice>
   );
 }
+function resolutionCandidateItems(preparation: ReleasePreparation | null) {
+  return preparation?.currentCandidate.source === "resolution_candidate"
+    ? [
+        {
+          label: "Pending resolution candidate",
+          value: (
+            <>
+              {valuePair(preparation.currentCandidate.values)}
+              <p className="wr-help">
+                These values await resolution and are not the currently recorded
+                values.
+              </p>
+            </>
+          ),
+        },
+      ]
+    : [];
+}
 function Comparison({
   sale,
   preparation,
@@ -1734,10 +1754,9 @@ function Comparison({
         items={[
           {
             label: "Currently recorded",
-            value: valuePair(
-              preparation?.currentCandidate.values ?? sale.displayedValues,
-            ),
+            value: valuePair(sale.displayedValues),
           },
+          ...resolutionCandidateItems(preparation),
           {
             label: "Record type",
             value: facts.source === "shift_sheet" ? "Shift sheet" : "Sales log",
