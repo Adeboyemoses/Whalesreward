@@ -219,7 +219,10 @@ export async function acceptedSale(
   });
   const local = new URL(upload.url);
   expect(local.hostname).toBe("127.0.0.1");
-  expect(local.port).toBe("9000");
+  expect(local.port).toBe(
+    new URL(process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000")
+      .port,
+  );
   const sent = await phone.request.put(upload.url, {
     headers: upload.headers,
     data: bytes,
