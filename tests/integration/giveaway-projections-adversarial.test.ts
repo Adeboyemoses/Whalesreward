@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { createServer } from "node:http";
 import { POST as censusPOST } from "../../src/app/api/admin/giveaway/[campaignId]/reconciliation/censuses/route";
 import { COOKIE } from "../../src/server/modules/admin-access/http";
@@ -1170,5 +1170,532 @@ it(
         await database().end();
       }
     }),
+  30000,
+);
+it(
+  "T21 disabled candidate role and still-verified person rebinding invalidate manager choices",
+  () =>
+    isolated(async (f) => {
+      const a = await reviewer(f),
+        before = managerSelectionSchema.parse(await read(f, "managers"));
+      await f.pool.query(
+        "UPDATE role SET enabled=false,version=version+1 WHERE id=$1",
+        [a.roleId],
+      );
+      await expect(
+        read(f, "managers", { expectedView: before.view.viewToken }),
+      ).rejects.toMatchObject({ code: "read_view_stale" });
+      expect(
+        managerSelectionSchema
+          .parse(await read(f, "managers"))
+          .items.some((x) => x.adminId === a.adminId),
+      ).toBe(false);
+      await f.pool.query(
+        "UPDATE role SET enabled=true,version=version+1 WHERE id=$1",
+        [a.roleId],
+      );
+      const current = managerSelectionSchema.parse(await read(f, "managers")),
+        person = newId();
+      await f.pool.query(
+        "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+        [person, fixtureId(8)],
+      );
+      await f.pool.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+        [newId(), fixtureId(8), a.userId, person],
+      );
+      await expect(
+        read(f, "managers", { expectedView: current.view.viewToken }),
+      ).rejects.toMatchObject({ code: "read_view_stale" });
+      expect(
+        managerSelectionSchema
+          .parse(await read(f, "managers"))
+          .items.some((x) => x.adminId === a.adminId),
+      ).toBe(true);
+    }),
+  30000,
+);
+it(
+  "T21 authorized different caller and full phone parent cannot reuse a valid signed cursor",
+  () =>
+    isolated(async (f) => {
+      await reviewer(f);
+      const reader = await f.actor(["settings", "sales"]),
+        ownerRole = newId();
+      await f.pool.query(
+        "INSERT INTO role(id,name,is_owner,enabled,version) VALUES($1,$2,true,true,1)",
+        [ownerRole, `Fictional owner ${ownerRole}`],
+      );
+      await f.pool.query(
+        "INSERT INTO role_permission(role_id,permission_code) VALUES($1,'settings'),($1,'sales')",
+        [ownerRole],
+      );
+      await f.pool.query(
+        "UPDATE admin SET role_id=$2,version=version+1 WHERE id=$1",
+        [reader.adminId, ownerRole],
+      );
+      const first = managerSelectionSchema.parse(
+        await read(f, "managers", { limit: 1 }),
+      );
+      expect(first.nextCursor).not.toBeNull();
+      await expect(
+        read(
+          f,
+          "managers",
+          { limit: 1, cursor: first.nextCursor },
+          undefined,
+          reader.token,
+        ),
+      ).rejects.toMatchObject({ code: "invalid_request" });
+      const ids = (
+        await f.pool.query("SELECT DISTINCT attendant_id FROM assignment")
+      ).rows.map((r) => r.attendant_id);
+      await f.phones.census(f.token, f.campaignId, {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional parent scope",
+        ...(await f.guard()),
+        expectedCensusVersion: 1,
+        phones: [
+          { label: "Fictional first", attendantIds: ids },
+          { label: "Fictional second", attendantIds: ids },
+        ],
+      });
+      await historicalSale(f.pool, { state: "received" });
+      await historicalSale(f.pool, { state: "received" });
+      const phones = phoneSelectionSchema.parse(await read(f, "phones"));
+      const source = incompleteSelectionSchema.parse(
+        await read(f, "incomplete-sources", { limit: 1 }, phones.items[0]!.id),
+      );
+      expect(source.nextCursor).not.toBeNull();
+      await expect(
+        read(
+          f,
+          "incomplete-sources",
+          { limit: 1, cursor: source.nextCursor },
+          phones.items[1]!.id,
+        ),
+      ).rejects.toMatchObject({ code: "invalid_request" });
+    }),
+  30000,
+);
+it(
+  "T21 required historical labels fail closed rather than guessing or omitting an account",
+  () =>
+    isolated(async (f) => {
+      await f.pool.query("UPDATE auth_user SET display_name=$2 WHERE id=$1", [
+        fixtureId(3),
+        "Fictional ".repeat(120),
+      ]);
+      await expect(read(f, "attendants")).rejects.toMatchObject({
+        code: "temporarily_unavailable",
+        status: 503,
+      });
+    }),
+  30000,
+);
+it(
+  "T21 photo fact for a different asset remains unbound to the selected accepted evidence",
+  () =>
+    isolated(async (f) => {
+      const s = await historicalSale(f.pool, {});
+      await relevant(f, s);
+      const evidence = await observe(f, s.id);
+      await f.pool.query(
+        "UPDATE photo_asset SET state='validated',final_key=$2,validated_digest=expected_digest,validated_bytes=100,width=10,height=10,media_type='image/jpeg',validated_at=clock_timestamp() WHERE id=$1",
+        [evidence.asset, `fictional/final/${evidence.asset}`],
+      );
+      await f.pool.query(
+        "INSERT INTO photo_receipt_fact(asset_id,observation_id,purchase_id,receipt_at) SELECT asset_id,id,purchase_id,receipt_at FROM photo_receipt_observation WHERE id=$1",
+        [evidence.observation],
+      );
+      const c = await checklist(f);
+      expect(
+        c.checks.find((x) => x.name === "complete_photo_deadline"),
+      ).toMatchObject({
+        blocking: "1",
+        outcome: "unresolved",
+        reasonCodes: ["photo_proof_unbound"],
+      });
+      expect(c.readiness.blockers).toContain("uploads_unresolved");
+    }),
+  30000,
+);
+it(
+  "T21 all projection reads leave certification reconciliation preview snapshot and source tables unchanged",
+  () =>
+    isolated(async (f) => {
+      await f.check();
+      const prepared = await prepare(f),
+        id = String(prepared.data.reconciliationId),
+        phone = phoneSelectionSchema.parse(await read(f, "phones")).items[0]!;
+      const state = async () =>
+        (
+          await f.pool.query(
+            `SELECT (SELECT count(*) FROM audit_event)::text audits,(SELECT count(*) FROM mutation_receipt)::text receipts,(SELECT count(*) FROM giveaway_reconciliation)::text reconciliations,(SELECT count(*) FROM giveaway_preview)::text previews,(SELECT count(*) FROM giveaway_snapshot)::text snapshots,(SELECT count(*) FROM giveaway_phone_check)::text checks,(SELECT count(*) FROM giveaway_preview_consumption)::text consumed,(SELECT count(*) FROM purchase_revision)::text revisions,(SELECT count(*) FROM purchase)::text purchases,to_jsonb(c) campaign FROM campaign c WHERE id=$1`,
+            [f.campaignId],
+          )
+        ).rows;
+      const before = await state();
+      for (const action of [
+        "checklist",
+        "managers",
+        "attendants",
+        "phones",
+      ] as const)
+        await read(f, action);
+      await read(f, "results", {}, id);
+      await read(f, "incomplete-sources", {}, phone.id);
+      expect(await state()).toEqual(before);
+    }),
+  30000,
+);
+it(
+  "T21 acceptance after source selection invalidates view and cannot be proposed as incomplete",
+  () =>
+    isolated(async (f) => {
+      const s = await historicalSale(f.pool, { state: "photo_pending" });
+      await f.check();
+      const phone = phoneSelectionSchema.parse(await read(f, "phones"))
+          .items[0]!,
+        before = incompleteSelectionSchema.parse(
+          await read(f, "incomplete-sources", {}, phone.id),
+        );
+      expect(before.items.some((x) => x.purchaseId === s.id)).toBe(true);
+      const asset = newId(),
+        revision = newId(),
+        db = await f.pool.connect();
+      try {
+        await db.query("BEGIN");
+        await db.query(
+          "UPDATE purchase SET status='finalizing',version=version+1 WHERE id=$1",
+          [s.id],
+        );
+        await db.query(
+          "INSERT INTO photo_asset(id,purchase_id,upload_operation_id,state,staging_key,staging_expires_at,expected_digest,expected_bytes) VALUES($1,$2,$3,'staged',$4,clock_timestamp()+interval '1 hour',$5,100)",
+          [asset, s.id, newId(), `fictional/${asset}`, "a".repeat(64)],
+        );
+        await db.query(
+          "UPDATE photo_asset SET state='validated',final_key=$2,validated_digest=expected_digest,validated_bytes=100,width=10,height=10,media_type='image/jpeg',validated_at=clock_timestamp() WHERE id=$1",
+          [asset, `fictional/final/${asset}`],
+        );
+        await db.query(
+          `INSERT INTO purchase_revision(id,purchase_id,revision_number,operation_id,actor_user_id,payload_digest,kind,state,server_received_at,amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,rate_kobo,price_version_id,medium,evidence_asset_id) SELECT $1,id,1,$2,$3,'fictional acceptance','original','proposed',clock_timestamp(),amount_kobo,quantity,currency,unit,quantity_precision,basis,entered_amount_kobo,rate_kobo,price_version_id,medium,$4 FROM purchase WHERE id=$5`,
+          [revision, newId(), fixtureId(3), asset, s.id],
+        );
+        await db.query(
+          "UPDATE purchase_revision SET state='accepted',decision_actor_id=$2,decision_reason='Fictional acceptance',decided_at=clock_timestamp() WHERE id=$1",
+          [revision, fixtureId(3)],
+        );
+        await db.query(
+          "UPDATE purchase SET status='credited',current_revision_id=$2,version=version+1 WHERE id=$1",
+          [s.id, revision],
+        );
+        await db.query(
+          "INSERT INTO sync_validation(purchase_id,policy_version,reasons,campaign_eligible) VALUES($1,2,'[]',false)",
+          [s.id],
+        );
+        await db.query("COMMIT");
+      } catch (error) {
+        await db.query("ROLLBACK");
+        throw error;
+      } finally {
+        db.release();
+      }
+      await expect(
+        read(
+          f,
+          "incomplete-sources",
+          { expectedView: before.view.viewToken },
+          phone.id,
+        ),
+      ).rejects.toMatchObject({ code: "read_view_stale" });
+      expect(
+        incompleteSelectionSchema.parse(
+          await read(f, "incomplete-sources", {}, phone.id),
+        ).items,
+      ).toEqual([]);
+      await expect(propose(f, s.id)).rejects.toMatchObject({
+        code: "exclusion_source_invalid",
+      });
+    }),
+  30000,
+);
+it(
+  "T21 required purchase accounts cannot lose assignment or identity through ordinary constrained writes",
+  () =>
+    isolated(async (f) => {
+      await historicalSale(f.pool, { state: "received" });
+      // The conservative purchase branch also protects older retained layouts. In this schema,
+      // a purchase with no station assignment history cannot be produced through valid writes.
+      await expect(
+        seedHistorical(
+          f.pool,
+          "assignment",
+          "DELETE FROM assignment WHERE attendant_id=$1",
+          [fixtureId(6)],
+        ),
+      ).rejects.toMatchObject({ code: "23503" });
+      await expect(
+        seedHistorical(
+          f.pool,
+          "auth_user",
+          "DELETE FROM auth_user WHERE id=$1",
+          [fixtureId(3)],
+        ),
+      ).rejects.toMatchObject({ code: "23503" });
+      await expect(
+        f.pool.query("UPDATE auth_user SET display_name=NULL WHERE id=$1", [
+          fixtureId(3),
+        ]),
+      ).rejects.toMatchObject({ code: "23502" });
+      expect(
+        attendantSelectionSchema
+          .parse(await read(f, "attendants"))
+          .items.some((x) => x.attendantId === fixtureId(6)),
+      ).toBe(true);
+    }),
+  30000,
+);
+it(
+  "T21 known valid foreign-schema campaign phone and stored result IDs return identical not_found",
+  () =>
+    isolated(async (f) => {
+      const ownUrl = process.env.DATABASE_URL,
+        other = await giveawayFixture();
+      try {
+        await other.check();
+        const prepared = await prepare(other);
+        const foreignPhone = phoneSelectionSchema.parse(
+          await read(other, "phones"),
+        ).items[0]!.id;
+        await expect(
+          readProjection(
+            f.pool,
+            config.secret,
+            f.token,
+            other.campaignId,
+            "checklist",
+          ),
+        ).rejects.toMatchObject({ code: "not_found", status: 404 });
+        await expect(
+          read(f, "results", {}, String(prepared.data.reconciliationId)),
+        ).rejects.toMatchObject({ code: "not_found", status: 404 });
+        await expect(
+          read(f, "incomplete-sources", {}, foreignPhone),
+        ).rejects.toMatchObject({ code: "not_found", status: 404 });
+        for (const action of ["results", "incomplete-sources"] as const)
+          await expect(read(f, action, {}, newId())).rejects.toMatchObject({
+            code: "not_found",
+            status: 404,
+          });
+      } finally {
+        await other.close();
+        process.env.DATABASE_URL = ownUrl;
+      }
+    }),
+  30000,
+);
+it(
+  "T21 a single oversized retained result returns 413 over real HTTP without partial evidence",
+  () =>
+    isolated(async (f) => {
+      await f.check();
+      const p = await prepare(f),
+        id = String(p.data.reconciliationId);
+      await seedHistorical(
+        f.pool,
+        "giveaway_reconciliation",
+        "UPDATE giveaway_reconciliation SET content=jsonb_set(content,'{checks,0,checked}',to_jsonb($2::text)) WHERE id=$1",
+        [id, "1".repeat(33000)],
+      );
+      vi.resetModules();
+      const { GET } =
+        await import("../../src/app/api/admin/giveaway/[campaignId]/reconciliation/results/[reconciliationId]/route");
+      const server = createServer(async (req, res) => {
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers))
+          if (value)
+            headers.set(key, Array.isArray(value) ? value.join(",") : value);
+        const result = await GET(
+          new Request(
+            config.origin +
+              "/api/admin/giveaway/" +
+              f.campaignId +
+              "/reconciliation/results/" +
+              id,
+            { headers },
+          ),
+          {
+            params: Promise.resolve({
+              campaignId: f.campaignId,
+              reconciliationId: id,
+            }),
+          },
+        );
+        res.writeHead(result.status, Object.fromEntries(result.headers));
+        res.end(await result.text());
+      });
+      await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve),
+      );
+      try {
+        const address = server.address();
+        if (!address || typeof address === "string") throw Error("No listener");
+        const response = await fetch(`http://127.0.0.1:${address.port}`, {
+            headers: {
+              cookie: `${COOKIE}=${f.token}`,
+              "x-test-ip": "192.0.2.179",
+            },
+          }),
+          body = await response.json();
+        expect(response.status).toBe(413);
+        expect(body).not.toHaveProperty("data");
+        expect(body.error).toMatchObject({
+          code: "request_too_large",
+          retryable: false,
+        });
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+        const { database } = await import("../../src/server/lib/db");
+        await database().end();
+      }
+    }),
+  30000,
+);
+it(
+  "T21 missing protected source digest cannot be serialized as a historical pass",
+  () =>
+    isolated(async (f) => {
+      await f.check();
+      const p = await prepare(f),
+        id = String(p.data.reconciliationId);
+      await seedHistorical(
+        f.pool,
+        "giveaway_reconciliation",
+        "UPDATE giveaway_reconciliation SET content=content-'sourceDigest' WHERE id=$1",
+        [id],
+      );
+      await expect(read(f, "results", {}, id)).rejects.toMatchObject({
+        code: "temporarily_unavailable",
+        status: 503,
+      });
+    }),
+  30000,
+);
+it(
+  "T21 mismatched retained actor binding cannot be serialized as a historical pass",
+  () =>
+    isolated(async (f) => {
+      await f.check();
+      const p = await prepare(f),
+        id = String(p.data.reconciliationId),
+        a = await reviewer(f);
+      await seedHistorical(
+        f.pool,
+        "giveaway_reconciliation",
+        "UPDATE giveaway_reconciliation SET content=jsonb_set(content,'{actorId}',to_jsonb($2::text)) WHERE id=$1",
+        [id, a.adminId],
+      );
+      await expect(read(f, "results", {}, id)).rejects.toMatchObject({
+        code: "temporarily_unavailable",
+        status: 503,
+      });
+    }),
+  30000,
+);
+
+it.each([
+  [
+    "invalid protected source digest",
+    "jsonb_set(content,'{sourceDigest}','123'::jsonb)",
+  ],
+  [
+    "unchanged outcome without predecessor",
+    "jsonb_set(jsonb_set(content,'{outcome}','\"unchanged\"'::jsonb),'{previousSnapshotId}','null'::jsonb)",
+  ],
+  [
+    "duplicate approved exclusion IDs",
+    "jsonb_set(content,'{approvedExclusionIds}','[\"00000000-0000-7000-8000-000000000001\",\"00000000-0000-7000-8000-000000000001\"]'::jsonb)",
+  ],
+])(
+  "T21 %s cannot be serialized as a historical pass",
+  async (_name, expression) => {
+    await isolated(async (f) => {
+      await f.check();
+      const prepared = await prepare(f),
+        id = String(prepared.data.reconciliationId);
+      await seedHistorical(
+        f.pool,
+        "giveaway_reconciliation",
+        `UPDATE giveaway_reconciliation SET content=${expression} WHERE id=$1`,
+        [id],
+      );
+      await expect(read(f, "results", {}, id)).rejects.toMatchObject({
+        code: "temporarily_unavailable",
+        status: 503,
+      });
+    });
+  },
+  30000,
+);
+it("T21 verified caller binding revoked while waiting for security lock denies inventory", async () => {
+  await isolated(async (f) => {
+    const db = await f.pool.connect();
+    let pending: Promise<unknown> | undefined;
+    try {
+      await db.query("BEGIN");
+      await db.query("SELECT id FROM security_state WHERE id=true FOR UPDATE");
+      const inserted = await db.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT $1,station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$2 ORDER BY version DESC LIMIT 1",
+        [newId(), fixtureId(2)],
+      );
+      expect(inserted.rowCount).toBe(1);
+      pending = read(f, "phones").then(
+        (value) => ({ value }),
+        (error) => ({ error }),
+      );
+      await f.waitForLock("security_state");
+      await db.query("COMMIT");
+      expect(
+        (
+          await f.pool.query(
+            "SELECT verified FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+            [fixtureId(2)],
+          )
+        ).rows[0].verified,
+      ).toBe(false);
+      expect(await pending).toMatchObject({
+        error: { code: "independent_admin_required", status: 403 },
+      });
+    } finally {
+      await db.query("ROLLBACK");
+      db.release();
+      await pending;
+    }
+  });
+}, 30000);
+
+it.each([
+  ["missing", "content-'operationId'", "23502"],
+  ["invalid", "jsonb_set(content,'{operationId}','123'::jsonb)", "22P02"],
+])(
+  "T21 %s protected operation ID is prevented by native generated-column constraints",
+  async (_name, expression, code) => {
+    await isolated(async (f) => {
+      await f.check();
+      const prepared = await prepare(f),
+        id = String(prepared.data.reconciliationId);
+      await expect(
+        seedHistorical(
+          f.pool,
+          "giveaway_reconciliation",
+          `UPDATE giveaway_reconciliation SET content=${expression} WHERE id=$1`,
+          [id],
+        ),
+      ).rejects.toMatchObject({ code });
+      expect(await read(f, "results", {}, id)).toMatchObject({ id });
+    });
+  },
   30000,
 );

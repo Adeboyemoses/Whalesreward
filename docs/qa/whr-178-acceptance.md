@@ -46,27 +46,39 @@ These are existing named tests, not newly written coverage or a claim that they 
 - `I-46 every durable M3 source table participates in the shared reporting-generation protocol` and `I-46 actual M3 duplicate clear and cancellation services invalidate reviewed snapshot guards` in `giveaway-writers.test.ts`.
 - `SR-06 persisted %s transition invalidates real giveaway confirmation even after pending blocker closes` in `giveaway-writers.test.ts`.
 
-## Remaining subcases and limits
+## Additional boundary evidence and reachability limits
 
-Do not read the broad mapping as a claim that every Cartesian combination has been tested. At this checkpoint the following subcases are not directly exercised by the new tests:
+The following new named tests close the previously listed explicit subcases:
 
-- A required account present solely through originating-purchase history, with no station assignment history; malformed/missing required account labels.
-- A distinct foreign station's valid campaign/phone/result IDs, and a valid signed cursor reused by a different authorized caller or a different phone. Current new tests cover random absent parents, route/limit mismatch, tampering and stale generations.
-- A disabled manager role versus a removed action grant; rebind to a different still-verified person (new tests cover unverified latest binding and verified aliases).
-- A complete-photo fact for a different selected asset and the exact `photo_proof_unbound` reason; a single individually overlarge retained evidence row.
-- Every acceptance/receipt/partition/predecessor permutation at every lifecycle boundary. New tests exercise representative boundaries, and the listed existing tests supplement them; they do not constitute an exhaustive race matrix.
-- All possible read side effects beyond counted audits/receipts and dirty flag; full table checksums are not asserted.
-- Production deployment, real station data, browser/fidelity and Stage 2b client retry/session handling. These are outside this work order's test surface.
+- `T21 required purchase accounts cannot lose assignment or identity through ordinary constrained writes`: proves native composite assignment/identity FKs and NOT NULL prevent a normal purchase-only orphan or missing identity. The conservative purchase-union predicate remains unchanged. This is a constraint test, not a claim that invalid retained orphan data was successfully created.
+- `T21 required historical labels fail closed rather than guessing or omitting an account`: a retained out-of-bounds label yields 503, without an invented label or silent omission.
+- `T21 known valid foreign-schema campaign phone and stored result IDs return identical not_found`: IDs are created in a second disposable schema and sent to the first schema's authenticated services. This demonstrates resource-namespace isolation; it does not invent multi-station operation inside the one-station database.
+- `T21 authorized different caller and full phone parent cannot reuse a valid signed cursor`: valid signed manager cursor used by another authorized Owner, and valid source cursor used under another current phone, both return 400.
+- `T21 disabled candidate role and still-verified person rebinding invalidate manager choices`: checks both explicit role disablement and rebinding to a different verified canonical person.
+- `T21 photo fact for a different asset remains unbound to the selected accepted evidence`: native validated-byte fact exists for another asset, yet the accepted revision's evidence remains unresolved with photo_proof_unbound.
+- `T21 a single oversized retained result returns 413 over real HTTP without partial evidence`: a retained result whose syntactically valid count exceeds the response budget produces only the 413 error envelope.
+- `T21 acceptance after source selection invalidates view and cannot be proposed as incomplete`: the selected purchase transitions through finalizing to credited with an accepted revision under native constraints. Its old view becomes stale and a new exclusion proposal rejects it.
+- `T21 all projection reads leave certification reconciliation preview snapshot and source tables unchanged`: checks all six reads against audits, receipts, reconciliation/check/preview/snapshot/consumption rows, purchases/revisions and the full campaign row.
+- `T21 missing protected source digest cannot be serialized as a historical pass` and `T21 mismatched retained actor binding cannot be serialized as a historical pass`: verify malformed protected retained evidence is not ignored merely because public fields look valid.
 
-Local PostgreSQL is version 15. Tests requiring PostgreSQL 16 functions remain a CI requirement; no compatibility shim is installed. WHR-179 prevents a green acceptance/READY claim while the mutation-preservation instruction remains in force.
+The lifecycle coverage includes each change class (receipt, acceptance, partitions, predecessor) and every boundary (list, proposal, independent decision, certification, preparation, confirmation). It does not claim every Cartesian combination; existing named transaction races above supplement the new tests.
+
+Production deployment, real station data, browser/fidelity and Stage 2b client retry/session handling remain outside this work order's test surface. Local PostgreSQL is version 15. Tests requiring PostgreSQL 16 functions remain a CI requirement; no compatibility shim is installed. WHR-179 prevents a green acceptance/READY claim while the mutation-preservation instruction remains in force.
+
+## Retained evidence and authority regressions
+
+The protected-history cases additionally test missing and invalid `sourceDigest`, mismatched actor binding, unchanged outcome without predecessor, and duplicate approved exclusion IDs. Each requires 503 rather than a historical pass. Missing/invalid operation IDs are separately named native-constraint tests: generated UUID/NOT NULL columns prevent those retained states even with user triggers disabled. No schema constraints are removed to manufacture reachability.
+
+`T21 verified caller binding revoked while waiting for security lock denies inventory` holds the security row lock, appends an unverified latest binding in the writer transaction, starts the inventory read and confirms its lock wait, then commits. The read must deny 403 after the change. This tests append-only authority independent of role/session revision changes.
 
 ## Recorded adversarial run
 
-17 Nov 2026, production implementation through `e218bed` (local cherry-pick `1024d73`), local PostgreSQL 15, non-superuser fixture account:
+17 Nov 2026, production implementation through `e529185` (local cherry-pick `d71cb17`), local PostgreSQL 15, non-superuser fixture account. Final run results are recorded after execution below. The EM must rerun the final integrated head and full required gates. This work is not READY while acceptance regressions fail.
 
 ```text
 Test Files  1 failed (1)
-Tests       1 failed | 28 passed (29)
+Tests       7 failed | 39 passed (46)
+Duration    51.81s
 ```
 
-Only failing case: `T21 WHR-179 duplicate applicable source exclusions cannot certify or prepare`. This is an unresolved acceptance failure, not a waived/expected-pass test. Typecheck and focused ESLint passed. Log: `/tmp/whr178-adversarial-tests.log` (local evidence, not committed). The EM must rerun the final integrated head and full required gates.
+The seven ordinary failing assertions are WHR-179 duplicate applicability; missing source digest; invalid source digest; mismatched actor binding; unchanged outcome without predecessor; duplicate approved exclusion IDs; and verified caller binding revoked during the security-lock wait. None is skipped or treated as an expected pass. The lock-race fixture asserts one appended binding and latest verified=false after commit. Typecheck and focused ESLint passed. Local log: `/tmp/whr178-adversarial-final46c.log` (not committed). These results precede review fixes; their presence in this matrix is evidence of regressions requiring repair, not a claim that final integrated production still has each defect.
