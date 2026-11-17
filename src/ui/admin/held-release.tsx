@@ -643,7 +643,12 @@ function ReleaseView({
   const canDecide = selected?.state === "pending" && !self && !disabled;
   return (
     <div className="wr-release" aria-label="Two-person release">
-      {loading && <Notice role="status">Loading release details…</Notice>}
+      {loading && (
+        <>
+          <Notice role="status">Loading release details…</Notice>
+          <Button disabled>Propose a release with a sheet photo</Button>
+        </>
+      )}
       {readError && (
         <Notice tone="danger" role="alert">
           {readError}
