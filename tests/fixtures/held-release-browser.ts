@@ -14,7 +14,8 @@ import { reviewFixture, heldSale, type ReviewKind } from "../reviews/helpers";
 import { browserReleasePolicy } from "../reviews/release-browser-policy";
 import { fixture, signIn } from "../admin-access/admin-access.fixtures";
 import { data, origin } from "../sales-history/helpers";
-import { seedId, api } from "../station/helpers";
+import { seedId, api, type Attendant } from "../station/helpers";
+import type { AttendantSession } from "../../src/shared/contracts/auth";
 import { ensureLocalCardBucket } from "../customers-cards/storage";
 import type { z } from "zod";
 import type {
@@ -292,6 +293,7 @@ export async function releaseFixture(
   return {
     ...f,
     reviewer,
+    adminRequest: page.request,
     second,
     browserBased: !apiOnlyPhone,
     async close() {
@@ -392,6 +394,90 @@ export async function boundarySale(
         },
         at,
       ],
+    );
+  }
+  if (kind === "capture") {
+    // The retained sale belongs to an ended historical assignment. M2 P-10/P-21
+    // requires a separate current assignment and fresh sign-in for live reads.
+    // Never reopen that historical interval or rebind the original capture context.
+    const retained = async () =>
+      (
+        await f.db.query(
+          `SELECT p.version,p.current_revision_id,p.capture_context_id,p.assignment_id,p.pump_id,
+             p.capture_lower_bound::text,p.server_received_at::text,p.app_captured_at::text,
+             (SELECT id FROM purchase_revision WHERE purchase_id=p.id AND revision_number=1) original_revision_id,
+             a.effective_from::text,a.effective_until::text,
+             c.signed_in_at::text,c.offline_expires_at::text,c.revoked_at::text
+           FROM purchase p JOIN assignment a ON a.id=p.assignment_id
+           JOIN capture_context c ON c.id=p.capture_context_id WHERE p.id=$1`,
+          [sale.id],
+        )
+      ).rows[0];
+    const before = await retained();
+    expect(before.assignment_id).toBe(sale.original.assignmentId);
+    expect(new Date(before.effective_until).toISOString()).toBe(
+      "2026-11-10T12:30:00.000Z",
+    );
+    expect(
+      (await f.phone.request.get(`/api/attendant/sales/${sale.id}`)).status(),
+    ).toBe(401);
+    const attendant = await api<Attendant>(
+      f.adminRequest,
+      `attendants/${f.attendant.id}`,
+    );
+    expect(attendant.assignment).toBeNull();
+    const pump = await api<{ version: number }>(
+      f.adminRequest,
+      `pumps/${before.pump_id}`,
+    );
+    const assigned = await api<{ attendant: Attendant }>(
+      f.adminRequest,
+      `attendants/${f.attendant.id}/assignment`,
+      {
+        operationId: v7(),
+        expectedVersion: attendant.version,
+        expectedAssignmentId: null,
+        pumpId: before.pump_id,
+        expectedPumpVersion: pump.version,
+        reason: "Fictional current assignment after the retained capture",
+      },
+    );
+    expect(assigned.attendant.accountId).toBe(f.attendant.accountId);
+    expect(assigned.attendant.assignment!.id).not.toBe(before.assignment_id);
+    const signed = await f.phone.request.post("/api/attendant/sign-in", {
+      headers: { Origin: origin, "Idempotency-Key": v7() },
+      data: { username: f.username, password: f.password, deviceId: v7() },
+    });
+    expect(signed.status()).toBe(200);
+    const session = (await signed.json()).data as AttendantSession;
+    expect(session.account.id).toBe(f.attendant.id);
+    expect(session.assignment.id).toBe(assigned.attendant.assignment!.id);
+    expect(session.captureContextId).not.toBe(before.capture_context_id);
+    expect(session.reassignmentRequiresSignIn).toBe(false);
+    expect(
+      Date.parse(assigned.attendant.assignment!.effectiveFrom),
+    ).toBeGreaterThan(Date.parse(before.effective_until));
+    const currentContext = (
+      await f.db.query(
+        `SELECT a.user_id,c.assignment_id FROM capture_context c
+         JOIN attendant a ON a.id=c.attendant_id WHERE c.id=$1`,
+        [session.captureContextId],
+      )
+    ).rows[0];
+    expect(currentContext.user_id).toBe(f.attendant.accountId);
+    expect(currentContext.assignment_id).toBe(session.assignment.id);
+    expect(await retained()).toEqual(before);
+    const own = await data<{ id: string }>(
+      f.phone.request,
+      `/api/attendant/sales/${sale.id}`,
+    );
+    expect(own.id).toBe(sale.id);
+    const history = await data<{ items: { id: string }[] }>(
+      f.phone.request,
+      `/api/attendant/sales/${sale.id}/history?kind=revisions`,
+    );
+    expect(history.items.map((revision) => revision.id)).toContain(
+      before.original_revision_id,
     );
   }
   // Fixtures represent original held purchases, before any accepted revision or credit.
