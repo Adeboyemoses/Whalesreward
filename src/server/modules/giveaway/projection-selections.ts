@@ -78,6 +78,11 @@ export async function phones(db: pg.PoolClient, ctx: ProjectionContext) {
       .max(100),
     ctx.inventory.census_content?.phones,
   );
+  if (
+    new Set(raw.map((p) => p.id)).size !== raw.length ||
+    raw.some((p) => new Set(p.attendantIds).size !== p.attendantIds.length)
+  )
+    throw new AuthError("temporarily_unavailable", 503);
   const status = await phoneReadiness(db, ctx.c.id, ctx.kind);
   const exclusions = (
     await db.query(

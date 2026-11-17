@@ -232,7 +232,7 @@ export const incompleteChoiceSchema = z.strictObject({
   state: z.enum(["received", "photo_pending"]),
   detailsReceivedAt: instant,
   amountKobo: saleValuesSchema.shape.amountKobo,
-  currency: saleValuesSchema.shape.currency,
+  currency: z.string().regex(/^[A-Z]{3}$/),
   quantity: saleValuesSchema.shape.quantity,
   unit: z.enum(["litre", "kilogram"]),
   everAccepted: z.literal(false),

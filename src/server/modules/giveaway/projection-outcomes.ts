@@ -128,6 +128,27 @@ export async function outcomes(db: pg.PoolClient, ctx: ProjectionContext) {
     (s) =>
       s.reasons.includes("evidence_deadline_unresolved") || !s.photoReceiptAt,
   );
+  const photoReasons = new Set<string>();
+  if (photoMissing.length) {
+    const evidence = (
+      await db.query<{ id: string; observed: boolean; fact: boolean }>(
+        `SELECT p.id, EXISTS(SELECT 1 FROM photo_receipt_observation o WHERE o.purchase_id=p.id) observed,
+        EXISTS(SELECT 1 FROM photo_receipt_fact f WHERE f.purchase_id=p.id) fact
+       FROM purchase p WHERE p.station_id=$1 AND p.id=ANY($2::uuid[])`,
+        [c.station_id, photoMissing.map((s) => s.purchaseId)],
+      )
+    ).rows;
+    for (const source of photoMissing) {
+      const facts = evidence.find((e) => e.id === source.purchaseId);
+      photoReasons.add(
+        facts?.fact
+          ? "photo_proof_unbound"
+          : facts?.observed
+            ? "photo_deadline_uncertain"
+            : "photo_proof_missing",
+      );
+    }
+  }
   if (!ctx.policy || !c.deadline_us)
     row("complete_photo_deadline", null, null, ["policy_missing"]);
   else
@@ -136,7 +157,7 @@ export async function outcomes(db: pg.PoolClient, ctx: ProjectionContext) {
       String(photoSources.length),
       String(photoMissing.length),
       photoMissing.length
-        ? ["photo_proof_missing"]
+        ? [...photoReasons].sort()
         : photoSources.length
           ? []
           : ["no_applicable_sources"],
