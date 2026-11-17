@@ -179,6 +179,7 @@ export async function heldSale(
   value = "1000000",
   cardOutcome: "before" | "after" | "ambiguous" = "before",
   meterDisplay?: { amount: string; quantity: string },
+  refreshPhone = true,
 ) {
   const sale = await acceptedSale(
     f.phone,
@@ -313,8 +314,10 @@ export async function heldSale(
   expect(detail.credited).toBe(false);
   // A fresh sign-in gives the phone a current capture context; the held purchase
   // keeps its original historical context and interval unchanged.
-  await attendantSignIn(f.phone, f.username, f.password);
-  await expect(f.phone).toHaveURL(/\/attendant\/sale$/);
+  if (refreshPhone) {
+    await attendantSignIn(f.phone, f.username, f.password);
+    await expect(f.phone).toHaveURL(/\/attendant\/sale$/);
+  }
   return { ...sale, id };
 }
 

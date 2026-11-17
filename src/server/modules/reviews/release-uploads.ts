@@ -1,6 +1,7 @@
 import type pg from "pg";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import { newId } from "../../lib/ids";
 import {
   releaseSheetReservationSchema,
   releaseSheetFinalizeSchema,
@@ -170,7 +171,7 @@ export function createReleaseUploadsService({
           if (hold.version !== input.target.expectedHoldVersion)
             throw new AuthError("version_conflict", 409);
         }
-        const id = randomUUID();
+        const id = newId();
         await db.query(
           `INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,clock_timestamp()+interval '15 minutes')`,
           [

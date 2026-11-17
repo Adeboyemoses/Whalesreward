@@ -85,3 +85,4 @@ jobs:
       - run: docker compose up -d minio
       - run: pnpm db:migrate:deploy && pnpm db:seed && pnpm test:e2e
       - run: pnpm exec playwright test -c tests/storage/playwright.config.ts
+      - run: pnpm exec playwright test -c playwright.release.config.ts
