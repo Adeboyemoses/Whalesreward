@@ -560,9 +560,10 @@ test("R2 R7 R8 independent written-brief fidelity across all four kinds at 1440,
   browser,
 }) => {
   test.setTimeout(240000);
-  const f = await releaseFixture(page, browser);
-  try {
-    for (const kind of ["price", "card", "date", "capture"] as const) {
+  for (const kind of ["price", "card", "date", "capture"] as const) {
+    // Card fixtures retain retirement history; later kinds need their own card.
+    const f = await releaseFixture(page, browser);
+    try {
       const sale = await boundarySale(f, kind),
         prep = await preparation(page, sale.id, kind);
       await open(page, sale.id, kind);
@@ -630,9 +631,9 @@ test("R2 R7 R8 independent written-brief fidelity across all four kinds at 1440,
           .first(),
       ).toBeVisible();
       await captureView(f.reviewer, `R7-R8-${kind}`);
+    } finally {
+      await f.close();
     }
-  } finally {
-    await f.close();
   }
 });
 
@@ -944,6 +945,13 @@ test("R14 stale decision remains pending until explicit fresh independent reject
     await f.reviewer
       .getByRole("button", { name: "Reject proposal", exact: true })
       .click();
+    // The stale mutation must happen after prepareDecision freezes its guard.
+    const confirmDecision = f.reviewer.getByRole("button", {
+      name: "Confirm decision",
+      exact: true,
+    });
+    await expect(confirmDecision).toBeVisible();
+    await expect(confirmDecision).toBeEnabled();
     await f.db.query("UPDATE purchase SET version=version+1 WHERE id=$1", [
       x.sale.id,
     ]);
@@ -1262,11 +1270,15 @@ for (const outcome of ["confirm", "cancel"] as const) {
       await expect(
         f.reviewer.getByText(`Decision reason: ${reason}`, { exact: true }),
       ).toBeVisible();
+      const decisionRow = history.getByRole("listitem").filter({
+        has: f.reviewer.getByText(decision!.auditEventId, { exact: true }),
+      });
+      await expect(decisionRow).toHaveCount(1);
       await expect(
-        history.getByText(ordinaryReason, { exact: true }),
+        decisionRow.getByText(ordinaryReason, { exact: true }),
       ).toBeVisible();
       await expect(
-        history.getByText(decision!.auditEventId, { exact: true }),
+        decisionRow.getByText(decision!.auditEventId, { exact: true }),
       ).toBeVisible();
       await f.reviewer
         .getByRole("button", { name: "Refresh sale", exact: true })
@@ -1279,7 +1291,7 @@ for (const outcome of ["confirm", "cancel"] as const) {
         ),
       ).toBeVisible();
       await expect(
-        history.getByText(decision!.auditEventId, { exact: true }),
+        decisionRow.getByText(decision!.auditEventId, { exact: true }),
       ).toBeVisible();
       await expect(
         f.reviewer.getByRole("heading", {
