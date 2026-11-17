@@ -319,11 +319,16 @@ test("R2 R4–R11 minute attestation uploads, freezes lost proposal/decision res
     ).toBeVisible();
     await captureView(f.reviewer, "R11-recorded");
     const final = await adminDetail(page, sale.id);
-    if (final.credited)
+    if (final.credited) {
       await expect(
         f.reviewer.getByText("Loyalty credit recorded", { exact: true }),
       ).toBeVisible();
-    else
+      await expect(
+        f.reviewer.getByLabel("Two-person release", { exact: true }),
+      ).not.toContainText(
+        "This sale stays held until a different authorized person can review it.",
+      );
+    } else
       await expect(
         f.reviewer.getByText(
           /Still held for review|Decision recorded · not credited/,
