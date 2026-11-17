@@ -38,7 +38,12 @@ export async function projectionContext(
   campaignId: string,
   action: ProjectionAction,
 ) {
-  await db.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+  // Use fresh statement snapshots after waiting for the security lock. A
+  // REPEATABLE READ snapshot taken before this wait can retain an obsolete
+  // append-only person binding without a row conflict. The held security,
+  // reporting and campaign locks serialize identity and source writers for
+  // the entire projection, providing one consistent protected read state.
+  await db.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
   await db.query("SELECT id FROM security_state WHERE id=true FOR SHARE");
   const actor = await requireAdminSession(db, token);
   if (action === "managers") {

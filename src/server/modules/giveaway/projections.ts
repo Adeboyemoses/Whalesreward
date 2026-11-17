@@ -1,3 +1,4 @@
+import { storedProjection } from "./projection-history";
 import type pg from "pg";
 import { z } from "zod";
 import { transaction } from "../admin-access/repo";
@@ -6,7 +7,6 @@ import {
   checklistQuery,
   selectionQuery,
   checklistProjectionSchema,
-  storedChecklistSchema,
   managerSelectionSchema,
   attendantSelectionSchema,
   phoneSelectionSchema,
@@ -34,8 +34,8 @@ const cursorSchema = z.strictObject({
   limit: z.number().int(),
   last: z.string(),
 });
-/** Lock waits can invalidate a repeatable-read snapshot. Retry the whole read,
- * including current authority and expected-view checks, never only its serializer. */
+/** Retry a serialization refusal as a whole read, including current authority
+ * and expected-view checks, never only its serializer. */
 async function consistentRead<T>(
   pool: pg.Pool,
   run: (db: pg.PoolClient) => Promise<T>,
@@ -70,40 +70,7 @@ export async function readProjection(
     const ctx = await projectionContext(db, token, campaignId, action);
     if (action === "results") {
       z.strictObject({}).parse(input);
-      const r = (
-        await db.query(
-          `SELECT id,campaign_id,phone_check_id,source_data_version::text,content,checked_at FROM giveaway_reconciliation WHERE id=$1 AND campaign_id=$2 AND station_id=$3`,
-          [resourceId, ctx.c.id, ctx.c.station_id],
-        )
-      ).rows[0];
-      if (!r) throw new AuthError("not_found", 404);
-      const v = r.content;
-      if (
-        !v ||
-        v.phoneCheckId !== r.phone_check_id ||
-        new Date(v.checkedAt).getTime() !== r.checked_at.getTime()
-      )
-        throw new AuthError("temporarily_unavailable", 503);
-      return retained(storedChecklistSchema, {
-        id: r.id,
-        campaignId: r.campaign_id,
-        kind: v.currentSnapshotId ? "revision" : "initial",
-        checkedAt: v.checkedAt,
-        sourceDataVersion: r.source_data_version,
-        settingsVersionId: v.settingsVersionId,
-        timingPolicyVersion: v.timingPolicyVersion,
-        reconciliationPolicyVersion: v.policyVersion,
-        previousSnapshotId: v.currentSnapshotId,
-        phoneCheckId: v.phoneCheckId,
-        approvedExclusionIds: v.approvedExclusionIds,
-        actor: v.actor,
-        reason: v.reason,
-        auditEventId: v.auditEventId,
-        outcome: v.outcome,
-        checks: v.checks,
-        countBasis: "reconciliation_v1_stored",
-        historical: true,
-      });
+      return storedProjection(db, ctx.c.station_id, ctx.c.id, resourceId!);
     }
     const p =
       action === "checklist"

@@ -99,6 +99,15 @@ export async function outcomes(db: pg.PoolClient, ctx: ProjectionContext) {
   const incomplete = uploads.filter((s) =>
     ready.sets.uploads.has(s.purchaseId),
   );
+  const pendingValidation = incomplete.length
+    ? (
+        await db.query<{ pending: boolean }>(
+          `SELECT EXISTS(SELECT 1 FROM purchase p WHERE p.station_id=$1 AND p.id=ANY($2::uuid[])
+     AND p.status IN ('received','photo_pending','finalizing') AND p.current_revision_id IS NULL) pending`,
+          [c.station_id, incomplete.map((s) => s.purchaseId)],
+        )
+      ).rows[0]!.pending
+    : false;
   if (!ctx.policy) row("uploads", null, null, ["policy_missing"]);
   else
     row(
@@ -106,7 +115,10 @@ export async function outcomes(db: pg.PoolClient, ctx: ProjectionContext) {
       String(uploads.length),
       String(incomplete.length),
       incomplete.length
-        ? ["uploads_incomplete", "validation_pending"]
+        ? [
+            "uploads_incomplete",
+            ...(pendingValidation ? ["validation_pending"] : []),
+          ]
         : uploads.length
           ? []
           : ["no_applicable_sources"],
