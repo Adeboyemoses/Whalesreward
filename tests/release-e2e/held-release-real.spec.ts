@@ -22,10 +22,6 @@ test.use({
   actionTimeout: 15000,
 });
 
-test.afterEach(async ({ page }) => {
-  await page.unrouteAll({ behavior: "wait" });
-});
-
 async function propose(
   page: Page,
   f: ReleaseFixture,
@@ -52,11 +48,11 @@ async function propose(
 
 for (const kind of ["price", "card", "date", "capture"] as const) {
   test(`I-22 I-35 ${kind}: real v2 preparation, private upload and independent approval retain original facts`, async ({
-    page,
-    browser,
+    request,
   }) => {
+    const page = { request } as Page;
     test.setTimeout(120000);
-    const f = await releaseFixture(page, browser);
+    const f = await releaseFixture(page);
     try {
       const x = await propose(page, f, kind);
       expect(x.proposal.state).toBe("pending");
@@ -152,11 +148,11 @@ for (const kind of ["price", "card", "date", "capture"] as const) {
 }
 
 test("I-35 void-only cancellation is terminal while rejection preserves held values", async ({
-  page,
-  browser,
+  request,
 }) => {
+  const page = { request } as Page;
   test.setTimeout(120000);
-  const f = await releaseFixture(page, browser);
+  const f = await releaseFixture(page);
   try {
     const x = await propose(page, f, "date", "cancel");
     const before = await adminDetail(page, x.sale.id);
@@ -210,11 +206,11 @@ test("I-35 void-only cancellation is terminal while rejection preserves held val
 });
 
 test("I-39 stale approval never rebases; independent rejection uses the fresh post-proposal guard", async ({
-  page,
-  browser,
+  request,
 }) => {
+  const page = { request } as Page;
   test.setTimeout(120000);
-  const f = await releaseFixture(page, browser);
+  const f = await releaseFixture(page);
   try {
     const x = await propose(page, f, "date");
     const current = await adminDetail(page, x.sale.id);
@@ -266,11 +262,11 @@ test("I-39 stale approval never rebases; independent rejection uses the fresh po
 });
 
 test("I-07 alias and unknown canonical people cannot decide; kind access alone grants no paper", async ({
-  page,
-  browser,
+  request,
 }) => {
+  const page = { request } as Page;
   test.setTimeout(120000);
-  const f = await releaseFixture(page, browser);
+  const f = await releaseFixture(page);
   try {
     const x = await propose(page, f, "date");
     await f.db.query(

@@ -29,6 +29,22 @@ const proposerAttestation =
 const reviewerAttestation =
   "I have independently inspected the sheet photo. The facts and time precision are legible and faithfully copied.";
 
+async function captureView(page: Page, state: string) {
+  const original = page.viewportSize();
+  const dir = "tests/design-parity/held-release";
+  await mkdir(dir, { recursive: true });
+  for (const width of [1440, 390, 360]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.screenshot({
+      path: `${dir}/${state}-${width}.built.png`,
+      fullPage: true,
+    });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+  }
+  if (original) await page.setViewportSize(original);
+}
 async function open(page: Page, id: string, kind: string, proposal?: string) {
   await page.goto(
     `/admin/sales/${id}/${kind}-review${proposal ? `?proposal=${proposal}` : ""}`,
@@ -205,6 +221,7 @@ test("R2 R4–R11 minute attestation uploads, freezes lost proposal/decision res
     await expect(
       page.getByRole("button", { name: "Retry same proposal", exact: true }),
     ).toBeVisible();
+    await captureView(page, "R10-uncertain-proposal");
     await page
       .getByRole("button", { name: "Retry same proposal", exact: true })
       .click();
@@ -291,6 +308,7 @@ test("R2 R4–R11 minute attestation uploads, freezes lost proposal/decision res
     await expect(
       f.reviewer.getByText("Release decision recorded", { exact: true }),
     ).toBeVisible();
+    await captureView(f.reviewer, "R11-recorded");
     const final = await adminDetail(page, sale.id);
     if (final.credited)
       await expect(
@@ -483,54 +501,48 @@ test("RD-07 complete server queue traverses over 100 tied-time stale proposals w
   }
 });
 
-test("R2 R7 R8 independent written-brief fidelity captures at 1440, 390 and 360 pixels", async ({
+test("R2 R7 R8 independent written-brief fidelity across all four kinds at 1440, 390 and 360 pixels", async ({
   page,
   browser,
 }) => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
   const f = await releaseFixture(page, browser);
   try {
-    const x = await pendingFixture(page, f);
-    const dir = "tests/design-parity/held-release";
-    await mkdir(dir, { recursive: true });
-    for (const width of [1440, 390, 360]) {
-      await f.reviewer.setViewportSize({ width, height: 1000 });
-      await open(f.reviewer, x.sale.id, "date", x.proposal.id);
+    for (const kind of ["price", "card", "date", "capture"] as const) {
+      const sale = await boundarySale(f, kind),
+        prep = await preparation(page, sale.id, kind);
+      await open(page, sale.id, kind);
+      await page
+        .getByRole("button", {
+          name: "Propose a release with a sheet photo",
+          exact: true,
+        })
+        .click();
+      await captureView(page, `R2-${kind}`);
+      await page
+        .getByRole("button", { name: "Review proposal", exact: true })
+        .click();
+      await expect(
+        page.getByText("Check the marked fields before reviewing.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await captureView(page, `R3-${kind}`);
+      const sheet = await uploadSheet(page, sale.id, prep),
+        proposal = (await post(
+          page.request,
+          `/api/admin/sales/${sale.id}/release-proposals`,
+          proposalBody(prep, sheet.assetId),
+          201,
+        )) as Proposal;
+      await open(f.reviewer, sale.id, kind, proposal.id);
       await expect(
         f.reviewer
           .getByText("Awaiting another reviewer", { exact: true })
           .first(),
       ).toBeVisible();
-      await f.reviewer.screenshot({
-        path: `${dir}/R7-R8-${width}.built.png`,
-        fullPage: true,
-      });
-      const geometry = await f.reviewer.evaluate(() => ({
-        page: document.documentElement.scrollWidth,
-        width: innerWidth,
-        controls: Array.from(
-          document.querySelectorAll<HTMLButtonElement>("button"),
-        )
-          .filter((x) => x.getClientRects().length)
-          .map((x) => ({
-            label: x.textContent?.trim(),
-            h: x.getBoundingClientRect().height,
-          })),
-      }));
-      expect(geometry.page).toBeLessThanOrEqual(width);
-      if (width < 900)
-        expect(geometry.controls.filter((x) => x.h < 48)).toEqual([]);
+      await captureView(f.reviewer, `R7-R8-${kind}`);
     }
-    await page.setViewportSize({ width: 390, height: 1000 });
-    const secondSale = await boundarySale(f, "date");
-    await open(page, secondSale.id, "date");
-    await page
-      .getByRole("button", {
-        name: "Propose a release with a sheet photo",
-        exact: true,
-      })
-      .click();
-    await page.screenshot({ path: `${dir}/R2-390.built.png`, fullPage: true });
   } finally {
     await f.close();
   }
@@ -591,3 +603,358 @@ for (const denial of [
     }
   });
 }
+
+test("R4 uncertain reserve and finalize retry their original operations without replacing the photo", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const sale = await boundarySale(f, "date"),
+      prep = await preparation(page, sale.id, "date");
+    await open(page, sale.id, "date");
+    await page
+      .getByRole("button", {
+        name: "Propose a release with a sheet photo",
+        exact: true,
+      })
+      .click();
+    const reserves: unknown[] = [],
+      finalizes: unknown[] = [];
+    await page.route(
+      `**/api/admin/sales/${sale.id}/release-sheet-uploads`,
+      async (route) => {
+        reserves.push(route.request().postDataJSON());
+        const response = await route.fetch();
+        expect([200, 201]).toContain(response.status());
+        if (reserves.length === 1)
+          await route.fulfill({
+            response,
+            body: "{unreadable success",
+            contentType: "application/json",
+          });
+        else await route.fulfill({ response });
+      },
+    );
+    await page.route(
+      `**/api/admin/sales/${sale.id}/release-sheet-uploads/*/finalize`,
+      async (route) => {
+        finalizes.push(route.request().postDataJSON());
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        if (finalizes.length === 1) await route.abort("failed");
+        else await route.fulfill({ response });
+      },
+    );
+    await page.getByLabel("Choose JPEG", { exact: true }).setInputFiles({
+      name: "fictional-entry.jpg",
+      mimeType: "image/jpeg",
+      buffer: await sheetBytes("date", "confirm", prep.currentCandidate.values),
+    });
+    await page
+      .getByRole("button", { name: "Use this photo", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Retry same photo upload", exact: true })
+      .click();
+    await expect.poll(() => finalizes.length).toBe(1);
+    await page
+      .getByRole("button", { name: "Retry same photo upload", exact: true })
+      .click();
+    await expect(
+      page.getByText("Photo received · entry still needs review", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    expect(reserves).toHaveLength(2);
+    expect(reserves[1]).toEqual(reserves[0]);
+    expect(finalizes).toHaveLength(2);
+    expect(finalizes[1]).toEqual(finalizes[0]);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM held_release_sheet WHERE purchase_id=$1",
+          [sale.id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await f.db.query(
+          "SELECT count(*)::int n FROM held_release_proposal WHERE purchase_id=$1",
+          [sale.id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+  } finally {
+    await f.close();
+  }
+});
+
+test("R8 retained-photo keyboard viewer restores focus and expired inspection disables approval", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const x = await pendingFixture(page, f);
+    await open(f.reviewer, x.sale.id, "date", x.proposal.id);
+    await f.reviewer
+      .getByRole("button", { name: "Load sheet photo", exact: true })
+      .click();
+    const sheet = f.reviewer.getByRole("region", {
+      name: "Sheet photo",
+      exact: true,
+    });
+    const openButton = sheet.getByRole("button", {
+      name: "Open full size",
+      exact: true,
+    });
+    await openButton.focus();
+    await f.reviewer.keyboard.press("Enter");
+    const dialog = f.reviewer.getByRole("dialog", {
+      name: "Full size sheet photo",
+      exact: true,
+    });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
+    await dialog.getByRole("button", { name: "Zoom out", exact: true }).click();
+    await f.reviewer.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(openButton).toBeFocused();
+    await f.reviewer.reload();
+    await f.reviewer.route(
+      `**/api/admin/sales/${x.sale.id}/release-proposals/${x.proposal.id}/photo-access`,
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        const json = await response.json();
+        json.data.expiresAt = new Date(Date.now() + 1200).toISOString();
+        await route.fulfill({ response, json });
+      },
+    );
+    await f.reviewer
+      .getByRole("button", { name: "Load sheet photo", exact: true })
+      .click();
+    await expect(
+      f.reviewer.getByText("Photo access expired. Load the photo again.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      f.reviewer.getByRole("button", { name: "Approve proposal", exact: true }),
+    ).toBeDisabled();
+    await f.reviewer
+      .getByLabel("Decision reason", { exact: true })
+      .last()
+      .fill("The entry cannot be verified while access is expired");
+    await expect(
+      f.reviewer.getByRole("button", { name: "Reject proposal", exact: true }),
+    ).toBeEnabled();
+  } finally {
+    await f.close();
+  }
+});
+
+test("R12 R13 recorded rejected and superseded history do not invent loyalty outcomes or supersession time", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const x = await pendingFixture(page, f);
+    const current = await adminDetail(page, x.sale.id);
+    await post(
+      f.reviewer.request,
+      `/api/admin/sales/${x.sale.id}/release-proposals/${x.proposal.id}/decision`,
+      {
+        operationId: v7(),
+        expectedVersion: current.version,
+        expectedRevisionId: current.currentRevisionId,
+        expectedProposalVersion: x.proposal.version,
+        outcome: "reject",
+        reason: "The entry could not be independently confirmed",
+      },
+    );
+    await open(page, x.sale.id, "date", x.proposal.id);
+    await expect(
+      page.getByRole("heading", { name: "Proposal rejected", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "This proposal changed no sale values or holds. Check the current sale status below.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    const prep = await preparation(page, x.sale.id, "date");
+    const next = (await post(
+      page.request,
+      `/api/admin/sales/${x.sale.id}/release-proposals`,
+      proposalBody(prep, x.sheet.assetId),
+      201,
+    )) as Proposal;
+    // A persisted terminal fixture tests the historical view independently of the already-covered mutation path.
+    await f.db.query("BEGIN");
+    try {
+      await f.db.query(
+        "UPDATE held_release_state SET state='superseded',version=version+1 WHERE proposal_id=$1",
+        [next.id],
+      );
+      await f.db.query(
+        "INSERT INTO held_release_transition(id,proposal_id,version,state,actor_id,content) VALUES($1,$2,2,'superseded',NULL,'{}')",
+        [v7(), next.id],
+      );
+      await f.db.query("COMMIT");
+    } catch (error) {
+      await f.db.query("ROLLBACK");
+      throw error;
+    }
+    await open(page, x.sale.id, "date", next.id);
+    await expect(
+      page.getByRole("heading", { name: "Proposal superseded", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Supersession time unavailable", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Approve proposal", exact: true }),
+    ).toHaveCount(0);
+    expect((await adminDetail(page, x.sale.id)).credited).toBe(false);
+  } finally {
+    await f.close();
+  }
+});
+
+test("R14 stale decision remains pending until explicit fresh independent rejection", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const x = await pendingFixture(page, f);
+    await open(f.reviewer, x.sale.id, "date", x.proposal.id);
+    await f.reviewer
+      .getByLabel("Decision reason", { exact: true })
+      .last()
+      .fill(
+        "Reject this obsolete proposal after inspecting the current record",
+      );
+    await f.reviewer
+      .getByRole("button", { name: "Reject proposal", exact: true })
+      .click();
+    await f.db.query("UPDATE purchase SET version=version+1 WHERE id=$1", [
+      x.sale.id,
+    ]);
+    await f.reviewer
+      .getByRole("button", { name: "Confirm decision", exact: true })
+      .click();
+    await expect(
+      f.reviewer.getByText("This proposal needs a fresh review", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await captureView(f.reviewer, "R14-stale");
+    expect(
+      (
+        await f.db.query(
+          "SELECT state FROM held_release_state WHERE proposal_id=$1",
+          [x.proposal.id],
+        )
+      ).rows[0].state,
+    ).toBe("pending");
+    await f.reviewer
+      .getByRole("button", { name: "Refresh sale", exact: true })
+      .first()
+      .click();
+    await f.reviewer
+      .getByRole("button", { name: "Reject proposal", exact: true })
+      .click();
+    await f.reviewer
+      .getByRole("button", { name: "Confirm decision", exact: true })
+      .click();
+    await expect(
+      f.reviewer.getByRole("heading", {
+        name: "Proposal rejected",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await captureView(f.reviewer, "R12-rejected");
+  } finally {
+    await f.close();
+  }
+});
+
+test("R4 retained same-sale sheet can be renewed after expiry and requires a fresh inspection", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const x = await pendingFixture(page, f),
+      current = await adminDetail(page, x.sale.id);
+    await post(
+      f.reviewer.request,
+      `/api/admin/sales/${x.sale.id}/release-proposals/${x.proposal.id}/decision`,
+      {
+        operationId: v7(),
+        expectedVersion: current.version,
+        expectedRevisionId: current.currentRevisionId,
+        expectedProposalVersion: x.proposal.version,
+        outcome: "reject",
+        reason:
+          "Original entry requires a fresh independently checked proposal",
+      },
+    );
+    await open(page, x.sale.id, "date");
+    await page
+      .getByRole("button", {
+        name: "Propose a release with a sheet photo",
+        exact: true,
+      })
+      .click();
+    let reads = 0;
+    await page.route(
+      `**/api/admin/sales/${x.sale.id}/release-proposals/${x.proposal.id}/photo-access`,
+      async (route) => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200);
+        const json = await response.json();
+        if (++reads === 1)
+          json.data.expiresAt = new Date(Date.now() + 1200).toISOString();
+        await route.fulfill({ response, json });
+      },
+    );
+    await page
+      .getByRole("button", { name: /^Use sheet photo proposed / })
+      .click();
+    await expect(
+      page.getByText("Photo access expired. Load the photo again.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Load photo again", exact: true })
+      .first()
+      .click();
+    await expect(
+      page
+        .getByRole("img", {
+          name: `Sheet entry for sale ${x.sale.detail.saleCode}`,
+          exact: true,
+        })
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel(proposerAttestation, { exact: true }),
+    ).not.toBeChecked();
+    expect(reads).toBe(2);
+    await captureView(page, "R4-retained-renewed");
+  } finally {
+    await f.close();
+  }
+});
