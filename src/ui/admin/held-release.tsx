@@ -117,10 +117,12 @@ function ReleaseView({
       assetId: string;
       url: string;
       expiresAt?: string;
+      retainedProposal?: ReleaseProposal;
     } | null>(null),
     [file, setFile] = useState<File | null>(null),
     [localUrl, setLocalUrl] = useState(""),
     [photoState, setPhotoState] = useState(""),
+    [draftSheetReady, setDraftSheetReady] = useState(false),
     [busy, setBusy] = useState("");
   const [decisionReason, setDecisionReason] = useState(""),
     [independentInspected, setIndependentInspected] = useState(false),
@@ -149,6 +151,7 @@ function ReleaseView({
     setFile(null);
     setLocalUrl("");
     setPhotoState("");
+    setDraftSheetReady(false);
     uploadRef.current = null;
     setDraft((d) => ({ ...d, inspected: false }));
   };
@@ -397,7 +400,7 @@ function ReleaseView({
       const access = await api.sheetAccess(sale.id, p);
       if (live()) {
         clearPhoto();
-        setSheet(access);
+        setSheet({ ...access, retainedProposal: p });
         setPhotoState("validated");
       }
     } catch (e) {
@@ -407,6 +410,24 @@ function ReleaseView({
       if (live()) setBusy("");
     }
   }
+  const invalidateSheetInspection = () => {
+    setDraft((d) => ({ ...d, inspected: false }));
+    setDraftSheetReady(false);
+    setReview(false);
+  };
+  const reloadRetainedSheet = sheet?.retainedProposal
+    ? async () => {
+        const live = capture();
+        const access = await api.sheetAccess(sale.id, sheet.retainedProposal!);
+        if (!live()) throw new AdminError("obsolete");
+        invalidateSheetInspection();
+        setSheet({ ...access, retainedProposal: sheet.retainedProposal });
+        return access;
+      }
+    : undefined;
+  const sheetAccessKey = sheet
+    ? `${sheet.assetId}:${sheet.url}:${sheet.expiresAt ?? ""}`
+    : localUrl;
   function reviewProposal() {
     if (!preparation || !canPropose || busy || uncertain) return;
     const checked = validateReleaseDraft(
@@ -414,8 +435,11 @@ function ReleaseView({
       preparation,
       sheet?.assetId ?? null,
     );
+    if (!draftSheetReady)
+      checked.errors.photo =
+        "Load and inspect the sheet photo before reviewing.";
     setErrors(checked.errors);
-    if (!checked.input) {
+    if (!checked.input || !draftSheetReady) {
       queueMicrotask(() => summary.current?.focus());
       return;
     }
@@ -424,7 +448,7 @@ function ReleaseView({
     queueMicrotask(() => heading.current?.focus());
   }
   async function propose(retry = false) {
-    if (lock.current || !preparation) return;
+    if (lock.current || !preparation || (!retry && !draftSheetReady)) return;
     let request = frozen;
     if (!retry) {
       if (!canPropose) return;
@@ -702,8 +726,12 @@ function ReleaseView({
                 }
               />
               <PhotoViewer
+                key={sheetAccessKey}
                 local={sheet?.url}
                 expiresAt={sheet?.expiresAt}
+                load={reloadRetainedSheet}
+                onInvalidated={invalidateSheetInspection}
+                onReady={setDraftSheetReady}
                 title="Sheet photo"
                 alt={`Sheet entry for sale ${sale.saleCode}`}
               />
@@ -713,7 +741,10 @@ function ReleaseView({
                 above are legible and faithfully copied.
               </p>
               <div className="wr-release-actions">
-                <Button disabled={disabled} onClick={() => void propose()}>
+                <Button
+                  disabled={disabled || !draftSheetReady}
+                  onClick={() => void propose()}
+                >
                   Confirm proposal
                 </Button>
                 <Button
@@ -833,9 +864,12 @@ function ReleaseView({
                   {(sheet || localUrl) && (
                     <>
                       <PhotoViewer
-                        key={sheet?.assetId ?? localUrl}
+                        key={sheetAccessKey}
                         local={sheet?.url ?? localUrl}
                         expiresAt={sheet?.expiresAt}
+                        load={reloadRetainedSheet}
+                        onInvalidated={invalidateSheetInspection}
+                        onReady={setDraftSheetReady}
                         title="Sheet photo preview"
                         alt={`Sheet entry for sale ${sale.saleCode}`}
                       />
@@ -1047,6 +1081,7 @@ function ReleaseView({
                   <input
                     type="checkbox"
                     checked={draft.inspected}
+                    disabled={!draftSheetReady}
                     onChange={(e) => update("inspected", e.target.checked)}
                   />
                   I have inspected the sheet photo. The facts and time precision
@@ -1723,6 +1758,7 @@ function PhotoViewer({
   expiresAt,
   load,
   onReady,
+  onInvalidated,
 }: {
   title: string;
   alt: string;
@@ -1730,6 +1766,7 @@ function PhotoViewer({
   expiresAt?: string;
   load?: () => Promise<{ url: string; expiresAt: string }>;
   onReady?: (ready: boolean) => void;
+  onInvalidated?: () => void;
 }) {
   const [photo, setPhoto] = useState<{
       url: string;
@@ -1745,9 +1782,11 @@ function PhotoViewer({
     opener = useRef<HTMLButtonElement>(null),
     pan = useRef<HTMLDivElement>(null);
   const ready = useRef(onReady);
+  const invalidate = useRef(onInvalidated);
   useEffect(() => {
     ready.current = onReady;
-  }, [onReady]);
+    invalidate.current = onInvalidated;
+  }, [onReady, onInvalidated]);
   useEffect(() => {
     ready.current?.(false);
     return () => ready.current?.(false);
@@ -1760,6 +1799,7 @@ function PhotoViewer({
       setFull(false);
       setError("Photo access expired. Load the photo again.");
       ready.current?.(false);
+      invalidate.current?.();
     }, delay);
     return () => clearTimeout(timer);
   }, [photo]);
@@ -1799,6 +1839,7 @@ function PhotoViewer({
     setPhoto(null);
     setFull(false);
     ready.current?.(false);
+    invalidate.current?.();
     setError("This photo is unavailable. Approval needs both retained photos.");
   };
   return (
@@ -1827,6 +1868,7 @@ function PhotoViewer({
                 setPhoto(null);
                 ready.current?.(false);
                 setError("Photo access expired. Load the photo again.");
+                invalidate.current?.();
               } else {
                 setZoom(1);
                 setFull(true);
