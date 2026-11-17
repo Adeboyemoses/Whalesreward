@@ -1,3 +1,4 @@
+import pg from "pg";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { expect, it, vi } from "vitest";
@@ -11,12 +12,48 @@ import { newId } from "../../src/server/lib/ids";
 
 async function setup() {
   const f = await giveawayFixture();
-  const role = (
+  const privilege = (
     await f.pool.query(
       "SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user",
     )
   ).rows[0];
-  expect(role).toEqual({ rolsuper: false, rolbypassrls: false });
+  if (privilege.rolsuper) {
+    // CI provisions a superuser; every tested operation still runs as a restricted role.
+    const rootUrl = process.env.DATABASE_URL!;
+    const admin = new pg.Pool({ connectionString: rootUrl });
+    const roleName = `exclusion_${newId().replaceAll("-", "")}`;
+    await admin.query(`CREATE ROLE ${roleName} NOSUPERUSER NOBYPASSRLS`);
+    await admin.query(`GRANT USAGE ON SCHEMA ${f.schema} TO ${roleName}`);
+    await admin.query(
+      `GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA ${f.schema} TO ${roleName}`,
+    );
+    const setRole = (client: pg.PoolClient) => {
+      void client.query(`SET ROLE ${roleName}`);
+    };
+    f.pool.on("connect", setRole);
+    await f.pool.query(`SET ROLE ${roleName}`);
+    const url = new URL(rootUrl);
+    url.searchParams.set(
+      "options",
+      `${url.searchParams.get("options") ?? ""} -c role=${roleName}`,
+    );
+    process.env.DATABASE_URL = url.toString();
+    const close = f.close;
+    f.close = async () => {
+      await close();
+      await admin.query(`DROP OWNED BY ${roleName}`);
+      await admin.query(`DROP ROLE ${roleName}`);
+      await admin.end();
+      process.env.DATABASE_URL = rootUrl;
+    };
+  }
+  expect(
+    (
+      await f.pool.query(
+        "SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user",
+      )
+    ).rows[0],
+  ).toEqual({ rolsuper: false, rolbypassrls: false });
   const sale = await historicalSale(f.pool, { state: "photo_pending" });
   const ids = (
     await f.pool.query("SELECT DISTINCT attendant_id FROM assignment")
