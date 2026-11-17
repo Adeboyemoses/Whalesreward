@@ -682,7 +682,7 @@ function ReleaseView({
           </Button>
         </Notice>
       )}
-      {error && (
+      {error && !(uncertain && error === uncertainCopy) && (
         <Notice tone="danger" role="alert">
           {error}
         </Notice>
@@ -1354,7 +1354,7 @@ function ReleaseView({
           {selected.state === "pending" &&
             (self ? (
               <Notice>
-                {ownCopy}
+                <p>{ownCopy}</p>
                 <p>
                   A different person with this review permission must decide it.
                   Signing in with another account does not make you a different
