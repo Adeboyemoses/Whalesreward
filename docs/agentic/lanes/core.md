@@ -1,22 +1,21 @@
 # lane:core
-WO-core-14b (WHR-150) Owner campaign setup and timing: READY since 2026-11-14
+WHR-181 original verified-date read projection: READY since 2026-11-18
 
 ## In flight
-- [Feature #143](https://github.com/Adeboyemoses/Whalesreward/pull/143) merged to staging at `36f1210`, all five PR checks green. This separate records PR completes READY; WHR-150 stays In Review for Earl's end-of-M4 smoke.
-- Reviewed source `9780c30ca45f2c712999efe8d9b34cbf8b9b382d`; evidence-only PR head `b42ecd43367c4e6fc03c2f8b32e5ffd4e65ac4e9`. Code/security/integrity PASS round 3; no open findings or escalation.
-- Owner-only create/update review and confirmation, append-only campaign-timing-v1 definition and station binding, exact audit, health, generation and retention-independent timing pins are implemented. No campaign values seeded.
-- EM final gates: typecheck/lint/build/Prisma PASS; 871 unit, 1,154 PostgreSQL, timezone 5+5 and Linux browser 360/four existing skips PASS. Local integration uses one worker; browser uses two workers and zero retries. No timeout or assertion weakened.
-- Named core acceptance evidence: tests/integration/p28-acceptance.md. Fresh/upgrade/repeated bootstrap, non-superuser registry guards, concurrent creation, post-start replay, locked-clock boundaries and pre-upgrade provenance are covered.
+- [Feature PR #166](https://github.com/Adeboyemoses/Whalesreward/pull/166) merged into staging at `784cf67e6b6baa82a4be484276f604619ab2d944` with all five checks green. PR head `81f5a3207164cb7532579b603813531ef7c35626`; reviewed source `8f691b0`.
+- Code/security/integrity PASS, round 1 of cap 3, no findings. Evidence `.review/core__WHR-181-original-date.md` validates. Feature PR excludes shared records; this docs-only PR records READY.
+- Shared original Values now reads the original revision date, including non-null original dates. Sale detail/list/search, review comparison and sync audit fallback inherit the repair. Release preparation, reports, audit queries and corrections were audited; full dispositions in `docs/qa/verification-2026-11-18-original-date.md`.
+- EM typecheck/lint/build, 981 unit, 1,453 PostgreSQL 16, timezone 5+5, real Next/PostgreSQL/MinIO HTTP 2, gate self-tests 53 and guard 94 PASS. CI adds browser 426 passed/two retry passes/four existing skips, storage 1 and release 3 PASS. No schema, endpoint-shape or production immutable-revision writes changed.
 
 ## Next
-- T2 starts WHR-151 / WO-app-13b campaign setup screens in a fresh session. T1 stops at READY; no screen parity or end-of-M4 acceptance is inferred.
+- Stop at READY. WHR-171 can rebase on the staging fix; WHR-178 resumes only in a new session. No WHR-178 work performed here.
 
 ## Earl's gos
-- 2026-11-14: “Start WHR-150 (WO-core-14b).” “open the PR to staging, merge when green, and report READY with PR, head SHA and test counts.”
-- “Then stop: WHR-151 (screens) follows on T2.”
+- 17 Nov 2026: “Fix WHR-181.” “Then stop: WHR-178 resumes in a new session.”
 
 ## Risks
-- Campaign values remain Owner-entered. Reconciliation/complete-photo proof and deletion policies remain separate gates; no cloud or managed database operation was performed.
-- Two inherited image lint warnings and four existing browser skips. Feature dispatch flag: 13 > 8, including two builder fix dispatches and three review rounds; records review adds one. No round-cap escalation.
+- Existing operator cleanup timeout WHR-174 required one unchanged CI integration rerun; final 1,453 assertions and both timezone runs passed. Browser retry cases remain WHR-177 and WHR-83; evidence added to existing issues with `found-in:WHR-181`.
+- Local Chromium launch is sandbox-blocked; full native CI browser verification passed. Initial local PostgreSQL 15/fixture-role/name mismatches were replaced by an isolated PostgreSQL 16 disposable test database; clean full EM run passed without skips.
+- Runtime model ID unavailable. No cloud resources, deployed data or main promotion touched.
 
-dispatches=14 prs=2 rounds_max=3 escalations=0 model=unavailable
+dispatches=5 prs=2 rounds_max=1 escalations=0 model=unavailable
