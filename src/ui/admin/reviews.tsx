@@ -545,55 +545,87 @@ export function ReviewPage({
     </>
   );
 }
-function Original({ sale }: { sale: AdminSaleDetail }) {
+function Original({
+  sale,
+  compact = false,
+}: {
+  sale: AdminSaleDetail;
+  compact?: boolean;
+}) {
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 899px)");
+    const update = () => setPhone(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const collapsed = compact && phone;
   return (
     <Sheet title="Original purchase">
       <div className="wr-review-status">
         <SaleStatus sale={sale} />
       </div>
-      <KeyValueList
-        items={[
-          {
-            label: "Customer name",
-            value: sale.customer?.name ?? "Customer pending",
-          },
-          { label: "Customer card", value: sale.capturedCardCode, mono: true },
-          {
-            label: "Original captured amount",
-            value: saleMoney(sale.original.amountKobo),
-          },
-          { label: "Original quantity", value: saleQuantity(sale.original) },
-          {
-            label: "Entry mode",
-            value: sale.original.basis === "amount" ? "Amount" : "Quantity",
-          },
-          { label: "Rate at capture", value: saleRate(sale.original) },
-          { label: "Bought into", value: adminAction(sale.original.medium) },
-          {
-            label: "Station / pump",
-            value: `${sale.station.code} · ${sale.pump.code} · ${productNames[sale.product]}`,
-          },
-          { label: "Recorded by", value: sale.seller.name },
-          {
-            label: "Username / attendant ID",
-            value: `${sale.seller.username} · ${sale.seller.staffCode}`,
-            mono: true,
-          },
-          {
-            label: "App capture time",
-            value: adminTime(sale.appCapturedAt) + " (device-reported)",
-          },
-          { label: "Server receipt", value: adminTime(sale.serverReceivedAt) },
-          {
-            label: "Currently recorded",
-            value: valuePair(sale.displayedValues),
-          },
-          {
-            label: "Loyalty credit",
-            value: sale.credited ? "Recorded spend included" : "Not credited",
-          },
-        ]}
-      />
+      <details
+        className={
+          collapsed
+            ? "wr-release-original wr-release-original-compact"
+            : "wr-release-original"
+        }
+        open={!collapsed}
+      >
+        <summary>Original purchase</summary>
+        <KeyValueList
+          items={[
+            {
+              label: "Customer name",
+              value: sale.customer?.name ?? "Customer pending",
+            },
+            {
+              label: "Customer card",
+              value: sale.capturedCardCode,
+              mono: true,
+            },
+            {
+              label: "Original captured amount",
+              value: saleMoney(sale.original.amountKobo),
+            },
+            { label: "Original quantity", value: saleQuantity(sale.original) },
+            {
+              label: "Entry mode",
+              value: sale.original.basis === "amount" ? "Amount" : "Quantity",
+            },
+            { label: "Rate at capture", value: saleRate(sale.original) },
+            { label: "Bought into", value: adminAction(sale.original.medium) },
+            {
+              label: "Station / pump",
+              value: `${sale.station.code} · ${sale.pump.code} · ${productNames[sale.product]}`,
+            },
+            { label: "Recorded by", value: sale.seller.name },
+            {
+              label: "Username / attendant ID",
+              value: `${sale.seller.username} · ${sale.seller.staffCode}`,
+              mono: true,
+            },
+            {
+              label: "App capture time",
+              value: adminTime(sale.appCapturedAt) + " (device-reported)",
+            },
+            {
+              label: "Server receipt",
+              value: adminTime(sale.serverReceivedAt),
+            },
+            {
+              label: "Currently recorded",
+              value: valuePair(sale.displayedValues),
+            },
+            {
+              label: "Loyalty credit",
+              value: sale.credited ? "Recorded spend included" : "Not credited",
+            },
+          ]}
+        />
+      </details>
     </Sheet>
   );
 }
@@ -620,6 +652,7 @@ function ReviewRecord({
     label: string;
   } | null>(null);
   const [current, setCurrent] = useState<AdminSaleDetail | null>(sale);
+  const [proposing, setProposing] = useState(false);
   const [currentError, setCurrentError] = useState("");
   const releaseCurrent = useCallback(
     (detail: AdminSaleDetail | null, failed = false) => {
@@ -694,7 +727,7 @@ function ReviewRecord({
           )
         ) : (
           <div className="wr-two-col">
-            <Original sale={current} />
+            <Original sale={current} compact={proposing} />
             <AdminSalePhoto sale={current} />
           </div>
         )
@@ -707,40 +740,43 @@ function ReviewRecord({
             : "Loading current sale after the recorded decision…"}
         </Notice>
       )}
-      {outcome ? (
-        <RecordedDecision
-          receipt={outcome.receipt}
-          recordedLabel={outcome.label}
-          reload={reload}
-        />
-      ) : !current || meterView ? null : pending ? (
-        <DecisionForm
-          sale={current}
-          kind={pending.kind}
-          session={session}
-          reload={reload}
-        />
-      ) : kind === "duplicate" ? (
-        <DuplicateReview
-          sale={current}
-          session={session}
-          suffix={suffix}
-          reload={reload}
-        />
-      ) : (
-        <HoldReview
-          sale={current}
-          kind={kind}
-          session={session}
-          reload={reload}
-        />
-      )}
+      <div hidden={proposing && !outcome} className="wr-release-ordinary">
+        {outcome ? (
+          <RecordedDecision
+            receipt={outcome.receipt}
+            recordedLabel={outcome.label}
+            reload={reload}
+          />
+        ) : !current || meterView ? null : pending ? (
+          <DecisionForm
+            sale={current}
+            kind={pending.kind}
+            session={session}
+            reload={reload}
+          />
+        ) : kind === "duplicate" ? (
+          <DuplicateReview
+            sale={current}
+            session={session}
+            suffix={suffix}
+            reload={reload}
+          />
+        ) : (
+          <HoldReview
+            sale={current}
+            kind={kind}
+            session={session}
+            reload={reload}
+          />
+        )}
+      </div>
       {kind !== "duplicate" && !outcome && (
         <HeldRelease
           sale={current ?? sale}
           kind={kind}
           session={session}
           onCurrentSale={releaseCurrent}
+          onProposingChange={setProposing}
         />
       )}
       {current && (

@@ -1,6 +1,20 @@
 .wr-release {
   min-width: 0;
 }
+.wr-release-ordinary:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.wr-release-original:not(.wr-release-original-compact) > summary {
+  display: none;
+}
+.wr-release-original-compact > summary {
+  cursor: pointer;
+  min-height: var(--control-h);
+  font-size: 16px;
+  font-weight: 600;
+}
 .wr-release fieldset {
   border: 0;
   padding: 0;
@@ -93,8 +107,15 @@
   .wr-release .wr-btn-primary {
     min-height: var(--cta-h);
   }
-  .wr-release input[type="file"] {
-    max-width: 100%;
-    min-height: var(--control-h);
+  .wr-release .wr-kv-row,
+  .wr-release-original-compact .wr-kv-row {
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: 16px;
+  }
+  .wr-release .wr-kv-row dd,
+  .wr-release-original-compact .wr-kv-row dd {
+    text-align: left;
+    overflow-wrap: anywhere;
   }
 }

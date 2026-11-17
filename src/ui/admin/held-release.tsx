@@ -57,6 +57,7 @@ export function HeldRelease(props: {
   kind: ReleaseKind;
   session: AdminSession;
   onCurrentSale: (detail: AdminSaleDetail | null, failed?: boolean) => void;
+  onProposingChange?: (proposing: boolean) => void;
 }) {
   const state = useAdminSession();
   const proposalId = useSearchParams().get("proposal");
@@ -84,11 +85,13 @@ function ReleaseView({
   kind,
   session,
   onCurrentSale,
+  onProposingChange,
 }: {
   sale: AdminSaleDetail;
   kind: ReleaseKind;
   session: AdminSession;
   onCurrentSale: (detail: AdminSaleDetail | null, failed?: boolean) => void;
+  onProposingChange?: (proposing: boolean) => void;
 }) {
   const { store } = useAdminSession(),
     capture = useViewGuard(),
@@ -125,6 +128,12 @@ function ReleaseView({
     [photoState, setPhotoState] = useState(""),
     [draftSheetReady, setDraftSheetReady] = useState(false),
     [busy, setBusy] = useState("");
+  useEffect(() => {
+    onProposingChange?.(form);
+    return () => onProposingChange?.(false);
+  }, [form, onProposingChange]);
+  const cameraInput = useRef<HTMLInputElement>(null),
+    fileInput = useRef<HTMLInputElement>(null);
   const [decisionReason, setDecisionReason] = useState(""),
     [independentInspected, setIndependentInspected] = useState(false),
     [meterSeen, setMeterSeen] = useState(false),
@@ -828,51 +837,6 @@ function ReleaseView({
               )}
               <fieldset disabled={disabled}>
                 <legend>Entry must match this sale</legend>
-                <KeyValueList
-                  items={[
-                    {
-                      label: "Station / pump",
-                      value: `${sale.station.code} · ${sale.pump.code}`,
-                    },
-                    { label: "Product", value: productNames[sale.product] },
-                    {
-                      label: "Original attendant",
-                      value: `${sale.seller.name} · ${sale.seller.staffCode}`,
-                    },
-                    {
-                      label: "Customer / captured card",
-                      value: `${sale.customer?.name ?? "Customer pending"} · ${sale.capturedCardCode}`,
-                    },
-                    {
-                      label: "Original purchase",
-                      value: valuePair(preparation.original),
-                    },
-                    {
-                      label: "Currently recorded",
-                      value: valuePair(preparation.currentCandidate.values),
-                    },
-                  ]}
-                />
-                <Choice
-                  id="source"
-                  label="Record type"
-                  value={draft.source}
-                  onChange={change("source")}
-                  error={errors.source}
-                  choices={[
-                    ["shift_sheet", "Shift sheet"],
-                    ["sales_log", "Sales log"],
-                  ]}
-                />
-                <TextField
-                  id="release-entryReference"
-                  label="Entry reference"
-                  value={draft.entryReference}
-                  onChange={(e) => update("entryReference", e.target.value)}
-                  error={errors.entryReference}
-                  helper="Use a page and entry reference. Do not enter a link, phone number or email address."
-                  maxLength={120}
-                />
                 <section id="release-photo" aria-label="Sheet photo">
                   <h3>Sheet photo</h3>
                   <p>
@@ -884,25 +848,43 @@ function ReleaseView({
                     either side.
                   </p>
                   {!sheet && !localUrl && <p>No sheet photo chosen.</p>}
-                  <label className="wr-field">
-                    Take sheet photo
+                  <div className="wr-release-actions">
+                    <Button
+                      variant="secondary"
+                      aria-controls="release-sheet-camera"
+                      onClick={() => cameraInput.current?.click()}
+                    >
+                      Take sheet photo
+                    </Button>
                     <input
+                      ref={cameraInput}
+                      id="release-sheet-camera"
+                      className="wr-visually-hidden"
+                      tabIndex={-1}
                       aria-label="Take sheet photo"
                       type="file"
                       accept="image/jpeg"
                       capture="environment"
                       onChange={(e) => void choose(e.target.files?.[0])}
                     />
-                  </label>
-                  <label className="wr-field">
-                    Choose JPEG
+                    <Button
+                      variant="secondary"
+                      aria-controls="release-sheet-file"
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      Choose JPEG
+                    </Button>
                     <input
+                      ref={fileInput}
+                      id="release-sheet-file"
+                      className="wr-visually-hidden"
+                      tabIndex={-1}
                       aria-label="Choose JPEG"
                       type="file"
                       accept="image/jpeg"
                       onChange={(e) => void choose(e.target.files?.[0])}
                     />
-                  </label>
+                  </div>
                   {(sheet || localUrl) && (
                     <>
                       <PhotoViewer
@@ -968,6 +950,51 @@ function ReleaseView({
                     </div>
                   )}
                 </section>
+                <KeyValueList
+                  items={[
+                    {
+                      label: "Station / pump",
+                      value: `${sale.station.code} · ${sale.pump.code}`,
+                    },
+                    { label: "Product", value: productNames[sale.product] },
+                    {
+                      label: "Original attendant",
+                      value: `${sale.seller.name} · ${sale.seller.staffCode}`,
+                    },
+                    {
+                      label: "Customer / captured card",
+                      value: `${sale.customer?.name ?? "Customer pending"} · ${sale.capturedCardCode}`,
+                    },
+                    {
+                      label: "Original purchase",
+                      value: valuePair(preparation.original),
+                    },
+                    {
+                      label: "Currently recorded",
+                      value: valuePair(preparation.currentCandidate.values),
+                    },
+                  ]}
+                />
+                <Choice
+                  id="source"
+                  label="Record type"
+                  value={draft.source}
+                  onChange={change("source")}
+                  error={errors.source}
+                  choices={[
+                    ["shift_sheet", "Shift sheet"],
+                    ["sales_log", "Sales log"],
+                  ]}
+                />
+                <TextField
+                  id="release-entryReference"
+                  label="Entry reference"
+                  value={draft.entryReference}
+                  onChange={(e) => update("entryReference", e.target.value)}
+                  error={errors.entryReference}
+                  helper="Use a page and entry reference. Do not enter a link, phone number or email address."
+                  maxLength={120}
+                />
                 <p>
                   Copy only values visible in the entry. Do not calculate
                   missing values or change this sale&apos;s numbers.
