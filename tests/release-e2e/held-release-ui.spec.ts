@@ -95,11 +95,13 @@ async function fillDateForm(page: Page, prep: Preparation) {
     );
   await page.getByLabel(proposerAttestation, { exact: true }).check();
 }
-async function addPhoto(page: Page, prep: Preparation) {
+async function addPhoto(page: Page, prep: Preparation, bytes?: Buffer) {
   await page.getByLabel("Choose JPEG", { exact: true }).setInputFiles({
     name: "fictional-entry.jpg",
     mimeType: "image/jpeg",
-    buffer: await sheetBytes("date", "confirm", prep.currentCandidate.values),
+    buffer:
+      bytes ??
+      (await sheetBytes("date", "confirm", prep.currentCandidate.values)),
   });
   await expect(
     page.getByText("Sheet photo preview", { exact: true }),
@@ -506,6 +508,45 @@ test("RD-07 complete server queue traverses over 100 tied-time stale proposals w
     ).toBeVisible();
   } finally {
     await f.close();
+  }
+});
+
+test("R1 R2 R3 all-kind written-brief fidelity before any sheet upload", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(240000);
+  for (const kind of ["price", "card", "date", "capture"] as const) {
+    const f = await releaseFixture(page, browser);
+    try {
+      const sale = await boundarySale(f, kind);
+      await open(page, sale.id, kind);
+      await expect(
+        page.getByRole("button", {
+          name: "Propose a release with a sheet photo",
+          exact: true,
+        }),
+      ).toBeEnabled();
+      await captureView(page, `R1-${kind}`);
+      await page
+        .getByRole("button", {
+          name: "Propose a release with a sheet photo",
+          exact: true,
+        })
+        .click();
+      await captureView(page, `R2-${kind}`);
+      await page
+        .getByRole("button", { name: "Review proposal", exact: true })
+        .click();
+      await expect(
+        page.getByText("Check the marked fields before reviewing.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await captureView(page, `R3-${kind}`);
+    } finally {
+      await f.close();
+    }
   }
 });
 
@@ -1345,6 +1386,475 @@ test("P1 regression: uncertain approval retry retains its frozen request after p
     ).toBeVisible();
     expect(writes).toHaveLength(2);
     expect(writes[1]).toEqual(writes[0]);
+  } finally {
+    await f.close();
+  }
+});
+
+test("Matrix: quantity-basis cooking gas keeps kilograms, captured precision and blank transcriptions", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser, {
+    pumpId: "019a5000-0000-7000-8000-000000000017",
+  });
+  try {
+    const sale = await boundarySale(f, "date", {
+      basis: "quantity",
+      value: "20.25",
+      medium: "cylinder",
+    });
+    const prep = await preparation(page, sale.id, "date");
+    expect(prep.original).toMatchObject({
+      basis: "quantity",
+      unit: "kilogram",
+      quantity: "20.25",
+      quantityPrecision: 2,
+    });
+    await open(page, sale.id, "date");
+    const original = page
+      .locator("section.wr-sheet")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Original purchase",
+          exact: true,
+        }),
+      })
+      .first();
+    await expect(original.getByText("Quantity", { exact: true })).toBeVisible();
+    await expect(original).toContainText("kilograms");
+    await page
+      .getByRole("button", {
+        name: "Propose a release with a sheet photo",
+        exact: true,
+      })
+      .click();
+    const quantity = page.getByLabel(
+      "Quantity written in the entry (kilograms)",
+      { exact: true },
+    );
+    await expect(quantity).toHaveValue("");
+    await expect(
+      page.getByLabel("Rate written in the entry (₦ / kilogram)", {
+        exact: true,
+      }),
+    ).toHaveValue("");
+    await expect(
+      page.getByText("Up to 2 decimals, as captured.", { exact: true }),
+    ).toBeVisible();
+    await quantity.fill("20.251");
+    await page
+      .getByRole("button", { name: "Review proposal", exact: true })
+      .click();
+    await expect(
+      page
+        .getByText("Enter a positive quantity with no more than 2 decimals.", {
+          exact: true,
+        })
+        .last(),
+    ).toBeVisible();
+    await expect(quantity).toHaveValue("20.251");
+    await captureView(page, "matrix-quantity-kilograms");
+  } finally {
+    await f.close();
+  }
+});
+
+for (const precision of ["date", "second", "millisecond"] as const) {
+  test(`Matrix: ${precision} paper precision preserves full encoded range and explicit absent fields`, async ({
+    page,
+    browser,
+  }) => {
+    test.setTimeout(180000);
+    const f = await releaseFixture(page, browser);
+    try {
+      const sale = await boundarySale(f, "date"),
+        prep = await preparation(page, sale.id, "date");
+      await open(page, sale.id, "date");
+      await page
+        .getByRole("button", {
+          name: "Propose a release with a sheet photo",
+          exact: true,
+        })
+        .click();
+      const label =
+        precision === "date"
+          ? "11 Nov 2026 · date only"
+          : precision === "second"
+            ? "11 Nov 2026 · 00:10:05–00:20:06"
+            : "11 Nov 2026 · 00:10:05.123–00:20:06.456";
+      await addPhoto(
+        page,
+        prep,
+        await sheetBytes(
+          "date",
+          "confirm",
+          prep.currentCandidate.values,
+          label,
+          true,
+        ),
+      );
+      await fillDateForm(page, prep);
+      await page
+        .getByLabel("Quantity not written in this entry", { exact: true })
+        .check();
+      await page
+        .getByLabel("Rate not written in this entry", { exact: true })
+        .check();
+      if (precision === "date") {
+        await page
+          .getByRole("radio", { name: "Date only", exact: true })
+          .check();
+        await page
+          .getByLabel("Sale date in the entry", { exact: true })
+          .fill("2026-11-11");
+      } else {
+        await page
+          .getByRole("radio", {
+            name: precision === "second" ? "Second" : "Millisecond",
+            exact: true,
+          })
+          .check();
+        await page
+          .getByLabel("Earliest supported time", { exact: true })
+          .fill(precision === "second" ? "00:10:05" : "00:10:05.123");
+        await page
+          .getByLabel("Latest supported time", { exact: true })
+          .fill(precision === "second" ? "00:20:06" : "00:20:06.456");
+      }
+      await page
+        .getByRole("button", { name: "Review proposal", exact: true })
+        .click();
+      await expect(
+        page.getByText("Not written in the entry", { exact: true }).first(),
+      ).toBeVisible();
+      const sent = page.waitForRequest(
+        (r) =>
+          r.method() === "POST" &&
+          new URL(r.url()).pathname ===
+            `/api/admin/sales/${sale.id}/release-proposals`,
+      );
+      const response = page.waitForResponse(
+        (r) =>
+          r.request().method() === "POST" &&
+          new URL(r.url()).pathname ===
+            `/api/admin/sales/${sale.id}/release-proposals`,
+      );
+      await page
+        .getByRole("button", { name: "Confirm proposal", exact: true })
+        .click();
+      const body = (await sent).postDataJSON();
+      expect(body.facts).toMatchObject({
+        recordedQuantity: null,
+        recordedRateKobo: null,
+      });
+      expect(body.facts.observedCapture).toEqual({
+        timezone: "Africa/Lagos",
+        from:
+          precision === "date"
+            ? "2026-11-10T23:00:00.000Z"
+            : precision === "second"
+              ? "2026-11-10T23:10:05.000Z"
+              : "2026-11-10T23:10:05.123Z",
+        through:
+          precision === "date"
+            ? "2026-11-11T22:59:59.999Z"
+            : precision === "second"
+              ? "2026-11-10T23:20:06.999Z"
+              : "2026-11-10T23:20:06.456Z",
+      });
+      expect((await response).status()).toBe(201);
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+test("Matrix: staged numeric candidate is separate from immutable original and never prefills paper fields", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(150000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const sale = await boundarySale(f, "date"),
+      candidate = v7();
+    await f.db.query(
+      "INSERT INTO purchase_revision SELECT (jsonb_populate_record(NULL::purchase_revision,to_jsonb(r)||jsonb_build_object('id',$2::text,'operation_id',$3::text,'revision_number',2,'kind','price_resolution','reason','Fictional staged meter candidate','based_on_revision_id',r.id,'amount_kobo',1900000,'quantity',19,'calculation_mode','meter_evidence','verified_sale_date','2026-11-11'))).* FROM purchase_revision r WHERE r.purchase_id=$1 AND r.kind='original'",
+      [sale.id, candidate, v7()],
+    );
+    await f.db.query(
+      "UPDATE purchase SET resolution_candidate_revision_id=$2,version=version+1 WHERE id=$1",
+      [sale.id, candidate],
+    );
+    const prep = await preparation(page, sale.id, "date");
+    expect(prep.currentCandidate).toMatchObject({
+      revisionId: candidate,
+      source: "resolution_candidate",
+      values: { amountKobo: "1900000", quantity: "19" },
+    });
+    expect(prep.original.amountKobo).toBe("2000000");
+    await open(page, sale.id, "date");
+    await page
+      .getByRole("button", {
+        name: "Propose a release with a sheet photo",
+        exact: true,
+      })
+      .click();
+    const release = page.locator('[aria-label="Two-person release"]');
+    await expect(release).toContainText("₦20,000.00");
+    await expect(release).toContainText("₦19,000.00");
+    await expect(
+      release.getByText("Currently recorded", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel("Amount written in the entry (₦)", { exact: true }),
+    ).toHaveValue("");
+    await expect(
+      page.getByLabel("Quantity written in the entry (litres)", {
+        exact: true,
+      }),
+    ).toHaveValue("");
+    await captureView(page, "matrix-later-candidate");
+  } finally {
+    await f.close();
+  }
+});
+
+test("Matrix: release clears only the date hold and displays remaining price hold without a credit claim", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(180000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const sale = await boundarySale(f, "date"),
+      sibling = v7();
+    const original = (
+      await f.db.query(
+        "SELECT id FROM purchase_revision WHERE purchase_id=$1 AND kind='original'",
+        [sale.id],
+      )
+    ).rows[0].id;
+    await f.db.query(
+      "INSERT INTO purchase_hold(id,purchase_id,kind,state,opened_revision_id,reason_code,version) VALUES($1,$2,'price','open',$3,'price_uncertain',1)",
+      [sibling, sale.id, original],
+    );
+    const prep = await preparation(page, sale.id, "date"),
+      sheet = await uploadSheet(page, sale.id, prep);
+    const proposal = (await post(
+      page.request,
+      `/api/admin/sales/${sale.id}/release-proposals`,
+      proposalBody(prep, sheet.assetId),
+      201,
+    )) as Proposal;
+    const x = { sale, prep, sheet, proposal };
+    await open(f.reviewer, x.sale.id, "date", x.proposal.id);
+    await inspectIndependentPhotos(f.reviewer, x.sale.detail.saleCode);
+    await f.reviewer
+      .getByLabel("Decision reason", { exact: true })
+      .last()
+      .fill(
+        "The entry settles only the date; the separate price hold remains open",
+      );
+    await f.reviewer
+      .getByRole("button", { name: "Approve proposal", exact: true })
+      .click();
+    await f.reviewer
+      .getByRole("button", { name: "Confirm decision", exact: true })
+      .click();
+    await expect(
+      f.reviewer.getByText("Still held for review", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      f.reviewer.getByText(
+        "This decision cleared only the selected review. The remaining checks below still prevent credit.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    const current = await adminDetail(f.reviewer, x.sale.id);
+    expect(current.credited).toBe(false);
+    expect(current.holds.find((h) => h.id === sibling)?.state).toBe("open");
+    await expect(
+      f.reviewer.getByText("Loyalty credit recorded", { exact: true }),
+    ).toHaveCount(0);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const condition of ["demoted-proposer", "policy-off-transport"] as const) {
+  test(`Matrix: ${condition} preserves independent rejection without permitting approval`, async ({
+    page,
+    browser,
+  }) => {
+    test.setTimeout(180000);
+    const f = await releaseFixture(page, browser);
+    try {
+      const x = await pendingFixture(page, f);
+      if (condition === "demoted-proposer")
+        await f.db.query(
+          "UPDATE auth_user SET enabled=false,auth_version=auth_version+1 WHERE id=$1",
+          [f.userId],
+        );
+      else {
+        // App-only boundary injection: the real inactive-policy mutation is covered by core SR-06.
+        // This does not pretend to activate/deactivate the running server's immutable policy.
+        await f.reviewer.route(
+          `**/api/admin/sales/${x.sale.id}/release-preparation?kind=date`,
+          (route) =>
+            route.fulfill({
+              status: 409,
+              json: {
+                error: {
+                  code: "release_policy_unconfigured",
+                  message: "Fictional inactive preparation",
+                  retryable: false,
+                },
+                serverTime: new Date().toISOString(),
+                requestId: v7(),
+              },
+            }),
+        );
+      }
+      await open(f.reviewer, x.sale.id, "date", x.proposal.id);
+      await f.reviewer
+        .getByLabel("Decision reason", { exact: true })
+        .last()
+        .fill(
+          "Independently reject this proposal while its approval prerequisites are unavailable",
+        );
+      if (condition === "demoted-proposer") {
+        await inspectIndependentPhotos(f.reviewer, x.sale.detail.saleCode);
+        await f.reviewer
+          .getByRole("button", { name: "Approve proposal", exact: true })
+          .click();
+        await f.reviewer
+          .getByRole("button", { name: "Confirm decision", exact: true })
+          .click();
+        await expect(
+          f.reviewer.getByText("This proposal needs a fresh review", {
+            exact: true,
+          }),
+        ).toBeVisible();
+      } else {
+        await expect(
+          f.reviewer
+            .getByText(
+              /Two-person release isn't switched on for this station\./,
+            )
+            .first(),
+        ).toBeVisible();
+        await expect(
+          f.reviewer.getByRole("button", {
+            name: "Approve proposal",
+            exact: true,
+          }),
+        ).toBeDisabled();
+      }
+      await f.reviewer
+        .getByRole("button", { name: "Reject proposal", exact: true })
+        .click();
+      await f.reviewer
+        .getByRole("button", { name: "Confirm decision", exact: true })
+        .click();
+      await expect(
+        f.reviewer.getByRole("heading", {
+          name: "Proposal rejected",
+          exact: true,
+        }),
+      ).toBeVisible();
+      expect((await adminDetail(f.reviewer, x.sale.id)).credited).toBe(false);
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+test("Matrix: pending hold and proposal use a distinct-sale giveaway union and safe audit/attendant projections", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(180000);
+  const f = await releaseFixture(page, browser);
+  try {
+    const sale = await boundarySale(f, "date"),
+      prep = await preparation(page, sale.id, "date");
+    const campaign = (
+      await f.db.query("SELECT id FROM campaign WHERE station_id=$1", [
+        prep.originalContext.stationId,
+      ])
+    ).rows[0].id;
+    const before = (await post(
+      page.request,
+      `/api/admin/giveaway/${campaign}/readiness`,
+      undefined,
+    )) as { counts: { holds: string; policyBlocks: string } };
+    const sheet = await uploadSheet(page, sale.id, prep),
+      body = proposalBody(prep, sheet.assetId);
+    const proposal = (await post(
+      page.request,
+      `/api/admin/sales/${sale.id}/release-proposals`,
+      body,
+      201,
+    )) as Proposal;
+    const after = (await post(
+      page.request,
+      `/api/admin/giveaway/${campaign}/readiness`,
+      undefined,
+    )) as {
+      counts: { holds: string; policyBlocks: string };
+      blockers: string[];
+    };
+    expect(after.counts.holds).toBe(before.counts.holds);
+    expect(after.counts.policyBlocks).toBe(before.counts.policyBlocks);
+    expect(after.blockers).toContain("reviews_unresolved");
+    const audit = (await post(page.request, "/api/admin/audit/search", {
+      targetId: sale.id,
+      limit: 100,
+    })) as { items: { id: string; action: string }[] };
+    const event = audit.items.find((e) => e.action === "held_release_proposed");
+    expect(event).toBeDefined();
+    await page.goto(`/admin/audit/${event!.id}`);
+    await expect(
+      page.getByRole("heading", { name: "Release proposed", exact: true }),
+    ).toBeVisible();
+    const main = page.getByRole("main");
+    await expect(main).not.toContainText(body.reason);
+    await expect(main).not.toContainText(body.facts.entryReference);
+    await expect(main).not.toContainText(sheet.assetId);
+    const own = (await post(
+      f.phone.request,
+      `/api/attendant/sales/${sale.id}`,
+      undefined,
+    )) as Record<string, unknown>;
+    for (const field of [
+      "pendingRelease",
+      "facts",
+      "sheetAssetId",
+      "proposedBy",
+      "releaseProposalId",
+    ])
+      expect(own).not.toHaveProperty(field);
+    expect(JSON.stringify(own)).not.toContain(proposal.id);
+    expect(JSON.stringify(own)).not.toContain(body.facts.entryReference);
+    await page.goto("/admin/leaderboards/finalize");
+    await expect(
+      page.getByText("Reviews still need decisions", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByText("Sales with holds or pending hold releases", { exact: true })
+        .locator(".."),
+    ).toContainText(after.counts.holds);
+    await expect(
+      page
+        .getByText("Sales with policy checks or pending capture releases", {
+          exact: true,
+        })
+        .locator(".."),
+    ).toContainText(after.counts.policyBlocks);
   } finally {
     await f.close();
   }

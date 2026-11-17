@@ -180,13 +180,15 @@ export async function heldSale(
   cardOutcome: "before" | "after" | "ambiguous" = "before",
   meterDisplay?: { amount: string; quantity: string },
   refreshPhone = true,
+  basis: "amount" | "quantity" = "amount",
+  medium: "vehicle" | "cylinder" = "vehicle",
 ) {
   const sale = await acceptedSale(
     f.phone,
-    "amount",
+    basis,
     value,
     f.cardCode,
-    "vehicle",
+    medium,
     meterDisplay,
   );
   const id = sale.detail.id;
