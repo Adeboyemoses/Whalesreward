@@ -208,7 +208,9 @@ test("R2 R4–R11 minute attestation uploads, freezes lost proposal/decision res
       .getByRole("button", { name: "Review proposal", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Review proposal", exact: true }),
+      page
+        .getByRole("heading", { name: "Review proposal", exact: true })
+        .last(),
     ).toBeFocused();
     await expect(
       page.getByText("Submitting a proposal does not change loyalty credit.", {
@@ -480,7 +482,13 @@ test("RD-07 complete server queue traverses over 100 tied-time stale proposals w
           r.url().includes("/release-proposals/pending") && r.status() === 200,
       );
       await next.click();
-      await response;
+      const nextPage = (await (await response).json()).data as {
+        items: { saleCode: string }[];
+      };
+      if (nextPage.items.length)
+        await expect(
+          rows.getByText(nextPage.items[0]!.saleCode, { exact: true }),
+        ).toBeVisible();
       if (pages > 10)
         throw new Error("Pending cursor traversal did not terminate");
     }
