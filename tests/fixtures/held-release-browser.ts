@@ -373,12 +373,26 @@ export async function boundarySale(
     );
   }
   // Fixtures represent original held purchases, before any accepted revision or credit.
-  await historical(
-    f.db,
-    "purchase",
-    "UPDATE purchase SET current_revision_id=NULL WHERE id=$1",
-    [sale.id],
-  );
+  // Keep the revision and pointer coherent: the next real purchase update checks both.
+  await f.db.query("BEGIN");
+  try {
+    await f.db.query("ALTER TABLE purchase DISABLE TRIGGER USER");
+    await f.db.query("ALTER TABLE purchase_revision DISABLE TRIGGER USER");
+    await f.db.query(
+      "UPDATE purchase_revision SET state='proposed' WHERE purchase_id=$1 AND state='accepted'",
+      [sale.id],
+    );
+    await f.db.query(
+      "UPDATE purchase SET current_revision_id=NULL WHERE id=$1",
+      [sale.id],
+    );
+    await f.db.query("ALTER TABLE purchase_revision ENABLE TRIGGER USER");
+    await f.db.query("ALTER TABLE purchase ENABLE TRIGGER USER");
+    await f.db.query("COMMIT");
+  } catch (error) {
+    await f.db.query("ROLLBACK");
+    throw error;
+  }
   return sale;
 }
 
