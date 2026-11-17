@@ -4,6 +4,12 @@ Scope: six read-only projections over WHR-22. The specification is `docs/enginee
 
 The new tests are in `tests/integration/giveaway-projections.test.ts` (B below) and `tests/integration/giveaway-projections-adversarial.test.ts` (A). Names below are exact Vitest names, except the clearly identified parameterized HTTP name. Tests use real disposable PostgreSQL schemas. The adversarial local run uses the `whr178_fixture` non-superuser, without BYPASSRLS. Historical/corrupt-evidence fixtures use the existing `seedHistorical` helper to establish retained state, then restore native guards before exercising services. The equality test replaces only the SQL clock expression; PostgreSQL performs the actual microsecond comparisons.
 
+## Current integrated verification
+
+EM verified code head `d89c105` on 17 Nov 2026: typecheck, lint (two existing image warnings), all 981 unit tests and production build passed. The combined named projection suites run against real disposable PostgreSQL under a non-superuser: **66 passed, 1 failed, 67 total; no skips**. All six actual GET route exports run over localhost HTTP, including success and authentication/permission/input errors. See [all exact test names and results](whr-178-named-tests.md).
+
+Round-one stored-history validation, misleading upload reasons and append-only person-revocation lock-race findings are fixed and their regressions pass. **WHR-179 remains the sole projection-suite failure**: duplicate applicable source exclusions are permitted by existing mutations, which this work order must preserve. This is not READY and cannot merge while that acceptance fails. Full supported PostgreSQL 16 integration remains a CI requirement; the local version and receipt-suite database-name guard are not bypassed.
+
 ## Acceptance mapping
 
 | T-21 acceptance clause | Named evidence |
