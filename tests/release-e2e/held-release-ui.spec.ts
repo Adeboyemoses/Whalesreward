@@ -33,6 +33,20 @@ const reviewerAttestation =
 
 async function captureView(page: Page, state: string) {
   const original = page.viewportSize();
+  if (state === "R11-recorded") {
+    const meter = page.getByRole("img", {
+      name: "Validated meter photo",
+      exact: true,
+    });
+    await meter.scrollIntoViewIfNeeded();
+    await meter.evaluate((image: HTMLImageElement) => image.decode());
+    expect(
+      await meter.evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    ).toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+  }
   const dir = "tests/design-parity/held-release";
   await mkdir(dir, { recursive: true });
   for (const width of [1440, 390, 360]) {
