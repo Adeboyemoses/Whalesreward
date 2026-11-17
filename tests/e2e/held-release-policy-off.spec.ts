@@ -9,9 +9,9 @@ test("WHR-171 R0 R15 R17 unconfigured v2 leaves ordinary review available and ca
 }) => {
   test.setTimeout(90000);
   const f = await reviewFixture(page, browser);
+  let release = () => {};
   try {
     const sale = await heldSale(f, ["date"]);
-    let release!: () => void;
     const wait = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -27,7 +27,9 @@ test("WHR-171 R0 R15 R17 unconfigured v2 leaves ordinary review available and ca
         await route.fulfill({ response });
       },
     );
-    await page.goto(`/admin/sales/${sale.id}/date-review`);
+    await page.goto(`/admin/sales/${sale.id}/date-review`, {
+      waitUntil: "domcontentloaded",
+    });
     await expect(
       page.getByText("Loading release details…", { exact: true }),
     ).toBeVisible();
@@ -57,6 +59,7 @@ test("WHR-171 R0 R15 R17 unconfigured v2 leaves ordinary review available and ca
     ).toBeVisible();
     expect(await page.locator('input[type="file"]').count()).toBe(0);
   } finally {
+    release();
     await page.unrouteAll({ behavior: "wait" });
     await f.close();
   }
