@@ -19,6 +19,6 @@ WO-app-8b (WHR-171) two-person stuck-hold release: READY since 2026-11-18
 ## Risks
 - Physical-phone/manual acceptance and separately authorized v2 activation remain pending; no cloud/data operations performed. Fidelity explicitly scopes unexecuted assistive-technology, geometry, contrast and zoom checks.
 - Four existing image warnings; inherited mobile nav WHR-180 and exact-24-hour fixture WHR-86 remain tracked. Final CI had zero flaky passes; no retry/timeout policy changes.
-- Feature dispatches35 exceed high-tier flag8; three review rounds, no escalation. One separate records review gives session36; model ID unavailable in runtime.
+- Feature dispatches35 exceed high-tier flag8; three review rounds, no escalation. Two separate records review rounds give session37; model ID unavailable in runtime.
 
-dispatches=36 prs=2 rounds_max=3 escalations=0 model=unknown
+dispatches=37 prs=2 rounds_max=3 escalations=0 model=unknown

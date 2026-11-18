@@ -21,7 +21,7 @@ Final feature [CI 44210059868](https://github.com/Adeboyemoses/Whalesreward/acti
 
 | Board row / written states | Named verification | Status |
 | --- | --- | --- |
-| S02/S03/S04/S06/S07/S09 review, comparison and recorded outcome; A14 categorical audit; approved R0–R18/RD-07 | Independent [fidelity report](../qa/whr171-fidelity/REPORT.md) and [69 original PNGs/hash inventory](../qa/whr171-fidelity/CAPTURES.md): 23 named groups at 1440/390/360; release runtime assertions and ordinary R17 test | on-staging; scoped PASS, not exhaustive visual/manual acceptance |
+| S02/S03/S04/S06/S07/S09 review, comparison and recorded outcome; A14 attendant held-result/reassurance reference; approved R0–R18/RD-07 | Independent [fidelity report](../qa/whr171-fidelity/REPORT.md) and [69 original PNGs/hash inventory](../qa/whr171-fidelity/CAPTURES.md): 23 named groups at 1440/390/360; release runtime assertions and ordinary R17 test | on-staging; scoped PASS, not exhaustive visual/manual acceptance; attendant/A14 and general-audit behavior have runtime assertions, no dedicated captures |
 
 [Smoke runbook](../qa/smoke-2026-11-17-two-person-release.md) retains keyboard/tab, assistive-technology, geometry, contrast, zoom and physical-phone checks. WHR-180 inherited mobile admin navigation is visible/tracked, not silently accepted as a feature fix. Unconfigured staging shows R17. READY does not authorize v2 activation.
 
