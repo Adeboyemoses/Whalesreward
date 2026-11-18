@@ -30,9 +30,11 @@ export class AdminAuditApi {
   }
 }
 export const auditTitle = (e: AuditEvent) =>
-  e.action === "legacy_event"
-    ? "older event, details not available"
-    : adminAction(e.action);
+  e.action.startsWith("held_release_")
+    ? adminAction(e.action.slice("held_".length))
+    : e.action === "legacy_event"
+      ? "older event, details not available"
+      : adminAction(e.action);
 export function auditValue(
   event: AuditEvent,
   change: AuditChange,
@@ -97,6 +99,10 @@ export function auditValue(
     "exportFormat",
     "policyEnvironment",
     "policyState",
+    "releaseState",
+    "releaseTargetKind",
+    "releaseOutcome",
+    "releaseConclusion",
   ];
   return enums.includes(change.field) ? adminAction(value) : value;
 }

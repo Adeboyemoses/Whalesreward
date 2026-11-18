@@ -56,9 +56,17 @@ import {
   AdminSalePhoto,
   AdminSaleHistory,
 } from "./sales-common";
-import { ReviewQueue, ReviewPage, ReviewLinks, reviewKind } from "./reviews";
+import { releaseReviewAllowed } from "@/client/admin-pending-release-api";
+import {
+  ReviewQueue,
+  ReviewPage,
+  ReviewLinks,
+  PendingReleaseLabel,
+  reviewKind,
+} from "./reviews";
 const statusOptions = {
   all: "All records",
+  pending_release: "Pending releases",
   completed: "Completed",
   incomplete: "Incomplete upload",
   late_correction: "Late correction",
@@ -85,8 +93,24 @@ export function SalesPortal({
 }) {
   const search = useSearchParams();
   const customer = search.get("customer") ?? search.get("customerId");
-  const leaderboardCategory = Object.keys(categories).includes(search.get("category") ?? "") ? search.get("category") : null;
-  const suffix = customer ? `?customer=${encodeURIComponent(customer)}` : "";
+  const leaderboardCategory = Object.keys(categories).includes(
+    search.get("category") ?? "",
+  )
+    ? search.get("category")
+    : null;
+  const returnQuery = new URLSearchParams();
+  if (customer) returnQuery.set("customer", customer);
+  if (search.get("from") === "leaderboards") {
+    returnQuery.set("from", "leaderboards");
+    returnQuery.set(
+      "basis",
+      search.get("basis") === "recorded_all_time"
+        ? "recorded_all_time"
+        : "campaign_qualifying",
+    );
+    if (leaderboardCategory) returnQuery.set("category", leaderboardCategory);
+  }
+  const suffix = returnQuery.size ? `?${returnQuery}` : "";
   if (!session.permissions?.includes("sales"))
     return (
       <Notice tone="danger" role="alert">
@@ -95,11 +119,21 @@ export function SalesPortal({
     );
   return (
     <div className="wr-sales">
-      {search.get("from") === "leaderboards" && session.permissions?.includes("leaderboards") && (
-        <Link className="wr-btn wr-btn-secondary" href={`/admin/leaderboards?${new URLSearchParams({basis: search.get("basis") === "recorded_all_time" ? "recorded_all_time" : "campaign_qualifying", ...(leaderboardCategory ? {category: leaderboardCategory} : {})})}`}>Back to leaderboard</Link>
-      )}
+      {search.get("from") === "leaderboards" &&
+        session.permissions?.includes("leaderboards") && (
+          <Link
+            className="wr-btn wr-btn-secondary"
+            href={`/admin/leaderboards?${new URLSearchParams({ basis: search.get("basis") === "recorded_all_time" ? "recorded_all_time" : "campaign_qualifying", ...(leaderboardCategory ? { category: leaderboardCategory } : {}) })}`}
+          >
+            Back to leaderboard
+          </Link>
+        )}
       {path[1] === "reviews" ? (
-        <ReviewQueue customer={customer} suffix={suffix} />
+        <ReviewQueue
+          key={search.get("view") ?? "ordinary"}
+          customer={customer}
+          suffix={suffix}
+        />
       ) : path[1] && reviewKind(path[2] ?? "") ? (
         <ReviewPage
           key={path.slice(1).join(":")}
@@ -187,11 +221,19 @@ function SalesList({
             setFilters({ ...draft, status });
           }}
         >
-          {Object.entries(statusOptions).map(([v, l]) => (
-            <option key={v} value={v}>
-              {l}
-            </option>
-          ))}
+          {Object.entries(statusOptions)
+            .filter(
+              ([v]) =>
+                v !== "pending_release" ||
+                (["price", "card", "date", "capture"] as const).some((kind) =>
+                  releaseReviewAllowed(session.permissions, kind),
+                ),
+            )
+            .map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
         </SelectField>
         <TextField
           label="Day"
@@ -205,6 +247,25 @@ function SalesList({
         Day uses the verified sale date where available; otherwise it is the
         app-reported date, not proof of capture time.
       </p>
+      {filters.status === "pending_release" && (
+        <Notice>
+          Pending releases are narrowed by the search, day and customer filters
+          shown here.
+          <Button
+            variant="ghost"
+            onClick={() => {
+              const cleared = { query: "", status: "pending_release", day: "" };
+              setDraft(cleared);
+              setFilters(cleared);
+            }}
+          >
+            Clear search and day filters
+          </Button>
+          <Link href="/admin/sales/reviews?view=pending_release">
+            Open complete review queue
+          </Link>
+        </Notice>
+      )}
       <SalesResults
         key={JSON.stringify([filters, customer])}
         filters={filters}
@@ -246,7 +307,7 @@ function SalesResults({
       JSON.stringify([filters, customer, cursor]),
       load,
     ),
-    data = result.data;
+    data = !result.busy && !result.error ? result.data : null;
   const suffix = customer ? `?customer=${encodeURIComponent(customer)}` : "";
   return (
     <>
@@ -296,7 +357,18 @@ function SalesResults({
                 </span>
               </>
             ),
-            status: <SaleStatus sale={s} />,
+            status: (
+              <>
+                <SaleStatus sale={s} />
+                {s.pendingRelease && (
+                  <PendingReleaseLabel
+                    purchaseId={s.id}
+                    proposal={s.pendingRelease}
+                    suffix={suffix}
+                  />
+                )}
+              </>
+            ),
             action: <Link href={`/admin/sales/${s.id}${suffix}`}>View</Link>,
           },
         }))}

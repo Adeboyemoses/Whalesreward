@@ -308,7 +308,7 @@ export function giveawayMessage(e: unknown) {
     snapshot_superseded:
       "This review is out of date. Refresh the evidence and review again.",
     preview_stale:
-      "This preview can no longer be confirmed. Refresh the checks and prepare a new preview.",
+      "The records changed. Refresh readiness and prepare a new preview.",
     preview_expired:
       "This preview can no longer be confirmed. Refresh the checks and prepare a new preview.",
     preview_used:

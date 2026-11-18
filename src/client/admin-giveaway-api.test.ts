@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AdminGiveawayApi,
   giveawayUncertain,
+  giveawayMessage,
   matchingPreview,
 } from "./admin-giveaway-api";
 import { AdminError, type adminRequest } from "./admin-api";
@@ -287,4 +288,10 @@ describe("giveaway client boundary", () => {
       false,
     );
   });
+});
+
+it("P-29 explains stale preview requires refreshed readiness and a new preview", () => {
+  expect(giveawayMessage(new AdminError("preview_stale", 409))).toBe(
+    "The records changed. Refresh readiness and prepare a new preview.",
+  );
 });

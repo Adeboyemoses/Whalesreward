@@ -83,6 +83,24 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
       - run: docker compose up -d minio
-      - run: pnpm db:migrate:deploy && pnpm db:seed && pnpm test:e2e
+      - run: pnpm db:migrate:deploy && pnpm db:seed
+      - run: pnpm exec playwright test --config playwright.release.config.ts
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: held-release-fidelity
+          path: tests/design-parity/held-release/*.png
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: held-release-failures
+          path: |
+            test-results/**/error-context.md
+            test-results/**/reviewer-context.md
+          if-no-files-found: ignore
+      - run: pnpm test:e2e
+        if: ${{ !cancelled() }}
       - run: pnpm exec playwright test -c tests/storage/playwright.config.ts
-      - run: pnpm exec playwright test -c playwright.release.config.ts
+        if: ${{ !cancelled() }}

@@ -1,18 +1,21 @@
 import {
   expect,
+  test,
   request as requestFactory,
   type Browser,
   type Page,
   type APIRequestContext,
 } from "@playwright/test";
 import { createHash, randomBytes } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { v7 } from "uuid";
 import { reviewFixture, heldSale, type ReviewKind } from "../reviews/helpers";
 import { browserReleasePolicy } from "../reviews/release-browser-policy";
 import { fixture, signIn } from "../admin-access/admin-access.fixtures";
 import { data, origin } from "../sales-history/helpers";
-import { seedId, api } from "../station/helpers";
+import { seedId, api, type Attendant } from "../station/helpers";
+import type { AttendantSession } from "../../src/shared/contracts/auth";
 import { ensureLocalCardBucket } from "../customers-cards/storage";
 import type { z } from "zod";
 import type {
@@ -22,6 +25,11 @@ import type {
 
 export type Preparation = z.infer<typeof releasePreparationSchema>;
 export type Proposal = z.infer<typeof releaseProposalSchema>;
+export type PaperCaptureRange = {
+  from: string;
+  through: string;
+  timezone: "Africa/Lagos";
+};
 export type ReleaseFixture = Awaited<ReturnType<typeof releaseFixture>>;
 
 export async function bindEnabledPeople(db: {
@@ -181,7 +189,7 @@ export async function releaseFixture(
   const apiOnlyPhone = !browser || !!options.pumpId;
   const f = apiOnlyPhone
     ? await apiReviewFixture(page.request, options.pumpId)
-    : await reviewFixture(page, browser!);
+    : await reviewFixture(page, browser!, false);
   const second = await fixture();
   await second.db.query(
     "UPDATE auth_user SET must_change_password=false WHERE id=$1",
@@ -278,12 +286,32 @@ export async function releaseFixture(
     await f.db.query("ROLLBACK");
     throw error;
   }
+  if (browser) {
+    await installReleaseStorageBridge(page);
+    await installReleaseStorageBridge(reviewer);
+  }
   return {
     ...f,
     reviewer,
+    adminRequest: page.request,
     second,
     browserBased: !apiOnlyPhone,
     async close() {
+      if (context) {
+        await page.unrouteAll({ behavior: "wait" });
+        await reviewer.unrouteAll({ behavior: "wait" });
+      }
+      // Best-effort diagnostics for the separate reviewer page, before teardown.
+      if (context && !reviewer.isClosed()) {
+        try {
+          await writeFile(
+            test.info().outputPath("reviewer-context.md"),
+            await reviewer.locator("body").ariaSnapshot({ timeout: 3000 }),
+          );
+        } catch {
+          // Diagnostic capture must not replace the original failure or skip cleanup.
+        }
+      }
       await context?.close();
       await secondRequest?.dispose();
       await second.db.end();
@@ -308,6 +336,8 @@ export async function boundarySale(
     kind === "card" ? "ambiguous" : "before",
     undefined,
     f.browserBased,
+    entry.basis ?? "amount",
+    entry.medium ?? "vehicle",
   );
   if (kind === "date") {
     await historical(
@@ -366,6 +396,111 @@ export async function boundarySale(
       ],
     );
   }
+  if (kind === "capture") {
+    // The retained sale belongs to an ended historical assignment. M2 P-10/P-21
+    // requires a separate current assignment and fresh sign-in for live reads.
+    // Never reopen that historical interval or rebind the original capture context.
+    const retained = async () =>
+      (
+        await f.db.query(
+          `SELECT p.version,p.current_revision_id,p.capture_context_id,p.assignment_id,p.pump_id,
+             p.capture_lower_bound::text,p.server_received_at::text,p.app_captured_at::text,
+             (SELECT id FROM purchase_revision WHERE purchase_id=p.id AND revision_number=1) original_revision_id,
+             a.effective_from::text,a.effective_until::text,
+             c.signed_in_at::text,c.offline_expires_at::text,c.revoked_at::text
+           FROM purchase p JOIN assignment a ON a.id=p.assignment_id
+           JOIN capture_context c ON c.id=p.capture_context_id WHERE p.id=$1`,
+          [sale.id],
+        )
+      ).rows[0];
+    const before = await retained();
+    expect(before.assignment_id).toBe(sale.original.assignmentId);
+    expect(new Date(before.effective_until).toISOString()).toBe(
+      "2026-11-10T12:30:00.000Z",
+    );
+    expect(
+      (await f.phone.request.get(`/api/attendant/sales/${sale.id}`)).status(),
+    ).toBe(401);
+    const attendant = await api<Attendant>(
+      f.adminRequest,
+      `attendants/${f.attendant.id}`,
+    );
+    expect(attendant.assignment).toBeNull();
+    const pump = await api<{ version: number }>(
+      f.adminRequest,
+      `pumps/${before.pump_id}`,
+    );
+    const assigned = await api<{ attendant: Attendant }>(
+      f.adminRequest,
+      `attendants/${f.attendant.id}/assignment`,
+      {
+        operationId: v7(),
+        expectedVersion: attendant.version,
+        expectedAssignmentId: null,
+        pumpId: before.pump_id,
+        expectedPumpVersion: pump.version,
+        reason: "Fictional current assignment after the retained capture",
+      },
+    );
+    expect(assigned.attendant.accountId).toBe(f.attendant.accountId);
+    expect(assigned.attendant.assignment!.id).not.toBe(before.assignment_id);
+    const signed = await f.phone.request.post("/api/attendant/sign-in", {
+      headers: { Origin: origin, "Idempotency-Key": v7() },
+      data: { username: f.username, password: f.password, deviceId: v7() },
+    });
+    expect(signed.status()).toBe(200);
+    const session = (await signed.json()).data as AttendantSession;
+    expect(session.account.id).toBe(f.attendant.id);
+    expect(session.assignment.id).toBe(assigned.attendant.assignment!.id);
+    expect(session.captureContextId).not.toBe(before.capture_context_id);
+    expect(session.reassignmentRequiresSignIn).toBe(false);
+    expect(
+      Date.parse(assigned.attendant.assignment!.effectiveFrom),
+    ).toBeGreaterThan(Date.parse(before.effective_until));
+    const currentContext = (
+      await f.db.query(
+        `SELECT a.user_id,c.assignment_id FROM capture_context c
+         JOIN attendant a ON a.id=c.attendant_id WHERE c.id=$1`,
+        [session.captureContextId],
+      )
+    ).rows[0];
+    expect(currentContext.user_id).toBe(f.attendant.accountId);
+    expect(currentContext.assignment_id).toBe(session.assignment.id);
+    expect(await retained()).toEqual(before);
+    const own = await data<{ id: string }>(
+      f.phone.request,
+      `/api/attendant/sales/${sale.id}`,
+    );
+    expect(own.id).toBe(sale.id);
+    const history = await data<{ items: { id: string }[] }>(
+      f.phone.request,
+      `/api/attendant/sales/${sale.id}/history?kind=revisions`,
+    );
+    expect(history.items.map((revision) => revision.id)).toContain(
+      before.original_revision_id,
+    );
+  }
+  // Fixtures represent original held purchases, before any accepted revision or credit.
+  // Keep the revision and pointer coherent: the next real purchase update checks both.
+  await f.db.query("BEGIN");
+  try {
+    await f.db.query("ALTER TABLE purchase DISABLE TRIGGER USER");
+    await f.db.query("ALTER TABLE purchase_revision DISABLE TRIGGER USER");
+    await f.db.query(
+      "UPDATE purchase_revision SET state='proposed' WHERE purchase_id=$1 AND state='accepted'",
+      [sale.id],
+    );
+    await f.db.query(
+      "UPDATE purchase SET current_revision_id=NULL WHERE id=$1",
+      [sale.id],
+    );
+    await f.db.query("ALTER TABLE purchase_revision ENABLE TRIGGER USER");
+    await f.db.query("ALTER TABLE purchase ENABLE TRIGGER USER");
+    await f.db.query("COMMIT");
+  } catch (error) {
+    await f.db.query("ROLLBACK");
+    throw error;
+  }
   return sale;
 }
 
@@ -401,11 +536,28 @@ export async function uploadSheet(
   id: string,
   prep: Preparation,
   outcome: "confirm" | "cancel" = "confirm",
+  observedCapture?: PaperCaptureRange,
 ) {
+  const day = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Lagos",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const minute = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Lagos",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const supportedLabel = observedCapture
+    ? `${day.format(new Date(observedCapture.from))} · ${minute.format(new Date(observedCapture.from))}–${minute.format(new Date(observedCapture.through))}`
+    : undefined;
   const bytes = await sheetBytes(
     prep.kind,
     outcome,
     prep.currentCandidate.values,
+    supportedLabel,
   );
   const reservation = await data<{ uploadId: string; assetId: string }>(
     page.request,
@@ -446,6 +598,7 @@ export function proposalBody(
   prep: Preparation,
   sheetAssetId: string,
   outcome: "confirm" | "cancel" = "confirm",
+  observedCapture?: PaperCaptureRange,
 ) {
   return {
     ...prep.guard,
@@ -461,7 +614,7 @@ export function proposalBody(
       recordedAmountKobo: prep.currentCandidate.values.amountKobo,
       recordedQuantity: prep.currentCandidate.values.quantity,
       recordedRateKobo: prep.original.rateKobo,
-      observedCapture: {
+      observedCapture: observedCapture ?? {
         from:
           prep.kind === "date"
             ? "2026-11-10T23:10:00.000Z"
@@ -493,4 +646,52 @@ export async function post(
   const json = await response.json();
   expect(response.status(), json.error?.code ?? "HTTP status").toBe(status);
   return json.data;
+}
+export async function installReleaseStorageBridge(page: Page) {
+  await page.route(
+    /\/api\/admin\/sales\/[^/]+\/(?:release-sheet-uploads\/[^/]+\/upload-url|release-proposals\/[^/]+\/photo-access|photo-access)$/,
+    async (route) => {
+      const response = await route.fetch({ maxRedirects: 0 });
+      if (response.status() !== 200) return route.fulfill({ response });
+      const json = await response.json();
+      const local = new URL(json.data.url);
+      if (
+        local.hostname !== "127.0.0.1" ||
+        local.port !==
+          new URL(
+            process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000",
+          ).port
+      )
+        throw new Error("Unexpected release fixture storage endpoint");
+      local.protocol = "https:";
+      json.data.url = local.href;
+      await route.fulfill({ response, json });
+    },
+  );
+  await page.route(
+    `https://127.0.0.1:${new URL(process.env.WHR_TEST_STORAGE_ENDPOINT ?? "http://127.0.0.1:9000").port}/**`,
+    async (route) => {
+      const url = new URL(route.request().url());
+      url.protocol = "http:";
+      if (route.request().method() === "OPTIONS")
+        return route.fulfill({
+          status: 204,
+          headers: {
+            "access-control-allow-origin": origin,
+            "access-control-allow-methods": "GET, PUT, OPTIONS",
+            "access-control-allow-headers": "content-type",
+          },
+        });
+      if (!["GET", "PUT"].includes(route.request().method()))
+        return route.abort("blockedbyclient");
+      const response = await route.fetch({ url: url.href, maxRedirects: 0 });
+      await route.fulfill({
+        response,
+        headers: {
+          ...response.headers(),
+          "access-control-allow-origin": origin,
+        },
+      });
+    },
+  );
 }

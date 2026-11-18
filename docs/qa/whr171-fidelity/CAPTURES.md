@@ -1,0 +1,75 @@
+# CI capture inventory
+
+Run [44204172724](https://github.com/Adeboyemoses/Whalesreward/actions/runs/44204172724); source head `07ad8c71f1dbd5ce50c354f839116a06eff26a73`. All **69 original PNGs**, comprising **23 capture groups × 3 widths**, individually opened with `view_image` by the independent checker. Original downloaded bytes retained and checked byte-for-byte. Widths equal CSS viewport widths: **1×**, not 2×. This supersedes previous checkpoints preserved in git history. See [report](REPORT.md) for state coverage and manual limits.
+
+| Capture                                                                              | PNG width × height | SHA-256                                                            |
+| ------------------------------------------------------------------------------------ | ------------------ | ------------------------------------------------------------------ |
+| [R1-capture-1440.built.png](R1-capture-1440.built.png)                               | 1440 × 2657        | `c252b52221705d13641d2357b61e32aa68c5ab7eafa178dd1867f025460309d4` |
+| [R1-capture-360.built.png](R1-capture-360.built.png)                                 | 360 × 4602         | `dda3cc6e9ca51282d6b29a0ee6c6969b9af4dac3066f6581e031b17924bae2be` |
+| [R1-capture-390.built.png](R1-capture-390.built.png)                                 | 390 × 4471         | `4858c929aa58d8d5941a379c2c0cc7c0265c8f4c8addbb0573bda35658cbbe31` |
+| [R1-card-1440.built.png](R1-card-1440.built.png)                                     | 1440 × 2717        | `3b873a6ae5999743024b188dad3676fd6e5659581194103b427f572563d5d160` |
+| [R1-card-360.built.png](R1-card-360.built.png)                                       | 360 × 4758         | `294fc1215ce658aee79e3a7182f981a226cbaa4149f777036e8cad8dfe27816f` |
+| [R1-card-390.built.png](R1-card-390.built.png)                                       | 390 × 4583         | `c71d780f0813e2099038a1f257a0c944fc2b164c81fee7da7fa83d4c19aee25f` |
+| [R1-date-1440.built.png](R1-date-1440.built.png)                                     | 1440 × 2683        | `6fc6888887a34c6f3a0d7a5aa42c0d7475cf6cb16bfabb9c74c6e824de5ad48b` |
+| [R1-date-360.built.png](R1-date-360.built.png)                                       | 360 × 4632         | `7dd98c84d29bf76ceb04e1711098d7dac000d7f6149b8539a20a2a81aa4fadf4` |
+| [R1-date-390.built.png](R1-date-390.built.png)                                       | 390 × 4457         | `57bc9e857b26e767b7aafc1efccb274023dc8c0dc13b22cd539e50ce2129269b` |
+| [R1-price-1440.built.png](R1-price-1440.built.png)                                   | 1440 × 2789        | `1ff4c4ed6cd4789baf1c3921bed03c2dd68df2196c3935f5b68be404558455e3` |
+| [R1-price-360.built.png](R1-price-360.built.png)                                     | 360 × 4834         | `ea54438833cee83222844de73fbff2cbae70e435aa7b21836de84f603955cd49` |
+| [R1-price-390.built.png](R1-price-390.built.png)                                     | 390 × 4695         | `bdade6c65c2c15c2f52add27faf4ab5c3e198be69fba49b58934e761c68da686` |
+| [R10-uncertain-proposal-1440.built.png](R10-uncertain-proposal-1440.built.png)       | 1440 × 4026        | `61f3deaabd997cc6137474b82f7ed20393f519ea4640a87e6a6ceb1162769b60` |
+| [R10-uncertain-proposal-360.built.png](R10-uncertain-proposal-360.built.png)         | 360 × 5860         | `0cbe1a667ffdc14431ce858d69fc82ac4edc26eb667aef24fa54b84c1a6fdb34` |
+| [R10-uncertain-proposal-390.built.png](R10-uncertain-proposal-390.built.png)         | 390 × 5863         | `c372123d0935556d955f1786e16208af9d16a2024201d8b6b1e0c12d91586a74` |
+| [R11-recorded-1440.built.png](R11-recorded-1440.built.png)                           | 1440 × 4488        | `a1453a4634e10ef2b4f2733700a68c2076ddc600485a62a8dac75b0715b11cf0` |
+| [R11-recorded-360.built.png](R11-recorded-360.built.png)                             | 360 × 7681         | `880f1c5253fc5bfe5d0b00302409b6c4b35a108ecafa8d309f349f5bbbd8f5df` |
+| [R11-recorded-390.built.png](R11-recorded-390.built.png)                             | 390 × 7559         | `f5e1d863cd9b64bd00a99706d1b1390a95a246a6c8199820f58954df5152ee0d` |
+| [R12-rejected-1440.built.png](R12-rejected-1440.built.png)                           | 1440 × 4714        | `7f869505345cd414f1595e794d18ce2a14526d39c33473baa178c99d646f7a73` |
+| [R12-rejected-360.built.png](R12-rejected-360.built.png)                             | 360 × 8080         | `72996bcae42cb82d1bd0be7e28716548ff3309f1ed9d81c9f31191da7bd7e675` |
+| [R12-rejected-390.built.png](R12-rejected-390.built.png)                             | 390 × 7885         | `723134bd65ab48ffa20fa3dee46ee5c6cdbf5c0db439f17f6244dd9dc697156a` |
+| [R14-stale-1440.built.png](R14-stale-1440.built.png)                                 | 1440 × 5174        | `548af53bfd6f09ba5f11f5e52a7f4118fe9cd639ab6bb36f33783815616a0088` |
+| [R14-stale-360.built.png](R14-stale-360.built.png)                                   | 360 × 8776         | `b15fbef6875c3b5dab88317db100839e94c1272a8891adf5452426884f118162` |
+| [R14-stale-390.built.png](R14-stale-390.built.png)                                   | 390 × 8521         | `23af564b8b058683c9dd75880d2d552bba03e2b963a213e1015b378b2de95155` |
+| [R2-capture-1440.built.png](R2-capture-1440.built.png)                               | 1440 × 4304        | `e211ea3a8f14c5fdb9acb0bf166d1248a8f593b83b7f4ba72ab670fe8e395ac3` |
+| [R2-capture-360.built.png](R2-capture-360.built.png)                                 | 360 × 4954         | `41e539c30788d9fdd77f4aec0c77a1cb2d358e010568d7f626396f17b2f16b58` |
+| [R2-capture-390.built.png](R2-capture-390.built.png)                                 | 390 × 4941         | `909d62b12d8b336cdfe46cb003ecc16e42adf9b689f24a1345d599fc1155bb10` |
+| [R2-card-1440.built.png](R2-card-1440.built.png)                                     | 1440 × 4364        | `58426e12278b75b9b76f78d4a6bf5f663f917f1673e9b8cbdc9a87b0e5833030` |
+| [R2-card-360.built.png](R2-card-360.built.png)                                       | 360 × 4964         | `6e68543f148b4f16f667ed6c2c4d291b7fe630bf2de1fa21171dcff741df4a83` |
+| [R2-card-390.built.png](R2-card-390.built.png)                                       | 390 × 4951         | `c1986d7cdd51d682851638178c99911dc2615ea35b7d6a7b890aa38cf6bb0e35` |
+| [R2-date-1440.built.png](R2-date-1440.built.png)                                     | 1440 × 4330        | `fcbe4bf02cff19e250fcc49cc934d85520a32e1eded4933b59b9ea4ab3522c84` |
+| [R2-date-360.built.png](R2-date-360.built.png)                                       | 360 × 4926         | `f2d36543e22c1fe800c1c05449cc2d7b0cd619a1dcd35423c84a087585974ed4` |
+| [R2-date-390.built.png](R2-date-390.built.png)                                       | 390 × 4913         | `557166b40ead626049cc5c5532dabf2329fe0981e94ab6728bfa1940eff43b95` |
+| [R2-price-1440.built.png](R2-price-1440.built.png)                                   | 1440 × 4462        | `7e7eca79fb8403164bc64a91c5650871a9185590fef459d266c8ed8d33a15823` |
+| [R2-price-360.built.png](R2-price-360.built.png)                                     | 360 × 4952         | `5d5cf1cdee5a7b6704b67997b59591a5bdd67cfa0c05b6c040823c4676a67ca9` |
+| [R2-price-390.built.png](R2-price-390.built.png)                                     | 390 × 4875         | `d94396051c1538d07564fe6fd5d15f6c002d11e7031b99ee967255aeaeb486ac` |
+| [R3-capture-1440.built.png](R3-capture-1440.built.png)                               | 1440 × 3996        | `771859a0477a64d16f44cd7676766bddc64019c149ac897e165cc8c00d6e2ba9` |
+| [R3-capture-360.built.png](R3-capture-360.built.png)                                 | 360 × 6002         | `31b81194328839b3a3e8a7a42a15a4903ac05d1311290ea61a3e7eb259c58c15` |
+| [R3-capture-390.built.png](R3-capture-390.built.png)                                 | 390 × 5857         | `ab7f751b1a5efb36120456c6ba698cc73b7df2d230879caa37b1f3c5a7ba112c` |
+| [R3-card-1440.built.png](R3-card-1440.built.png)                                     | 1440 × 3996        | `6ee9e718778c9c6135975ffb397ffc33860bae06b01ff91a81a740f13b7f546f` |
+| [R3-card-360.built.png](R3-card-360.built.png)                                       | 360 × 6012         | `a01782391b7a7b68d106ad1b8b8d3507c8839f4c03f93f517f8db78bdfffe037` |
+| [R3-card-390.built.png](R3-card-390.built.png)                                       | 390 × 5867         | `35f294b36fb65aa1bf00594f4c089ebd61e9387c46786ed6073b545f24b0aa3b` |
+| [R3-date-1440.built.png](R3-date-1440.built.png)                                     | 1440 × 3996        | `1a86f7550bb2125e9e8c804743edb878c486378c276904654deaaf7e77aaacd0` |
+| [R3-date-360.built.png](R3-date-360.built.png)                                       | 360 × 5974         | `7b872f50168a2ddf9c63b7c689c96dbd4af73f2b9fb707472841c4f076943a1f` |
+| [R3-date-390.built.png](R3-date-390.built.png)                                       | 390 × 5829         | `4b7934afee1f923691c57151664cbc128cb44a445f6471976fbd50fec4b274ed` |
+| [R3-price-1440.built.png](R3-price-1440.built.png)                                   | 1440 × 3996        | `a47f769889bf9bbf63b06dcd6088d6b5e6b58746e3a89e39105c4fe38a44074c` |
+| [R3-price-360.built.png](R3-price-360.built.png)                                     | 360 × 5974         | `d4d082d885835b2ad6d72276bb18ffdd6d5f90108ac4dcd66909ec743b841492` |
+| [R3-price-390.built.png](R3-price-390.built.png)                                     | 390 × 5765         | `a38ffc78cabd669bebc458ddbb7cd0187570ae11e13bcb36e3fcc7ea3eae3883` |
+| [R4-retained-renewed-1440.built.png](R4-retained-renewed-1440.built.png)             | 1440 × 4485        | `276d2107a96448acb63887b4b3a8c3a438d2d166791bc9ecd9721d72941d3a17` |
+| [R4-retained-renewed-360.built.png](R4-retained-renewed-360.built.png)               | 360 × 5658         | `5b7d7cc4feecff3c3b67c04a46288285460da5f40eb0cd99f55947b82c1e06e6` |
+| [R4-retained-renewed-390.built.png](R4-retained-renewed-390.built.png)               | 390 × 5661         | `ce3984db362db033c28a4e77a63751d1db6b365cd02951a1a7f3af8f94e19ca2` |
+| [R7-R8-capture-1440.built.png](R7-R8-capture-1440.built.png)                         | 1440 × 4854        | `201a06a43eb34a91d30851625f6a292f34a96d12bc99791b39523e1a73bbdec1` |
+| [R7-R8-capture-360.built.png](R7-R8-capture-360.built.png)                           | 360 × 8333         | `172c508a2ded5120fe12f59ca29d42bcd05b1ffbccad47e36fce243fc4e0f96d` |
+| [R7-R8-capture-390.built.png](R7-R8-capture-390.built.png)                           | 390 × 8122         | `8468b3dccf6013bd2f0732a5af056aa167055b476db3b58838c8ec5046abf762` |
+| [R7-R8-card-1440.built.png](R7-R8-card-1440.built.png)                               | 1440 × 4914        | `42aa31c378954c00ca050deeadf1de98624794469eb86ee9f01c1672f7d5d42b` |
+| [R7-R8-card-360.built.png](R7-R8-card-360.built.png)                                 | 360 × 8489         | `98c972d36c5c07e2e799c5bd19bac6731ab933053ac3806bdfd7dea9c87616f0` |
+| [R7-R8-card-390.built.png](R7-R8-card-390.built.png)                                 | 390 × 8234         | `c3be7af272796df86ef354eda8c8075573ea8f9db370ced71ccadd9ec744497d` |
+| [R7-R8-date-1440.built.png](R7-R8-date-1440.built.png)                               | 1440 × 4880        | `baebc4161246f9c9b598e6e576fd7831a5b82a9587db7c8a527300ee0dcebc6a` |
+| [R7-R8-date-360.built.png](R7-R8-date-360.built.png)                                 | 360 × 8363         | `f4c973e2e73c4130b320ef844b91983a1b579ce1c7f3099636204ce17b9503e3` |
+| [R7-R8-date-390.built.png](R7-R8-date-390.built.png)                                 | 390 × 8108         | `522077f5fe008f510e5c70b72be471bafed3f03b693fa44fbdd122a316929a11` |
+| [R7-R8-price-1440.built.png](R7-R8-price-1440.built.png)                             | 1440 × 4986        | `fa09ea135e5afe0f5129286750d283d9804be8dd81e67438ac9b3d008c887fa2` |
+| [R7-R8-price-360.built.png](R7-R8-price-360.built.png)                               | 360 × 8565         | `bd62ad5e104136350b43877aa48a7564b49f98d39baef3314b44618a67fc245b` |
+| [R7-R8-price-390.built.png](R7-R8-price-390.built.png)                               | 390 × 8346         | `0bcd07a3c1832d4f306e7d574ebb5f2625c2e7d8231db575061e0fcc558168c7` |
+| [matrix-later-candidate-1440.built.png](matrix-later-candidate-1440.built.png)       | 1440 × 3648        | `03e132b4ce9edf4a36f35743300b0fed15d203c19823e608ed9edbfa28634757` |
+| [matrix-later-candidate-360.built.png](matrix-later-candidate-360.built.png)         | 360 × 5168         | `674704f76ef33b518a21e98676b7cf66f561a99930fe22333d724b18809ade97` |
+| [matrix-later-candidate-390.built.png](matrix-later-candidate-390.built.png)         | 390 × 5155         | `e89cf27294c4bfa9d6acc77f227089870854982919ac19cb6638645c2b77a91e` |
+| [matrix-quantity-kilograms-1440.built.png](matrix-quantity-kilograms-1440.built.png) | 1440 × 3996        | `01837ec20ead96891286602b0bb4493e4226bdd660e490372ed5b518a60a0c99` |
+| [matrix-quantity-kilograms-360.built.png](matrix-quantity-kilograms-360.built.png)   | 360 × 5974         | `892f298e8fc44540b770be5c5da503d87c88191a015e2b88771a9aa6b19f6596` |
+| [matrix-quantity-kilograms-390.built.png](matrix-quantity-kilograms-390.built.png)   | 390 × 5829         | `e1aa4e00c157a337c161b4d15e0909ba53ad6b68d1785479a063f657ef3bcefa` |

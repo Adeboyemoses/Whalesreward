@@ -1,13 +1,21 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   createContext,
+  useEffect,
   useContext,
   useCallback,
   useMemo,
   useRef,
   useState,
 } from "react";
+import {
+  AdminPendingReleaseApi,
+  releaseProposalHref,
+  releaseReviewAllowed,
+} from "@/client/admin-pending-release-api";
+import type { ReleaseKind } from "@/shared/contracts/pending-release";
 import type { AdminSession } from "@/client/admin-session";
 import type { AdminSaleDetail } from "@/client/admin-sales-api";
 import { correctionDecisionRequest } from "@/client/admin-sales-api";
@@ -56,6 +64,7 @@ import {
   SaleStatus,
 } from "./sales-common";
 import { useMemory } from "./customers-common";
+import { HeldRelease } from "./held-release";
 const RecordedContext = createContext<
   ((receipt: Decision, label: string) => void) | null
 >(null);
@@ -115,9 +124,16 @@ export function ReviewLinks({
       ? ["capture" as const]
       : []),
   ];
-  if (!kinds.length) return null;
+  if (!kinds.length && !sale.pendingRelease) return null;
   return (
     <Sheet title="Reviews">
+      {sale.pendingRelease && (
+        <PendingReleaseLabel
+          purchaseId={sale.id}
+          proposal={sale.pendingRelease}
+          suffix={suffix}
+        />
+      )}
       <div className="wr-row">
         {kinds.map((kind) => (
           <Link
@@ -139,7 +155,22 @@ export function ReviewQueue({
   customer: string | null;
   suffix: string;
 }) {
-  const [kind, setKind] = useMemory<ReviewKind>("reviews:kind", "duplicate");
+  const view = useSearchParams().get("view");
+  const [savedKind, saveKind] = useMemory<ReviewKind | "pending_release">(
+    "reviews:kind",
+    "duplicate",
+  );
+  const [kind, selectKind] = useState<ReviewKind | "pending_release">(() =>
+    view === "pending_release" ? "pending_release" : savedKind,
+  );
+  const setKind = (next: ReviewKind | "pending_release") => {
+    selectKind(next);
+    saveKind(next);
+  };
+  const { session } = useAdminSession();
+  const pendingAllowed = (["price", "card", "date", "capture"] as const).some(
+    (k) => releaseReviewAllowed(session?.permissions, k),
+  );
   return (
     <>
       <PageHead
@@ -151,20 +182,34 @@ export function ReviewQueue({
       <SelectField
         label="Review type"
         value={kind}
-        onChange={(v) => setKind(v as ReviewKind)}
+        onChange={(v) => setKind(v as ReviewKind | "pending_release")}
       >
+        {pendingAllowed && (
+          <option value="pending_release">Pending releases</option>
+        )}
         {Object.entries(titles).map(([key, title]) => (
           <option key={key} value={key}>
             {title}
           </option>
         ))}
       </SelectField>
-      <QueuePage
-        key={kind + customer}
-        kind={kind}
-        customer={customer}
-        suffix={suffix}
-      />
+      {kind === "pending_release" ? (
+        pendingAllowed ? (
+          <PendingReleaseQueue />
+        ) : (
+          <Notice>
+            You do not have permission to view pending releases. Choose an
+            ordinary review type to continue.
+          </Notice>
+        )
+      ) : (
+        <QueuePage
+          key={kind + customer}
+          kind={kind}
+          customer={customer}
+          suffix={suffix}
+        />
+      )}
     </>
   );
 }
@@ -191,7 +236,7 @@ function QueuePage({
     [api, kind, customer, cursor],
   );
   const result = useSalesRead(kind + ":" + cursor, load);
-  const rows = result.data?.items ?? [];
+  const rows = !result.busy && !result.error ? (result.data?.items ?? []) : [];
   return (
     <>
       <ReadState {...result} />
@@ -224,7 +269,18 @@ function QueuePage({
                 </span>
               </>
             ),
-            status: <SaleStatus sale={s} />,
+            status: (
+              <>
+                <SaleStatus sale={s} />
+                {s.pendingRelease && (
+                  <PendingReleaseLabel
+                    purchaseId={s.id}
+                    proposal={s.pendingRelease}
+                    suffix={suffix}
+                  />
+                )}
+              </>
+            ),
             action: (
               <Link
                 href={`/admin/sales/${s.id}${kind === "capture" && !s.policyBlocks.some((b) => b === "capture_authorization_unresolved" || b === "capture_time_unresolved") ? "" : "/" + routes[kind]}${suffix}`}
@@ -266,6 +322,179 @@ function QueuePage({
       <p className="wr-help">
         Duplicate flags do not remove credit. Held sales are not counted until
         all required checks pass.
+      </p>
+    </>
+  );
+}
+export function PendingReleaseLabel({
+  purchaseId,
+  proposal,
+  suffix = "",
+}: {
+  purchaseId: string;
+  proposal: NonNullable<AdminSaleDetail["pendingRelease"]>;
+  suffix?: string;
+}) {
+  return (
+    <div className="wr-sub">
+      <b>Awaiting another reviewer</b>
+      <span className="wr-sub">
+        Proposed by {proposal.proposedBy.name} · {proposal.proposedBy.code}
+      </span>
+      <span className="wr-sub">{adminTime(proposal.proposedAt)}</span>
+      <Link href={releaseProposalHref(purchaseId, proposal, suffix)}>
+        Review proposal
+      </Link>
+    </div>
+  );
+}
+function PendingReleaseQueue() {
+  const { store, session, epoch } = useAdminSession();
+  const api = useMemo(() => new AdminPendingReleaseApi(store.request), [store]);
+  const [kind, setKind] = useState<ReleaseKind | "">("");
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [previous, setPrevious] = useState<(string | undefined)[]>([]);
+  const [serial, setSerial] = useState(0);
+  const viewKey = `${epoch}:${kind}:${cursor}:${serial}`;
+  const [state, setResult] = useState<{
+    key: string;
+    data: Awaited<ReturnType<AdminPendingReleaseApi["pending"]>> | null;
+    busy: boolean;
+    error: boolean;
+  }>({ key: "", data: null, busy: true, error: false });
+  const result =
+    state.key === viewKey ? state : { data: null, busy: true, error: false };
+  useEffect(() => {
+    let live = true;
+    void api.pending({ ...(kind ? { kind } : {}), cursor, limit: 25 }).then(
+      (data) => {
+        if (live && store.getSnapshot().epoch === epoch)
+          setResult({ key: viewKey, data, busy: false, error: false });
+      },
+      () => {
+        if (live && store.getSnapshot().epoch === epoch)
+          setResult({ key: viewKey, data: null, busy: false, error: true });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, kind, cursor, store, epoch, viewKey]);
+  const refresh = () => {
+    setCursor(undefined);
+    setPrevious([]);
+    setSerial((n) => n + 1);
+  };
+  const reset = () => {
+    setKind("");
+    setCursor(undefined);
+    setPrevious([]);
+    setSerial((n) => n + 1);
+  };
+  return (
+    <>
+      <Notice>
+        All pending releases you are permitted to review, across station sales.
+        Ordinary customer, day and status filters do not apply here.
+      </Notice>
+      <SelectField
+        label="Pending release kind"
+        value={kind}
+        onChange={(value) => {
+          setKind(value as ReleaseKind | "");
+          setCursor(undefined);
+          setPrevious([]);
+        }}
+      >
+        <option value="">All authorized kinds</option>
+        {(["price", "card", "date", "capture"] as const)
+          .filter((k) => releaseReviewAllowed(session?.permissions, k))
+          .map((k) => (
+            <option key={k} value={k}>
+              {titles[k]}
+            </option>
+          ))}
+      </SelectField>
+      {kind && (
+        <Notice>
+          Kind filter applied: {titles[kind]}.{" "}
+          <Button variant="ghost" onClick={reset}>
+            Clear filters
+          </Button>
+        </Notice>
+      )}
+      {result.busy && <p role="status">Checking release status…</p>}
+      {result.error && (
+        <Notice role="alert" tone="danger">
+          Release status unavailable{" "}
+          <Button variant="secondary" onClick={refresh}>
+            Try again
+          </Button>
+        </Notice>
+      )}
+      {result.data && (
+        <>
+          <DataTable
+            caption="Pending releases"
+            summary={`${result.data.summary.pending} pending releases in the full authorized set · as of ${adminTime(result.data.asOf)}`}
+            columns={[
+              { key: "sale", label: "Sale" },
+              { key: "kind", label: "Review" },
+              { key: "proposal", label: "Pending proposal" },
+            ]}
+            rows={result.data.items.map((row) => ({
+              id: row.proposalId,
+              cells: {
+                sale: <span className="wr-mono">{row.saleCode}</span>,
+                kind: titles[row.kind],
+                proposal: (
+                  <PendingReleaseLabel
+                    purchaseId={row.purchaseId}
+                    proposal={row}
+                  />
+                ),
+              },
+            }))}
+          />
+          {!result.data.items.length && (
+            <Notice>
+              No pending releases visible with your current access and filters.
+            </Notice>
+          )}
+        </>
+      )}
+      <div className="wr-row">
+        <Button
+          variant="secondary"
+          disabled={!previous.length || result.busy}
+          onClick={() => {
+            setCursor(previous.at(-1));
+            setPrevious(previous.slice(0, -1));
+          }}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!result.data?.nextCursor || result.busy || result.error}
+          onClick={() => {
+            if (result.data?.nextCursor) {
+              setPrevious([...previous, cursor]);
+              setCursor(result.data.nextCursor);
+            }
+          }}
+        >
+          Next
+        </Button>
+        <Button variant="ghost" disabled={result.busy} onClick={refresh}>
+          Refresh pending releases
+        </Button>
+      </div>
+      <p className="wr-help">
+        Pending and stale proposals remain blocking until a recorded decision
+        closes them. This view shows only your authorized kinds. No visible rows
+        does not mean giveaway results are ready; check server readiness
+        separately.
       </p>
     </>
   );
@@ -316,55 +545,87 @@ export function ReviewPage({
     </>
   );
 }
-function Original({ sale }: { sale: AdminSaleDetail }) {
+function Original({
+  sale,
+  compact = false,
+}: {
+  sale: AdminSaleDetail;
+  compact?: boolean;
+}) {
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 899px)");
+    const update = () => setPhone(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const collapsed = compact && phone;
   return (
     <Sheet title="Original purchase">
       <div className="wr-review-status">
         <SaleStatus sale={sale} />
       </div>
-      <KeyValueList
-        items={[
-          {
-            label: "Customer name",
-            value: sale.customer?.name ?? "Customer pending",
-          },
-          { label: "Customer card", value: sale.capturedCardCode, mono: true },
-          {
-            label: "Original captured amount",
-            value: saleMoney(sale.original.amountKobo),
-          },
-          { label: "Original quantity", value: saleQuantity(sale.original) },
-          {
-            label: "Entry mode",
-            value: sale.original.basis === "amount" ? "Amount" : "Quantity",
-          },
-          { label: "Rate at capture", value: saleRate(sale.original) },
-          { label: "Bought into", value: adminAction(sale.original.medium) },
-          {
-            label: "Station / pump",
-            value: `${sale.station.code} · ${sale.pump.code} · ${productNames[sale.product]}`,
-          },
-          { label: "Recorded by", value: sale.seller.name },
-          {
-            label: "Username / attendant ID",
-            value: `${sale.seller.username} · ${sale.seller.staffCode}`,
-            mono: true,
-          },
-          {
-            label: "App capture time",
-            value: adminTime(sale.appCapturedAt) + " (device-reported)",
-          },
-          { label: "Server receipt", value: adminTime(sale.serverReceivedAt) },
-          {
-            label: "Currently recorded",
-            value: valuePair(sale.displayedValues),
-          },
-          {
-            label: "Loyalty credit",
-            value: sale.credited ? "Recorded spend included" : "Not credited",
-          },
-        ]}
-      />
+      <details
+        className={
+          collapsed
+            ? "wr-release-original wr-release-original-compact"
+            : "wr-release-original"
+        }
+        open={!collapsed}
+      >
+        <summary>Original purchase</summary>
+        <KeyValueList
+          items={[
+            {
+              label: "Customer name",
+              value: sale.customer?.name ?? "Customer pending",
+            },
+            {
+              label: "Customer card",
+              value: sale.capturedCardCode,
+              mono: true,
+            },
+            {
+              label: "Original captured amount",
+              value: saleMoney(sale.original.amountKobo),
+            },
+            { label: "Original quantity", value: saleQuantity(sale.original) },
+            {
+              label: "Entry mode",
+              value: sale.original.basis === "amount" ? "Amount" : "Quantity",
+            },
+            { label: "Rate at capture", value: saleRate(sale.original) },
+            { label: "Bought into", value: adminAction(sale.original.medium) },
+            {
+              label: "Station / pump",
+              value: `${sale.station.code} · ${sale.pump.code} · ${productNames[sale.product]}`,
+            },
+            { label: "Recorded by", value: sale.seller.name },
+            {
+              label: "Username / attendant ID",
+              value: `${sale.seller.username} · ${sale.seller.staffCode}`,
+              mono: true,
+            },
+            {
+              label: "App capture time",
+              value: adminTime(sale.appCapturedAt) + " (device-reported)",
+            },
+            {
+              label: "Server receipt",
+              value: adminTime(sale.serverReceivedAt),
+            },
+            {
+              label: "Currently recorded",
+              value: valuePair(sale.displayedValues),
+            },
+            {
+              label: "Loyalty credit",
+              value: sale.credited ? "Recorded spend included" : "Not credited",
+            },
+          ]}
+        />
+      </details>
     </Sheet>
   );
 }
@@ -391,7 +652,15 @@ function ReviewRecord({
     label: string;
   } | null>(null);
   const [current, setCurrent] = useState<AdminSaleDetail | null>(sale);
+  const [proposing, setProposing] = useState(false);
   const [currentError, setCurrentError] = useState("");
+  const releaseCurrent = useCallback(
+    (detail: AdminSaleDetail | null, failed = false) => {
+      setCurrent(detail);
+      setCurrentError(failed ? "release_refresh_failed" : "");
+    },
+    [],
+  );
   const recorded = (receipt: Decision, label: string) => {
     const live = capture();
     setOutcome({ receipt, label });
@@ -429,18 +698,22 @@ function ReviewRecord({
         <Notice>
           {kind === "duplicate"
             ? "Similarity alone does not confirm a duplicate. The flag does not change either sale's loyalty credit."
-            : "This sale needs admin review. Resolving one review does not clear other holds or guarantee loyalty credit."}
+            : current?.credited
+              ? "Current sale status: recorded spend included."
+              : current?.state === "cancelled"
+                ? "Sale cancelled. The original entry and history are retained."
+                : "This sale needs admin review. Resolving one review does not clear other holds or guarantee loyalty credit."}
         </Notice>
       )}
       {current ? (
         meterView && !outcome ? (
           pending ||
-          (sale.state !== "cancelled" &&
-            sale.holds.some(
+          (current.state !== "cancelled" &&
+            current.holds.some(
               (h) => h.kind === "price" && h.state === "open",
             )) ? (
             <DecisionForm
-              sale={sale}
+              sale={current}
               kind="price"
               meter
               session={session}
@@ -454,39 +727,57 @@ function ReviewRecord({
           )
         ) : (
           <div className="wr-two-col">
-            <Original sale={current} />
+            <Original sale={current} compact={proposing} />
             <AdminSalePhoto sale={current} />
           </div>
         )
       ) : (
         <Notice role="status">
           {currentError
-            ? "The decision is recorded, but the current sale could not be refreshed. Use View updated record to retry the read."
+            ? currentError === "release_refresh_failed"
+              ? "Decision recorded. Current sale status couldn't be refreshed."
+              : "The decision is recorded, but the current sale could not be refreshed. Use View updated record to retry the read."
             : "Loading current sale after the recorded decision…"}
         </Notice>
       )}
-      {outcome ? (
-        <RecordedDecision
-          receipt={outcome.receipt}
-          recordedLabel={outcome.label}
-          reload={reload}
-        />
-      ) : meterView ? null : pending ? (
-        <DecisionForm
-          sale={sale}
-          kind={pending.kind}
+      <div hidden={proposing && !outcome} className="wr-release-ordinary">
+        {outcome ? (
+          <RecordedDecision
+            receipt={outcome.receipt}
+            recordedLabel={outcome.label}
+            reload={reload}
+          />
+        ) : !current || meterView ? null : pending ? (
+          <DecisionForm
+            sale={current}
+            kind={pending.kind}
+            session={session}
+            reload={reload}
+          />
+        ) : kind === "duplicate" ? (
+          <DuplicateReview
+            sale={current}
+            session={session}
+            suffix={suffix}
+            reload={reload}
+          />
+        ) : (
+          <HoldReview
+            sale={current}
+            kind={kind}
+            session={session}
+            reload={reload}
+          />
+        )}
+      </div>
+      {kind !== "duplicate" && !outcome && (
+        <HeldRelease
+          sale={current ?? sale}
+          kind={kind}
           session={session}
-          reload={reload}
+          onCurrentSale={releaseCurrent}
+          onProposingChange={setProposing}
         />
-      ) : kind === "duplicate" ? (
-        <DuplicateReview
-          sale={sale}
-          session={session}
-          suffix={suffix}
-          reload={reload}
-        />
-      ) : (
-        <HoldReview sale={sale} kind={kind} session={session} reload={reload} />
       )}
       {current && (
         <AdminSaleHistory
