@@ -3,14 +3,14 @@ branch: core/WHR-178-checklist-projections
 linear: WHR-178
 tier: high
 reviewed_head: e46a1afaa3977a56b28660d74ff2ee3ccae58615
-rounds: 3
+rounds: 4
 builder: backend-engineer
 reviewers:
-  code-reviewer: FAIL
-  security-reviewer: PASS
-  integrity-reviewer: PASS
+  code-reviewer: PENDING
+  security-reviewer: PENDING
+  integrity-reviewer: PENDING
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 14
+dispatches: 18
 plan:
   goal: implement six read-only T-21 giveaway projections without changing grouped readiness or mutation behavior
   files: src/shared/contracts/giveaway-projections.ts, src/server/modules/giveaway/**, src/app/api/admin/giveaway/**, tests/integration/giveaway-projections*.test.ts, tests/helpers/giveaway-projection*.ts
@@ -18,8 +18,9 @@ plan:
   tests: every m4 T-21 acceptance item named against local disposable PostgreSQL, all six routes over real HTTP, regression unit integration and build gates
   risks: false pass from missing proof, authority or identity leakage, stale selections, changed grouped blockers, historical recomputation
 invariants: [I-07, I-11, I-25, I-26, I-35, I-40, I-41, I-42, I-45, I-45a, I-46, I-48]
-p1: ["WHR-182: unchanged regression assumes conflicting approval succeeds; decision pending"]
+p1: []
 tickets: [WHR-179, WHR-182]
+escalation: Earl chose Option A on 2026-11-18 (WHR-182), one bounded test-only round 4; any production-code change or new finding stops work; no round 5
 ---
 
 Approved scope: WHR-178 and m4.md T-21, including its complete acceptance list.
@@ -32,21 +33,20 @@ Base: 6d2e504, containing WHR-176, WHR-179, WHR-181 and approved T-21.
 6. EM reruns gates; independent code/security/integrity reviewers, maximum three rounds; merge green PR to staging.
 No STATUS, coverage-map or lane changes. No cloud operations or real databases.
 
-BLOCKED, not READY: WHR-182 tracks the unchanged regression expectation mismatch.
-Rebased from parked 6aa6ea6 onto staging 6d2e504, including WHR-179 and WHR-181.
-WHR-179's duplicate-exclusion guard is preserved; no mutation behavior changed.
-Both projection test files remain byte-for-byte unchanged from the parked draft.
-Round 3: security PASS, integrity PASS; code FAIL for the regression setup assumption.
-The second overlapping approval now correctly fails with exclusion_stale before certification.
-Earl requested the test unchanged and cap 3; no additional code/test edits or review dispatched.
-WHR-182 asks Option A update the test with downstream coverage and one bounded review;
-Option B preserve the test and leave the draft parked. Default B pending Earl's reply.
-EM typecheck/lint, 997 unit tests and build PASS; four pre-existing image warnings.
-Clean serial non-superuser PostgreSQL named suites: 66 PASS / 1 FAIL / 67; no skips.
-All six actual GET routes pass through localhost HTTP, including authority/input cases.
-All 81 existing giveaway regressions PASS, 12 files; includes photo receipts and WHR-179 guards.
-Review self-tests 53, guard self-tests 94, time 5 in each timezone PASS.
-Local PostgreSQL 15; PG16 init blocked by sandbox shared memory; supported PG16 CI required.
-No shim, safety-guard relaxation, skip, expected-failure wrapper or bypass.
+Earl's 2026-11-18 WHR-182 Option A authorizes one bounded test-only round 4.
+Round 4 reviews the named test correction and updated verification records only.
+Any production-code change or new finding stops work; no round 5.
+Only the named regression changes after parked 6bf2cd2; production files are identical.
+Second approval fails exclusion_stale; ordinary SQL appends retained duplicate approval.
+Native guards remain enabled; certification must fail phone_check_stale.
+Matching historical pins exercise stale readiness and preparation finalization_blocked.
+All refusals assert no effects; expanded test timeout 30 to 60 seconds only.
+EM focused test PASS; typecheck/lint, 997 unit tests and production build PASS.
+Review self-tests 53, guard self-tests 94, time 5 per timezone PASS.
+Local PostgreSQL 15 broad runs hit unchanged fixture/DDL timeouts, not green evidence.
+Full supported PostgreSQL 16 final-head CI is required, including all 67 named tests,
+all six real HTTP GET routes and named authority/writer/snapshot/receipt regressions.
+Final CI outcomes/counts are recorded on PR #164 and the WHR-178 READY comment.
+No shim, guard relaxation, skip, expected-failure wrapper or bypass.
 Exact names: docs/qa/whr-178-named-tests.md; mapping: whr-178-acceptance.md.
-Dispatch flag: 14 exceeds 8; round cap 3 reached. No READY or merge claim.
+Dispatch flag: 18 exceeds 8; bounded round 4 explicitly authorized, no round 5.

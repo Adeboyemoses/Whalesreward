@@ -2,15 +2,15 @@
 
 Scope: six read-only projections over WHR-22. The specification is `docs/engineering/contracts/m4.md`, “Granular outcomes and narrow selections — WHR-170 / T-21”, including its complete core acceptance paragraph. Grouped Readiness and mutation behavior are not authorized to change. No READY or complete-acceptance claim is made by this document.
 
-The new tests are in `tests/integration/giveaway-projections.test.ts` (B below) and `tests/integration/giveaway-projections-adversarial.test.ts` (A). Names below are exact Vitest names, except the clearly identified parameterized HTTP name. Tests use real disposable PostgreSQL schemas. The adversarial local run uses the `whr178_fixture` non-superuser, without BYPASSRLS. Historical/corrupt-evidence fixtures use the existing `seedHistorical` helper to establish retained state, then restore native guards before exercising services. The equality test replaces only the SQL clock expression; PostgreSQL performs the actual microsecond comparisons.
+The new tests are in `tests/integration/giveaway-projections.test.ts` (B below) and `tests/integration/giveaway-projections-adversarial.test.ts` (A). Names below are exact Vitest names, except the clearly identified parameterized HTTP name. Tests use real disposable PostgreSQL schemas. The focused post-change local run uses the `whr178_resume` non-superuser, without BYPASSRLS. Historical/corrupt-evidence fixtures use the existing `seedHistorical` helper to establish retained state, then restore native guards before exercising services. The equality test replaces only the SQL clock expression; PostgreSQL performs the actual microsecond comparisons.
 
 ## Current integrated verification
 
-EM verified rebased code head `e46a1afaa3977a56b28660d74ff2ee3ccae58615` on 18 Nov 2026, based on staging `6d2e504` including WHR-179 and WHR-181. Typecheck, lint (four existing image warnings), 997 unit tests and production build passed. Clean serial named suites on disposable real PostgreSQL 15 under a NOSUPERUSER/NOBYPASSRLS fixture role: **66 passed, 1 failed, 67 total; no skips**. Both test files remain unchanged from parked `6aa6ea6`. All six actual GET route exports pass over localhost HTTP, including success and authentication/permission/input errors. See [exact test names and results](whr-178-named-tests.md).
+Earl approved WHR-182 Option A on 18 Nov 2026: correct the second approval expectation, preserve certification/preparation assertions using pre-existing duplicate evidence, and run one bounded review round 4. The incremental code change from parked `6bf2cd2` is confined to the one named test. Production files, grouped Readiness and mutations are unchanged. Any production-code change or new finding stops work; no round 5.
 
-All 81 existing giveaway regressions pass serially across 12 files, including photo receipts previously excluded by the database-name guard, all named authority/writer/snapshot regressions below, and WHR-179's exact sequence, concurrent approvals, historical certification/preparation and census-replacement coverage. Review self-tests 53, guard self-tests 94 and time tests 5 per timezone pass.
+At test code head `7780b7ca17ffa90aca5ab2980425b6bf3cc457b7`, the EM focused test PASS on real PostgreSQL 15 under a NOSUPERUSER/NOBYPASSRLS role. It asserts second-approval `exclusion_stale` without effects, appends a retained duplicate through ordinary SQL with native guards enabled, and asserts certification `phone_check_stale`. Matching historical check pins make readiness stale; preparation must refuse with `finalization_blocked`. Both downstream refusals leave business effects unchanged. Only the expanded test timeout changes from 30 to 60 seconds.
 
-**The remaining test failure changed after rebasing.** WHR-179 now correctly rejects the second overlapping approval with `409 exclusion_stale`; the unchanged T21 regression assumes it succeeds before asserting certification refusal. The earlier production defect is fixed in the base. [WHR-182](https://linear.app/phaneum/issue/WHR-182/whr-178-resume-decide-regression-update-and-bounded-review-after) asks Earl whether to update this test and allow one bounded review after round cap 3. Round 3: security PASS, integrity PASS, code FAIL for this expectation mismatch. PR #164 remains draft, not READY. Full PostgreSQL 16 CI is required; local PG16 initialization was blocked by sandbox shared-memory restrictions, with no shim or guard relaxation.
+Fresh EM typecheck, lint (four existing image warnings), 997 unit tests, production build, review self-tests 53, guard self-tests 94 and time tests 5 per timezone PASS. Broad local PostgreSQL reruns hit setup/DDL timeouts in unchanged tests and were not used as green evidence. The full supported PostgreSQL 16 integration suite, including all 67 named cases, six HTTP routes and all named regressions below, remains a mandatory final-head CI gate. Final outcomes/counts are recorded on [PR #164 checks](https://github.com/Adeboyemoses/Whalesreward/pull/164/checks) and the WHR-178 READY comment. See [exact names and provenance](whr-178-named-tests.md). No compatibility shim or safety-guard relaxation.
 
 ## Acceptance mapping
 
@@ -37,7 +37,7 @@ All 81 existing giveaway regressions pass serially across 12 files, including ph
 | Changes between preparation and confirmation | A: `T21 new intake after preparation prevents confirmation without rewriting historical result`. Existing real transaction races are separately listed below. |
 | Least-privilege fields and links | B: `T-21 checklist without sales exposes aggregate outcomes and omits protected links and fields`; `T-21 Owner with settings and sales but no leaderboards sees current designation and eligible choices without directory grants`; `T-21 incomplete sources include received and photo_pending originals but exclude finalizing held accepted and cancelled`. |
 | No business read audit or dirty-clear | B: `T-21 reads do not create business audits receipts or clear dirty state`. Checks audit/receipt counts and reconciliation flag before/after reads. |
-| No duplicate applicable source exclusion | **FAIL / WHR-182**: A: `T21 WHR-179 duplicate applicable source exclusions cannot certify or prepare`. WHR-179 now rejects the second overlapping approval earlier with `exclusion_stale`; the unchanged test expects approval success before testing certification. Existing `giveaway-exclusion-uniqueness.test.ts` independently passes exact-sequence, concurrent-approval and historical certification/preparation guards. No skip, expected-failure wrapper or mutation change. |
+| No duplicate applicable source exclusion | A: `T21 WHR-179 duplicate applicable source exclusions cannot certify or prepare` (focused post-change PASS). Expects earlier `exclusion_stale`, appends pre-existing duplicate approval with native guards, asserts certification `phone_check_stale`, seeds matching historical check pins and asserts preparation `finalization_blocked`; all refusals preserve effects. Existing `giveaway-exclusion-uniqueness.test.ts` independently covers sequence, concurrency and historical HTTP guards. Final full-suite CI required. |
 | Response and body limits | A: `T21 response budget continues large phone pages without dropping or truncating partitions`; `T21 read bounds reject excess filters empty tokens oversized cursors and limits`; `T21 mutation source and partition limits stay 100 and real HTTP body limit stays 32 KiB`. |
 | Immutable historical results | A: `T21 unchanged historical result preserves exact stored checks after later intake and snapshots remain immutable`; `T21 new intake after preparation prevents confirmation without rewriting historical result`. |
 | All six new routes through real HTTP | B: `T-21 all six routes traverse real HTTP with strict envelopes no-store and typed history`; six instances of `T-21 real HTTP %s rejects no session, missing grants and unknown input` for checklist, results, managers, attendants, phones, incomplete-sources. Listener dispatches actual exported route GET functions. |
@@ -45,7 +45,7 @@ All 81 existing giveaway regressions pass serially across 12 files, including ph
 
 ## Existing regression evidence to rerun
 
-These existing named tests all passed in the EM serial 81-test giveaway regression on the rebased code head:
+These existing named tests passed in the prior EM 81-test giveaway regression; they run again in mandatory final-head supported-version CI:
 
 - `P-30 proposer identity rebinding cannot silently rebase an existing exclusion` and `P-30 revoked manager grant denies independent approval and manager proposal replay` in `giveaway-phones.test.ts`.
 - `P-30 non-superuser cannot attach another campaign census or omit its check entries` in `giveaway-phones.test.ts`.
@@ -71,22 +71,10 @@ The following new named tests close the previously listed explicit subcases:
 
 The lifecycle coverage includes each change class (receipt, acceptance, partitions, predecessor) and every boundary (list, proposal, independent decision, certification, preparation, confirmation). It does not claim every Cartesian combination; existing named transaction races above supplement the new tests.
 
-Production deployment, real station data, browser/fidelity and Stage 2b client retry/session handling remain outside this work order's test surface. Local PostgreSQL is version 15. Tests requiring PostgreSQL 16 functions remain a CI requirement; no compatibility shim is installed. The unchanged-test mismatch tracked in WHR-182 prevents a green acceptance/READY claim; mutation behavior is preserved.
+Production deployment, real station data, browser/fidelity and Stage 2b client retry/session handling remain outside this work order's test surface. Local PostgreSQL is version 15. Tests requiring PostgreSQL 16 functions remain a CI requirement; no compatibility shim is installed. WHR-182 authorizes the bounded test correction; final-head review and green CI are required before READY. Mutation behavior is preserved.
 
 ## Retained evidence and authority regressions
 
 The protected-history cases additionally test missing and invalid `sourceDigest`, mismatched actor binding, unchanged outcome without predecessor, and duplicate approved exclusion IDs. Each requires 503 rather than a historical pass. Missing/invalid operation IDs are separately named native-constraint tests: generated UUID/NOT NULL columns prevent those retained states even with user triggers disabled. No schema constraints are removed to manufacture reachability.
 
 `T21 verified caller binding revoked while waiting for security lock denies inventory` holds the security row lock, appends an unverified latest binding in the writer transaction, starts the inventory read and confirms its lock wait, then commits. The read must deny 403 after the change. This tests append-only authority independent of role/session revision changes.
-
-## Historical pre-fix adversarial run (17 Nov; superseded by verification above)
-
-17 Nov 2026, production implementation through `e529185` (local cherry-pick `d71cb17`), local PostgreSQL 15, non-superuser fixture account. Final run results are recorded after execution below. The EM must rerun the final integrated head and full required gates. This work is not READY while acceptance regressions fail.
-
-```text
-Test Files  1 failed (1)
-Tests       7 failed | 39 passed (46)
-Duration    51.81s
-```
-
-The seven ordinary failing assertions are WHR-179 duplicate applicability; missing source digest; invalid source digest; mismatched actor binding; unchanged outcome without predecessor; duplicate approved exclusion IDs; and verified caller binding revoked during the security-lock wait. None is skipped or treated as an expected pass. The lock-race fixture asserts one appended binding and latest verified=false after commit. Typecheck and focused ESLint passed. Local log: `/tmp/whr178-adversarial-final46c.log` (not committed). These results precede review fixes; their presence in this matrix is evidence of regressions requiring repair, not a claim that final integrated production still has each defect.
