@@ -6,9 +6,11 @@ The new tests are in `tests/integration/giveaway-projections.test.ts` (B below) 
 
 ## Current integrated verification
 
-EM verified code head `d89c105` on 17 Nov 2026: typecheck, lint (two existing image warnings), all 981 unit tests and production build passed. The combined named projection suites run against real disposable PostgreSQL under a non-superuser: **66 passed, 1 failed, 67 total; no skips**. All six actual GET route exports run over localhost HTTP, including success and authentication/permission/input errors. See [all exact test names and results](whr-178-named-tests.md).
+EM verified rebased code head `e46a1afaa3977a56b28660d74ff2ee3ccae58615` on 18 Nov 2026, based on staging `6d2e504` including WHR-179 and WHR-181. Typecheck, lint (four existing image warnings), 997 unit tests and production build passed. Clean serial named suites on disposable real PostgreSQL 15 under a NOSUPERUSER/NOBYPASSRLS fixture role: **66 passed, 1 failed, 67 total; no skips**. Both test files remain unchanged from parked `6aa6ea6`. All six actual GET route exports pass over localhost HTTP, including success and authentication/permission/input errors. See [exact test names and results](whr-178-named-tests.md).
 
-Round-one stored-history validation, misleading upload reasons and append-only person-revocation lock-race findings are fixed and their regressions pass. **WHR-179 remains the sole projection-suite failure**: duplicate applicable source exclusions are permitted by existing mutations, which this work order must preserve. This is not READY and cannot merge while that acceptance fails. Full supported PostgreSQL 16 integration remains a CI requirement; the local version and receipt-suite database-name guard are not bypassed.
+All 81 existing giveaway regressions pass serially across 12 files, including photo receipts previously excluded by the database-name guard, all named authority/writer/snapshot regressions below, and WHR-179's exact sequence, concurrent approvals, historical certification/preparation and census-replacement coverage. Review self-tests 53, guard self-tests 94 and time tests 5 per timezone pass.
+
+**The remaining test failure changed after rebasing.** WHR-179 now correctly rejects the second overlapping approval with `409 exclusion_stale`; the unchanged T21 regression assumes it succeeds before asserting certification refusal. The earlier production defect is fixed in the base. [WHR-182](https://linear.app/phaneum/issue/WHR-182/whr-178-resume-decide-regression-update-and-bounded-review-after) asks Earl whether to update this test and allow one bounded review after round cap 3. Round 3: security PASS, integrity PASS, code FAIL for this expectation mismatch. PR #164 remains draft, not READY. Full PostgreSQL 16 CI is required; local PG16 initialization was blocked by sandbox shared-memory restrictions, with no shim or guard relaxation.
 
 ## Acceptance mapping
 
@@ -35,7 +37,7 @@ Round-one stored-history validation, misleading upload reasons and append-only p
 | Changes between preparation and confirmation | A: `T21 new intake after preparation prevents confirmation without rewriting historical result`. Existing real transaction races are separately listed below. |
 | Least-privilege fields and links | B: `T-21 checklist without sales exposes aggregate outcomes and omits protected links and fields`; `T-21 Owner with settings and sales but no leaderboards sees current designation and eligible choices without directory grants`; `T-21 incomplete sources include received and photo_pending originals but exclude finalizing held accepted and cancelled`. |
 | No business read audit or dirty-clear | B: `T-21 reads do not create business audits receipts or clear dirty state`. Checks audit/receipt counts and reconciliation flag before/after reads. |
-| No duplicate applicable source exclusion | **FAIL / WHR-179**: A: `T21 WHR-179 duplicate applicable source exclusions cannot certify or prepare`. Ordinary failing assertion; no skip, expected-failure wrapper, or diagnostic pass. Existing mutation allows two independently approved phone exclusions for one source, then certifies both. Read-only scope cannot resolve this. |
+| No duplicate applicable source exclusion | **FAIL / WHR-182**: A: `T21 WHR-179 duplicate applicable source exclusions cannot certify or prepare`. WHR-179 now rejects the second overlapping approval earlier with `exclusion_stale`; the unchanged test expects approval success before testing certification. Existing `giveaway-exclusion-uniqueness.test.ts` independently passes exact-sequence, concurrent-approval and historical certification/preparation guards. No skip, expected-failure wrapper or mutation change. |
 | Response and body limits | A: `T21 response budget continues large phone pages without dropping or truncating partitions`; `T21 read bounds reject excess filters empty tokens oversized cursors and limits`; `T21 mutation source and partition limits stay 100 and real HTTP body limit stays 32 KiB`. |
 | Immutable historical results | A: `T21 unchanged historical result preserves exact stored checks after later intake and snapshots remain immutable`; `T21 new intake after preparation prevents confirmation without rewriting historical result`. |
 | All six new routes through real HTTP | B: `T-21 all six routes traverse real HTTP with strict envelopes no-store and typed history`; six instances of `T-21 real HTTP %s rejects no session, missing grants and unknown input` for checklist, results, managers, attendants, phones, incomplete-sources. Listener dispatches actual exported route GET functions. |
@@ -43,7 +45,7 @@ Round-one stored-history validation, misleading upload reasons and append-only p
 
 ## Existing regression evidence to rerun
 
-These are existing named tests, not newly written coverage or a claim that they passed this change's final head:
+These existing named tests all passed in the EM serial 81-test giveaway regression on the rebased code head:
 
 - `P-30 proposer identity rebinding cannot silently rebase an existing exclusion` and `P-30 revoked manager grant denies independent approval and manager proposal replay` in `giveaway-phones.test.ts`.
 - `P-30 non-superuser cannot attach another campaign census or omit its check entries` in `giveaway-phones.test.ts`.
@@ -69,7 +71,7 @@ The following new named tests close the previously listed explicit subcases:
 
 The lifecycle coverage includes each change class (receipt, acceptance, partitions, predecessor) and every boundary (list, proposal, independent decision, certification, preparation, confirmation). It does not claim every Cartesian combination; existing named transaction races above supplement the new tests.
 
-Production deployment, real station data, browser/fidelity and Stage 2b client retry/session handling remain outside this work order's test surface. Local PostgreSQL is version 15. Tests requiring PostgreSQL 16 functions remain a CI requirement; no compatibility shim is installed. WHR-179 prevents a green acceptance/READY claim while the mutation-preservation instruction remains in force.
+Production deployment, real station data, browser/fidelity and Stage 2b client retry/session handling remain outside this work order's test surface. Local PostgreSQL is version 15. Tests requiring PostgreSQL 16 functions remain a CI requirement; no compatibility shim is installed. The unchanged-test mismatch tracked in WHR-182 prevents a green acceptance/READY claim; mutation behavior is preserved.
 
 ## Retained evidence and authority regressions
 
@@ -77,7 +79,7 @@ The protected-history cases additionally test missing and invalid `sourceDigest`
 
 `T21 verified caller binding revoked while waiting for security lock denies inventory` holds the security row lock, appends an unverified latest binding in the writer transaction, starts the inventory read and confirms its lock wait, then commits. The read must deny 403 after the change. This tests append-only authority independent of role/session revision changes.
 
-## Recorded adversarial run
+## Historical pre-fix adversarial run (17 Nov; superseded by verification above)
 
 17 Nov 2026, production implementation through `e529185` (local cherry-pick `d71cb17`), local PostgreSQL 15, non-superuser fixture account. Final run results are recorded after execution below. The EM must rerun the final integrated head and full required gates. This work is not READY while acceptance regressions fail.
 

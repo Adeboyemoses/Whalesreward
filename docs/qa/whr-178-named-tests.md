@@ -1,6 +1,10 @@
 # WHR-178 named PostgreSQL tests
 
-EM run on code head `d89c105`, 17 Nov 2026. Disposable local PostgreSQL 15; non-superuser without BYPASSRLS. **66 passed, 1 failed, 67 total; no skips.** The failing WHR-179 acceptance blocks READY and merge. Six routes also execute over real localhost HTTP through their exported GET functions.
+EM serial rerun on rebased code head `e46a1afaa3977a56b28660d74ff2ee3ccae58615`, 18 Nov 2026, based on staging `6d2e504` including WHR-179 and WHR-181. Disposable local PostgreSQL 15; NOSUPERUSER/NOBYPASSRLS fixture role. **66 passed, 1 failed, 67 total; no skips.** Both projection test files are unchanged from parked `6aa6ea6`. All six actual exported GET routes execute over localhost HTTP, including success, authentication, permission and malformed-input cases.
+
+The sole failure now occurs earlier: WHR-179 correctly rejects the second conflicting approval with `409 exclusion_stale` at `phones.ts:633`, while the unchanged test unconditionally expects it to succeed at line 740. This is an expectation mismatch, not the previous mutation defect. [WHR-182](https://linear.app/phaneum/issue/WHR-182/whr-178-resume-decide-regression-update-and-bounded-review-after) requests Earl's decision on changing the test and one bounded review beyond round cap 3. PR #164 remains draft, not READY.
+
+Additional EM verification: typecheck, lint (four existing image warnings), 997 unit tests and production build PASS; review self-tests 53, guard self-tests 94, time tests 5 in each timezone PASS. All 81 existing giveaway regressions pass serially in 12 files, including photo receipts, the three named WHR-179 guards, and all named authority/writer/snapshot regressions in the acceptance mapping. CI uses PostgreSQL 16; local PG16 initialization was blocked by sandbox shared-memory restrictions. No compatibility shim or safety-guard relaxation.
 
 | Result | Exact test name |
 |---|---|
