@@ -732,24 +732,97 @@ it(
           { label: "Fictional second", attendantIds: ids },
         ],
       });
+      const census = (
+        await f.pool.query(
+          "SELECT * FROM giveaway_phone_census WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0];
       const choices = phoneSelectionSchema.parse(await read(f, "phones")),
-        a = await reviewer(f),
-        entries = [];
-      for (const phone of choices.items) {
-        const p = await propose(f, s.id, phone);
-        await f.phones.decide(a.token, f.campaignId, String(p.exclusion.id), {
-          operationId: newId(),
-          expectedVersion: 1,
-          decision: "approve",
-          reason: "Fictional independent approval",
-        });
-        entries.push({
-          phoneId: phone.id,
-          expectedPhoneVersion: phone.version,
-          result: "unavailable",
-          exclusionId: p.exclusion.id,
-        });
-      }
+        a = await reviewer(f);
+      const decision = () => ({
+        operationId: newId(),
+        expectedVersion: 1,
+        decision: "approve",
+        reason: "Fictional independent approval",
+      });
+      const effects = async () =>
+        (
+          await f.pool.query(
+            `SELECT (SELECT count(*) FROM audit_event)::text audits,
+              (SELECT count(*) FROM mutation_receipt)::text receipts,
+              (SELECT count(*) FROM giveaway_phone_exclusion_transition)::text transitions,
+              (SELECT count(*) FROM giveaway_phone_check)::text checks,
+              (SELECT count(*) FROM giveaway_reconciliation)::text reconciliations,
+              (SELECT count(*) FROM giveaway_preview)::text previews,
+              (SELECT count(*) FROM giveaway_snapshot)::text snapshots,
+              to_jsonb(c) campaign FROM campaign c WHERE id=$1`,
+            [f.campaignId],
+          )
+        ).rows[0];
+      const first = await propose(f, s.id, choices.items[0]!);
+      await f.phones.decide(
+        a.token,
+        f.campaignId,
+        String(first.exclusion.id),
+        decision(),
+      );
+      const second = await propose(f, s.id, choices.items[1]!);
+      const beforeApproval = await effects();
+      await expect(
+        f.phones.decide(
+          a.token,
+          f.campaignId,
+          String(second.exclusion.id),
+          decision(),
+        ),
+      ).rejects.toMatchObject({ code: "exclusion_stale", status: 409 });
+      expect(await effects()).toEqual(beforeApproval);
+      const approved = (
+        await f.pool.query(
+          "SELECT state,content FROM giveaway_phone_exclusion_transition WHERE exclusion_id=$1 ORDER BY version DESC LIMIT 1",
+          [first.exclusion.id],
+        )
+      ).rows[0];
+      expect(approved.state).toBe("approved");
+      expect(
+        (
+          await f.pool.query(
+            "SELECT state FROM giveaway_phone_exclusion_transition WHERE exclusion_id=$1 ORDER BY version DESC LIMIT 1",
+            [second.exclusion.id],
+          )
+        ).rows[0].state,
+      ).toBe("pending");
+      const pending = (
+        await f.pool.query(
+          "SELECT content FROM giveaway_phone_exclusion WHERE id=$1",
+          [second.exclusion.id],
+        )
+      ).rows[0].content;
+      // Retained legacy approval, appended with ordinary SQL and native guards enabled.
+      await f.pool.query(
+        "INSERT INTO giveaway_phone_exclusion_transition(id,exclusion_id,version,state,content) VALUES($1,$2,2,'approved',$3)",
+        [
+          newId(),
+          second.exclusion.id,
+          {
+            ...approved.content,
+            ...pending,
+            state: "approved",
+            version: 2,
+            decidedBy: approved.content.decidedBy,
+            approverPerson: approved.content.approverPerson,
+            decidedAt: approved.content.decidedAt,
+          },
+        ],
+      );
+      const entries = [first, second].map((p, i) => ({
+        phoneId: choices.items[i]!.id,
+        expectedPhoneVersion: choices.items[i]!.version,
+        result: "unavailable",
+        exclusionId: p.exclusion.id,
+      }));
+      const beforeCertification = await effects();
       await expect(
         f.phones.check(f.token, f.campaignId, {
           operationId: newId(),
@@ -759,16 +832,80 @@ it(
           expectedCensusVersion: choices.view.censusVersion,
           entries,
         }),
-      ).rejects.toBeDefined();
+      ).rejects.toMatchObject({ code: "phone_check_stale", status: 409 });
+      expect(await effects()).toEqual(beforeCertification);
+      // Matching historical pins make readiness exercise the duplicate guard independently.
+      const checkId = newId(),
+        guard = await f.guard();
+      const campaign = (
+        await f.pool.query("SELECT * FROM campaign WHERE id=$1", [f.campaignId])
+      ).rows[0];
+      const content = {
+        id: checkId,
+        manager: { id: fixtureId(5) },
+        operationId: newId(),
+        auditEventId: census.content.auditEventId,
+        campaignId: f.campaignId,
+        kind: "initial",
+        sourceDataVersion: guard.expectedDataVersion,
+        settingsVersionId: guard.expectedSettingsVersionId,
+        censusId: census.id,
+        designationId: campaign.manager_designation_id,
+        previousSnapshotId: null,
+        policyVersion: "reconciliation-v1",
+      };
+      await f.pool.query(
+        "INSERT INTO giveaway_phone_check(id,campaign_id,census_id,content,entries) VALUES($1,$2,$3,$4,$5)",
+        [
+          checkId,
+          f.campaignId,
+          census.id,
+          content,
+          JSON.stringify(
+            entries.map((e, i) => ({
+              ...e,
+              phoneVersion: choices.items[i]!.version,
+              attendantIds: census.content.phones.find(
+                (p: { id: string }) => p.id === e.phoneId,
+              ).attendantIds,
+            })),
+          ),
+        ],
+      );
+      await f.pool.query(
+        "UPDATE campaign SET phone_check_id=$2,version=version+1 WHERE id=$1",
+        [f.campaignId, checkId],
+      );
+      const beforePreparation = await effects();
       const db = await f.pool.connect();
       try {
         const r = await phoneReadiness(db, f.campaignId, "initial");
-        expect(r.status.state).not.toBe("complete");
+        expect(r.status).toMatchObject({
+          state: "stale",
+          phoneCheckId: checkId,
+          pendingExclusions: "0",
+        });
+        expect(r.blockers).toEqual(["phone_check_required"]);
       } finally {
         db.release();
       }
+      const ready = await readReadiness(f.pool, f.token, f.campaignId);
+      expect(ready.phoneCheck.state).toBe("stale");
+      expect(ready.blockers).toContain("phone_check_required");
+      await expect(prepare(f)).rejects.toMatchObject({
+        code: "finalization_blocked",
+        status: 409,
+      });
+      expect(await effects()).toEqual(beforePreparation);
+      expect(
+        (
+          await f.pool.query(
+            "SELECT count(*)::int n FROM giveaway_phone_exclusion_transition WHERE state='approved'",
+          )
+        ).rows[0].n,
+      ).toBe(2);
     }),
-  30000,
+  60000,
 );
 
 /** Freeze only the database clock expression; actual PostgreSQL compares exact stored instants. */
