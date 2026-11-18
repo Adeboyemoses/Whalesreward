@@ -2,6 +2,29 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WO-app-8b two-person stuck-hold release READY (WHR-171)
+
+[Feature PR #161](https://github.com/Adeboyemoses/Whalesreward/pull/161) merged green at `4e22f8ee584f6e240122e5cbb64b3798ce518e64`; final feature head `1da3e5f7d968a431469f7b962c0d83a780a92f52`, reviewed source/QA `bb8f9f4`. Code/security/integrity PASS round 3 of 3; integrity explicitly states no correction hides a product or contract defect. [API expectation authority](../qa/whr171-test-corrections.md) records Earl's allowed fixture corrections; the immutable original date assertion stayed unchanged until T1's WHR-181 fix. No endpoint/schema changes or v2 activation. Status is on-staging, not accepted; Earl's station/phone smoke remains pending.
+
+Final feature [CI 44210059868](https://github.com/Adeboyemoses/Whalesreward/actions/runs/44210059868): 997 unit, 1,453 PostgreSQL, timezone 5+5, release 42 (10 HTTP + 32 browser), ordinary browser 430/4 existing skips/0 flaky passes, storage 1; typecheck/lint/build/evidence PASS. Named release cases live in `tests/release-e2e/held-release-real.spec.ts` and `held-release-ui.spec.ts`.
+
+| Invariants / boundary | Named verification | Status |
+| --- | --- | --- |
+| I-07/I-11 action-level live access and same-person exclusion | `I-07 alias and unknown canonical people cannot decide; kind access alone grants no paper`; `R16 R18 protected failure is never empty and permission loss clears paper and unsent facts`; R1 denied/ordinary-failure cases | on-staging; positive preparation and live access required |
+| I-22 stable operation identity and exactly-once UI recovery | `R2 R4–R11 minute attestation uploads, freezes lost proposal/decision responses and displays server credit`; `R4 uncertain reserve and finalize retry their original operations without replacing the photo`; uncertain approval regression | on-staging; server-owned receipts retained |
+| I-25/I-26 validated evidence and honest credit | Four-kind `real v2 preparation, private upload and independent approval retain original facts`; `R8 retained-photo keyboard viewer restores focus and expired inspection disables approval`; actual server-credit R11 regression | on-staging; PUT alone cannot submit/credit |
+| I-34/I-35 immutable original, separate date/candidates and remaining holds | Unchanged original-fact comparison in four-kind HTTP; `Matrix: staged numeric candidate is separate from immutable original and never prefills paper fields`; `Matrix: release clears only the date hold and displays remaining price hold without a credit claim`; cancellation/rejection HTTP | on-staging; WHR-181 consumed, no expectation waiver |
+| I-39 stale guards and independent decisions | `I-39 stale approval never rebases; independent rejection uses the fresh post-proposal guard`; `R14 stale decision remains pending until explicit fresh independent rejection`; R9 expiry and frozen retry regressions | on-staging; no automatic guard rebase |
+| I-41 safe audit and retained history | `R12 R13 recorded rejected and superseded history do not invent loyalty outcomes or supersession time`; `Matrix: pending hold and proposal use a distinct-sale giveaway union and safe audit/attendant projections` | on-staging; protected narrative absent from ordinary projections |
+| I-46 complete blockers/discovery before finalization | `RD-07 complete server queue traverses over 100 tied-time stale proposals without inheriting ordinary filters`; distinct-sale giveaway union matrix; `admin-pending-release-api.test.ts` cursor traversal/failure cases | on-staging; failed/filtered empty never means ready |
+| I-48/I-49 protected photo access and client privacy | R8/R18 photo expiry/access loss assertions; client transport uses authorized private reads and no caching; ordinary service-worker/storage suite remains green | on-staging; scoped client evidence only, no new service-worker implementation claim |
+
+| Board row / written states | Named verification | Status |
+| --- | --- | --- |
+| S02/S03/S04/S06/S07/S09 review, comparison and recorded outcome; A14 attendant held-result/reassurance reference; approved R0–R18/RD-07 | Independent [fidelity report](../qa/whr171-fidelity/REPORT.md) and [69 original PNGs/hash inventory](../qa/whr171-fidelity/CAPTURES.md): 23 named groups at 1440/390/360; release runtime assertions and ordinary R17 test | on-staging; scoped PASS, not exhaustive visual/manual acceptance; attendant/A14 and general-audit behavior have runtime assertions, no dedicated captures |
+
+[Smoke runbook](../qa/smoke-2026-11-17-two-person-release.md) retains keyboard/tab, assistive-technology, geometry, contrast, zoom and physical-phone checks. WHR-180 inherited mobile admin navigation is visible/tracked, not silently accepted as a feature fix. Unconfigured staging shows R17. READY does not authorize v2 activation.
+
 ## WO-core-14b Owner campaign setup READY (WHR-150)
 
 [Feature PR #143](https://github.com/Adeboyemoses/Whalesreward/pull/143) merged at `36f1210` with five green PR checks. Code/security/integrity PASS round 3 at `9780c30`; evidence-only PR head `b42ecd4`. EM typecheck/lint/build/Prisma, unit 871, PostgreSQL 1,154, timezone 5+5 and Linux browser 360/four existing skips PASS. This separate records merge completes READY; Earl's end-of-M4 smoke remains pending.
