@@ -1,4 +1,9 @@
 import { hasConflictingPhoneExclusion } from "./phone-exclusion-conflicts";
+import {
+  managerCandidatePredicate,
+  requiredAttendantsQuery,
+  incompleteCandidate,
+} from "./selection-predicates";
 import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 import type pg from "pg";
 import {
@@ -184,10 +189,7 @@ async function actorProjection(db: pg.PoolClient, actor: LiveAdmin) {
 }
 async function required(db: pg.PoolClient, stationId: string) {
   return (
-    await db.query<{ id: string }>(
-      `SELECT DISTINCT a.attendant_id AS id FROM assignment a JOIN pump p ON p.id=a.pump_id WHERE p.station_id=$1 UNION SELECT originating_attendant_id AS id FROM purchase WHERE station_id=$1 ORDER BY id`,
-      [stationId],
-    )
+    await db.query<{ id: string }>(requiredAttendantsQuery, [stationId])
   ).rows.map((r) => r.id);
 }
 async function census(db: pg.PoolClient, c: CampaignRow): Promise<Phone[]> {
@@ -215,14 +217,7 @@ async function partial(
         [source.purchaseId, c.station_id],
       )
     ).rows[0];
-    if (
-      !p ||
-      !phone.attendantIds.includes(p.originating_attendant_id) ||
-      p.current_revision_id ||
-      p.ever_accepted ||
-      !["received", "photo_pending"].includes(p.status) ||
-      p.observed
-    )
+    if (!incompleteCandidate(p, phone.attendantIds))
       fail("exclusion_source_invalid", 422);
     if (p.version !== source.expectedPurchaseVersion) fail("exclusion_stale");
     result.push({
@@ -288,8 +283,7 @@ export function createPhoneService(
               await db.query(
                 `SELECT a.id FROM admin a JOIN auth_user u ON u.id=a.user_id JOIN role r ON r.id=a.role_id
                  JOIN LATERAL (SELECT verified FROM held_release_person_binding WHERE station_id=$2 AND user_id=u.id ORDER BY version DESC LIMIT 1) person ON person.verified
-                 WHERE a.id=$1 AND u.enabled AND u.kind='admin' AND r.enabled AND NOT u.must_change_password
-                 AND (SELECT count(DISTINCT permission_code) FROM role_permission WHERE role_id=r.id AND permission_code=ANY($3::text[]))=3`,
+                 WHERE a.id=$1 AND ${managerCandidatePredicate}`,
                 [
                   b.managerAdminId,
                   c.station_id,

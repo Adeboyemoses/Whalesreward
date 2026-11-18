@@ -129,5 +129,9 @@ export async function readiness(
     },
     sources,
     phone,
+    relevant,
+    ordinary,
+    pending,
+    sets,
   };
 }
