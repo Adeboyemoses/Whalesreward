@@ -125,7 +125,7 @@ corrections do not replace accepted spend; report quantities retain explicit uni
    closure records a terminal supersession rather than leaving an invisible write.
 4. Trace admin and attendant SaleDetail, revision/decision history and audit.
    `src/server/modules/sales/projections.ts:3` reads original verified date from
-   the original revision; `:37` separates original display from accepted revision.
+   the original revision; `:24` separates original display from accepted revision.
    WHR-181 is addressed on this shared read side, including a non-null historic
    original date. Candidate-only values are not labelled credited.
 5. Trace `GET /api/admin/giveaway/:campaignId/readiness`, preview preparation,
@@ -144,7 +144,7 @@ and `result` (a Decision). `src/server/modules/giveaway/data.ts:124` accepts a
 campaign conclusion only with `target.purchaseId`, `target.decisionId`,
 `result.closure='confirmed'`, `result.appliedPurchaseVersion`,
 `result.resultingRevisionId` and `result.evidenceAssetId` matching the committed
-sale decision. P-29 puts none of those fields in those positions. This is a
+sale decision. P-29 includes `appliedPurchaseVersion`, but omits the target purchase/decision IDs and result closure, resulting-revision and evidence-asset fields in those positions (`appliedRevisionId` is a different name). This is a
 producer/consumer mismatch, not a recommendation to remove binding checks.
 Ordinary v1 provenance is built differently at `reviews/service.ts:490`.
 
@@ -285,7 +285,7 @@ changes list and private case detail have their distinct documented permissions.
 1. Trace admin `GET /api/admin/prices`, `/:productCode/history`, and
    `POST /api/admin/prices/:productCode/activate` through
    `src/server/modules/station/http.ts:1`. Compare attendant Session and card
-   lookup price refresh through `auth/http.ts:1`, `cards/http.ts:1` and
+   lookup price refresh through `auth/http.ts:1`, `sync/http.ts:74` and
    `src/client/api.ts:52`: acknowledged context and increasing price version
    decide adoption; an outbox original retains its captured snapshot.
 2. Trace the same original through sync submit/upload/finalize.
