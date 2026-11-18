@@ -1,28 +1,24 @@
 # lane:app
-
-WO-app-11 (WHR-23), Stage 2a only: READY-2a since 2026-11-16
+WO-app-8b (WHR-171) two-person stuck-hold release: READY since 2026-11-18
 
 ## In flight
-
-- [Feature PR #157](https://github.com/Adeboyemoses/Whalesreward/pull/157) merged green to staging at 23e03b831dfeb274fde18a9df1c88f0c47d6ce7c; feature head 8cd892315b10082d54768da38eb6273732103e54, reviewed source e230cdf.
-- E01 live exact-spend/shared rankings; E02 actual grouped readiness and honest unavailable checklist; E04 frozen explicit confirmation; E03 immutable saved results/revisions. WHR-22 endpoints unchanged.
-- EM typecheck/lint/build, 981 unit and real HTTP protocol 1 PASS. CI: 1,445 PostgreSQL, timezone 5+5, browser 423 passed/three retry passes/four existing skips, storage 1 PASS. Code/security/integrity PASS round 3 of 3.
-- Smoke: docs/qa/smoke-2026-11-16-giveaway-stage-2a.md. Independent fidelity: tests/design-parity/leaderboards/REPORT.md, 14 captures at 1440/390/360; native E03 height-limit caveat retained.
+- [Feature PR #161](https://github.com/Adeboyemoses/Whalesreward/pull/161) merged green at 4e22f8ee584f6e240122e5cbb64b3798ce518e64; final head 1da3e5f7d968a431469f7b962c0d83a780a92f52, reviewed source/QA bb8f9f4. Separate READY records PR preserves the feature's no-STATUS/coverage/lane rule.
+- Approved R0–R18/RD-07: positive preparation/live access gate proposal; validated paper evidence, independent guarded decisions, frozen retries, current status/history and complete stale queue. WHR-176/181 consumed by rebase; endpoints/schema unchanged.
+- Code/security/integrity PASS round 3/3. Integrity explicitly: “No correction hides a product or contract defect.” Immutable date assertion retained; ended capture assignment/history preserved with separate current authority.
+- Final CI: typecheck/lint/build/evidence, 997 unit, 1,453 PostgreSQL, timezone 5+5, release 42 (10 HTTP/32 browser), ordinary 430/4 existing skips/0 flaky passes, storage 1 PASS. Gate53/guard94; EM independent gates and 10 HTTP PASS.
+- Smoke: docs/qa/smoke-2026-11-17-two-person-release.md. Independent scoped fidelity PASS: docs/qa/whr171-fidelity/REPORT.md, 69 fresh original PNGs/23 groups at 1440/390/360.
 
 ## Next
-
-- Stop. WHR-171 follows in a new session. Stage 2b checklist forms and granular per-check rows remain pending the separate core projections and work order.
-- WHR-23/WHR-172 stay In Review for Earl's end-of-M4 smoke; READY-2a is not acceptance of the complete WO.
+- Stop. WHR-171 stays In Review/READY pending Earl's station/phone acceptance; no next work order starts here.
+- Staging remains R17 while v2 is unconfigured. Activation is a separate authorized ops step.
 
 ## Earl's gos
-
-- 2026-11-16: “Continue WHR-23 (WO-app-11) with STAGE 2a only”; “Run code, security and integrity reviewers (round cap 3), open the PR to staging, merge when green, and report READY-2a”. No main promotion authorized.
+- 2026-11-17: “Fixture and synchronization fixes only by waiting on durable state: no sleeps, added retries or raised timeouts.” API changes require clause proof; integrity must confirm no defect hidden.
+- “When WHR-181 merges, rebase PR #161, rerun everything unchanged (release, browser, fidelity), take it out of draft when green, merge, and report READY with final counts. Then stop.”
 
 ## Risks
+- Physical-phone/manual acceptance and separately authorized v2 activation remain pending; no cloud/data operations performed. Fidelity explicitly scopes unexecuted assistive-technology, geometry, contrast and zoom checks.
+- Four existing image warnings; inherited mobile nav WHR-180 and exact-24-hour fixture WHR-86 remain tracked. Final CI had zero flaky passes; no retry/timeout policy changes.
+- Feature dispatches35 exceed high-tier flag8; three review rounds, no escalation. One separate records review gives session36; model ID unavailable in runtime.
 
-- Earl's station/phone smoke remains pending. Checklist forms are unavailable; current endpoints expose grouped evidence only.
-- Existing CI fixture defects: WHR-86 exact 24-hour timestamps, WHR-142 shared settings race, WHR-169 waiting-worker retry. Assertions/constraints/timeouts unchanged.
-- [QA correction PR #158](https://github.com/Adeboyemoses/Whalesreward/pull/158) addresses WHR-173: keyboard/focus and horizontal table-scroll interactions remain manual checks; CI covers width/control-height geometry and exercised flows.
-- Feature dispatches 18 exceed the high-tier flag of eight; final review stayed within three rounds, no escalation. QA review passed in round 2; READY records have their own review. Two inherited image lint warnings remain.
-
-dispatches=21 prs=3 rounds_max=3 escalations=0 model=unknown
+dispatches=36 prs=2 rounds_max=3 escalations=0 model=unknown
