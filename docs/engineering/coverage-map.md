@@ -859,3 +859,17 @@ EM typecheck/lint/build and 893 unit tests PASS; focused desktop/phone 40 and fi
 | E01, E02, E04, E03 | `tests/design-parity/leaderboards/REPORT.md`: independent comparison of 14 captures at 1440/390/360; resolved E02 overflow and E03 native height limit disclosed | adapted Stage 2a parity on-staging; checklist forms/per-check rows remain Stage 2b |
 
 Verification: EM typecheck/lint/build, 981 unit and real HTTP protocol 1 PASS. Final CI: 1,445 PostgreSQL, timezone 5+5, browser 423 passed/three retry passes/four existing skips, storage 1 PASS. All 24 new desktop/attendant Stage 2a project cases passed. Existing fixture issues WHR-86/142/169 remain separate. WHR-173 narrows overstated interaction-coverage prose: width/control-height geometry is automated; keyboard/focus and horizontal table-scroll interactions remain manual acceptance checks. [Smoke](../qa/smoke-2026-11-16-giveaway-stage-2a.md).
+
+
+## WHR-181 immutable original verified-date reads
+
+[Feature PR #166](https://github.com/Adeboyemoses/Whalesreward/pull/166) merged green at `784cf67`, PR head `81f5a32`, reviewed source `8f691b0`. Read-side repair only; no new endpoint shape, schema, policy or revision-write authority. No UI board parity claim.
+
+| Invariants | Named evidence | Status |
+|---|---|---|
+| I-34, I-35 | `sale-original-date.test.ts`: `I-34 ordinary date resolution preserves original Values with another hold=%s` (false/true), with same-operation replay, preserved original revision and separate current/candidate/accepted dates | on-staging; remaining hold keeps zero credit |
+| I-41 | `sale-original-date.test.ts`: `I-41 retains a non-null date captured in the original revision instead of hard-coding null`; `I-41 pending purchase without an original revision has an original null verified date` | on-staging immutable original read projection |
+| I-34, I-35, I-41, I-42, I-45a | `held-release-service.test.ts` SR-05 approval/replay cases compare complete original Values and immutable revision facts; date case retains separately resolved current/accepted date | on-staging; unchanged credit gates and accepted-source semantics |
+| I-34, I-41 | `original-date-real.spec.ts`: `WHR-181 ordinary date resolution keeps original Values over real HTTP` and `WHR-181 P-29 date resolution keeps original Values over real HTTP`; actual Next/PostgreSQL16/MinIO, admin/attendant originals, replay and one decision | on-staging real HTTP regression coverage |
+
+Expected failures were observed before repair for ordinary, P-29, real HTTP and retained non-null original dates. EM: 981 unit, 1,453 PostgreSQL16 (77 suites, zero skips), timezone 5+5, HTTP 2, typecheck/lint/build, review self-tests 53 and guard 94 PASS. CI: 1,453 PostgreSQL, timezone 5+5, browser 426 passed/two retry passes/four existing skips, storage 1 and release 3 PASS. All three reviewers PASS in round 1 of 3. Existing WHR-174 cleanup failure passed on one unchanged CI job rerun; browser retry evidence is on WHR-177/WHR-83. Full callsite dispositions: [verification](../qa/verification-2026-11-18-original-date.md).
