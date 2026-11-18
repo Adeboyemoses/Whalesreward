@@ -160,8 +160,9 @@ async function corrupt(x: Awaited<ReturnType<typeof fixture>>) {
 }
 async function freshSeller(x: Awaited<ReturnType<typeof fixture>>) {
   const context = newId();
+  // ck_context_window requires one shared instant, even across a clock/date boundary.
   await db.pool.query(
-    "INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest) SELECT $1,attendant_id,assignment_id,clock_timestamp(),clock_timestamp()+interval '24 hours',seller_name,seller_username,device_binding_digest FROM capture_context WHERE id=$2",
+    "INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest) SELECT $1,attendant_id,assignment_id,statement_timestamp(),statement_timestamp()+interval '24 hours',seller_name,seller_username,device_binding_digest FROM capture_context WHERE id=$2",
     [context, x.f.contextId],
   );
   const token = newId();
