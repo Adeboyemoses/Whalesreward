@@ -33,7 +33,18 @@ const reviewerAttestation =
 
 async function captureView(page: Page, state: string) {
   const original = page.viewportSize();
-  if (state === "R11-recorded") {
+  if (state === "R12-rejected") {
+    await expect(
+      page.getByRole("button", {
+        name: "Propose a release with a sheet photo",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await expect(
+      page.getByText("Loading release details…", { exact: true }),
+    ).toHaveCount(0);
+  }
+  if (state === "R11-recorded" || state === "R12-rejected") {
     const meter = page.getByRole("img", {
       name: "Validated meter photo",
       exact: true,
