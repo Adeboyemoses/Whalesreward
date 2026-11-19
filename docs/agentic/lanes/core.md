@@ -1,21 +1,23 @@
 # lane:core
-WHR-181 original verified-date read projection: READY since 2026-11-18
+WHR-184 bound campaign proof: READY since 2026-11-19
 
 ## In flight
-- [Feature PR #166](https://github.com/Adeboyemoses/Whalesreward/pull/166) merged into staging at `784cf67e6b6baa82a4be484276f604619ab2d944` with all five checks green. PR head `81f5a3207164cb7532579b603813531ef7c35626`; reviewed source `8f691b0`.
-- Code/security/integrity PASS, round 1 of cap 3, no findings. Evidence `.review/core__WHR-181-original-date.md` validates. Feature PR excludes shared records; this docs-only PR records READY.
-- Shared original Values now reads the original revision date, including non-null original dates. Sale detail/list/search, review comparison and sync audit fallback inherit the repair. Release preparation, reports, audit queries and corrections were audited; full dispositions in `docs/qa/verification-2026-11-18-original-date.md`.
-- EM typecheck/lint/build, 981 unit, 1,453 PostgreSQL 16, timezone 5+5, real Next/PostgreSQL/MinIO HTTP 2, gate self-tests 53 and guard 94 PASS. CI adds browser 426 passed/two retry passes/four existing skips, storage 1 and release 3 PASS. No schema, endpoint-shape or production immutable-revision writes changed.
+- [Feature PR #171](https://github.com/Adeboyemoses/Whalesreward/pull/171) merged to staging at `4fe42cd1c4098f6796b92f458189d0f0090b373e`; head `f3e8817253c20e5a6c344b48c797ca251f244eab`, reviewed code `d03197b`. All five CI checks green; code/security/integrity PASS round 1/3.
+- Shared protected schema aligns ordinary/P-29 writers and giveaway reads, retaining purchase/decision/station/version/revision/evidence/campaign/settings binding and private provenance. Card/date/price/capture checked; no backfill or policy activation.
+- EM typecheck/lint/build, unit 997, PostgreSQL16 1,534, time 5+5, real HTTP proof 1 and release HTTP 10 PASS. CI release 42, campaign HTTP 1, ordinary browser 429 passed/one known retry pass/four existing skips, storage 1. Named tests/setup: `docs/qa/verification-2026-11-19-proof.md`.
+- READY records are in a separate docs PR; feature PR changes no STATUS, coverage map or lane file.
 
 ## Next
-- Stop at READY. WHR-171 can rebase on the staging fix; WHR-178 resumes only in a new session. No WHR-178 work performed here.
+- Stop at READY. Earl's end-of-M4 smoke and separate policy activation remain pending. No next work order started.
+- WHR-178 and WHR-185 were already merged before this branch started.
 
 ## Earl's gos
-- 17 Nov 2026: “Fix WHR-181.” “Then stop: WHR-178 resumes in a new session.”
+- 18 Nov 2026: “Option A, fix before the end-of-M4 smoke.”
+- 19 Nov 2026: “No policy activation.” “open the PR to staging, merge when green, and report READY with PR, head SHA, test counts and named tests. Then stop.”
 
 ## Risks
-- Existing operator cleanup timeout WHR-174 required one unchanged CI integration rerun; final 1,453 assertions and both timezone runs passed. Browser retry cases remain WHR-177 and WHR-83; evidence added to existing issues with `found-in:WHR-181`.
-- Local Chromium launch is sandbox-blocked; full native CI browser verification passed. Initial local PostgreSQL 15/fixture-role/name mismatches were replaced by an isolated PostgreSQL 16 disposable test database; clean full EM run passed without skips.
-- Runtime model ID unavailable. No cloud resources, deployed data or main promotion touched.
+- WHR-177 existing ordinary leaderboard fixture deadlock retried once in green feature CI; occurrence/label recorded, no extra fix attempted.
+- Local Chromium bootstrap denied by macOS (1100/SIGTRAP); real HTTP/MinIO passed locally, complete browser/storage passed in Linux CI.
+- Historical malformed provenance stays fail-closed; no data rewrite. This is readiness for smoke, not client acceptance.
 
 dispatches=5 prs=2 rounds_max=1 escalations=0 model=unavailable

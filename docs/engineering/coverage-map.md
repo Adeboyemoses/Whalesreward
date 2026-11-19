@@ -2,6 +2,18 @@
 
 Where each requirement stands. The EM updates the rows its work order touched at session close (`close-session` skill). Status: `todo` → `building` → `on-staging` → `accepted`. A row reaches `on-staging` only with a named test (invariants) or a design-parity check (boards).
 
+## WHR-184 bound campaign proof READY — 19 Nov 2026
+
+[Feature PR #171](https://github.com/Adeboyemoses/Whalesreward/pull/171) merged green at `4fe42cd1c4098f6796b92f458189d0f0090b373e`; PR head `f3e8817253c20e5a6c344b48c797ca251f244eab`, reviewed code `d03197bb65359c8dd1a205c811962f1c3c5f6211`. Code/security/integrity PASS round 1/3. No policy activation, backfill or new board parity claim. [Verification and named tests](../qa/verification-2026-11-19-proof.md).
+
+| Invariants | Named coverage | Status |
+| --- | --- | --- |
+| I-07/I-25/I-26/I-28/I-31/I-33/I-34/I-35/I-41/I-48 | `SR-08 %s approval preserves original evidence and exact protected people provenance` for card, price, date and capture; real HTTP reserve/upload URL/actual MinIO PUT/finalize/propose/independent decision | on-staging; original facts/private provenance retained; PUT alone never credits |
+| I-42/I-43/I-44/I-45a/I-45b | `WHR-184 P-29 campaign reader rejects a foreign %s binding`; `WHR-184 rejects campaign proof with a foreign %s binding`; real HTTP inside/outside proof, both leaderboard bases, foreign campaign/settings | on-staging; purchase/decision/station/version/revision/evidence/closure guards retained |
+| I-39/I-45/I-46 | `WHR-184 I-45a real HTTP inside and outside proof reaches both leaderboards, readiness and immutable snapshot sources after later correction` | on-staging; normal census/check/readiness, exact initial/revised source, late numeric correction, policy-off replay and frozen predecessor |
+
+Final [CI 44499372604](https://github.com/Adeboyemoses/Whalesreward/actions/runs/44499372604): unit 997, PostgreSQL16 1,534, time 5+5, release 42, dedicated campaign HTTP 1, ordinary browser 429 passed/one known WHR-177 fixture-deadlock retry pass/four existing skips, storage 1. Typecheck/lint/build/evidence and all five checks green. Local HTTP used real storage; native macOS UI startup was denied and is covered by the complete Linux CI run.
+
 ## WO-app-8b two-person stuck-hold release READY (WHR-171)
 
 [Feature PR #161](https://github.com/Adeboyemoses/Whalesreward/pull/161) merged green at `4e22f8ee584f6e240122e5cbb64b3798ce518e64`; final feature head `1da3e5f7d968a431469f7b962c0d83a780a92f52`, reviewed source/QA `bb8f9f4`. Code/security/integrity PASS round 3 of 3; integrity explicitly states no correction hides a product or contract defect. [API expectation authority](../qa/whr171-test-corrections.md) records Earl's allowed fixture corrections; the immutable original date assertion stayed unchanged until T1's WHR-181 fix. No endpoint/schema changes or v2 activation. Status is on-staging, not accepted; Earl's station/phone smoke remains pending.
