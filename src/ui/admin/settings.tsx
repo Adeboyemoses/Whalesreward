@@ -427,6 +427,16 @@ function SettingsContent({
                         : "Create campaign"
                       : "View giveaway settings"}
                   </Link>
+                  {session.role?.isOwner &&
+                    session.permissions?.includes("sales") &&
+                    settings.campaign && (
+                      <Link
+                        className="wr-btn wr-btn-secondary wr-settings-inline-action"
+                        href="/admin/leaderboards/finalize/manager"
+                      >
+                        Campaign station manager
+                      </Link>
+                    )}
                   <p className="wr-help">{timingReason(settings, session)}</p>
                 </Sheet>
                 <Sheet

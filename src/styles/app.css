@@ -976,3 +976,76 @@ body {
 @media (max-width: 900px) {
   .wr-report-chart > h2 { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 }
+
+/* Approved P-30 checklist extends the E02/E04 sheets with labelled phone cards.
+   Tokens and standard controls remain the design-system contract. */
+.wr-checklist {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.wr-checklist .wr-sheet,
+.wr-checklist .wr-two-col > *,
+.wr-checklist-row {
+  min-width: 0;
+}
+.wr-checklist-card,
+.wr-checklist-row {
+  padding: var(--space-4);
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-lg);
+  margin-block: var(--space-4);
+}
+.wr-checklist-id,
+.wr-checklist .wr-kv-row,
+.wr-checklist-outcomes .wr-kv-row,
+.wr-checklist p,
+.wr-checklist li {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.wr-checklist-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--control-h);
+  padding-block: var(--space-3);
+  cursor: pointer;
+}
+.wr-checklist-choice input {
+  flex: none;
+  width: var(--space-5);
+  height: var(--space-5);
+  margin-top: var(--space-1);
+  accent-color: var(--whale-600);
+}
+.wr-checklist-outcomes h4 {
+  margin-block: 0 var(--space-3);
+}
+.wr-checklist-outcomes .wr-pill {
+  white-space: normal;
+}
+@media (max-width: 899px) {
+  .wr-checklist-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .wr-checklist .wr-btn,
+  .wr-checklist select,
+  .wr-checklist input:not([type="checkbox"]) {
+    min-height: var(--control-h);
+  }
+  .wr-checklist .wr-btn {
+    white-space: normal;
+  }
+  .wr-checklist .wr-kv-row,
+  .wr-checklist-outcomes .wr-kv-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .wr-checklist .wr-kv-value,
+  .wr-checklist-outcomes .wr-kv-value {
+    text-align: left;
+  }
+}
