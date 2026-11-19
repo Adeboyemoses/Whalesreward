@@ -224,6 +224,7 @@ function PhoneContent({ data }: { data: Data }) {
             This replaces the current census and requires a new phone check.
             Earlier evidence is retained.
           </Notice>
+          <EvidenceContext campaign={data.campaign} view={v} />
           <h3>Current census</h3>
           {data.inventory.items.length ? (
             data.inventory.items.map((p) => (
@@ -271,7 +272,6 @@ function PhoneContent({ data }: { data: Data }) {
               : ""}
           </p>
           <p>Census reason: {draft.reason}</p>
-          <EvidenceContext campaign={data.campaign} view={v} />
         </>
       ),
     }));
@@ -300,6 +300,7 @@ function PhoneContent({ data }: { data: Data }) {
             Inspection selections are a draft until the complete phone check is
             recorded.
           </p>
+          <EvidenceContext campaign={data.campaign} view={v} />
           {data.inventory.items.map((p) => (
             <section className="wr-checklist-card" key={p.id}>
               <PhoneFacts phone={p} />
@@ -318,7 +319,6 @@ function PhoneContent({ data }: { data: Data }) {
             </section>
           ))}
           <p>Phone-check reason: {draft.checkReason}</p>
-          <EvidenceContext campaign={data.campaign} view={v} />
         </>
       ),
     }));
@@ -337,7 +337,10 @@ function PhoneContent({ data }: { data: Data }) {
           </Button>
         </Notice>
       )}
-      <div className="wr-two-col">
+      <div className="wr-two-col wr-checklist-context-grid">
+        <div className="wr-checklist-context">
+          <EvidenceContext campaign={data.campaign} view={v} />
+        </div>
         <Sheet title="Recorded phone census">
           {!data.inventory.items.length && (
             <p>
@@ -425,7 +428,6 @@ function PhoneContent({ data }: { data: Data }) {
             />
           )}
         </Sheet>
-        <EvidenceContext campaign={data.campaign} view={v} />
       </div>
       <Sheet title="Unavailable-phone proposals">
         {!data.exclusions.length && (

@@ -169,7 +169,10 @@ function UnavailableForm({
           </Button>
         </Notice>
       )}
-      <div className="wr-two-col">
+      <div className="wr-two-col wr-checklist-context-grid">
+        <div className="wr-checklist-context">
+          <EvidenceContext campaign={data.campaign} view={data.view} />
+        </div>
         <Sheet title="Unavailable phone evidence">
           <PhoneFacts phone={data.phone} />
           <h3>Account partitions</h3>
@@ -190,7 +193,6 @@ function UnavailableForm({
             records.
           </p>
         </Sheet>
-        <EvidenceContext campaign={data.campaign} view={data.view} />
       </div>
       <Sheet title="Exact incomplete sales received by the server">
         <p>
@@ -283,6 +285,7 @@ function UnavailableForm({
               review: (
                 <>
                   <Notice tone="warning">{consequence}</Notice>
+                  <EvidenceContext campaign={data.campaign} view={data.view} />
                   <PhoneFacts phone={data.phone} />
                   {data.phone.attendantIds.map((id) => {
                     const a = data.accounts.items.find(
@@ -314,7 +317,6 @@ function UnavailableForm({
                     </p>
                   )}
                   <p>Why is this phone unavailable? {draft.reason}</p>
-                  <EvidenceContext campaign={data.campaign} view={data.view} />
                 </>
               ),
             }))

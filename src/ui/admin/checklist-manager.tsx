@@ -8,6 +8,7 @@ import { Reason, SelectField, Sheet } from "./station-common";
 import {
   ChecklistFrame,
   EvidenceContext,
+  Id,
   ReadState,
   useChecklistApi,
   useChecklistDraft,
@@ -55,7 +56,13 @@ export function ManagerPage({ session }: { session: AdminSession }) {
             <Notice>Campaign values are not configured.</Notice>
           )}
           {data && (
-            <div className="wr-two-col">
+            <div className="wr-two-col wr-checklist-context-grid">
+              <div className="wr-checklist-context">
+                <EvidenceContext
+                  campaign={data.campaign}
+                  view={data.choices.view}
+                />
+              </div>
               <Sheet title="Campaign station manager">
                 {data.choices.currentDesignation ? (
                   <p>
@@ -107,17 +114,48 @@ export function ManagerPage({ session }: { session: AdminSession }) {
                                 and pending unavailable-phone proposals
                                 unusable.
                               </Notice>
+                              <EvidenceContext
+                                campaign={data.campaign}
+                                view={data.choices.view}
+                              />
                               <KeyValueList
                                 items={[
                                   {
                                     label: "Current manager",
-                                    value: data.choices.currentDesignation
-                                      ? `${data.choices.currentDesignation.manager.name} / ${data.choices.currentDesignation.manager.adminId}`
-                                      : "Not designated",
+                                    value: data.choices.currentDesignation ? (
+                                      <>
+                                        {
+                                          data.choices.currentDesignation
+                                            .manager.name
+                                        }{" "}
+                                        /{" "}
+                                        <Id>
+                                          {
+                                            data.choices.currentDesignation
+                                              .manager.adminCode
+                                          }
+                                        </Id>{" "}
+                                        /{" "}
+                                        <Id>
+                                          {
+                                            data.choices.currentDesignation
+                                              .manager.adminId
+                                          }
+                                        </Id>
+                                      </>
+                                    ) : (
+                                      "Not designated"
+                                    ),
                                   },
                                   {
                                     label: "Proposed manager",
-                                    value: `${target.name} / ${target.adminCode} / ${target.adminId}`,
+                                    value: (
+                                      <>
+                                        {target.name} /{" "}
+                                        <Id>{target.adminCode}</Id> /{" "}
+                                        <Id>{target.adminId}</Id>
+                                      </>
+                                    ),
                                   },
                                   {
                                     label: "Reason for designation",
@@ -175,10 +213,6 @@ export function ManagerPage({ session }: { session: AdminSession }) {
                   </form>
                 )}
               </Sheet>
-              <EvidenceContext
-                campaign={data.campaign}
-                view={data.choices.view}
-              />
             </div>
           )}
           <Button

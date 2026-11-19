@@ -1049,3 +1049,9 @@ body {
     text-align: left;
   }
 }
+/* Keep campaign context first in reading order on phones while matching the
+   approved desktop evidence-left/context-right sheet layout. */
+@media (min-width: 900px) {
+  .wr-checklist-context-grid > .wr-checklist-context { grid-column: 2; grid-row: 1; }
+  .wr-checklist-context-grid > .wr-sheet { grid-column: 1; grid-row: 1; }
+}
