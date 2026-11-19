@@ -1,6 +1,7 @@
 "use client";
 import {
   useCallback,
+  useId,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -133,7 +134,7 @@ export function Reason({
   label?: string;
   disabled?: boolean;
 }) {
-  const id = "station-reason";
+  const id = useId();
   return (
     <div className="wr-field">
       <label className="wr-label" htmlFor={id}>
@@ -142,6 +143,7 @@ export function Reason({
       <textarea
         id={id}
         className="wr-input wr-station-reason"
+        aria-describedby={`${id}-help`}
         rows={3}
         value={value}
         maxLength={1000}
@@ -149,7 +151,7 @@ export function Reason({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       />
-      <p className="wr-help">
+      <p className="wr-help" id={`${id}-help`}>
         Required. Recorded in the history with your name.
       </p>
     </div>

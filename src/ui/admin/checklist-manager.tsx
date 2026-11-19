@@ -1,5 +1,6 @@
 "use client";
 import { useCallback } from "react";
+import { EvidencePager, useEvidencePage } from "./checklist-paging";
 import type { AdminSession } from "@/client/admin-session";
 import { checklistOperation } from "@/client/admin-checklist-api";
 import { Button, KeyValueList, Notice } from "@/ui";
@@ -33,6 +34,13 @@ export function ManagerPage({ session }: { session: AdminSession }) {
   }, [api, allowed]);
   const r = useChecklistRead(`manager:${m.serial}`, load);
   const data = r.data;
+  const managerPages = useEvidencePage(
+    data?.choices.items ?? [],
+    data?.choices.view.viewToken ?? "loading",
+  );
+  const selectedChoice = data?.choices.items.find(
+    (c) => c.adminId === draft.manager,
+  );
   return (
     <ChecklistFrame title="Campaign station manager">
       {!allowed ? (
@@ -130,12 +138,26 @@ export function ManagerPage({ session }: { session: AdminSession }) {
                       onChange={(manager) => set({ ...draft, manager })}
                     >
                       <option value="">Select an eligible manager</option>
-                      {data.choices.items.map((c) => (
+                      {selectedChoice &&
+                        !managerPages.items.some(
+                          (c) => c.adminId === selectedChoice.adminId,
+                        ) && (
+                          <option value={selectedChoice.adminId}>
+                            Selected: {selectedChoice.name} /{" "}
+                            {selectedChoice.adminCode}
+                          </option>
+                        )}
+                      {managerPages.items.map((c) => (
                         <option value={c.adminId} key={c.adminId}>
                           {c.name} / {c.adminCode}
                         </option>
                       ))}
                     </SelectField>
+                    <EvidencePager
+                      pages={managerPages}
+                      label="Manager choices pages"
+                      disabled={m.locked}
+                    />
                     <Reason
                       label="Reason for designation"
                       value={draft.reason}

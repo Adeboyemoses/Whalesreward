@@ -1,5 +1,6 @@
 "use client";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { EvidencePager, useEvidencePage } from "./checklist-paging";
 import Link from "next/link";
 import type { AdminSession } from "@/client/admin-session";
 import { AdminError } from "@/client/admin-api";
@@ -176,11 +177,16 @@ function PhoneContent({ data }: { data: Data }) {
     attested: false,
     checks: {} as Record<string, string>,
     checkReason: "",
+    recoveredPhoneIds: [] as string[],
   });
   const [draft, set] = useChecklistDraft(
     `checklist:census:${data.campaign.id}`,
     defaults,
   );
+  const recordedPages = useEvidencePage(data.inventory.items, v.viewToken);
+  const inspectionPages = useEvidencePage(data.inventory.items, v.viewToken);
+  const proposalPages = useEvidencePage(data.exclusions, v.viewToken);
+  const draftPages = useEvidencePage(draft.phones, v.viewToken);
   const stale = draft.viewToken !== v.viewToken;
   const accounts = data.accounts?.items ?? [];
   const covered = new Set(draft.phones.flatMap((p) => p.attendantIds));
@@ -188,6 +194,7 @@ function PhoneContent({ data }: { data: Data }) {
   const deadline = data.campaign.timing.uploadDeadline;
   const afterDeadline = !!deadline && Date.parse(v.asOf) > Date.parse(deadline);
   const locked = m.locked || stale;
+  const recovered = draft.recoveredPhoneIds ?? [];
   const pending = data.exclusions.some((e) => e.state === "pending");
   const validCensus =
     draft.phones.length > 0 &&
@@ -240,6 +247,15 @@ function PhoneContent({ data }: { data: Data }) {
             ))
           ) : (
             <p>No census recorded.</p>
+          )}
+          {recovered.length > 0 && (
+            <p>
+              Recovered phones declared available:{" "}
+              {recovered.map((id) => (
+                <Id key={id}>{id} </Id>
+              ))}
+              . This replacement requires a fresh complete phone check.
+            </p>
           )}
           <h3>Proposed census</h3>
           {draft.phones.map((p, i) => (
@@ -329,7 +345,7 @@ function PhoneContent({ data }: { data: Data }) {
               recorded.
             </p>
           )}
-          {data.inventory.items.map((p) => (
+          {recordedPages.items.map((p) => (
             <section className="wr-checklist-card" key={p.id}>
               <PhoneFacts phone={p} />
               <AccountLabels ids={p.attendantIds} accounts={accounts} />
@@ -348,6 +364,33 @@ function PhoneContent({ data }: { data: Data }) {
                     submit a new proposal.
                   </p>
                 ))}
+              {recovered.includes(p.id) && (
+                <Notice tone="warning">
+                  This phone is available again. Record a new census and phone
+                  check. Earlier exclusion decisions remain retained history; a
+                  fresh census must be recorded before inspection can be
+                  certified.
+                </Notice>
+              )}
+              {data.manager &&
+                (p.state === "unavailable_pending" ||
+                  p.state === "unavailable_approved") && (
+                  <Button
+                    variant="secondary"
+                    disabled={locked}
+                    onClick={() =>
+                      set({
+                        ...draft,
+                        recoveredPhoneIds: [...new Set([...recovered, p.id])],
+                        attested: false,
+                        checks: {},
+                        checkReason: "",
+                      })
+                    }
+                  >
+                    Phone available again
+                  </Button>
+                )}
               {data.manager && (
                 <Link
                   className="wr-btn wr-btn-secondary"
@@ -358,6 +401,11 @@ function PhoneContent({ data }: { data: Data }) {
               )}
             </section>
           ))}
+          <EvidencePager
+            pages={recordedPages}
+            label="Phone census pages"
+            disabled={m.locked}
+          />
           {data.evidence && (
             <KeyValueList
               items={[
@@ -383,13 +431,18 @@ function PhoneContent({ data }: { data: Data }) {
         {!data.exclusions.length && (
           <p>No unavailable-phone proposals are recorded.</p>
         )}
-        {data.exclusions.map((e) => (
+        {proposalPages.items.map((e) => (
           <p className="wr-checklist-card" key={e.id}>
             <Link href={basePath + "/exclusions/" + e.id}>
               {e.phoneLabel} · {e.state} · <Id>{e.id}</Id>
             </Link>
           </p>
         ))}
+        <EvidencePager
+          pages={proposalPages}
+          label="Unavailable-phone proposals pages"
+          disabled={m.locked}
+        />
       </Sheet>
       {data.manager ? (
         <>
@@ -398,87 +451,75 @@ function PhoneContent({ data }: { data: Data }) {
               Use a station label such as ‘Pump 1 handset’. Do not enter a phone
               number, IMEI, serial number or secret.
             </p>
-            {draft.phones.map((p, i) => (
-              <fieldset
-                className="wr-checklist-card"
-                key={p.id ?? `draft-${i}`}
-                disabled={locked}
-              >
-                <legend>Phone {i + 1}</legend>
-                <TextField
-                  label={`Phone label · ${i + 1}`}
-                  value={p.label}
-                  maxLength={80}
-                  onChange={(e) =>
-                    set({
-                      ...draft,
-                      phones: draft.phones.map((q, j) =>
-                        j === i ? { ...q, label: e.target.value } : q,
-                      ),
-                    })
-                  }
-                />
-                <p>
-                  Inventory ID: <Id>{p.id ?? "Assigned when saved"}</Id>
-                </p>
-                <h3>Attendant accounts</h3>
-                {accounts.map((a) => (
-                  <label className="wr-checklist-choice" key={a.attendantId}>
-                    <input
-                      type="checkbox"
-                      aria-label={`${a.staffCode} · ${a.name} · ${a.attendantId} · phone ${i + 1}`}
-                      checked={p.attendantIds.includes(a.attendantId)}
-                      onChange={(e) =>
-                        set({
-                          ...draft,
-                          phones: draft.phones.map((q, j) =>
-                            i === j
-                              ? {
-                                  ...q,
-                                  attendantIds: e.target.checked
-                                    ? [...q.attendantIds, a.attendantId]
-                                    : q.attendantIds.filter(
-                                        (id) => id !== a.attendantId,
-                                      ),
-                                }
-                              : q,
-                          ),
-                        })
-                      }
-                    />
-                    <span>
-                      {a.name} · <Id>{a.staffCode}</Id>
-                      <br />
-                      <Id>{a.attendantId}</Id>
-                      {!a.enabled && <span className="wr-sub">Disabled</span>}
-                      {!a.hasCurrentAssignment && (
-                        <span className="wr-sub">Assignment ended</span>
-                      )}
-                    </span>
-                  </label>
-                ))}
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    set({
-                      ...draft,
-                      phones: draft.phones.filter((_, j) => i !== j),
-                    })
-                  }
+            {draftPages.items.map((p, localIndex) => {
+              const i = draftPages.start + localIndex;
+              return (
+                <fieldset
+                  className="wr-checklist-card"
+                  key={p.id ?? `draft-${i}`}
+                  disabled={locked}
                 >
-                  Remove draft row
-                </Button>
-              </fieldset>
-            ))}
+                  <legend>Phone {i + 1}</legend>
+                  <TextField
+                    label={`Phone label · ${i + 1}`}
+                    value={p.label}
+                    maxLength={80}
+                    onChange={(e) =>
+                      set({
+                        ...draft,
+                        phones: draft.phones.map((q, j) =>
+                          j === i ? { ...q, label: e.target.value } : q,
+                        ),
+                      })
+                    }
+                  />
+                  <p>
+                    Inventory ID: <Id>{p.id ?? "Assigned when saved"}</Id>
+                  </p>
+                  <h3>Attendant accounts</h3>
+                  <AccountChoices
+                    accounts={accounts}
+                    selected={p.attendantIds}
+                    index={i}
+                    viewToken={v.viewToken}
+                    onChange={(attendantIds) =>
+                      set({
+                        ...draft,
+                        phones: draft.phones.map((q, j) =>
+                          i === j ? { ...q, attendantIds } : q,
+                        ),
+                      })
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      set({
+                        ...draft,
+                        phones: draft.phones.filter((_, j) => i !== j),
+                      })
+                    }
+                  >
+                    Remove draft row
+                  </Button>
+                </fieldset>
+              );
+            })}
+            <EvidencePager
+              pages={draftPages}
+              label="Draft phones pages"
+              disabled={m.locked}
+            />
             <Button
               variant="secondary"
               disabled={locked || draft.phones.length >= 100}
-              onClick={() =>
+              onClick={() => {
                 set({
                   ...draft,
                   phones: [...draft.phones, { label: "", attendantIds: [] }],
-                })
-              }
+                });
+                draftPages.last(draft.phones.length + 1);
+              }}
             >
               Add phone
             </Button>
@@ -535,16 +576,17 @@ function PhoneContent({ data }: { data: Data }) {
               is recorded.
             </p>
             <p>
-              Sales or photos remain unsent. Resolve them through the authorized
-              upload or recovery process, then inspect again.
+              Inspect every relevant account partition. If sales or photos
+              remain unsent, resolve them through the authorized upload or
+              recovery process, then inspect again.
             </p>
-            {data.inventory.items.map((p) => (
+            {inspectionPages.items.map((p) => (
               <section className="wr-checklist-card" key={p.id}>
                 <PhoneFacts phone={p} />
                 <SelectField
                   label={`Inspection result · ${p.label}`}
                   value={draft.checks[p.id] ?? ""}
-                  disabled={locked}
+                  disabled={locked || recovered.length > 0}
                   onChange={(value) =>
                     set({
                       ...draft,
@@ -569,6 +611,17 @@ function PhoneContent({ data }: { data: Data }) {
                 )}
               </section>
             ))}
+            <EvidencePager
+              pages={inspectionPages}
+              label="Inspection phones pages"
+              disabled={m.locked}
+            />
+            {recovered.length > 0 && (
+              <Notice tone="warning">
+                Record a new census for the recovered phone before recording a
+                complete phone check.
+              </Notice>
+            )}
             <Reason
               label="Phone-check reason"
               value={draft.checkReason}
@@ -583,6 +636,7 @@ function PhoneContent({ data }: { data: Data }) {
             <Button
               disabled={
                 locked ||
+                recovered.length > 0 ||
                 pending ||
                 !afterDeadline ||
                 !data.inventory.items.length ||
@@ -601,7 +655,6 @@ function PhoneContent({ data }: { data: Data }) {
           permission can record the census or phone check.
         </Notice>
       )}
-      <p>This phone is available again. Record a new census and phone check.</p>
     </>
   );
 }
@@ -625,5 +678,89 @@ function AccountLabels({
         );
       })}
     </ul>
+  );
+}
+
+function AccountChoices({
+  accounts,
+  selected,
+  index,
+  viewToken,
+  onChange,
+}: {
+  accounts: z.infer<typeof attendantChoiceSchema>[];
+  selected: string[];
+  index: number;
+  viewToken: string;
+  onChange: (ids: string[]) => void;
+}) {
+  const pages = useEvidencePage(accounts, viewToken);
+  const [candidate, setCandidate] = useState("");
+  return (
+    <>
+      <AccountLabels ids={selected} accounts={accounts} />
+      <SelectField
+        label={`Attendant account to add · phone ${index + 1}`}
+        value={candidate}
+        required={false}
+        onChange={setCandidate}
+      >
+        <option value="">Choose an authorized attendant account</option>
+        {pages.items.map((a) => (
+          <option
+            value={a.attendantId}
+            key={a.attendantId}
+            disabled={selected.includes(a.attendantId)}
+          >
+            {a.staffCode} / {a.name}
+            {!a.enabled ? " · Disabled" : ""}
+            {!a.hasCurrentAssignment ? " · Assignment ended" : ""}
+          </option>
+        ))}
+      </SelectField>
+      <Button
+        variant="secondary"
+        disabled={
+          !candidate || selected.includes(candidate) || selected.length >= 100
+        }
+        onClick={() => {
+          if (accounts.some((a) => a.attendantId === candidate)) {
+            onChange([...selected, candidate]);
+            setCandidate("");
+          }
+        }}
+      >
+        Add attendant account
+      </Button>
+      {pages.items.map((a) => (
+        <label className="wr-checklist-choice" key={a.attendantId}>
+          <input
+            type="checkbox"
+            aria-label={`${a.staffCode} · ${a.name} · ${a.attendantId} · phone ${index + 1}`}
+            checked={selected.includes(a.attendantId)}
+            onChange={(e) =>
+              onChange(
+                e.target.checked
+                  ? [...selected, a.attendantId]
+                  : selected.filter((id) => id !== a.attendantId),
+              )
+            }
+          />
+          <span>
+            {a.name} · <Id>{a.staffCode}</Id>
+            <br />
+            <Id>{a.attendantId}</Id>
+            {!a.enabled && <span className="wr-sub">Disabled</span>}
+            {!a.hasCurrentAssignment && (
+              <span className="wr-sub">Assignment ended</span>
+            )}
+          </span>
+        </label>
+      ))}
+      <EvidencePager
+        pages={pages}
+        label={`Attendant accounts · phone ${index + 1} pages`}
+      />
+    </>
   );
 }

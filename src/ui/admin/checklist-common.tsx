@@ -315,7 +315,12 @@ export function ReadState({
   }, [error]);
   return (
     <>
-      {busy && <p role="status">Loading finalization evidence…</p>}
+      {busy && (
+        <p role="status">
+          Loading finalization evidence… The complete list is still loading.
+          Review is unavailable until every page has loaded.
+        </p>
+      )}
       {error && (
         <div ref={r} tabIndex={-1}>
           <Notice tone="danger" role="alert">

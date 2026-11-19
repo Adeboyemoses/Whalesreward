@@ -23,6 +23,7 @@ import {
   useChecklistRead,
 } from "./checklist-common";
 import { PhoneFacts } from "./checklist-phones";
+import { EvidencePager, useEvidencePage } from "./checklist-paging";
 type Source = Exclusion["partialSources"][number];
 export function SourceFacts({ source }: { source: Source }) {
   return (
@@ -140,6 +141,7 @@ function UnavailableForm({
     defaults,
   );
   const stale = draft.viewToken !== data.view.viewToken;
+  const sourcePages = useEvidencePage(data.sources.items, data.view.viewToken);
   const allowed =
     session.account.adminId === data.managerAdminId &&
     !!session.permissions?.includes(
@@ -205,7 +207,7 @@ function UnavailableForm({
             still only on the phone remain unknown.
           </p>
         )}
-        {data.sources.items.map((s) => (
+        {sourcePages.items.map((s) => (
           <section className="wr-checklist-card" key={s.purchaseId}>
             <label className="wr-checklist-choice">
               <input
@@ -234,6 +236,11 @@ function UnavailableForm({
             <p>No accepted revision; no trusted complete-photo receipt.</p>
           </section>
         ))}
+        <EvidencePager
+          pages={sourcePages}
+          label="Incomplete sales pages"
+          disabled={m.locked}
+        />
         <Reason
           label="Why is this phone unavailable?"
           value={draft.reason}
