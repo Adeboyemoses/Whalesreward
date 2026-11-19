@@ -100,6 +100,10 @@ jobs:
             test-results/**/error-context.md
             test-results/**/reviewer-context.md
           if-no-files-found: ignore
+      # Separate disposable schema: this regression intentionally changes policy
+      # selection and campaign settings after saving immutable snapshots.
+      - run: pnpm exec playwright test --config playwright.campaign-proof.config.ts
+        if: ${{ !cancelled() }}
       - run: pnpm test:e2e
         if: ${{ !cancelled() }}
       - run: pnpm exec playwright test -c tests/storage/playwright.config.ts
