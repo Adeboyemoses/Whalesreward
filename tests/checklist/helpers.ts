@@ -1,4 +1,9 @@
-import { expect, request, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  request,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { randomBytes } from "node:crypto";
 import { v7 } from "uuid";
@@ -268,6 +273,39 @@ export async function checklistFixture(
       );
       return c;
     },
+    async historicalAccounts(count: number) {
+      const rows = Array.from({ length: count }, (_, i) => ({
+        userId: v7(),
+        attendantId: v7(),
+        assignmentId: v7(),
+        i,
+      }));
+      for (const row of rows) {
+        await f.pool.query(
+          "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'attendant',$2,$2,$3,false,1,false,now())",
+          [
+            row.userId,
+            `history.${row.userId}`,
+            `Fictional historical account ${row.i}`,
+          ],
+        );
+        await f.pool.query(
+          "INSERT INTO attendant(id,user_id,staff_code,version) VALUES($1,$2,$3,1)",
+          [row.attendantId, row.userId, `HIST-${row.i}`],
+        );
+        await f.pool.query(
+          "INSERT INTO assignment(id,attendant_id,pump_id,assignment_version,effective_from,effective_until,changed_by,reason) VALUES($1,$2,$3,1,'2000-01-01T00:00:00Z'::timestamptz+$4::int*interval '2 minutes','2000-01-01T00:00:00Z'::timestamptz+($4::int+1)*interval '2 minutes',$5,'Fictional ended account history')",
+          [
+            row.assignmentId,
+            row.attendantId,
+            seedId(13),
+            row.i,
+            identity.adminId,
+          ],
+        );
+      }
+      return rows;
+    },
     personId,
     otherActor,
     checklist,
@@ -283,4 +321,15 @@ export async function checklistFixture(
       await f.close();
     },
   };
+}
+
+export async function signInChecklist(
+  page: Page,
+  f: { username: string; password: string },
+) {
+  await page.goto("/admin/sign-in");
+  await page.getByLabel("Username", { exact: true }).fill(f.username);
+  await page.getByLabel("Password", { exact: true }).fill(f.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/admin\/sign-in$/);
 }
