@@ -1,3 +1,5 @@
+import { campaignMembershipProofSchema } from "../reviews/provenance";
+
 /** Input contains only immutable server capture facts and protected conclusions. */
 export type CampaignBounds = {
   id: string;
@@ -12,11 +14,7 @@ export type MembershipFacts = {
   upper: string;
   details: string;
   photo: string | null;
-  conclusions: {
-    campaignIds: string[];
-    configurationIds: string[];
-    inside: boolean;
-  }[];
+  conclusions: unknown[];
 };
 export function membership(f: MembershipFacts, c: CampaignBounds) {
   const l = BigInt(f.lower),
@@ -24,24 +22,17 @@ export function membership(f: MembershipFacts, c: CampaignBounds) {
     start =
       BigInt(c.start) > BigInt(c.launch) ? BigInt(c.start) : BigInt(c.launch),
     end = BigInt(c.cutoff);
-  if (
-    f.conclusions.some(
-      (v) =>
-        typeof v !== "object" ||
-        v === null ||
-        typeof v.inside !== "boolean" ||
-        !Array.isArray(v.campaignIds) ||
-        !v.campaignIds.every((id) => typeof id === "string") ||
-        !Array.isArray(v.configurationIds) ||
-        !v.configurationIds.every((id) => typeof id === "string"),
-    )
-  )
-    return "timing_unresolved" as const;
-  const bound = f.conclusions.filter(
-    (v) =>
-      v.campaignIds.includes(c.id) &&
-      v.configurationIds.includes(c.settingsVersionId),
+  const proofs = f.conclusions.map((v) =>
+    campaignMembershipProofSchema.safeParse(v),
   );
+  if (proofs.some((v) => !v.success)) return "timing_unresolved" as const;
+  const bound = proofs
+    .flatMap((v) => (v.success ? [v.data] : []))
+    .filter(
+      (v) =>
+        v.campaignIds.includes(c.id) &&
+        v.configurationIds.includes(c.settingsVersionId),
+    );
   if (l > u || bound.some((v) => v.inside !== bound[0]!.inside))
     return "timing_unresolved" as const;
   const inside = bound.length ? bound[0]!.inside : l >= start && u <= end;

@@ -51,6 +51,7 @@ import {
   type AttestedPredicate,
 } from "./release-consistency";
 import type { TypedConclusion } from "./evidence-types";
+import { reviewProvenanceSchema } from "./provenance";
 
 type Kind = "price" | "card" | "date" | "capture";
 const permissions = {
@@ -1089,37 +1090,48 @@ export function createHeldReleaseService({
           [
             saleDecisionId,
             purchaseId,
-            JSON.stringify({
-              policy,
-              target: r.content.target,
-              interval: evaluation.originalInterval,
-              attestedInterval: evaluation.attestedInterval,
-              sources: evaluation.sources,
-              conclusions: evaluation.conclusions,
-              result,
-              proposalId,
-              proposer: r.provenance.person,
-              approver: person,
-              people: {
-                proposer: {
-                  actor: r.provenance.actor,
-                  person: r.provenance.person,
-                  reason: r.content.reason,
-                  at: r.proposed_at.toISOString(),
+            JSON.stringify(
+              reviewProvenanceSchema.parse({
+                policy,
+                target: {
+                  ...r.content.target,
+                  purchaseId,
+                  decisionId: saleDecisionId,
                 },
-                approver: {
-                  actor,
-                  person,
-                  reason: body.reason,
-                  at: now.toISOString(),
+                interval: evaluation.originalInterval,
+                attestedInterval: evaluation.attestedInterval,
+                sources: evaluation.sources,
+                conclusions: evaluation.conclusions,
+                result: {
+                  ...result,
+                  closure: r.outcome === "cancel" ? "cancelled" : "confirmed",
+                  resultingRevisionId: current.current_revision_id,
+                  evidenceAssetId: r.content.meterAssetId,
                 },
-              },
-              evidence: {
-                meterAssetId: r.content.meterAssetId,
-                sheetAssetId: r.sheet_asset_id,
-              },
-              certificate: joint.certificate,
-            }),
+                proposalId,
+                proposer: r.provenance.person,
+                approver: person,
+                people: {
+                  proposer: {
+                    actor: r.provenance.actor,
+                    person: r.provenance.person,
+                    reason: r.content.reason,
+                    at: r.proposed_at.toISOString(),
+                  },
+                  approver: {
+                    actor,
+                    person,
+                    reason: body.reason,
+                    at: now.toISOString(),
+                  },
+                },
+                evidence: {
+                  meterAssetId: r.content.meterAssetId,
+                  sheetAssetId: r.sheet_asset_id,
+                },
+                certificate: joint.certificate,
+              }),
+            ),
           ],
         );
         extra = {

@@ -9,6 +9,7 @@ import {
   auditSeller,
 } from "../audit/write";
 import { saleAuditGates, saleAuditValues } from "../sync/audit";
+import { reviewProvenanceSchema } from "./provenance";
 import { validateMeterPair } from "./meter-math";
 import { pinMeterPolicy } from "./meter-config";
 import { evaluateMeter } from "./meter-evaluator";
@@ -493,22 +494,24 @@ async function record(
       [
         did,
         p.id,
-        JSON.stringify({
-          ...extra.evaluation,
-          result: {
-            actorId: a.user_id,
-            reason: body.reason,
-            decidedAt: now.toISOString(),
-            evidenceAssetId: extra.evidence!.assetId,
-            notes: extra.evidence!.notes,
-            resultingRevisionId: current.current_revision_id,
-            appliedPurchaseVersion: current.version,
-            remainingHolds: holds,
-            remainingBlocks: blocks,
-            credited: response.creditedAfter,
-            closure: outcome === "cancel" ? "cancelled" : "confirmed",
-          },
-        }),
+        JSON.stringify(
+          reviewProvenanceSchema.parse({
+            ...extra.evaluation,
+            result: {
+              actorId: a.user_id,
+              reason: body.reason,
+              decidedAt: now.toISOString(),
+              evidenceAssetId: extra.evidence!.assetId,
+              notes: extra.evidence!.notes,
+              resultingRevisionId: current.current_revision_id,
+              appliedPurchaseVersion: current.version,
+              remainingHolds: holds,
+              remainingBlocks: blocks,
+              credited: response.creditedAfter,
+              closure: outcome === "cancel" ? "cancelled" : "confirmed",
+            },
+          }),
+        ),
       ],
     );
   }
