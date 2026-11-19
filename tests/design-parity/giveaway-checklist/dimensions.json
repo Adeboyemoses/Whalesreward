@@ -1,0 +1,250 @@
+{
+  "source": "d7625c3",
+  "capturedFrames": 30,
+  "phoneControls": 212,
+  "minimumPhoneControlHeight": 48,
+  "pageOverflowFrames": 0,
+  "fullPagePNGDimensionsMatch": true,
+  "frames": [
+    {
+      "state": "Census-review-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 4096,
+      "pngWidth": 2880,
+      "pngHeight": 8192
+    },
+    {
+      "state": "Census-review-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 7145,
+      "pngWidth": 720,
+      "pngHeight": 14290
+    },
+    {
+      "state": "Census-review-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 6919,
+      "pngWidth": 780,
+      "pngHeight": 13838
+    },
+    {
+      "state": "E02-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 4086,
+      "pngWidth": 2880,
+      "pngHeight": 8172
+    },
+    {
+      "state": "E02-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 7543,
+      "pngWidth": 720,
+      "pngHeight": 15086
+    },
+    {
+      "state": "E02-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 7293,
+      "pngWidth": 780,
+      "pngHeight": 14586
+    },
+    {
+      "state": "Historical-preparation-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 7130,
+      "pngWidth": 2880,
+      "pngHeight": 14260
+    },
+    {
+      "state": "Historical-preparation-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 12312,
+      "pngWidth": 720,
+      "pngHeight": 24624
+    },
+    {
+      "state": "Historical-preparation-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 11936,
+      "pngWidth": 780,
+      "pngHeight": 23872
+    },
+    {
+      "state": "Manager-review-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 2127,
+      "pngWidth": 2880,
+      "pngHeight": 4254
+    },
+    {
+      "state": "Manager-review-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 5114,
+      "pngWidth": 720,
+      "pngHeight": 10228
+    },
+    {
+      "state": "Manager-review-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 4928,
+      "pngWidth": 780,
+      "pngHeight": 9856
+    },
+    {
+      "state": "Phone-check-recorded-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 3161,
+      "pngWidth": 2880,
+      "pngHeight": 6322
+    },
+    {
+      "state": "Phone-check-recorded-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 6286,
+      "pngWidth": 720,
+      "pngHeight": 12572
+    },
+    {
+      "state": "Phone-check-recorded-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 6038,
+      "pngWidth": 780,
+      "pngHeight": 12076
+    },
+    {
+      "state": "Proposal-approved-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 2149,
+      "pngWidth": 2880,
+      "pngHeight": 4298
+    },
+    {
+      "state": "Proposal-approved-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 4123,
+      "pngWidth": 720,
+      "pngHeight": 8246
+    },
+    {
+      "state": "Proposal-approved-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 3913,
+      "pngWidth": 780,
+      "pngHeight": 7826
+    },
+    {
+      "state": "Proposal-pending-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 2349,
+      "pngWidth": 2880,
+      "pngHeight": 4698
+    },
+    {
+      "state": "Proposal-pending-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 4261,
+      "pngWidth": 720,
+      "pngHeight": 8522
+    },
+    {
+      "state": "Proposal-pending-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 4013,
+      "pngWidth": 780,
+      "pngHeight": 8026
+    },
+    {
+      "state": "Proposal-rejected-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 2111,
+      "pngWidth": 2880,
+      "pngHeight": 4222
+    },
+    {
+      "state": "Proposal-rejected-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 4083,
+      "pngWidth": 720,
+      "pngHeight": 8166
+    },
+    {
+      "state": "Proposal-rejected-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 3873,
+      "pngWidth": 780,
+      "pngHeight": 7746
+    },
+    {
+      "state": "Recovered-phone-choice-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 3079,
+      "pngWidth": 2880,
+      "pngHeight": 6158
+    },
+    {
+      "state": "Recovered-phone-choice-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 6010,
+      "pngWidth": 720,
+      "pngHeight": 12020
+    },
+    {
+      "state": "Recovered-phone-choice-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 5784,
+      "pngWidth": 780,
+      "pngHeight": 11568
+    },
+    {
+      "state": "Unavailable-review-1440",
+      "width": 1440,
+      "pageWidth": 1440,
+      "height": 3722,
+      "pngWidth": 2880,
+      "pngHeight": 7444
+    },
+    {
+      "state": "Unavailable-review-360",
+      "width": 360,
+      "pageWidth": 360,
+      "height": 7898,
+      "pngWidth": 720,
+      "pngHeight": 15796
+    },
+    {
+      "state": "Unavailable-review-390",
+      "width": 390,
+      "pageWidth": 390,
+      "height": 7562,
+      "pngWidth": 780,
+      "pngHeight": 15124
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 1440,
+  "pageHeight": 3079,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 40
+    },
+    {
+      "label": "Phone available again",
+      "width": 176,
+      "height": 40
+    },
+    {
+      "label": "Propose phone unavailable",
+      "width": 209,
+      "height": 40
+    },
+    {
+      "label": "Choose an authorized attendant accountSTAFF002 / Grace OkonSTAFF005 / Favour James",
+      "width": 1032,
+      "height": 40
+    },
+    {
+      "label": "Add attendant account",
+      "width": 179,
+      "height": 40
+    },
+    {
+      "label": "Grace Okon · STAFF002019a5000-0000-7000-8000-000000000006",
+      "width": 1032,
+      "height": 64
+    },
+    {
+      "label": "Favour James · STAFF005019a5000-0000-7000-8000-000000000007",
+      "width": 1032,
+      "height": 64
+    },
+    {
+      "label": "Remove draft row",
+      "width": 149,
+      "height": 40
+    },
+    {
+      "label": "Add phone",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "label": "",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "label": "I have included every relevant phone and account partition, including phones used by staff who have left.",
+      "width": 1070,
+      "height": 51
+    },
+    {
+      "label": "Review census",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "label": "Pending inspectionInspected · nothing remains unsentUnavailable · approved proposal 01a1f613-997e-71c4-b724-39117c73680b",
+      "width": 1036,
+      "height": 40
+    },
+    {
+      "label": "",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "label": "Review complete phone check",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "label": "Refresh complete evidence",
+      "width": 1112,
+      "height": 40
+    }
+  ]
+}

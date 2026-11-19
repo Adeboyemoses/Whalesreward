@@ -346,7 +346,7 @@ test("I-46 a concurrent saved revision invalidates a history cursor and Retry re
   }
 });
 
-test("I-46 grouped readiness reports actual blockers and honest unavailable checklist without per-check rows", async ({
+test("I-46 grouped readiness preserves actual blockers alongside all nine honest per-check outcomes", async ({
   page,
 }) => {
   const f = await leaderboardFixture(page);
@@ -367,7 +367,25 @@ test("I-46 grouped readiness reports actual blockers and honest unavailable chec
     await page.goto("/admin/leaderboards/finalize");
     const main = page.getByRole("main");
     await expect(main).toContainText("Finalization checks");
-    await expect(main).toContainText(/not available yet/i);
+    await expect(main).not.toContainText(/not available yet/i);
+    const checks = main.getByRole("region", {
+      name: "Finalization checklist",
+      exact: true,
+    });
+    await expect(checks.getByRole("heading", { level: 4 })).toHaveText([
+      "Campaign timing",
+      "Held sales",
+      "Corrections",
+      "Possible duplicates",
+      "Two-person release proposals",
+      "Incomplete uploads",
+      "Complete-photo deadline",
+      "Campaign eligibility",
+      "Phone census and checks",
+    ]);
+    await expect(
+      checks.getByText("Blocked", { exact: true }).first(),
+    ).toBeVisible();
     await expect(main).toContainText(
       "Sales with holds or pending hold releases",
     );
@@ -377,8 +395,11 @@ test("I-46 grouped readiness reports actual blockers and honest unavailable chec
       page.getByRole("button", { name: "Review final snapshot", exact: true }),
     ).toBeDisabled();
     await expect(
-      page.locator('a[href*="/finalize/phones"],a[href*="/finalize/manager"]'),
-    ).toHaveCount(0);
+      page.locator('a[href="/admin/leaderboards/finalize/phones"]').first(),
+    ).toBeVisible();
+    await expect(
+      page.locator('a[href="/admin/leaderboards/finalize/manager"]').first(),
+    ).toBeVisible();
     await expect(main).not.toContainText(
       /9 checks passed|0 unsent|all phones empty/i,
     );
@@ -416,7 +437,7 @@ test("I-46 grouped readiness reports actual blockers and honest unavailable chec
   }
 });
 
-test("I-46 reviewed preview saves once, immutable history survives identity and accepted revision changes, and unchanged reconciliation adds no snapshot", async ({
+test("I-46 reviewed preview saves once and immutable history survives identity and accepted revision changes", async ({
   page,
 }) => {
   const f = await leaderboardFixture(page);
@@ -433,7 +454,15 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
     await expect(page.getByRole("main")).toContainText("₦13,700.01");
     await capture(page, "E01");
     await page.goto("/admin/leaderboards/finalize");
-    await expect(page.getByRole("main")).toContainText(/not available yet/i);
+    await expect(
+      page.getByRole("heading", {
+        name: "Finalization checklist",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page.getByRole("main")).not.toContainText(
+      /not available yet/i,
+    );
     await capture(page, "E02");
     await f.phoneCheck();
     await page.reload();
@@ -494,16 +523,79 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
       .selectOption(initial.id);
     await expect(page.getByRole("main")).toContainText("Amina Bello");
     await expect(page.getByRole("main")).toContainText("₦13,700.01");
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM giveaway_snapshot WHERE campaign_id=$1",
+          [c.id],
+        )
+      ).rows[0].n,
+    ).toBe(2);
+  } finally {
+    await f.close();
+  }
+});
+
+// These are separate user journeys: the immutable initial/revision case above
+// produces over 60 UI reads when an unchanged third journey is compressed into
+// the same 3-second account bucket. Keep the real 60-token burst and one-token-per-second policy.
+test("I-46 unchanged reconciliation through the UI adds no snapshot and preserves the immutable prior result", async ({
+  page,
+}) => {
+  const f = await leaderboardFixture(page);
+  try {
+    await f.isolateInstrumentationReads();
+    await f.sale({ amount: "1370001" });
+    const c = await f.configure();
+    await f.phoneCheck();
+    // Real HTTP setup saves the predecessor without replaying a second UI
+    // journey merely to establish the unchanged-reconciliation before-state.
+    const preview = await api<Preview>(
+      page,
+      `giveaway/${c.id}/previews`,
+      {
+        operationId: v7(),
+        kind: "initial",
+        reason: "Fictional HTTP predecessor for unchanged UI review",
+        ...guard(await f.campaign()),
+      },
+      201,
+    );
+    const initial = await api<Snapshot>(
+      page,
+      `giveaway/${c.id}/snapshots`,
+      {
+        operationId: v7(),
+        previewId: preview.id,
+        contentDigest: preview.contentDigest,
+        ...preview.guard,
+      },
+      201,
+    );
+    const stored = await f.observe(`giveaway/${c.id}/snapshots/${initial.id}`);
+    const frozenRows = await f.observe(
+      `giveaway/${c.id}/snapshots/${initial.id}/rows`,
+    );
+    const frozenSources = await f.observe(
+      `giveaway/${c.id}/snapshots/${initial.id}/sources`,
+    );
     await f.phoneCheck("revision");
-    // Exercise the saved screen's refresh action rather than re-reading every
-    // historical source collection just to obtain current reconciliation guards.
+    await page.goto("/admin/leaderboards/finalize");
+    await expect(
+      page.getByRole("heading", {
+        name: "Finalization checklist",
+        exact: true,
+      }),
+    ).toBeVisible();
     const refreshed = page.waitForResponse((response) =>
-      response.url().endsWith(`/giveaway/${c.id}/readiness`),
+      response.url().endsWith(`/giveaway/${c.id}/reconciliation/checklist`),
     );
     await page
       .getByRole("button", { name: "Refresh current readiness", exact: true })
       .click();
-    expect((await refreshed).status()).toBe(200);
+    const refreshResponse = await refreshed;
+    expect(refreshResponse.status()).toBe(200);
+    expect((await refreshResponse.json()).data.readiness.canPrepare).toBe(true);
     const unchanged = (await prepare(
       page,
       "Fictional unchanged browser reconciliation",
@@ -511,7 +603,7 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
     )) as unknown as { state: string; currentSnapshotId: string };
     expect(unchanged).toMatchObject({
       state: "unchanged",
-      currentSnapshotId: revised.id,
+      currentSnapshotId: initial.id,
     });
     await expect(page.getByRole("main")).toContainText(
       /saved result is unchanged.*no new snapshot/i,
@@ -523,7 +615,16 @@ test("I-46 reviewed preview saves once, immutable history survives identity and 
           [c.id],
         )
       ).rows[0].n,
-    ).toBe(2);
+    ).toBe(1);
+    expect(await f.observe(`giveaway/${c.id}/snapshots/${initial.id}`)).toEqual(
+      stored,
+    );
+    expect(
+      await f.observe(`giveaway/${c.id}/snapshots/${initial.id}/rows`),
+    ).toEqual(frozenRows);
+    expect(
+      await f.observe(`giveaway/${c.id}/snapshots/${initial.id}/sources`),
+    ).toEqual(frozenSources);
   } finally {
     await f.close();
   }
