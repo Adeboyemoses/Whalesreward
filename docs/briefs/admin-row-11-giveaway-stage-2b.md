@@ -33,21 +33,21 @@ Spec: [approved design](../design/giveaway-checklist-brief.md), approved through
 
 Own src/client/admin-checklist*, related giveaway adapters, src/ui/admin/checklist*, giveaway integration, child routes and scoped CSS; focused colocated unit tests.
 
-- [ ] Read approved spec, T-21, existing Settings/session and Stage 2a patterns; inspect E02/E04 PNG/HTML and decision note.
-- [ ] Write and run failing contract/parser/frozen-request tests before implementation.
-- [ ] Add strict client reads for all six projections and unchanged phone mutations/evidence reads. Bind campaign, view and resource identities, freeze bounded requests, preserve uncertain session requests.
-- [ ] Implement every state/copy in the table and approved design, including complete pagination and explicit review; replace Stage 2a placeholders and render live/stored outcomes distinctly.
-- [ ] Run typecheck/lint/unit/build. Commit explicit owned files; report exact commands/counts and limitations. No push/PR or delegated agents.
+- [x] Read approved spec, T-21, existing Settings/session and Stage 2a patterns; inspect E02/E04 PNG/HTML and decision note.
+- [x] Write and run failing contract/parser/frozen-request tests before implementation.
+- [x] Add strict client reads for all six projections and unchanged phone mutations/evidence reads. Bind campaign, view and resource identities, freeze bounded requests, preserve uncertain session requests.
+- [x] Implement every state/copy in the table and approved design, including complete pagination and explicit review; replace Stage 2a placeholders and render live/stored outcomes distinctly.
+- [x] Run typecheck/lint/unit/build. Commit explicit owned files; report exact commands/counts and limitations. No push/PR or delegated agents.
 
 ## Task 2 — Independent acceptance and fidelity (test-engineer)
 
 Own tests/e2e/giveaway-checklist*, tests/leaderboards or new isolated checklist fixture/config, tests/design-parity/giveaway-checklist/**. Never modify production.
 
-- [ ] Before implementation, prepare failing tests against missing checklist flow using actual production Next HTTP and disposable local PostgreSQL fixtures. Assert exact response contracts, not inferred or mocked successes.
-- [ ] Test manager designation, complete census including disabled/ended accounts, explicit inspection/certification, exact incomplete-source proposal, independent approve/reject and terminal history, E02 nine outcomes plus stored historical checks.
-- [ ] Test least privilege, revoked authority, stale page chains, uncertain retry/navigation, missing/pending/stale evidence, unchanged mutations and retained blockers. Stop immediately on a real server-contract disagreement.
-- [ ] After feature commits, integrate by cherry-pick into isolated test worktree, run real HTTP/browser flows and independent fidelity at 1440/390/360 against approved design/E02 shell. Record screenshots, measured overflow/target sizes and actual differences. Never claim keyboard/focus coverage unless exercised.
-- [ ] Update smoke runbook with executable steps and real counts; commit explicit tests/evidence. No coverage-map edits.
+- [x] Before implementation, prepare failing tests against missing checklist flow using actual production Next HTTP and disposable local PostgreSQL fixtures. Assert exact response contracts, not inferred or mocked successes.
+- [x] Test manager designation, complete census including disabled/ended accounts, explicit inspection/certification, exact incomplete-source proposal, independent approve/reject and terminal history, E02 nine outcomes plus stored historical checks.
+- [x] Test least privilege, revoked authority, stale page chains, uncertain retry/navigation, missing/pending/stale evidence, unchanged mutations and retained blockers. Stop immediately on a real server-contract disagreement.
+- [x] After feature commits, integrate by cherry-pick into isolated test worktree, run real HTTP/browser flows and independent fidelity at 1440/390/360 against approved design/E02 shell. Record screenshots, measured overflow/target sizes and actual differences. Never claim keyboard/focus coverage unless exercised.
+- [x] Update smoke runbook with executable steps and real counts; commit explicit tests/evidence. No coverage-map edits.
 
 ## Task 3 — EM gates, independent review and staging
 

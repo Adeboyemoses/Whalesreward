@@ -56,3 +56,15 @@ pnpm exec playwright test tests/e2e/giveaway-checklist-protocol.spec.ts \
 ```
 
 **17 passed (1.0 min), zero failures.** Historical preparation, both timing phases and missing policy passed after the grant-revocation case in the same unchanged sequence. The connection failure did not reproduce; no environment leak or backend contract mismatch was established. No speculative test or production change, extra retry, rate reset, sleep or timeout increase was made. This focused pass does not replace the required complete CI run. Raw temporary logs remain local (`/tmp/whr23-checklist-root17.log` and the EM run log).
+
+## EM integrated-head verification
+
+20 November 2026. Production source remains `d7625c3`; integrated tests/QA were `1c0537e`, then the unrelated latest staging operations documentation was merged (staging `a83d6fb`). No server/shared-contract/projection/mutation or STATUS/coverage/lane changes are in this feature diff.
+
+- EM typecheck, lint (zero errors/four inherited image warnings), **1,006 unit tests in 106 files**, and production build passed on the integrated source.
+- Ordinary root runner, both projects: `pnpm test:e2e giveaway-checklist --workers=2` — **34 passed (1.3 minutes)**, including six real HTTP protocol executions and all browser states. Log `/tmp/whr23-em-checklist-e2e.log`.
+- Ordinary root runner, both projects: `pnpm test:e2e leaderboards --workers=2` — **26 passed (56.2 seconds)**. Includes snapshot/revision/immutable history, unchanged reconciliation, rankings, permission and uncertainty regressions. Log `/tmp/whr23-em-leaderboards-e2e.log`.
+- The broad local full run remains an unsuccessful attempt, not a full-suite pass: **149 passed, 19 failed, two interrupted, two skipped, 298 not run**, stopped with exit 130. [WHR-207](https://linear.app/phaneum/issue/WHR-207) retains the unproven connection/camera interaction investigation. No production or assertion fix was inferred from that interruption.
+- Unchanged [WHR-123](https://linear.app/phaneum/issue/WHR-123) print-preview race also recurred. Exact isolated rerun across both projects: **one passed / one failed**, with the desktop preview-download case still failing at its pre-existing missing-error-message assertion. No cards/test/retry/timeout changes were made for it. Log `/tmp/whr23-em-whr123-rerun.log`.
+
+These local results do not replace required supported Linux CI. Code/security/integrity review and every required PR check must pass before staging merge. No READY or whole-suite-green claim is made by this execution record.
