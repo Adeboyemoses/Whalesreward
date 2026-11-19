@@ -327,12 +327,14 @@ export class AdminChecklistApi {
       r.campaign.version !== Number(b.expectedVersion) + 1
     )
       throw invalid();
-    if (
-      "census" in r &&
-      (r.census.campaignId !== p.campaignId ||
-        r.census.version !== Number(b.expectedCensusVersion) + 1)
-    )
-      throw invalid();
+    if ("census" in r) {
+      const census = censusMetaSchema.parse(r.census);
+      if (
+        census.campaignId !== p.campaignId ||
+        census.version !== Number(b.expectedCensusVersion) + 1
+      )
+        throw invalid();
+    }
     if (
       "phoneCheck" in r &&
       (r.phoneCheck.campaignId !== p.campaignId ||
