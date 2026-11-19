@@ -750,9 +750,9 @@ function AccountChoices({
             {a.name} · <Id>{a.staffCode}</Id>
             <br />
             <Id>{a.attendantId}</Id>
-            {!a.enabled && <span className="wr-sub">Disabled</span>}
+            {!a.enabled && <span className="wr-sub"> · Disabled</span>}
             {!a.hasCurrentAssignment && (
-              <span className="wr-sub">Assignment ended</span>
+              <span className="wr-sub"> · Assignment ended</span>
             )}
           </span>
         </label>
