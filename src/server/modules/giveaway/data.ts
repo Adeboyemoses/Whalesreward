@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { reviewProvenanceSchema } from "../reviews/provenance";
 import {
   requireAdminSession,
   requirePermission,
@@ -121,7 +122,7 @@ export async function contributions(
  (extract(epoch FROM greatest(ctx.signed_in_at,coalesce(p.capture_lower_bound,ctx.signed_in_at)))*1000000)::bigint::text lower_us,
  (extract(epoch FROM least(p.server_received_at,ctx.offline_expires_at))*1000000)::bigint::text upper_us,
  (extract(epoch FROM p.server_received_at)*1000000)::bigint::text details_us,(extract(epoch FROM rf.receipt_at)*1000000)::bigint::text photo_us,
- coalesce((SELECT jsonb_agg(conclusion) FROM review_evaluation ev JOIN sale_decision d ON d.id=ev.decision_id AND d.purchase_id=ev.purchase_id CROSS JOIN LATERAL jsonb_array_elements(ev.provenance->'conclusions') conclusion WHERE ev.purchase_id=p.id AND conclusion->>'tag'='campaign_membership_uniform' AND ev.provenance->'result'->>'closure'='confirmed' AND ev.provenance->'target'->>'purchaseId'=p.id::text AND ev.provenance->'target'->>'decisionId'=d.id::text AND ev.provenance->'policy'->'scope'->>'stationId'=p.station_id::text AND ev.provenance->'result'->>'appliedPurchaseVersion'=d.applied_purchase_version::text AND ev.provenance->'result'->>'resultingRevisionId' IS NOT DISTINCT FROM d.result_revision_id::text AND ev.provenance->'result'->>'evidenceAssetId'=d.evidence_asset_id::text),'[]') conclusions
+ coalesce((SELECT jsonb_agg(DISTINCT ev.provenance) FROM review_evaluation ev JOIN sale_decision d ON d.id=ev.decision_id AND d.purchase_id=ev.purchase_id CROSS JOIN LATERAL jsonb_array_elements(ev.provenance->'conclusions') conclusion WHERE ev.purchase_id=p.id AND conclusion->>'tag'='campaign_membership_uniform' AND ev.provenance->'result'->>'closure'='confirmed' AND ev.provenance->'target'->>'purchaseId'=p.id::text AND ev.provenance->'target'->>'decisionId'=d.id::text AND ev.provenance->'policy'->'scope'->>'stationId'=p.station_id::text AND ev.provenance->'result'->>'appliedPurchaseVersion'=d.applied_purchase_version::text AND ev.provenance->'result'->>'resultingRevisionId' IS NOT DISTINCT FROM d.result_revision_id::text AND ev.provenance->'result'->>'evidenceAssetId'=d.evidence_asset_id::text),'[]') provenances
  FROM purchase p JOIN capture_context ctx ON ctx.id=p.capture_context_id JOIN product pr ON pr.id=p.product_id LEFT JOIN customer c ON c.id=p.customer_id LEFT JOIN purchase_revision r ON r.id=p.current_revision_id AND r.purchase_id=p.id AND r.state='accepted' LEFT JOIN photo_receipt_fact rf ON rf.asset_id=r.evidence_asset_id AND rf.purchase_id=p.id WHERE p.station_id=$1 ORDER BY p.id`,
       [stationId],
     )
@@ -147,7 +148,18 @@ export async function contributions(
           upper: r.upper_us,
           details: r.details_us,
           photo: r.photo_us,
-          conclusions: r.conclusions,
+          conclusions: (r.provenances as unknown[]).flatMap((value) => {
+            const parsed = reviewProvenanceSchema.safeParse(value);
+            return parsed.success
+              ? parsed.data.conclusions.filter(
+                  (c) =>
+                    typeof c === "object" &&
+                    c !== null &&
+                    "tag" in c &&
+                    c.tag === "campaign_membership_uniform",
+                )
+              : [];
+          }),
         },
         bounds,
       );

@@ -8,6 +8,75 @@ import {
 import { createReviewsService } from "../../src/server/modules/reviews/service";
 import { contributions } from "../../src/server/modules/giveaway/data";
 import { newId } from "../../src/server/lib/ids";
+
+it.each([
+  ["purchase", "{target,purchaseId}", (): string => newId()],
+  ["decision", "{target,decisionId}", (): string => newId()],
+  ["station", "{policy,scope,stationId}", (): string => newId()],
+  ["purchase version", "{result,appliedPurchaseVersion}", (): number => 987654],
+  ["revision", "{result,resultingRevisionId}", (): string => newId()],
+  ["meter evidence", "{result,evidenceAssetId}", (): string => newId()],
+  ["closure", "{result,closure}", (): string => "cancelled"],
+] as const)(
+  "WHR-184 rejects campaign proof with a foreign %s binding",
+  async (_name, path, foreign) => {
+    const db = await evidenceDatabase();
+    try {
+      const x = await evidenceFixture(db, "capture");
+      await db.pool.query(
+        "INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES($1,$2,'capture_time_unresolved','fixture',clock_timestamp(),1)",
+        [newId(), x.sale.purchaseId],
+      );
+      const svc = createReviewsService({
+        pool: db.pool,
+        storage: x.h.storage,
+        env: {
+          ...process.env,
+          WHR_ENV: "test",
+          WHR_REVIEW_EVIDENCE_POLICY: JSON.stringify(x.config),
+        },
+      });
+      await svc.decideCapture(x.token, x.sale.purchaseId, x.body);
+      const settings = (
+        await db.pool.query(
+          "SELECT id,campaign_id FROM settings_version WHERE station_id=$1 ORDER BY version DESC LIMIT 1",
+          [x.f.stationId],
+        )
+      ).rows[0];
+      const bounds = {
+        id: settings.campaign_id,
+        settingsVersionId: settings.id,
+        launch: ((BigInt(Date.parse(S)) + 1800000n) * 1000n).toString(),
+        start: ((BigInt(Date.parse(S)) + 1800000n) * 1000n).toString(),
+        cutoff: "1894306600000000",
+        deadline: "1994306600000000",
+      };
+      const client = await db.pool.connect();
+      try {
+        const read = async () =>
+          (await contributions(client, x.f.stationId, bounds)).find(
+            (s) => s.purchaseId === x.sale.purchaseId,
+          )!;
+        expect((await read()).included).toBe(true);
+        await seedHistorical(
+          db.pool,
+          "review_evaluation",
+          "UPDATE review_evaluation SET provenance=jsonb_set(provenance,$2::text[],$3::jsonb) WHERE purchase_id=$1",
+          [x.sale.purchaseId, path, JSON.stringify(foreign())],
+        );
+        const row = await read();
+        expect(row.included).toBe(false);
+        expect(row.reasons).toContain("timing_unresolved");
+      } finally {
+        client.release();
+      }
+    } finally {
+      await db.close();
+    }
+  },
+  30000,
+);
+
 it.each(["inside", "outside"] as const)(
   "P-25 committed %s provenance retains original facts and binds campaign configuration",
   async (mode) => {

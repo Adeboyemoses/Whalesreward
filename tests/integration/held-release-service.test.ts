@@ -15,6 +15,7 @@ import {
 } from "../helpers/review-evidence-fixture";
 import { fixtureId } from "../helpers/sync-fixture";
 import { heldReleaseFixture } from "../helpers/held-release-fixture";
+import { contributions } from "../../src/server/modules/giveaway/data";
 // Dormant protocol only: actual installation remains denied and is verified separately.
 vi.mock(
   "../../src/server/modules/reviews/release-v2",
@@ -259,6 +260,120 @@ describe("P-29 dormant two-person service on real Postgres", () => {
         ).rows[0].n,
       ).toBe(1);
     },
+  );
+  it.each([
+    ["purchase", "{target,purchaseId}", (): string => newId()],
+    ["decision", "{target,decisionId}", (): string => newId()],
+    ["station", "{policy,scope,stationId}", (): string => newId()],
+    [
+      "purchase version",
+      "{result,appliedPurchaseVersion}",
+      (): number => 987654,
+    ],
+    ["revision", "{result,resultingRevisionId}", (): string => newId()],
+    ["meter evidence", "{result,evidenceAssetId}", (): string => newId()],
+    ["closure", "{result,closure}", (): string => "cancelled"],
+  ] as const)(
+    "WHR-184 P-29 campaign reader rejects a foreign %s binding",
+    async (_name, path, foreign) => {
+      const x = await fixture("capture");
+      const timingBlock = newId();
+      await db.pool.query(
+        "INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES($1,$2,'capture_time_unresolved','fixture',clock_timestamp(),1)",
+        [timingBlock, x.sale.purchaseId],
+      );
+      await seedHistorical(
+        db.pool,
+        "settings_version",
+        "UPDATE settings_version SET purchase_start='2026-11-10T12:05:00Z' WHERE station_id=$1",
+        [x.f.stationId],
+      );
+      const target = {
+        kind: "capture",
+        blocks: [
+          {
+            id: x.holdId,
+            version: 1,
+            code: "capture_authorization_unresolved",
+          },
+          { id: timingBlock, version: 1, code: "capture_time_unresolved" },
+        ].sort((a, b) => a.id.localeCompare(b.id)),
+      };
+      await seedHistorical(
+        db.pool,
+        "held_release_sheet",
+        "UPDATE held_release_sheet SET target=$2 WHERE id=$1",
+        [x.body.sheetAssetId, target],
+      );
+      const { proposal } = await x.svc.propose(x.token, x.sale.purchaseId, {
+        ...x.body,
+        target,
+      });
+      await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "approve",
+      });
+      const timing = (
+        await db.pool.query(
+          `SELECT campaign_id id,id settings_id,
+          (extract(epoch FROM launch_at)*1000000)::bigint::text launch,
+          (extract(epoch FROM purchase_start)*1000000)::bigint::text start,
+          (extract(epoch FROM purchase_cutoff)*1000000)::bigint::text cutoff,
+          (extract(epoch FROM upload_deadline)*1000000)::bigint::text deadline
+         FROM settings_version WHERE station_id=$1 ORDER BY version DESC LIMIT 1`,
+          [x.f.stationId],
+        )
+      ).rows[0];
+      const bounds = {
+        ...timing,
+        launch: (BigInt(Date.parse(S)) * 1000n).toString(),
+        settingsVersionId: timing.settings_id,
+      };
+      const client = await db.pool.connect();
+      try {
+        const read = async () =>
+          (await contributions(client, x.f.stationId, bounds)).find(
+            (s) => s.purchaseId === x.sale.purchaseId,
+          )!;
+        expect((await read()).reasons).not.toContain("timing_unresolved");
+        for (const foreignBounds of [
+          { ...bounds, id: newId() },
+          { ...bounds, settingsVersionId: newId() },
+        ]) {
+          const row = (
+            await contributions(client, x.f.stationId, foreignBounds)
+          ).find((s) => s.purchaseId === x.sale.purchaseId)!;
+          expect(row.included).toBe(false);
+          expect(row.reasons).toContain("timing_unresolved");
+        }
+        const before = (
+          await db.pool.query(
+            "SELECT provenance FROM review_evaluation WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].provenance;
+        await seedHistorical(
+          db.pool,
+          "review_evaluation",
+          "UPDATE review_evaluation SET provenance=jsonb_set(provenance,$2::text[],$3::jsonb) WHERE purchase_id=$1",
+          [x.sale.purchaseId, path, JSON.stringify(foreign())],
+        );
+        const row = await read();
+        expect(row.included).toBe(false);
+        expect(row.reasons).toContain("timing_unresolved");
+        // Restore only fixture corruption, never a runtime mutation of protected proof.
+        await seedHistorical(
+          db.pool,
+          "review_evaluation",
+          "UPDATE review_evaluation SET provenance=$2::jsonb WHERE purchase_id=$1",
+          [x.sale.purchaseId, JSON.stringify(before)],
+        );
+      } finally {
+        client.release();
+      }
+    },
+    30000,
   );
   it("SR-03 proposer cannot approve own proposal and unknown reviewer binding denies", async () => {
     const x = await fixture();
@@ -1622,6 +1737,31 @@ describe("P-29 dormant two-person service on real Postgres", () => {
         }),
       ]),
     );
+    const settings = (
+      await db.pool.query(
+        `SELECT campaign_id id,id settings_id,
+          (extract(epoch FROM purchase_start)*1000000)::bigint::text start,
+          (extract(epoch FROM purchase_cutoff)*1000000)::bigint::text cutoff,
+          (extract(epoch FROM upload_deadline)*1000000)::bigint::text deadline
+         FROM settings_version WHERE station_id=$1 ORDER BY version DESC LIMIT 1`,
+        [x.f.stationId],
+      )
+    ).rows[0];
+    const client = await db.pool.connect();
+    try {
+      const row = (
+        await contributions(client, x.f.stationId, {
+          ...settings,
+          launch: (BigInt(Date.parse(S)) * 1000n).toString(),
+          settingsVersionId: settings.settings_id,
+        })
+      ).find((s) => s.purchaseId === x.sale.purchaseId)!;
+      expect(row.included).toBe(false);
+      expect(row.reasons).toContain("outside_period");
+      expect(row.reasons).not.toContain("timing_unresolved");
+    } finally {
+      client.release();
+    }
     expect(
       (
         await db.pool.query(
@@ -1667,6 +1807,23 @@ describe("P-29 dormant two-person service on real Postgres", () => {
           [x.sale.purchaseId],
         )
       ).rows[0].provenance;
+      const committed = (
+        await db.pool.query(
+          "SELECT id,purchase_id,applied_purchase_version,result_revision_id,evidence_asset_id FROM sale_decision WHERE purchase_id=$1 AND kind='held_release'",
+          [x.sale.purchaseId],
+        )
+      ).rows[0];
+      expect(evaluation.target).toMatchObject({
+        ...x.target,
+        purchaseId: committed.purchase_id,
+        decisionId: committed.id,
+      });
+      expect(evaluation.result).toMatchObject({
+        closure: "confirmed",
+        appliedPurchaseVersion: committed.applied_purchase_version,
+        resultingRevisionId: committed.result_revision_id,
+        evidenceAssetId: committed.evidence_asset_id,
+      });
       expect(evaluation.people.proposer).toMatchObject({
         person: { personId: x.people[0], version: 1 },
         reason: x.body.reason,
