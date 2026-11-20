@@ -1,21 +1,21 @@
 # lane:core
-WHR-181 original verified-date read projection: READY since 2026-11-18
+WHR-208 recovered-phone census enforcement: READY since 2026-11-20
 
 ## In flight
-- [Feature PR #166](https://github.com/Adeboyemoses/Whalesreward/pull/166) merged into staging at `784cf67e6b6baa82a4be484276f604619ab2d944` with all five checks green. PR head `81f5a3207164cb7532579b603813531ef7c35626`; reviewed source `8f691b0`.
-- Code/security/integrity PASS, round 1 of cap 3, no findings. Evidence `.review/core__WHR-181-original-date.md` validates. Feature PR excludes shared records; this docs-only PR records READY.
-- Shared original Values now reads the original revision date, including non-null original dates. Sale detail/list/search, review comparison and sync audit fallback inherit the repair. Release preparation, reports, audit queries and corrections were audited; full dispositions in `docs/qa/verification-2026-11-18-original-date.md`.
-- EM typecheck/lint/build, 981 unit, 1,453 PostgreSQL 16, timezone 5+5, real Next/PostgreSQL/MinIO HTTP 2, gate self-tests 53 and guard 94 PASS. CI adds browser 426 passed/two retry passes/four existing skips, storage 1 and release 3 PASS. No schema, endpoint-shape or production immutable-revision writes changed.
+- [Feature PR #175](https://github.com/Adeboyemoses/Whalesreward/pull/175) merged into staging at `f32426a550442083ff64075005f26deb6b079475` with all five required checks green. Feature head `0a8c0f10fb71adefec9ece041ae13ff4ec852121`; reviewed source `7636975`.
+- Same-census empty certification after approved unavailability now refuses without effects. Readiness blocks legacy invalid checks; preparation and confirmation inherit the guard. Replacement census succeeds, retaining immutable exclusions and snapshots. Strict wire requests unchanged.
+- Code/security/integrity PASS round 1 of cap 3; no findings. Evidence `.review/core__WHR-208-recovered-phone.md` validates. Shared records are in this separate docs-only PR.
+- EM typecheck/lint/build, 997 unit, 1,542 PostgreSQL16 (zero skips), HTTP 2, targeted non-superuser PostgreSQL 8 (three concurrency scenarios), timezone 5+5 PASS. T2 regression from 904078f remains byte-identical and passes. Final CI: 433 browser passes plus one retry pass/four existing skips, release 42, campaign-proof 1, storage 1, gate self-tests 53 and guard 94 PASS.
 
 ## Next
-- Stop at READY. WHR-171 can rebase on the staging fix; WHR-178 resumes only in a new session. No WHR-178 work performed here.
+- Stop at READY. WHR-210 starts only in a new session. T2 may resume WHR-187 against the merged fix; no app feature work was performed here.
 
 ## Earl's gos
-- 17 Nov 2026: “Fix WHR-181.” “Then stop: WHR-178 resumes in a new session.”
+- 20 Nov 2026: “Fix WHR-208.” “Feature PRs must not edit STATUS, coverage-map or lanes files.” “Then stop: WHR-210 follows in a new session.”
 
 ## Risks
-- Existing operator cleanup timeout WHR-174 required one unchanged CI integration rerun; final 1,453 assertions and both timezone runs passed. Browser retry cases remain WHR-177 and WHR-83; evidence added to existing issues with `found-in:WHR-181`.
-- Local Chromium launch is sandbox-blocked; full native CI browser verification passed. Initial local PostgreSQL 15/fixture-role/name mismatches were replaced by an isolated PostgreSQL 16 disposable test database; clean full EM run passed without skips.
+- Known fixture retries: final head reproduces WHR-83 assignment route fulfilment; first CI run reproduces WHR-177 leaderboard fixture deadlocks. Evidence added with found-in:WHR-208; no assertions, retries or timeouts changed.
+- Initial local fixture/worker setup failures were corrected; full EM PostgreSQL run passed. Shared remote browser lacks fake-camera launch options; full native CI passed. Disposable databases removed.
 - Runtime model ID unavailable. No cloud resources, deployed data or main promotion touched.
 
 dispatches=5 prs=2 rounds_max=1 escalations=0 model=unavailable
