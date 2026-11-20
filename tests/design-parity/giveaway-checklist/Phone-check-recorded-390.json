@@ -1,0 +1,91 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 390,
+  "pageHeight": 6058,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 48
+    },
+    {
+      "label": "Discard stale draft and review current evidence",
+      "width": 294,
+      "height": 48
+    },
+    {
+      "label": "Propose phone unavailable",
+      "width": 209,
+      "height": 48
+    },
+    {
+      "label": "Choose an authorized attendant accountSTAFF002 / Grace OkonSTAFF005 / Favour James · Disabled · Assignment ended",
+      "width": 278,
+      "height": 48
+    },
+    {
+      "label": "Add attendant account",
+      "width": 179,
+      "height": 48
+    },
+    {
+      "label": "Grace Okon · STAFF002019a5000-0000-7000-8000-000000000006",
+      "width": 278,
+      "height": 84
+    },
+    {
+      "label": "Favour James · STAFF005019a5000-0000-7000-8000-000000000007 · Disabled · Assignment ended",
+      "width": 278,
+      "height": 104
+    },
+    {
+      "label": "Remove draft row",
+      "width": 149,
+      "height": 48
+    },
+    {
+      "label": "Add phone",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "I have included every relevant phone and account partition, including phones used by staff who have left.",
+      "width": 316,
+      "height": 84
+    },
+    {
+      "label": "Review census",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Pending inspectionInspected · nothing remains unsent",
+      "width": 282,
+      "height": 48
+    },
+    {
+      "label": "Fictional physical inspection found no unsent records",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Review complete phone check",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Refresh complete evidence",
+      "width": 358,
+      "height": 48
+    }
+  ]
+}

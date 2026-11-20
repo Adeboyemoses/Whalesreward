@@ -1,0 +1,136 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 1440,
+  "pageHeight": 11650,
+  "controls": [
+    {
+      "label": "Back to leaderboards",
+      "width": 172,
+      "height": 40
+    },
+    {
+      "label": "Open review queue",
+      "width": 158,
+      "height": 40
+    },
+    {
+      "label": "Review uploads and sales",
+      "width": 191,
+      "height": 40
+    },
+    {
+      "label": "Campaign station manager",
+      "width": 208,
+      "height": 40
+    },
+    {
+      "label": "Phone census",
+      "width": 123,
+      "height": 40
+    },
+    {
+      "label": "Select a saved snapshotRevision 1 · 20 Nov 2026 · 5:58 PM",
+      "width": 411.328125,
+      "height": 40
+    },
+    {
+      "label": "Revision 1",
+      "width": 66,
+      "height": 20
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "All customersCar ownerCommercial busThree-wheelerBikeKeg buyerCooking gas",
+      "width": 1112,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "",
+      "width": 1070,
+      "height": 40
+    },
+    {
+      "label": "Prepare audited revision",
+      "width": 194,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Refresh rankings",
+      "width": 145,
+      "height": 40
+    },
+    {
+      "label": "Refresh current readiness",
+      "width": 203,
+      "height": 40
+    },
+    {
+      "label": "View audit history",
+      "width": 142,
+      "height": 40
+    }
+  ]
+}

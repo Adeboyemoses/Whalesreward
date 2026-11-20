@@ -1,0 +1,78 @@
+import { expect, type Page } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+
+/** Independent real-browser capture. All content comes from the disposable
+ * fictional schema; the app is neither mocked nor supplied board sample data. */
+export async function captureChecklist(page: Page, state: string) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  const measured = await page.evaluate(() => ({
+    viewport: {
+      width: innerWidth,
+      height: innerHeight,
+      scale: devicePixelRatio,
+    },
+    pageWidth: document.documentElement.scrollWidth,
+    pageHeight: document.documentElement.scrollHeight,
+    controls: [
+      ...document.querySelectorAll<HTMLElement>(
+        "main button, main select, main textarea, main a.wr-btn, main .wr-checklist-choice",
+      ),
+    ]
+      .map((e) => ({
+        label: e.getAttribute("aria-label") ?? e.textContent?.trim() ?? "",
+        width: e.getBoundingClientRect().width,
+        height: e.getBoundingClientRect().height,
+      }))
+      .filter((r) => r.width > 0 && r.height > 0),
+  }));
+  expect(
+    measured.pageWidth,
+    `${state} must not overflow the page`,
+  ).toBeLessThanOrEqual(measured.viewport.width);
+  if (measured.viewport.width <= 390)
+    expect(
+      measured.controls.filter((r) => r.height < 44),
+      `${state} phone targets must meet the absolute44pxfloor`,
+    ).toEqual([]);
+  const dir = process.env.WHR_CHECKLIST_CAPTURE;
+  if (dir) {
+    await mkdir(dir, { recursive: true });
+    await page.screenshot({
+      path: `${dir}/${state}-${measured.viewport.width}.built.png`,
+      fullPage: true,
+    });
+    // A late authority response can add the review between measurement and
+    // screenshot. Matching PNG dimensions alone would then hide missing content.
+    const after = await page.evaluate(() => ({
+      pageWidth: document.documentElement.scrollWidth,
+      pageHeight: document.documentElement.scrollHeight,
+      controls: [...document.querySelectorAll<HTMLElement>(
+        "main button, main select, main textarea, main a.wr-btn, main .wr-checklist-choice",
+      )].filter((e) => {
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      }).length,
+    }));
+    expect(after, `${state} layout must stay complete during capture`).toEqual({
+      pageWidth: measured.pageWidth,
+      pageHeight: measured.pageHeight,
+      controls: measured.controls.length,
+    });
+    await writeFile(
+      `${dir}/${state}-${measured.viewport.width}.json`,
+      JSON.stringify(measured, null, 2) + "\n",
+    );
+  }
+}
+
+/** Capture responsive variants of a verified retained state without another
+ * domain write or a fabricated viewport-specific data response. */
+export async function captureChecklistResponsive(page: Page, state: string) {
+  if (!process.env.WHR_CHECKLIST_CAPTURE) return;
+  for (const width of [1440, 390, 360]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await captureChecklist(page, state);
+  }
+}

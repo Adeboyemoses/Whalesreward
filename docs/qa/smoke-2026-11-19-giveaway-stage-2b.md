@@ -1,0 +1,70 @@
+# Giveaway Stage 2b smoke
+
+WO-app-11 / WHR-23. Local disposable fictional fixtures only. Independent test-engineer execution: 20 November 2026; production source d7625c3 over staging 4fe42cd. EM final-head gates and independent reviewer verdicts are recorded separately.
+
+1. Sign in as an Owner with settings and sales; open campaign manager designation from finalization checks. Review current and eligible manager, reason and stale-evidence warning; confirm designation. A non-Owner cannot designate.
+2. As named manager with sales, leaderboards and current initial/revision grant, open Phone census. Retain disabled and assignment-ended accounts; add every physical phone and all account partitions, including shared accounts/replacements. Review all pages and missing-account coverage. Review replacement diff/reason and explicit complete-scope attestation, then confirm after the server upload deadline.
+3. Physically inspect every listed partition. Record only genuinely empty queues as inspected; unknown phone-only totals remain unknown. Review and confirm a complete check; pending exclusions never count as approved.
+4. For unavailable phone, select exact never-accepted/no-byte-observation incomplete sources. Read full source IDs/versions, original attendant, money/quantity/receipt and manager-attribution warning. Review the full frozen list/reason and submit. No account-wide exclusion.
+5. With a canonically different verified authorized person, open the saved proposal directly. Review immutable phone/account/source snapshots, proposer/time/reason and pins. Review and confirm approval or rejection with reason. Same-person alias must be refused. Approved exclusion still requires a current complete check; other holds/corrections/duplicates/release proposals remain blocking.
+6. E02 shows all nine live outcomes with server as-of, exact separate counts and authorized links. Missing policy/unknown count/restricted destination never shows zero or a pass. Stored results show historical preparation checks and IDs separately.
+7. Introduce new intake/manager/census/byte receipt/predecessor change. Refresh stale evidence explicitly; no automatic choice substitution or pass reuse. Simulate lost POST response, navigate away/back and retry exact same operation/body. Sign-out or authority change clears protected drafts.
+8. Prepare and confirm through E04 using current evidence; view immutable E03 and historical stored checks, then authorized revision. Earlier snapshots stay unchanged.
+9. At 1440/390/360 verify wrapping, all fields, labelled cards, no page horizontal overflow, phone controls 48 px, keyboard/focus/error summary and complete last row. Record observed results and any limits before READY.
+
+## Execution evidence
+
+Actual compiled Next production HTTP server and disposable PostgreSQL 16 schemas; Playwright 1.64.1 Chromium in its matching local Linux container, CSS widths 1440/390/360, DPR 2. Native macOS Chromium failed to initialize before product code; the Linux browser ran the real local app through loopback forwarding. No deployed data, fake successful responses, rate-limit resets, extra retries, increased timeouts or sleeps were used.
+
+| Command/scope                                                         | Observed result                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| New Stage 2b suite, 17 cases                                          | 14 passed / 3 failed (1.6 min). The three failures were exact text locators for the displayed `Inspection status:` prefix; the UI and actual HTTP already recorded complete checks.                                                                                                                                                                                      |
+| Final focused `explicit reviews` or `historical preparation`                                                                                                                                                                                                                                                                                                                                                  | 4 passed (30.6 s), including all three corrected width flows and fresh historical-check captures. These are repeat cases, not four additional unique scenarios. All 17 new scenarios have an observed passing execution; this is not a claim of one clean full-suite command. |
+| Stage 2a grouped blockers + nine rows                                 | Passed in the targeted run; the combined initial/revision/unchanged test then exposed the documented read-budget condition below.                                                                                                                                                                                                                                        |
+| Final split initial/revision/immutable-history and unchanged UI cases | Initial/revision/immutable-history case passed in the two-case run (1 passed / 1 failed, 13.6 s); the new unchanged test had a premature enabled-button assertion before its required reason. After correcting that test precondition, the unchanged case passed separately (1 passed, 6.8 s), including byte-equal prior summary/rows/sources and exact snapshot count. |
+| Checker typecheck / scoped ESLint                                     | Passed; no scoped lint warnings. Production build passed on d7625c3.                                                                                                                                                                                                                                                                                                     |
+
+Thirty independently captured full-page PNGs and thirty frame measurements cover manager review, census review, recorded phone check, E02, exact unavailable review, pending/approved/rejected independent proposals, explicit recovered-phone choice and historical preparation at all three widths. [Fidelity report](../../tests/design-parity/giveaway-checklist/REPORT.md) and [dimensions](../../tests/design-parity/giveaway-checklist/dimensions.json): zero page overflows, all 212 measured visible phone controls at least 48 px; full PNG dimensions match the complete measured page at DPR 2. Keyboard Shift+Tab and 2 px focus outline were exercised at all widths; stale refusal focused its error summary.
+
+The new cases exercise manager/Owner grants, disabled and assignment-ended historical accounts, missing coverage, all-page inventory and visual paging, exact partial sources, alias-person refusal over HTTP, independent approve/reject, current-check requirement after approval, preserved received/no-accepted-revision state, trusted-byte view/proposal invalidation, authority revocation, same-body retry after a real committed POST response is lost, stale selection clearing, timing phases, missing policy and immutable historical outcomes after later intake. Unknown physical queues remain unknown; no physical phone inspection or daylight pilot is claimed.
+
+### Read-budget diagnosis and preserved coverage
+
+The earlier Stage 2a browser case compressed initial finalization, accepted revision, multiple saved-history selections and unchanged reconciliation into one rapid actor journey. Passive instrumentation measured **66 browser GET responses**, including four `/session` reads in a separate admin bucket, hence **62 browser M2 read requests**; one additional direct owner readiness read and eighteen independent-observer reads were counted separately. The first 429 was a browser campaign read at **3,048 ms**. The source bucket is capacity 60 with one token per second refill (`auth/rate-limit.ts`, giveaway/projection/reports HTTP); its behavior matched the contract. The trace showed expected finite route/selection reads, not an effect loop. [Redacted evidence](giveaway-stage2b-read-budget.json) contains route patterns, statuses and elapsed times only.
+
+The original immutable initial/revision assertions and exact two-snapshot count remain together. Unchanged reconciliation now has its own fresh real-stack UI case, with predecessor setup through real HTTP; it asserts the unchanged receipt, exact unchanged one-snapshot count and byte-equal prior summary/rows/sources. No production rate policy, endpoint, schema, original acceptance assertion, permission, retry or timeout was weakened. The approved Stage 2b refresh assertion follows the real `/reconciliation/checklist` projection and checks its contained readiness, replacing an obsolete wait for a separate `/readiness` request.
+
+### Reproduction
+
+Use an explicitly local test `DATABASE_URL`; each case creates/removes its own schema and Next server. Build once with `pnpm build`, then run `pnpm exec playwright test --config tests/checklist/playwright.config.ts`. Set `WHR_CHECKLIST_CAPTURE=tests/design-parity/giveaway-checklist` only when intentionally replacing reviewed screenshot artifacts. A matching remote local Playwright server can be selected with `WHR_PLAYWRIGHT_WS`; it forwards loopback requests without changing app origins. For the main runner, Playwright supports `PW_TEST_CONNECT_WS_ENDPOINT` plus `PW_TEST_CONNECT_EXPOSE_NETWORK=<loopback>`.
+
+EM must rerun the complete required gates on the integrated final head. The local command results above do not replace full `pnpm test:e2e`, CI or independent code/security/integrity verdicts.
+
+
+### Ordinary runner follow-up — 20 Nov
+
+The first EM full `pnpm test:e2e --workers=2` run was stopped: 149 passed, 19 failed, 2 interrupted, 2 skipped and 298 did not run. Four checklist failures involved a PostgreSQL connection closing unexpectedly or fixture sign-in returning HTTP 503; this was not an assertion that a blocked checklist passed. The recorded historical-case trace shows successful schema migration, schema verification and isolated Next startup before the fixture client connection failed. The database container stayed healthy; no restart or OOM was observed. The later authentication failure using a fallback operating-system account does not establish why the earlier connection failed. Unrelated camera flows also timed out. These are failed results, not a full-suite pass.
+
+The checker then ran the unchanged new checklist suite through the ordinary root config, including its build/webServer and both test files, using the same local PostgreSQL 16 database and matching remote browser:
+
+```sh
+PW_TEST_CONNECT_WS_ENDPOINT='<local matching browser websocket>' \
+PW_TEST_CONNECT_EXPOSE_NETWORK='<loopback>' \
+DATABASE_URL='<explicit local test database URL>' \
+pnpm exec playwright test tests/e2e/giveaway-checklist-protocol.spec.ts \
+  tests/e2e/giveaway-checklist-real.spec.ts --project=desktop --workers=2
+```
+
+**17 passed (1.0 min), zero failures.** Historical preparation, both timing phases and missing policy passed after the grant-revocation case in the same unchanged sequence. The connection failure did not reproduce; no environment leak or backend contract mismatch was established. No speculative test or production change, extra retry, rate reset, sleep or timeout increase was made. This focused pass does not replace the required complete CI run. Raw temporary logs remain local (`/tmp/whr23-checklist-root17.log` and the EM run log).
+
+## EM integrated-head verification
+
+20 November 2026. Production source remains `d7625c3`; integrated tests/QA were `1c0537e`, then the unrelated latest staging operations documentation was merged (staging `a83d6fb`). No server/shared-contract/projection/mutation or STATUS/coverage/lane changes are in this feature diff.
+
+- EM typecheck, lint (zero errors/four inherited image warnings), **1,006 unit tests in 106 files**, and production build passed on the integrated source.
+- Ordinary root runner, both projects: `pnpm test:e2e giveaway-checklist --workers=2` — **34 passed (1.3 minutes)**, including six real HTTP protocol executions and all browser states. Log `/tmp/whr23-em-checklist-e2e.log`.
+- Ordinary root runner, both projects: `pnpm test:e2e leaderboards --workers=2` — **26 passed (56.2 seconds)**. Includes snapshot/revision/immutable history, unchanged reconciliation, rankings, permission and uncertainty regressions. Log `/tmp/whr23-em-leaderboards-e2e.log`.
+- The broad local full run remains an unsuccessful attempt, not a full-suite pass: **149 passed, 19 failed, two interrupted, two skipped, 298 not run**, stopped with exit 130. [WHR-207](https://linear.app/phaneum/issue/WHR-207) retains the unproven connection/camera interaction investigation. No production or assertion fix was inferred from that interruption.
+- Unchanged [WHR-123](https://linear.app/phaneum/issue/WHR-123) print-preview race also recurred. Exact isolated rerun across both projects: **one passed / one failed**, with the desktop preview-download case still failing at its pre-existing missing-error-message assertion. No cards/test/retry/timeout changes were made for it. Log `/tmp/whr23-em-whr123-rerun.log`.
+
+These local results do not replace required supported Linux CI. Code/security/integrity review and every required PR check must pass before staging merge. No READY or whole-suite-green claim is made by this execution record.

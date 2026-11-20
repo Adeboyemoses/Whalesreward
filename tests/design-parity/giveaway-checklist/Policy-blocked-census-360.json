@@ -1,0 +1,76 @@
+{
+  "viewport": {
+    "width": 360,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 360,
+  "pageHeight": 4760,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 48
+    },
+    {
+      "label": "Choose an authorized attendant accountSTAFF002 / Grace OkonSTAFF005 / Favour James",
+      "width": 248,
+      "height": 48
+    },
+    {
+      "label": "Add attendant account",
+      "width": 179,
+      "height": 48
+    },
+    {
+      "label": "Grace Okon · STAFF002019a5000-0000-7000-8000-000000000006",
+      "width": 248,
+      "height": 84
+    },
+    {
+      "label": "Favour James · STAFF005019a5000-0000-7000-8000-000000000007",
+      "width": 248,
+      "height": 84
+    },
+    {
+      "label": "Remove draft row",
+      "width": 149,
+      "height": 48
+    },
+    {
+      "label": "Add phone",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Fictional census draft while policy is unavailable",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "I have included every relevant phone and account partition, including phones used by staff who have left.",
+      "width": 286,
+      "height": 84
+    },
+    {
+      "label": "Review census",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Review complete phone check",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Refresh complete evidence",
+      "width": 328,
+      "height": 48
+    }
+  ]
+}

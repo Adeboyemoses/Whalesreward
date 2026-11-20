@@ -1,0 +1,530 @@
+[
+  {
+    "file": "Census-review-1440.built.png",
+    "width": 2880,
+    "height": 8192,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4096
+  },
+  {
+    "file": "Census-review-360.built.png",
+    "width": 720,
+    "height": 14290,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7145
+  },
+  {
+    "file": "Census-review-390.built.png",
+    "width": 780,
+    "height": 13838,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 6919
+  },
+  {
+    "file": "Concurrent-reconciliation-history-1440.built.png",
+    "width": 2880,
+    "height": 28094,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 14047
+  },
+  {
+    "file": "Concurrent-reconciliation-history-360.built.png",
+    "width": 720,
+    "height": 41650,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 20825
+  },
+  {
+    "file": "Concurrent-reconciliation-history-390.built.png",
+    "width": 780,
+    "height": 40654,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 20327
+  },
+  {
+    "file": "Duplicate-label-controls-1440.built.png",
+    "width": 2880,
+    "height": 7658,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3829
+  },
+  {
+    "file": "Duplicate-label-controls-360.built.png",
+    "width": 720,
+    "height": 14606,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7303
+  },
+  {
+    "file": "Duplicate-label-controls-390.built.png",
+    "width": 780,
+    "height": 14074,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7037
+  },
+  {
+    "file": "E02-1440.built.png",
+    "width": 2880,
+    "height": 8590,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4295
+  },
+  {
+    "file": "E02-360.built.png",
+    "width": 720,
+    "height": 15086,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7543
+  },
+  {
+    "file": "E02-390.built.png",
+    "width": 780,
+    "height": 14586,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7293
+  },
+  {
+    "file": "Historical-preparation-1440.built.png",
+    "width": 2880,
+    "height": 14588,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7294
+  },
+  {
+    "file": "Historical-preparation-360.built.png",
+    "width": 720,
+    "height": 24624,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 12312
+  },
+  {
+    "file": "Historical-preparation-390.built.png",
+    "width": 780,
+    "height": 23872,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 11936
+  },
+  {
+    "file": "Latest-unchanged-reconciliation-1440.built.png",
+    "width": 2880,
+    "height": 23300,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 11650
+  },
+  {
+    "file": "Latest-unchanged-reconciliation-360.built.png",
+    "width": 720,
+    "height": 35540,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 17770
+  },
+  {
+    "file": "Latest-unchanged-reconciliation-390.built.png",
+    "width": 780,
+    "height": 34672,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 17336
+  },
+  {
+    "file": "Manager-review-1440.built.png",
+    "width": 2880,
+    "height": 4254,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 2127
+  },
+  {
+    "file": "Manager-review-360.built.png",
+    "width": 720,
+    "height": 10228,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 5114
+  },
+  {
+    "file": "Manager-review-390.built.png",
+    "width": 780,
+    "height": 9856,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4928
+  },
+  {
+    "file": "Phone-check-recorded-1440.built.png",
+    "width": 2880,
+    "height": 6322,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3161
+  },
+  {
+    "file": "Phone-check-recorded-360.built.png",
+    "width": 720,
+    "height": 12612,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 6306
+  },
+  {
+    "file": "Phone-check-recorded-390.built.png",
+    "width": 780,
+    "height": 12116,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 6058
+  },
+  {
+    "file": "Policy-blocked-census-1440.built.png",
+    "width": 2880,
+    "height": 5506,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 2753
+  },
+  {
+    "file": "Policy-blocked-census-360.built.png",
+    "width": 720,
+    "height": 9520,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4760
+  },
+  {
+    "file": "Policy-blocked-census-390.built.png",
+    "width": 780,
+    "height": 9068,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4534
+  },
+  {
+    "file": "Proposal-approved-1440.built.png",
+    "width": 2880,
+    "height": 4298,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 2149
+  },
+  {
+    "file": "Proposal-approved-360.built.png",
+    "width": 720,
+    "height": 8246,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4123
+  },
+  {
+    "file": "Proposal-approved-390.built.png",
+    "width": 780,
+    "height": 7826,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3913
+  },
+  {
+    "file": "Proposal-pending-1440.built.png",
+    "width": 2880,
+    "height": 4698,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 2349
+  },
+  {
+    "file": "Proposal-pending-360.built.png",
+    "width": 720,
+    "height": 8522,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4261
+  },
+  {
+    "file": "Proposal-pending-390.built.png",
+    "width": 780,
+    "height": 8026,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4013
+  },
+  {
+    "file": "Proposal-rejected-1440.built.png",
+    "width": 2880,
+    "height": 4222,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 2111
+  },
+  {
+    "file": "Proposal-rejected-360.built.png",
+    "width": 720,
+    "height": 8166,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 4083
+  },
+  {
+    "file": "Proposal-rejected-390.built.png",
+    "width": 780,
+    "height": 7746,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3873
+  },
+  {
+    "file": "Read-only-proposal-history-1440.built.png",
+    "width": 2880,
+    "height": 3344,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 1672
+  },
+  {
+    "file": "Read-only-proposal-history-360.built.png",
+    "width": 720,
+    "height": 7700,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3850
+  },
+  {
+    "file": "Read-only-proposal-history-390.built.png",
+    "width": 780,
+    "height": 7236,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3618
+  },
+  {
+    "file": "Recovered-phone-choice-1440.built.png",
+    "width": 2880,
+    "height": 6286,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3143
+  },
+  {
+    "file": "Recovered-phone-choice-360.built.png",
+    "width": 720,
+    "height": 12388,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 6194
+  },
+  {
+    "file": "Recovered-phone-choice-390.built.png",
+    "width": 780,
+    "height": 11896,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 5948
+  },
+  {
+    "file": "Superseded-proposal-1440.built.png",
+    "width": 2880,
+    "height": 3344,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 1672
+  },
+  {
+    "file": "Superseded-proposal-360.built.png",
+    "width": 720,
+    "height": 7696,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3848
+  },
+  {
+    "file": "Superseded-proposal-390.built.png",
+    "width": 780,
+    "height": 7192,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3596
+  },
+  {
+    "file": "Unavailable-review-1440.built.png",
+    "width": 2880,
+    "height": 7444,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3722
+  },
+  {
+    "file": "Unavailable-review-360.built.png",
+    "width": 720,
+    "height": 15796,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7898
+  },
+  {
+    "file": "Unavailable-review-390.built.png",
+    "width": 780,
+    "height": 15124,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7562
+  }
+]

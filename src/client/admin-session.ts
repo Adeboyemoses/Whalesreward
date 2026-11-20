@@ -142,7 +142,21 @@ export class AdminSessionStore {
         if (error.status === 401 || error.code === "password_change_required")
           this.clear("Your session ended. Sign in again.");
         else if (error.code === "permission_denied") {
-          this.clear("Your permissions changed. Sign in again.");
+          // These reads also authorize manager designation, which can change
+          // without a session grant change. Recheck the session before treating
+          // a scoped domain refusal as account-wide permission loss.
+          if (
+            body === undefined &&
+            (method === undefined || method === "GET") &&
+            /^giveaway\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/reconciliation\/selection\/(?:managers|attendants|phones(?:\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/incomplete-sources)?)(?:\?[^#]*)?$/i.test(
+              path,
+            )
+          ) {
+            await this.refresh();
+            if (epoch !== this.state.epoch) throw new AdminError("obsolete");
+            if (this.state.error)
+              throw new AdminError("scope_unavailable", 503);
+          } else this.clear("Your permissions changed. Sign in again.");
         }
       }
       throw error;
