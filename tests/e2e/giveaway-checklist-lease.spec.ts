@@ -1,6 +1,9 @@
 import { test, expect } from "../leaderboards/test";
 import { v7 } from "uuid";
 import { checklistFixture, api } from "../checklist/helpers";
+import { captureChecklistResponsive } from "../checklist/fidelity";
+
+test.use({ deviceScaleFactor: 2 });
 
 const base = "/admin/leaderboards/finalize";
 const reason = "Fictional protected frozen review before leaving checklist";
@@ -358,6 +361,21 @@ test("I-46 refreshing current readiness shows a later independent unchanged reco
     await expect(latest).toContainText(
       "Fictional independent unchanged reconciliation B",
     );
+    const ownReceipt = page.getByRole("region", {
+      name: "Your recorded reconciliation receipt",
+      exact: true,
+    });
+    await expect(ownReceipt).toContainText(own.reconciliationId);
+    await expect(ownReceipt).toContainText(
+      "Fictional own unchanged reconciliation A",
+    );
+    await expect(
+      latest.getByText("Passed during preparation", { exact: true }),
+    ).toHaveCount(9);
+    await expect(
+      ownReceipt.getByText("Passed during preparation", { exact: true }),
+    ).toHaveCount(9);
+    await captureChecklistResponsive(page, "Concurrent-reconciliation-history");
     expect(
       await f.observe(`giveaway/${f.campaignId}/snapshots/${snapshot.id}`),
     ).toEqual(original);
