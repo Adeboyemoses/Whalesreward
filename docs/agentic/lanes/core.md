@@ -1,21 +1,22 @@
 # lane:core
-WHR-208 recovered-phone census enforcement: READY since 2026-11-20
+WO-core-16a (WHR-210) report-only scheduled jobs: READY since 2026-11-20
 
 ## In flight
-- [Feature PR #175](https://github.com/Adeboyemoses/Whalesreward/pull/175) merged into staging at `f32426a550442083ff64075005f26deb6b079475` with all five required checks green. Feature head `0a8c0f10fb71adefec9ece041ae13ff4ec852121`; reviewed source `7636975`.
-- Same-census empty certification after approved unavailability now refuses without effects. Readiness blocks legacy invalid checks; preparation and confirmation inherit the guard. Replacement census succeeds, retaining immutable exclusions and snapshots. Strict wire requests unchanged.
-- Code/security/integrity PASS round 1 of cap 3; no findings. Evidence `.review/core__WHR-208-recovered-phone.md` validates. Shared records are in this separate docs-only PR.
-- EM typecheck/lint/build, 997 unit, 1,542 PostgreSQL16 (zero skips), HTTP 2, targeted non-superuser PostgreSQL 8 (three concurrency scenarios), timezone 5+5 PASS. T2 regression from 904078f remains byte-identical and passes. Final CI: 433 browser passes plus one retry pass/four existing skips, release 42, campaign-proof 1, storage 1, gate self-tests 53 and guard 94 PASS.
+- [Feature PR #180](https://github.com/Adeboyemoses/Whalesreward/pull/180) merged green into staging at `3db6b78`. Head `c56ca89985e73b91d8bfd10da78bb510e9e16402`; final reviewed head `76fb61b`, job implementation `9e25e06`.
+- Orphan inventory and upload reconciliation use fenced single-runner leases, bounded per-object checkpoints, immutable private count/UUID reports and heartbeat/due/deadline/complete-watermark fields for WO-core-16c. No evidence/revision/receipt/credit/campaign mutations, deletion or lifecycle changes.
+- Code/security/integrity PASS round 3/3. Round 1 fixed column-write grants, image packaging, slow-read progress and detached receipt coverage; round 3 is staging connection-alias documentation only. Evidence `.review/core__WHR-210-report-jobs.md` validates.
+- EM: typecheck/lint/build, 1,024 unit, 1,561 PostgreSQL16/82 suites/zero skips (15 maintenance cases), timezone 5+5, identifier guard26/848 sources, actual image/non-root/CLI/staging-alias smoke PASS. All job operations use restricted non-superuser roles and scoped read-only MinIO sessions.
+- Final CI five checks green: integration1,561 after one unchanged WHR-221 retry; browser503 plus three retry passes/four existing skips; release42/campaign1/storage1. Shared records are separate from the feature PR.
 
 ## Next
-- Stop at READY. WHR-210 starts only in a new session. T2 may resume WHR-187 against the merged fix; no app feature work was performed here.
+- Stop at READY. Earl verifies deployed staging using docs/ops/maintenance.md; both staging database URL bindings must use the same restricted maintenance connection. No backup/monitoring work order started.
 
 ## Earl's gos
-- 20 Nov 2026: “Fix WHR-208.” “Feature PRs must not edit STATUS, coverage-map or lanes files.” “Then stop: WHR-210 follows in a new session.”
+- 20 Nov 2026: “Start WHR-210 (WO-core-16a).” “No cloud resources.” “Feature PRs must not edit STATUS, coverage-map or lanes files.” “Then stop.”
 
 ## Risks
-- Known fixture retries: final head reproduces WHR-83 assignment route fulfilment; first CI run reproduces WHR-177 leaderboard fixture deadlocks. Evidence added with found-in:WHR-208; no assertions, retries or timeouts changed.
-- Initial local fixture/worker setup failures were corrected; full EM PostgreSQL run passed. Shared remote browser lacks fake-camera launch options; full native CI passed. Disposable databases removed.
-- Runtime model ID unavailable. No cloud resources, deployed data or main promotion touched.
+- Production execution remains blocked by WHR-206; WHR-56 removal/lifecycle prohibitions remain unconditional. Inventory watermarks are not backup coverage. No cloud resources or main promotion touched.
+- Existing fixture issues: WHR-221 native/CI timing, WHR-174 operator cleanup, WHR-216 review-control revocation and WHR-177 leaderboard deadlock. Assertions, domain deadlines and CI retry settings unchanged.
+- Dispatch flag: 13 > 8; review rounds remain within cap 3. Runtime model ID unavailable.
 
-dispatches=5 prs=2 rounds_max=1 escalations=0 model=unavailable
+dispatches=13 prs=2 rounds_max=3 escalations=0 model=unavailable
