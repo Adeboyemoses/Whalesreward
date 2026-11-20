@@ -33,6 +33,39 @@
     "pageHeight": 6919
   },
   {
+    "file": "Concurrent-reconciliation-history-1440.built.png",
+    "width": 2880,
+    "height": 28094,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 14047
+  },
+  {
+    "file": "Concurrent-reconciliation-history-360.built.png",
+    "width": 720,
+    "height": 41650,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 20825
+  },
+  {
+    "file": "Concurrent-reconciliation-history-390.built.png",
+    "width": 780,
+    "height": 40654,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 20327
+  },
+  {
     "file": "Duplicate-label-controls-1440.built.png",
     "width": 2880,
     "height": 7658,
