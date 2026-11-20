@@ -254,6 +254,14 @@ for (const decision of ["approve", "reject"] as const) {
       ).toBeVisible();
       for (const width of [1440, 390, 360]) {
         await page.setViewportSize({ width, height: 1000 });
+        // Source fields also exist in the draft. The review is ready only after
+        // live action authority is validated and its confirmation is displayed.
+        await expect(
+          page.getByRole("button", {
+            name: "Submit for independent approval",
+            exact: true,
+          }),
+        ).toBeVisible();
         await captureChecklist(page, "Unavailable-review");
       }
       const submitted = page.waitForResponse(

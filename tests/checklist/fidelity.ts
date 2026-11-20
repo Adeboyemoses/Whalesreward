@@ -43,6 +43,23 @@ export async function captureChecklist(page: Page, state: string) {
       path: `${dir}/${state}-${measured.viewport.width}.built.png`,
       fullPage: true,
     });
+    // A late authority response can add the review between measurement and
+    // screenshot. Matching PNG dimensions alone would then hide missing content.
+    const after = await page.evaluate(() => ({
+      pageWidth: document.documentElement.scrollWidth,
+      pageHeight: document.documentElement.scrollHeight,
+      controls: [...document.querySelectorAll<HTMLElement>(
+        "main button, main select, main textarea, main a.wr-btn, main .wr-checklist-choice",
+      )].filter((e) => {
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      }).length,
+    }));
+    expect(after, `${state} layout must stay complete during capture`).toEqual({
+      pageWidth: measured.pageWidth,
+      pageHeight: measured.pageHeight,
+      controls: measured.controls.length,
+    });
     await writeFile(
       `${dir}/${state}-${measured.viewport.width}.json`,
       JSON.stringify(measured, null, 2) + "\n",
