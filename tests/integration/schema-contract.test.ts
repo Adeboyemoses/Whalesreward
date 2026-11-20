@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { v7 } from "uuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
@@ -186,13 +186,13 @@ describe("database representation contract", () => {
       await client.query(
         `INSERT INTO customer (id, customer_code, name, phone_normalized, category, version)
          VALUES ($1, $2, 'Amina Bello', '+2348000009991', 'car_owner', 1)`,
-        [randomUUID(), `TEST-${randomUUID()}`],
+        [v7(), `TEST-${v7()}`],
       );
       await expect(
         client.query(
           `INSERT INTO customer (id, customer_code, name, phone_normalized, category, version)
          VALUES ($1, $2, 'Tunde Adebayo', '+2348000009991', 'bike_user', 1)`,
-          [randomUUID(), `TEST-${randomUUID()}`],
+          [v7(), `TEST-${v7()}`],
         ),
       ).rejects.toMatchObject({ code: "23505" });
     } finally {
@@ -203,11 +203,11 @@ describe("database representation contract", () => {
   it("I-14 keeps a customer's category fixed when their profile changes", async () => {
     await client.query("BEGIN");
     try {
-      const id = randomUUID();
+      const id = v7();
       await client.query(
         `INSERT INTO customer (id, customer_code, name, phone_normalized, category, version)
          VALUES ($1, $2, 'Amina Bello', '+2348000009992', 'car_owner', 1)`,
-        [id, `TEST-${randomUUID()}`],
+        [id, `TEST-${v7()}`],
       );
       await expect(
         client.query(
@@ -229,7 +229,7 @@ describe("database representation contract", () => {
       await expect(
         client.query(
           "INSERT INTO product (id, code, unit) VALUES ($1, $2, $3)",
-          [randomUUID(), code, unit],
+          [v7(), code, unit],
         ),
       ).rejects.toMatchObject({ code: "23514" });
     } finally {

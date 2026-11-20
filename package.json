@@ -8,6 +8,7 @@
     "node": "26.12.0"
   },
   "scripts": {
+    "check:identifiers": "node --test scripts/ci/check-identifiers.test.mjs && node scripts/ci/check-identifiers.mjs",
     "ops:review-evidence": "node scripts/ops/review-evidence.mjs",
     "ops:meter": "node scripts/ops/meter.mjs",
     "dev": "TZ=UTC NEXT_TELEMETRY_DISABLED=1 next dev",

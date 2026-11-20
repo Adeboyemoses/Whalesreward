@@ -18,4 +18,5 @@ You build `.github/**`, `.do/**`, `docker-compose.yml`, `scripts/**`, root tooli
 - Staging and production are fully separate: app, database, buckets, credentials, email sandbox. Secrets come from App Platform encrypted env vars, never from the repo.
 - After changing anything under `scripts/review/` or `.codex/hooks/`, run `bash scripts/review/test-review.sh` and `bash .codex/hooks/test-guard.sh` and paste the result.
 - Gotcha (WHR-41, PR #1): post-review path checks must ignore unrelated staging merges but reject changed PR files, preserving the ancestor and unchanged-plan guards.
+- Gotcha (WHR-217): UUIDv7 sweeps include SQL triggers, defaults, fixture writers and root config; run pnpm check:identifiers and justify each exact non-ID v4 exception.
 """

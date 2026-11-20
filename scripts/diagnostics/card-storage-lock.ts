@@ -13,7 +13,7 @@ await observer.connect();
 try {
   const row = (
     await pool.query(
-      "INSERT INTO card_export(id,batch_id,created_by,operation_id,format,batch_version,batch_status,batch_code,batch_name,snapshot_at,status) SELECT gen_random_uuid(),batch_id,created_by,gen_random_uuid(),'xlsx',batch_version,batch_status,batch_code,batch_name,clock_timestamp(),'pending' FROM card_export WHERE format='xlsx' LIMIT 1 RETURNING id",
+      "INSERT INTO card_export(id,batch_id,created_by,operation_id,format,batch_version,batch_status,batch_code,batch_name,snapshot_at,status) SELECT whr_uuid_v7(),batch_id,created_by,whr_uuid_v7(),'xlsx',batch_version,batch_status,batch_code,batch_name,clock_timestamp(),'pending' FROM card_export WHERE format='xlsx' LIMIT 1 RETURNING id",
     )
   ).rows[0];
   if (!row) throw new Error("Run the fixture matrix first");

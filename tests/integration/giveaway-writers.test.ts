@@ -9,9 +9,9 @@ import {
 import { newId } from "../../src/server/lib/ids";
 const mutations = {
   cancellation: `UPDATE purchase SET status='cancelled',cancellation_reason='Fictional cancellation',version=version+1 WHERE id=$1`,
-  hold: `UPDATE purchase_hold SET state='resolved',resolved_by=(SELECT id FROM admin ORDER BY id LIMIT 1),resolution_operation_id=gen_random_uuid(),resolution_reason='Fictional review',resolved_at=clock_timestamp(),resolution_revision_id=opened_revision_id,version=version+1 WHERE purchase_id=$1`,
-  capture_block: `INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES(gen_random_uuid(),$1,'campaign_uncertain','fixture',clock_timestamp(),1)`,
-  duplicate: `INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) SELECT gen_random_uuid(),least($1::uuid,id),greatest($1::uuid,id),'validated_photo','open',1 FROM purchase WHERE id<>$1 LIMIT 1`,
+  hold: `UPDATE purchase_hold SET state='resolved',resolved_by=(SELECT id FROM admin ORDER BY id LIMIT 1),resolution_operation_id=whr_uuid_v7(),resolution_reason='Fictional review',resolved_at=clock_timestamp(),resolution_revision_id=opened_revision_id,version=version+1 WHERE purchase_id=$1`,
+  capture_block: `INSERT INTO purchase_validation_block(id,purchase_id,code,policy_reference,opened_at,version) VALUES(whr_uuid_v7(),$1,'campaign_uncertain','fixture',clock_timestamp(),1)`,
+  duplicate: `INSERT INTO duplicate_flag(id,purchase_id,other_purchase_id,reason,state,version) SELECT whr_uuid_v7(),least($1::uuid,id),greatest($1::uuid,id),'validated_photo','open',1 FROM purchase WHERE id<>$1 LIMIT 1`,
   customer_display: `UPDATE customer SET name='Amina Bello',version=version+1 WHERE id=(SELECT customer_id FROM purchase WHERE id=$1)`,
   card_display: `UPDATE card SET state='retired',retired_at=clock_timestamp(),retirement_reason='Fictional replacement',version=version+1 WHERE id=(SELECT card_id FROM purchase WHERE id=$1)`,
 } as const;
