@@ -19,7 +19,7 @@ plan:
   risks: Legacy invalid checks must fail closed; concurrent transitions must serialize; old exclusions and snapshots must remain immutable; strict wire requests remain unchanged.
 invariants: [I-07, I-41, I-46]
 p1: []
-tickets: []
+tickets: [WHR-177]
 ---
 Commissioned by Earl on 20 Nov 2026 in WHR-208 and this session.
 All three reviewers passed round 1 without findings; worktree clean and head
@@ -31,3 +31,8 @@ Both HTTP regressions failed on the baseline with expected 409 / actual 201;
 both pass with the fix. Eight new PostgreSQL tests independently pass with
 rolsuper=false and rolbypassrls=false, including three concurrency scenarios.
 Shared records are excluded from this feature PR.
+EM full gates: 997 unit, 1542 PostgreSQL, HTTP 2, timezone 5+5 pass;
+typecheck/lint/build pass. First CI run passes all five checks: release 42,
+campaign proof 1, ordinary browser 432 plus 2 retry passes and 4 existing skips,
+storage 1. Both retry passes are unchanged leaderboard fixture deadlocks (WHR-177).
+Merged the concurrent docs-only staging update; reviewed fix paths are unchanged.
