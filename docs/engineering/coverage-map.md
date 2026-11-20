@@ -896,3 +896,19 @@ Verification: EM typecheck/lint/build, 981 unit and real HTTP protocol 1 PASS. F
 | I-34, I-41 | `original-date-real.spec.ts`: `WHR-181 ordinary date resolution keeps original Values over real HTTP` and `WHR-181 P-29 date resolution keeps original Values over real HTTP`; actual Next/PostgreSQL16/MinIO, admin/attendant originals, replay and one decision | on-staging real HTTP regression coverage |
 
 Expected failures were observed before repair for ordinary, P-29, real HTTP and retained non-null original dates. EM: 981 unit, 1,453 PostgreSQL16 (77 suites, zero skips), timezone 5+5, HTTP 2, typecheck/lint/build, review self-tests 53 and guard 94 PASS. CI: 1,453 PostgreSQL, timezone 5+5, browser 426 passed/two retry passes/four existing skips, storage 1 and release 3 PASS. All three reviewers PASS in round 1 of 3. Existing WHR-174 cleanup failure passed on one unchanged CI job rerun; browser retry evidence is on WHR-177/WHR-83. Full callsite dispositions: [verification](../qa/verification-2026-11-18-original-date.md).
+
+
+## WHR-208 recovered phone requires replacement census
+
+[Feature PR #175](https://github.com/Adeboyemoses/Whalesreward/pull/175) merged green at `f32426a`, head `0a8c0f10fb71adefec9ece041ae13ff4ec852121`, reviewed source `7636975`. Enforces existing M4 P-30; strict wire requests, old exclusions and snapshots remain unchanged. No UI parity claim.
+
+| Invariants | Named evidence | Status |
+|---|---|---|
+| I-07, I-41, I-46 | `giveaway-recovered-phone-contract.spec.ts`: `I-46 M4 P30 recovered phone requires a fresh census before an empty check can replace approved unavailability` (unchanged from 904078f) | on-staging; real compiled Next/PostgreSQL HTTP |
+| I-41, I-46 | `giveaway-recovered-phone-http.spec.ts`: `I-46 P-30 real HTTP refuses old-census recovery without effects and accepts the same phone only under a replacement census while preserving exclusions and snapshots` | on-staging; complete domain-state comparison and frozen history |
+| I-41, I-46 | `WHR-208 approved unavailable phone refuses old-census empty checks without any effects`; `WHR-208 replacement census permits recovered phone and preserves old approved history` | on-staging; real PostgreSQL |
+| I-07, I-41, I-46 | `WHR-208 legacy old-census empty check fails readiness and preparation without effects` | on-staging; legacy invalid evidence fails closed; confirmation caller audited |
+| I-07, I-41, I-46 | `WHR-208 concurrent old-census recovered checks both refuse as a non-superuser`; `WHR-208 concurrent approval and recovered check never certify the excluded census`; `WHR-208 concurrent replacement census wins while old-census recovery refuses` | on-staging; Promise.all against PostgreSQL16, rolsuper=false and rolbypassrls=false |
+| I-41, I-46 | `WHR-208 changed exclusion applicability never permits recovery under its excluded census`; `WHR-208 recovered revision with replacement census preserves the previous unavailable snapshot` | on-staging; original approval/census/snapshot history immutable |
+
+All eight PostgreSQL cases are in `tests/integration/giveaway-recovered-phone.test.ts`. Both HTTP regressions failed on the baseline (409 expected / 201 actual), then passed unchanged assertions. EM: 997 unit, 1,542 PostgreSQL16/80 suites/zero skips, targeted PostgreSQL8, HTTP2, timezone5+5 and typecheck/lint/build PASS. Final CI: 433 ordinary browser passes plus one retry pass/four existing skips; release42, campaign-proof1, storage1; all five required checks green. Code/security/integrity PASS round1/3. Existing fixture retry evidence is on WHR-83 (final head) and WHR-177 (first run); no assertion/timeout/retry changes. WHR-210 was not started.
