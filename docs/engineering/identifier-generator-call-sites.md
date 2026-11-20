@@ -9,7 +9,7 @@ This tracked-source sweep lists UUID generator definitions, calls and embedded S
 | `prisma/migrations/20261116071000_giveaway_reconciliation/migration.sql` | 110(2) |
 | `prisma/migrations/20261120140000_canonical_uuid_v7/migration.sql` | 26(1), 30(1), 53(2) |
 | `prisma/seed-auth.mjs` | 30(1), 49(1) |
-| `scripts/ci/check-identifiers.mjs` | 221(3) |
+| `scripts/ci/check-identifiers.mjs` | 228(3) |
 | `scripts/diagnostics/card-storage-lock.ts` | 16(2) |
 | `scripts/ops/meter.mjs` | 267(1), 341(1) |
 | `scripts/ops/review-evidence.mjs` | 188(1), 189(1), 255(1), 256(1), 257(1) |
@@ -211,7 +211,7 @@ This tracked-source sweep lists UUID generator definitions, calls and embedded S
 | `tests/integration/station-management.test.ts` | 53(1), 55(1), 70(1), 120(1), 138(1), 155(1), 178(1), 181(1), 214(1), 229(1), 238(1), 247(1), 258(1), 281(1), 293(1), 315(1), 333(1), 345(1), 349(1), 374(1), 397(1), 418(1), 424(1), 440(1), 451(1), 497(1), 506(1), 517(1), 537(1), 560(1), 573(1), 600(1), 635(1), 666(1), 667(1), 668(1), 669(1) |
 | `tests/integration/station-price-visibility.test.ts` | 65(1), 66(1), 67(1), 98(1), 148(1), 220(1), 279(1), 283(1) |
 | `tests/integration/sync-sales.test.ts` | 29(1), 67(1), 79(1), 97(1), 116(1), 128(1), 138(1), 146(1), 189(1), 247(1), 278(2), 294(1), 526(1), 607(1), 653(1), 656(1), 676(1), 681(1), 754(1), 759(1), 799(1), 800(2), 804(1), 821(1), 828(1), 954(1), 962(1), 996(1), 1053(1), 1055(1), 1115(1), 1144(1), 1152(1), 1191(1) |
-| `tests/integration/whr-217-identifiers.test.ts` | 21(1), 37(1), 87(1), 126(1), 139(1), 149(1), 208(1) |
+| `tests/integration/whr-217-identifiers.test.ts` | 21(1), 37(1), 87(1), 126(1), 139(1), 149(1) |
 | `tests/integration/zoho-diagnostics-adversarial.test.ts` | 66(1), 67(1), 83(1) |
 | `tests/integration/zoho-mail-adversarial.test.ts` | 46(1), 47(1), 69(1), 79(1), 194(1), 317(1) |
 | `tests/leaderboards/capture-fixture.ts` | 94(1) |

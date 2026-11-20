@@ -83,7 +83,7 @@ and supersede to typed HTTP detail/list, including intact proposal audit links.
 
 ## CI guard
 
-`pnpm check:identifiers` runs 21 adversarial self-tests then scans tracked SQL,
+`pnpm check:identifiers` runs 26 adversarial self-tests then scans tracked SQL,
 Prisma and JavaScript/TypeScript sources. The stable CI build job runs it after
 install. SQL functions/defaults/triggers/embedded queries, aliased UUID imports,
 member references, destructuring, re-exports and Prisma v4 defaults are checked.
