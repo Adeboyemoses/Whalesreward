@@ -49,3 +49,13 @@ export async function captureChecklist(page: Page, state: string) {
     );
   }
 }
+
+/** Capture responsive variants of a verified retained state without another
+ * domain write or a fabricated viewport-specific data response. */
+export async function captureChecklistResponsive(page: Page, state: string) {
+  if (!process.env.WHR_CHECKLIST_CAPTURE) return;
+  for (const width of [1440, 390, 360]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await captureChecklist(page, state);
+  }
+}

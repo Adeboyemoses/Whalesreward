@@ -134,10 +134,9 @@ for (const width of [1440, 390, 360]) {
       });
       await expect(discard).toBeVisible();
       await discard.click();
-      const inspection = page.getByLabel(
-        "Inspection result · Fictional complete inspection handset",
-        { exact: true },
-      );
+      const inspection = page.getByRole("combobox", {
+        name: /^Inspection result · Fictional complete inspection handset · [0-9a-f-]{36}$/,
+      });
       await expect(inspection).toBeEnabled();
       await inspection.selectOption({
         label: "Inspected · nothing remains unsent",

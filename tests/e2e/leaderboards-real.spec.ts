@@ -11,6 +11,7 @@ import {
   type Preview,
   type Snapshot,
 } from "../leaderboards/helpers";
+import { captureChecklistResponsive } from "../checklist/fidelity";
 import { seedId } from "../station/helpers";
 
 test.setTimeout(90000);
@@ -550,7 +551,7 @@ test("I-46 unchanged reconciliation through the UI adds no snapshot and preserve
     await f.phoneCheck();
     // Real HTTP setup saves the predecessor without replaying a second UI
     // journey merely to establish the unchanged-reconciliation before-state.
-    const preview = await api<Preview>(
+    const preview = await api<Preview & { reconciliationId: string }>(
       page,
       `giveaway/${c.id}/previews`,
       {
@@ -580,6 +581,11 @@ test("I-46 unchanged reconciliation through the UI adds no snapshot and preserve
       `giveaway/${c.id}/snapshots/${initial.id}/sources`,
     );
     await f.phoneCheck("revision");
+    const revisionCheckId = (
+      await f.pool.query("SELECT phone_check_id FROM campaign WHERE id=$1", [
+        c.id,
+      ])
+    ).rows[0].phone_check_id as string;
     await page.goto("/admin/leaderboards/finalize");
     await expect(
       page.getByRole("heading", {
@@ -600,7 +606,12 @@ test("I-46 unchanged reconciliation through the UI adds no snapshot and preserve
       page,
       "Fictional unchanged browser reconciliation",
       true,
-    )) as unknown as { state: string; currentSnapshotId: string };
+    )) as unknown as {
+      state: string;
+      currentSnapshotId: string;
+      reconciliationId: string;
+      phoneCheckId: string;
+    };
     expect(unchanged).toMatchObject({
       state: "unchanged",
       currentSnapshotId: initial.id,
@@ -608,6 +619,32 @@ test("I-46 unchanged reconciliation through the UI adds no snapshot and preserve
     await expect(page.getByRole("main")).toContainText(
       /saved result is unchanged.*no new snapshot/i,
     );
+    expect(unchanged.reconciliationId).not.toBe(preview.reconciliationId);
+    expect(unchanged.phoneCheckId).toBe(revisionCheckId);
+    const latest = () =>
+      page
+        .getByRole("heading", {
+          name: "Latest historical reconciliation",
+          exact: true,
+        })
+        .locator("..");
+    await expect(latest()).toContainText(unchanged.reconciliationId);
+    await expect(latest()).toContainText(revisionCheckId);
+    await expect(latest()).toContainText(
+      "Fictional unchanged browser reconciliation",
+    );
+    await expect(latest().getByRole("heading", { level: 4 })).toHaveCount(9);
+    await expect(
+      latest().getByText("Passed during preparation", { exact: true }),
+    ).toHaveCount(9);
+    // Reload discards client memory: reopening must use the new latestStoredResultId.
+    await page.reload();
+    await expect(latest()).toContainText(unchanged.reconciliationId);
+    await expect(latest()).toContainText(revisionCheckId);
+    await expect(latest()).toContainText(
+      "Fictional unchanged browser reconciliation",
+    );
+    await captureChecklistResponsive(page, "Latest-unchanged-reconciliation");
     expect(
       (
         await f.pool.query(

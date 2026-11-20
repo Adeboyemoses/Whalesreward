@@ -263,8 +263,9 @@ export async function checklistFixture(
     actor,
     async configure(
       state: "finished" | "before_cutoff" | "grace_open" = "finished",
+      options: { reconciliationPolicy?: boolean } = {},
     ) {
-      const c = await f.configure(state);
+      const c = await f.configure(state, options);
       // Stage 2b manager discovery also reads Settings, whose canonical pointer
       // must agree with the fictional timing row created by the Stage 2a helper.
       await f.pool.query(
