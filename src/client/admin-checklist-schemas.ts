@@ -56,7 +56,7 @@ export const exclusionSchema = z.strictObject({
     .max(100),
   partialSources: z.array(exclusionSourceSchema).max(100),
   kind: z.enum(["initial", "revision"]),
-  state: z.enum(["pending", "approved", "rejected"]),
+  state: z.enum(["pending", "approved", "rejected", "superseded"]),
   proposedBy: actorSchema,
   proposedAt: instant,
   decidedBy: actorSchema.nullable(),

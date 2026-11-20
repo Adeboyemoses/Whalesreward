@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -9,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { AdminError } from "@/client/admin-api";
 import {
   AdminChecklistApi,
   checklistMessage,
@@ -23,8 +26,15 @@ import { adminTime } from "@/client/admin-display";
 import type { Campaign } from "@/client/admin-giveaway-schemas";
 import { TimingFacts } from "./giveaway-common";
 export function useChecklistApi() {
-  const { store } = useAdminSession();
-  return useMemo(() => new AdminChecklistApi(store.request), [store]);
+  const { store, epoch } = useAdminSession();
+  return useMemo(() => {
+    const key = `checklist:api:${epoch}`;
+    const existing = store.lists.get(key) as AdminChecklistApi | undefined;
+    if (existing) return existing;
+    const api = new AdminChecklistApi(store.request);
+    store.lists.set(key, api);
+    return api;
+  }, [store, epoch]);
 }
 export function useChecklistRead<T>(key: string, load: () => Promise<T>) {
   const { store, epoch } = useAdminSession();
@@ -74,6 +84,7 @@ export function useChecklistDraft<T>(key: string, initial: () => T) {
 }
 type Change = {
   request: Pending;
+  view?: View;
   review: ReactNode;
   title: string;
   confirm: string;
@@ -87,6 +98,8 @@ type MemoryState = {
   message: string;
   serial: number;
   stopped: boolean;
+  authorizedPath: string | null;
+  validating: boolean;
 };
 class Memory {
   state: MemoryState = {
@@ -97,6 +110,8 @@ class Memory {
     message: "",
     serial: 0,
     stopped: false,
+    authorizedPath: null,
+    validating: false,
   };
   listeners = new Set<() => void>();
   get = () => this.state;
@@ -112,7 +127,8 @@ class Memory {
   }
 }
 export function useChecklistMutation() {
-  const { store, epoch } = useAdminSession();
+  const { store, epoch, session } = useAdminSession();
+  const path = usePathname();
   const api = useChecklistApi();
   const memory = useMemo(() => {
     const old = store.lists.get(`checklist:mutation:${epoch}`) as
@@ -124,8 +140,57 @@ export function useChecklistMutation() {
   }, [store, epoch]);
   const state = useSyncExternalStore(memory.subscribe, memory.get, memory.get);
   const valid = () => store.getSnapshot().epoch === epoch;
+  function clearScopedDrafts() {
+    for (const key of store.lists.keys())
+      if (
+        key.startsWith("checklist:census:") ||
+        key.startsWith("checklist:unavailable:") ||
+        key === "checklist:manager"
+      )
+        store.lists.delete(key);
+    api.clearReads();
+  }
+  async function validate() {
+    const c = memory.state.change;
+    if (!valid() || !c || !session) return false;
+    memory.set({ authorizedPath: null, validating: true });
+    try {
+      await api.authorize(
+        c.request,
+        c.view,
+        session,
+        memory.state.phase === "pending",
+      );
+      if (!valid() || memory.state.change !== c) return false;
+      memory.set({ authorizedPath: path, validating: false, error: "" });
+      return true;
+    } catch (e) {
+      if (valid() && memory.state.change === c) {
+        const transient =
+          e instanceof AdminError &&
+          (e.status === 0 || e.status === 429 || e.status >= 500);
+        if (!transient) clearScopedDrafts();
+        memory.set({
+          authorizedPath: null,
+          validating: false,
+          error: checklistMessage(e),
+          ...(!transient
+            ? {
+                change: null,
+                phase: "idle",
+                stopped: true,
+                serial: memory.state.serial + 1,
+              }
+            : {}),
+        });
+      }
+      return false;
+    }
+  }
   return {
     ...state,
+    authorized: state.authorizedPath === path,
+    revalidate: validate,
     locked: state.phase !== "idle" || state.stopped,
     review: (build: () => Change) => {
       if (!valid() || memory.state.phase !== "idle" || memory.state.stopped)
@@ -143,6 +208,7 @@ export function useChecklistMutation() {
       try {
         memory.set({
           change: build(),
+          authorizedPath: null,
           phase: "review",
           error: "",
           message: "",
@@ -167,6 +233,12 @@ export function useChecklistMutation() {
     confirm: async () => {
       const c = memory.state.change;
       if (!valid() || !c || memory.state.busy) return;
+      if (!session) return;
+      memory.set({ busy: true, authorizedPath: null, error: "", message: "" });
+      if (!(await validate())) {
+        if (valid()) memory.set({ busy: false });
+        return;
+      }
       memory.set({ phase: "pending", busy: true, error: "", message: "" });
       try {
         await api.send(c.request);
@@ -183,6 +255,7 @@ export function useChecklistMutation() {
         if (valid())
           memory.set({
             phase: giveawayUncertain(e) ? "pending" : "idle",
+            authorizedPath: null,
             stopped: !giveawayUncertain(e),
             change: giveawayUncertain(e) ? c : null,
             error: giveawayUncertain(e)
@@ -198,6 +271,24 @@ export function useChecklistMutation() {
 export function ChecklistPending() {
   const m = useChecklistMutation();
   const error = useRef<HTMLDivElement>(null);
+  const path = usePathname();
+  const change = m.change;
+  const revalidate = useEffectEvent(() => m.revalidate());
+  const busy = m.busy;
+  const phase = m.phase;
+  useEffect(() => {
+    if (!change || busy) return;
+    void revalidate();
+    const refresh = () => {
+      if (document.visibilityState === "visible") void revalidate();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [path, change, phase, busy]); // Action-scoped revalidation precedes redisplay; no polling.
   useEffect(() => {
     if (m.error) error.current?.focus();
   }, [m.error]);
@@ -216,9 +307,21 @@ export function ChecklistPending() {
           Refresh checks and review again
         </Button>
       )}
-      {m.change && (
+      {m.change && !m.authorized && (
+        <Notice role="status">
+          {m.validating
+            ? "Checking current review authority…"
+            : "Review evidence is hidden until current authority is revalidated."}
+          {!m.validating && (
+            <Button variant="secondary" onClick={() => void m.revalidate()}>
+              Retry review authorization
+            </Button>
+          )}
+        </Notice>
+      )}
+      {m.change && m.authorized && (
         <Sheet title={m.change.title}>
-          {m.change.review}
+          {m.phase === "review" && m.change.review}
           {m.phase === "pending" && (
             <Notice tone="warning">
               The result of this request is uncertain. Retry the same request

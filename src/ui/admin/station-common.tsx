@@ -102,7 +102,7 @@ export function SelectField({
   disabled?: boolean;
   required?: boolean;
 }) {
-  const id = "station-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const id = useId();
   return (
     <div className="wr-field">
       <label className="wr-label" htmlFor={id}>

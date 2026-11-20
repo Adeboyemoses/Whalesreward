@@ -4,6 +4,11 @@ import { EvidencePager, useEvidencePage } from "./checklist-paging";
 import Link from "next/link";
 import type { AdminSession } from "@/client/admin-session";
 import { AdminError } from "@/client/admin-api";
+import {
+  inventoryAuthority,
+  recoveryNeedsCensus,
+  checklistPolicyCopy,
+} from "@/client/admin-checklist-state";
 import { checklistOperation, type View } from "@/client/admin-checklist-api";
 import type { Phone, Exclusion } from "@/client/admin-checklist-schemas";
 import type { z } from "zod";
@@ -11,6 +16,7 @@ import type { attendantChoiceSchema } from "@/shared/contracts/giveaway-projecti
 import { Button, KeyValueList, Notice, TextField } from "@/ui";
 import { Reason, SelectField, Sheet } from "./station-common";
 import { adminTime } from "@/client/admin-display";
+import { useAdminSession } from "./session";
 import {
   ChecklistFrame,
   EvidenceContext,
@@ -49,17 +55,21 @@ export function PhoneFacts({
     />
   );
 }
-export function phoneState(p: Phone, overall: string) {
+export function phoneState(
+  p: Phone,
+  overall: string,
+  entry?: { result: string; exclusionId: string | null },
+) {
   if (overall === "stale")
     return "Earlier evidence is stale. Review this phone again.";
-  if (p.state === "empty" && overall === "complete")
-    return "Checked · nothing remains unsent";
+  if (overall === "complete" && entry)
+    return entry.result === "empty"
+      ? "Checked · nothing remains unsent"
+      : "Phone unavailable · exclusion approved";
   if (p.state === "unavailable_pending")
     return "Phone unavailable · awaiting independent decision";
   if (p.state === "unavailable_approved")
-    return overall === "complete"
-      ? "Phone unavailable · exclusion approved"
-      : "Approval recorded; current phone check required";
+    return "Approval recorded; current phone check required";
   return "Pending inspection";
 }
 const currentApproval = (e: Exclusion, p: Phone, v: View) =>
@@ -75,6 +85,7 @@ const currentApproval = (e: Exclusion, p: Phone, v: View) =>
   e.policyVersion === v.reconciliationPolicyVersion;
 export function PhonesPage({ session }: { session: AdminSession }) {
   const api = useChecklistApi();
+  const { store } = useAdminSession();
   const m = useChecklistMutation();
   const allowed =
     !!session.permissions?.includes("leaderboards") &&
@@ -91,20 +102,43 @@ export function PhonesPage({ session }: { session: AdminSession }) {
       inventory.census.dataVersion !== projection.view.guard.expectedDataVersion
     )
       throw new AdminError("read_view_stale", 409);
-    const manager =
-      projection.readiness.phoneCheck.managerAdminId ===
-        session.account.adminId &&
-      !!session.permissions?.includes(
-        projection.view.kind === "initial"
-          ? "giveawayFinalize"
-          : "giveawayRevise",
-      );
-    const accounts = manager
-      ? await api.attendants(campaign.id, projection.view.viewToken)
-      : null;
-    const phones = manager
-      ? await api.phones(campaign.id, projection.view.viewToken)
-      : null;
+    let manager = inventoryAuthority(session, {
+      kind: projection.view.kind,
+      phoneCheck: projection.readiness.phoneCheck,
+      checks: projection.checks,
+    });
+    let accounts: Awaited<ReturnType<typeof api.attendants>> | null = null;
+    let phones: Awaited<ReturnType<typeof api.phones>> | null = null;
+    let authorityMessage = "";
+    if (manager) {
+      try {
+        accounts = await api.attendants(campaign.id, projection.view.viewToken);
+        phones = await api.phones(campaign.id, projection.view.viewToken);
+      } catch (e) {
+        if (e instanceof AdminError && e.status === 403) {
+          manager = false;
+          accounts = null;
+          phones = null;
+          authorityMessage =
+            "Current named-manager and verified-person authority is required for choices and writes. Read-only history remains available.";
+          for (const key of store.lists.keys())
+            if (
+              key.startsWith("checklist:census:") ||
+              key.startsWith("checklist:unavailable:")
+            )
+              store.lists.delete(key);
+          api.clearReads();
+        } else throw e;
+      }
+    }
+    if (!manager) {
+      for (const key of store.lists.keys())
+        if (
+          key.startsWith("checklist:census:") ||
+          key.startsWith("checklist:unavailable:")
+        )
+          store.lists.delete(key);
+    }
     const exclusions = await api.exclusions(campaign.id);
     const evidence = projection.view.phoneCheckId
       ? await api.checkEvidence(campaign.id, projection.view.phoneCheckId)
@@ -119,8 +153,9 @@ export function PhonesPage({ session }: { session: AdminSession }) {
       exclusions,
       evidence,
       manager,
+      authorityMessage,
     };
-  }, [api, allowed, session]);
+  }, [api, allowed, session, store]);
   const r = useChecklistRead(`phones:${m.serial}`, load);
   return (
     <ChecklistFrame title="Phone census">
@@ -141,7 +176,12 @@ export function PhonesPage({ session }: { session: AdminSession }) {
           {!r.busy && !r.error && !r.data && (
             <Notice>Campaign values are not configured.</Notice>
           )}
-          {r.data && <PhoneContent key={r.data.campaign.id} data={r.data} />}
+          {r.data && (
+            <PhoneContent
+              key={`${r.data.campaign.id}:${r.data.manager}`}
+              data={r.data}
+            />
+          )}
           <Button variant="secondary" disabled={m.locked} onClick={r.reload}>
             Refresh complete evidence
           </Button>
@@ -160,6 +200,7 @@ type Data = {
   exclusions: Exclusion[];
   evidence: Awaited<ReturnType<Api["checkEvidence"]>> | null;
   manager: boolean;
+  authorityMessage: string;
 };
 type DraftPhone = { id?: string; label: string; attendantIds: string[] };
 function PhoneContent({ data }: { data: Data }) {
@@ -195,6 +236,7 @@ function PhoneContent({ data }: { data: Data }) {
   const afterDeadline = !!deadline && Date.parse(v.asOf) > Date.parse(deadline);
   const locked = m.locked || stale;
   const recovered = draft.recoveredPhoneIds ?? [];
+  const policyReady = !!v.reconciliationPolicyVersion;
   const pending = data.exclusions.some((e) => e.state === "pending");
   const validCensus =
     draft.phones.length > 0 &&
@@ -208,6 +250,7 @@ function PhoneContent({ data }: { data: Data }) {
     missing.length === 0;
   function reviewCensus() {
     m.review(() => ({
+      view: v,
       request: api.freeze(data.campaign.id, "census", {
         operationId: checklistOperation(),
         ...campaignGuard(v),
@@ -278,6 +321,7 @@ function PhoneContent({ data }: { data: Data }) {
   }
   function reviewCheck() {
     m.review(() => ({
+      view: v,
       request: api.freeze(data.campaign.id, "check", {
         operationId: checklistOperation(),
         ...campaignGuard(v),
@@ -337,6 +381,13 @@ function PhoneContent({ data }: { data: Data }) {
           </Button>
         </Notice>
       )}
+      {!policyReady && <Notice tone="warning">{checklistPolicyCopy}</Notice>}
+      {!data.manager && (
+        <Notice>
+          {data.authorityMessage ||
+            "Current named-manager and verified-person authority is required for choices and writes. Read-only history remains available."}
+        </Notice>
+      )}
       <div className="wr-two-col wr-checklist-context-grid">
         <div className="wr-checklist-context">
           <EvidenceContext campaign={data.campaign} view={v} />
@@ -354,8 +405,21 @@ function PhoneContent({ data }: { data: Data }) {
               <AccountLabels ids={p.attendantIds} accounts={accounts} />
               <p>
                 <b>Inspection status:</b>{" "}
-                {phoneState(p, data.projection.readiness.phoneCheck.state)}
+                {phoneState(
+                  p,
+                  data.projection.readiness.phoneCheck.state,
+                  data.evidence?.entries.find((e) => e.phoneId === p.id),
+                )}
               </p>
+              {data.evidence?.entries
+                .filter((e) => e.phoneId === p.id && e.exclusionId)
+                .map((e) => (
+                  <p key={e.exclusionId}>
+                    <Link href={basePath + "/exclusions/" + e.exclusionId}>
+                      Recorded approved exclusion <Id>{e.exclusionId}</Id>
+                    </Link>
+                  </p>
+                ))}
               {p.state === "unchecked" && (
                 <p>No current phone check covers this phone.</p>
               )}
@@ -377,7 +441,7 @@ function PhoneContent({ data }: { data: Data }) {
               )}
               {data.manager &&
                 (p.state === "unavailable_pending" ||
-                  p.state === "unavailable_approved") && (
+                  recoveryNeedsCensus(data.exclusions, p.id, v.censusId)) && (
                   <Button
                     variant="secondary"
                     disabled={locked}
@@ -562,6 +626,7 @@ function PhoneContent({ data }: { data: Data }) {
             <Button
               disabled={
                 locked ||
+                !policyReady ||
                 !validCensus ||
                 !draft.reason.trim() ||
                 !draft.attested ||
@@ -586,7 +651,7 @@ function PhoneContent({ data }: { data: Data }) {
               <section className="wr-checklist-card" key={p.id}>
                 <PhoneFacts phone={p} />
                 <SelectField
-                  label={`Inspection result · ${p.label}`}
+                  label={`Inspection result · ${p.label} · ${p.id}`}
                   value={draft.checks[p.id] ?? ""}
                   disabled={locked || recovered.length > 0}
                   onChange={(value) =>
@@ -597,7 +662,14 @@ function PhoneContent({ data }: { data: Data }) {
                   }
                 >
                   <option value="">Pending inspection</option>
-                  <option value="empty">
+                  <option
+                    value="empty"
+                    disabled={recoveryNeedsCensus(
+                      data.exclusions,
+                      p.id,
+                      v.censusId,
+                    )}
+                  >
                     Inspected · nothing remains unsent
                   </option>
                   {data.exclusions
@@ -608,6 +680,14 @@ function PhoneContent({ data }: { data: Data }) {
                       </option>
                     ))}
                 </SelectField>
+                {recoveryNeedsCensus(data.exclusions, p.id, v.censusId) && (
+                  <Notice tone="warning">
+                    This census contains retained phone-unavailability approval
+                    or superseded evidence. Declare the phone available and
+                    record a replacement census before selecting an empty
+                    inspection.
+                  </Notice>
+                )}
                 {draft.checks[p.id] && (
                   <p>Checked on this phone census · not recorded</p>
                 )}
@@ -640,6 +720,12 @@ function PhoneContent({ data }: { data: Data }) {
                 locked ||
                 recovered.length > 0 ||
                 pending ||
+                !policyReady ||
+                data.inventory.items.some(
+                  (p) =>
+                    draft.checks[p.id] === "empty" &&
+                    recoveryNeedsCensus(data.exclusions, p.id, v.censusId),
+                ) ||
                 !afterDeadline ||
                 !data.inventory.items.length ||
                 !data.inventory.items.every((p) => draft.checks[p.id]) ||

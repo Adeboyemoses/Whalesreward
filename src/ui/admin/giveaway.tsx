@@ -68,6 +68,7 @@ type Draft = {
   message: string;
   stopped: boolean;
   savedId: string | null;
+  reconciliationId: string | null;
 };
 const emptyDraft: Draft = {
   reason: "",
@@ -77,6 +78,7 @@ const emptyDraft: Draft = {
   message: "",
   stopped: false,
   savedId: null,
+  reconciliationId: null,
 };
 export function LeaderboardsPortal({
   path,
@@ -433,6 +435,7 @@ export function GiveawayPage({
           message:
             "Reconciliation recorded. The saved result is unchanged; no new snapshot was created.",
           savedId: receipt.currentSnapshotId,
+          reconciliationId: receipt.reconciliationId,
         });
         if (mounted.current) {
           result.reload();
@@ -701,6 +704,20 @@ export function GiveawayPage({
       </div>
       {!confirmView && campaign && (
         <>
+          {session.permissions?.includes("sales") &&
+            (draft.reconciliationId ??
+              result.data?.projection?.latestStoredResultId) && (
+              <section aria-label="Latest historical reconciliation">
+                <h2>Latest historical reconciliation</h2>
+                <StoredChecks
+                  campaignId={campaign.id}
+                  id={
+                    (draft.reconciliationId ??
+                      result.data?.projection?.latestStoredResultId)!
+                  }
+                />
+              </section>
+            )}
           {(draft.savedId ?? campaign.latestSnapshotId) && (
             <SavedResult
               key={draft.savedId ?? campaign.latestSnapshotId!}

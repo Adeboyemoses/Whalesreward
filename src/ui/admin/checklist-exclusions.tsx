@@ -3,6 +3,10 @@ import { useCallback } from "react";
 import Link from "next/link";
 import type { AdminSession } from "@/client/admin-session";
 import { checklistOperation } from "@/client/admin-checklist-api";
+import {
+  inventoryAuthority,
+  checklistPolicyCopy,
+} from "@/client/admin-checklist-state";
 import type { Exclusion } from "@/client/admin-checklist-schemas";
 import { adminTime } from "@/client/admin-display";
 import { formatAggregateQuantity } from "@/shared/aggregate-display";
@@ -70,6 +74,14 @@ export function UnavailablePage({
     const campaign = await api.campaign();
     if (!campaign) return null;
     const checklist = await api.checklist(campaign.id);
+    if (
+      !inventoryAuthority(session, {
+        kind: checklist.view.kind,
+        phoneCheck: checklist.readiness.phoneCheck,
+        checks: checklist.checks,
+      })
+    )
+      return { restricted: true as const };
     const phones = await api.phones(campaign.id, checklist.view.viewToken);
     const phone = phones.items.find((p) => p.id === phoneId);
     if (!phone) throw Error();
@@ -90,7 +102,7 @@ export function UnavailablePage({
       accounts,
       managerAdminId: checklist.readiness.phoneCheck.managerAdminId,
     };
-  }, [api, phoneId]);
+  }, [api, phoneId, session]);
   const r = useChecklistRead(`unavailable:${phoneId}:${m.serial}`, load);
   return (
     <ChecklistFrame title="Phone unavailable">
@@ -99,9 +111,16 @@ export function UnavailablePage({
         person must approve it. Other reviews still block finalization.
       </Notice>
       <ReadState {...r} />
-      {r.data && (
-        <UnavailableForm key={phoneId} data={r.data} session={session} />
-      )}
+      {r.data &&
+        ("restricted" in r.data ? (
+          <Notice>
+            Only the current named manager with verified-person authority and
+            the required action permission can propose phone unavailability.
+            Read-only proposal history remains available from the phone census.
+          </Notice>
+        ) : (
+          <UnavailableForm key={phoneId} data={r.data} session={session} />
+        ))}
       <BackToPhones />
     </ChecklistFrame>
   );
@@ -194,6 +213,9 @@ function UnavailableForm({
           </p>
         </Sheet>
       </div>
+      {!data.view.reconciliationPolicyVersion && (
+        <Notice tone="warning">{checklistPolicyCopy}</Notice>
+      )}
       <Sheet title="Exact incomplete sales received by the server">
         <p>
           Choose each exact sale deliberately. Phone attribution is the
@@ -260,9 +282,15 @@ function UnavailableForm({
           </Notice>
         )}
         <Button
-          disabled={locked || !draft.reason.trim() || !after}
+          disabled={
+            locked ||
+            !data.view.reconciliationPolicyVersion ||
+            !draft.reason.trim() ||
+            !after
+          }
           onClick={() =>
             m.review(() => ({
+              view: data.view,
               request: api.freeze(
                 data.campaign.id,
                 "proposal",
@@ -515,7 +543,9 @@ export function ExclusionPage({
             <Notice role="status">
               {e.state === "approved"
                 ? "Phone unavailability approved. Record a current complete phone check before preparing the result."
-                : "Proposal rejected. This phone still needs inspection or a new proposal."}{" "}
+                : e.state === "superseded"
+                  ? "Earlier evidence is stale. This proposal no longer applies. Review the current phone census and submit a new proposal if needed."
+                  : "Proposal rejected. This phone still needs inspection or a new proposal."}{" "}
               This is retained decision history; current applicability is
               checked separately.
             </Notice>

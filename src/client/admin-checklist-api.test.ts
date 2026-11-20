@@ -94,7 +94,7 @@ describe("checklist client integrity", () => {
     expect((frozen.body as typeof draft).phones[0]!.attendantIds).toEqual([id]);
     expect(Object.isFrozen(frozen.body)).toBe(true);
   });
-  it("refuses duplicate partitions and oversized atomic census before sending", () => {
+  it("refuses duplicate partitions before sending", () => {
     const api = new AdminChecklistApi();
     const body = {
       operationId: id,
@@ -156,4 +156,61 @@ it("refuses a validly shaped manager receipt for a different campaign generation
   await expect(api.send(frozen)).rejects.toMatchObject({
     code: "invalid_response",
   });
+});
+
+it("resumes a transient failed later page at the same cursor and view", async () => {
+  const transport = vi
+    .fn()
+    .mockResolvedValueOnce({
+      view,
+      items: [manager],
+      nextCursor: "next",
+      currentDesignation: null,
+    })
+    .mockRejectedValueOnce(
+      new (await import("./admin-api")).AdminError("rate_limited", 429),
+    )
+    .mockResolvedValueOnce({
+      view,
+      items: [{ ...manager, adminId: other }],
+      nextCursor: null,
+      currentDesignation: null,
+    });
+  const api = new AdminChecklistApi(transport as typeof adminRequest);
+  await expect(api.managers(id)).rejects.toMatchObject({ status: 429 });
+  const result = await api.managers(id);
+  expect(result.items.map((x) => x.adminId)).toEqual([id, other]);
+  expect(transport.mock.calls[2]?.[0]).toBe(transport.mock.calls[1]?.[0]);
+  expect(transport).toHaveBeenCalledTimes(3);
+});
+it("enforces the 32 KiB bound with valid unique census partitions immediately around the limit", () => {
+  const api = new AdminChecklistApi();
+  const account = (n: number) =>
+    `019ab100-0000-7000-8000-${n.toString(16).padStart(12, "0")}`;
+  const make = (count: number) => ({
+    operationId: id,
+    kind: "initial",
+    reason: "Physical inventory checked",
+    ...view.guard,
+    expectedCensusVersion: 1,
+    phones: Array.from({ length: Math.ceil(count / 100) }, (_, i) => ({
+      label: "Pump handset",
+      attendantIds: Array.from(
+        { length: Math.min(100, count - i * 100) },
+        (_, j) => account(i * 100 + j + 1),
+      ),
+    })),
+  });
+  let count = 1;
+  while (new TextEncoder().encode(JSON.stringify(make(count))).length <= 32768)
+    count++;
+  const below = make(count - 1),
+    above = make(count);
+  expect(
+    new TextEncoder().encode(JSON.stringify(below)).length,
+  ).toBeGreaterThan(32720);
+  expect(() => api.freeze(id, "census", below)).not.toThrow();
+  expect(() => api.freeze(id, "census", above)).toThrowError(
+    expect.objectContaining({ code: "request_too_large", status: 413 }),
+  );
 });

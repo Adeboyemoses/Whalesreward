@@ -30,8 +30,7 @@ export function ManagerPage({ session }: { session: AdminSession }) {
     if (!allowed) return null;
     const campaign = await api.campaign(true);
     if (!campaign) return null;
-    const choices = await api.managers(campaign.id);
-    return { campaign, choices };
+    return api.managerContext(campaign.id);
   }, [api, allowed]);
   const r = useChecklistRead(`manager:${m.serial}`, load);
   const data = r.data;
@@ -96,6 +95,7 @@ export function ManagerPage({ session }: { session: AdminSession }) {
                         );
                         if (!target) throw Error();
                         return {
+                          view: data.choices.view,
                           request: api.freeze(data.campaign.id, "manager", {
                             operationId: checklistOperation(),
                             expectedVersion:
