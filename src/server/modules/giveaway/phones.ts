@@ -1,4 +1,5 @@
 import { hasConflictingPhoneExclusion } from "./phone-exclusion-conflicts";
+import { hasSameCensusRecovery } from "./phone-recovery";
 import {
   managerCandidatePredicate,
   requiredAttendantsQuery,
@@ -751,6 +752,15 @@ export function createPhoneService(
                 exclusionId: entry.exclusionId,
               });
             }
+            if (
+              await hasSameCensusRecovery(
+                db,
+                c.id,
+                c.phone_census_id!,
+                b.entries,
+              )
+            )
+              fail("phone_check_stale");
             const current = await phoneReadiness(db, c.id, b.kind);
             if (current.status.pendingExclusions !== "0")
               fail("phone_exclusion_pending");
