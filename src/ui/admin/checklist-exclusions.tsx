@@ -541,13 +541,17 @@ export function ExclusionPage({
             </Sheet>
           ) : (
             <Notice role="status">
-              {e.state === "approved"
-                ? "Phone unavailability approved. Record a current complete phone check before preparing the result."
-                : e.state === "superseded"
-                  ? "Earlier evidence is stale. This proposal no longer applies. Review the current phone census and submit a new proposal if needed."
-                  : "Proposal rejected. This phone still needs inspection or a new proposal."}{" "}
-              This is retained decision history; current applicability is
-              checked separately.
+              <span>
+                {e.state === "approved"
+                  ? "Phone unavailability approved. Record a current complete phone check before preparing the result."
+                  : e.state === "superseded"
+                    ? "Earlier evidence is stale. This proposal no longer applies. Review the current phone census and submit a new proposal if needed."
+                    : "Proposal rejected. This phone still needs inspection or a new proposal."}
+              </span>{" "}
+              <span>
+                This is retained decision history; current applicability is
+                checked separately.
+              </span>
             </Notice>
           )}
         </>
