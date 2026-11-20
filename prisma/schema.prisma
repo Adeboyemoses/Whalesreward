@@ -919,6 +919,16 @@ model MaintenanceRun {
   next_attempt_at                  DateTime?    @db.Timestamptz(6)
   completed_at                     DateTime?    @db.Timestamptz(6)
   outcome                          Json?        @db.JsonB
+  storage_identity String?
+  started_at DateTime? @db.Timestamptz(6)
+  heartbeat_at DateTime? @db.Timestamptz(6)
+  completion_deadline DateTime? @db.Timestamptz(6)
+  watermark DateTime? @db.Timestamptz(6)
+  error_code String?
+  page_no Int @default(0)
+  jobs MaintenanceJob[]
+  pages MaintenancePage[]
+  findings MaintenanceFinding[]
   back_photo_asset_deletion_run_id PhotoAsset[] @relation("photo_asset_deletion_run_id")
 
   @@unique([job, deduplication_key], map: "uq_maintenance_run_job_deduplication_key")
@@ -1612,4 +1622,60 @@ model GiveawayPreviewConsumption {
   snapshot_id String @unique @db.Uuid
 
   @@map("giveaway_preview_consumption")
+}
+
+// Private operational inventory; no customer content or evidence mutation.
+model MaintenanceJob {
+ job String
+ scope String @default("primary")
+ run_id String? @db.Uuid
+ lease_owner String? @db.Uuid
+ lease_until DateTime? @db.Timestamptz(6)
+ fencing_version BigInt @default(0)
+ heartbeat_at DateTime? @db.Timestamptz(6)
+ next_due_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ completion_deadline DateTime? @db.Timestamptz(6)
+ last_complete_watermark DateTime? @db.Timestamptz(6)
+ last_succeeded_at DateTime? @db.Timestamptz(6)
+ last_outcome String?
+ error_code String?
+ run MaintenanceRun? @relation(fields:[run_id],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@id([job,scope])
+ @@map("maintenance_job")
+}
+model MaintenanceObject {
+ id String @id @db.Uuid
+ object_key String
+ version_id String
+ findings MaintenanceFinding[]
+ @@unique([object_key,version_id])
+ @@map("maintenance_object")
+}
+model MaintenancePage {
+ id String @id @db.Uuid
+ run_id String @db.Uuid
+ page_no Int
+ counts Json @db.JsonB
+ recorded_at DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+ run MaintenanceRun @relation(fields:[run_id],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ findings MaintenanceFinding[]
+ @@unique([run_id,page_no])
+ @@map("maintenance_page")
+}
+model MaintenanceFinding {
+ id String @id @db.Uuid
+ run_id String @db.Uuid
+ page_no Int
+ ordinal Int
+ code String
+ object_id String? @db.Uuid
+ asset_id String? @db.Uuid
+ purchase_id String? @db.Uuid
+ reference_ids String[] @db.Uuid
+ run MaintenanceRun @relation(fields:[run_id],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ page MaintenancePage @relation(fields:[run_id,page_no],references:[run_id,page_no],onDelete:NoAction,onUpdate:NoAction)
+ object MaintenanceObject? @relation(fields:[object_id],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@unique([run_id,page_no,ordinal])
+ @@index([run_id,page_no])
+ @@map("maintenance_finding")
 }
