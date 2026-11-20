@@ -1,13 +1,15 @@
 # Identifier generator call sites (WHR-217)
 
-This exhaustive tracked-source sweep lists UUID generator calls and the canonical `newId` wrapper. Each cell records `line (number of calls on that line)`. Canonical `v7`, `uuidv7` and `newId` calls remain unchanged. See [identifier-sweep.md](identifier-sweep.md) for each v4 decision, the immutable migration policy and deployment handling. Test-only malicious examples in guard tests are assertions, not runtime identifier generators. The CI allowlist records the exact retained v4 source and occurrence counts.
+This tracked-source sweep lists UUID generator definitions, calls and embedded SQL, including the canonical `newId` wrapper. Each cell records `line (occurrences on that line)`. Canonical `v7`, `uuidv7` and `newId` generators remain unchanged; schema validators do not generate IDs and are excluded. Guard self-test examples are assertions, not runtime identifier generators. See [identifier-sweep.md](identifier-sweep.md) for every v4 decision and the historical deployment procedure; the CI allowlist records exact retained source and counts.
 
-| File | Line (calls) |
+| File | Line (occurrences) |
 |---|---|
 | `next.config.ts` | 11(1) |
 | `prisma/migrations/20261109181000_correction_receipt_guards/migration.sql` | 34(1) |
 | `prisma/migrations/20261116071000_giveaway_reconciliation/migration.sql` | 110(2) |
+| `prisma/migrations/20261120140000_canonical_uuid_v7/migration.sql` | 26(1), 30(1), 53(2) |
 | `prisma/seed-auth.mjs` | 30(1), 49(1) |
+| `scripts/ci/check-identifiers.mjs` | 221(3) |
 | `scripts/diagnostics/card-storage-lock.ts` | 16(2) |
 | `scripts/ops/meter.mjs` | 267(1), 341(1) |
 | `scripts/ops/review-evidence.mjs` | 188(1), 189(1), 255(1), 256(1), 257(1) |
@@ -16,7 +18,6 @@ This exhaustive tracked-source sweep lists UUID generator calls and the canonica
 | `src/app/(attendant)/attendant/sign-in/page.tsx` | 40(1) |
 | `src/client/admin-api.ts` | 2(1) |
 | `src/client/api.test.ts` | 11(1), 59(1), 66(1), 70(1), 160(1), 166(1), 206(1), 207(1), 230(1), 232(1), 245(1) |
-| `src/client/api.ts` | 158(1), 221(1), 232(1), 245(1) |
 | `src/client/offline/access.test.ts` | 26(1), 49(1), 87(1), 119(1), 160(1), 162(1), 163(1), 267(1), 283(1), 303(1), 376(1) |
 | `src/client/offline/client.test.ts` | 23(1), 238(1), 320(1), 333(1), 368(1), 377(1), 408(1), 430(1), 501(1), 538(1), 692(1), 814(1) |
 | `src/client/offline/client.ts` | 78(1), 281(1), 286(1), 388(1), 403(1), 545(1), 713(1), 1146(1), 1364(1) |
@@ -28,12 +29,9 @@ This exhaustive tracked-source sweep lists UUID generator calls and the canonica
 | `src/client/policy-status-messages.test.ts` | 18(1), 68(1), 92(2) |
 | `src/client/price-refresh.test.ts` | 8(1), 22(1) |
 | `src/client/registration-api.test.ts` | 6(1), 16(1), 24(1), 25(1), 29(1), 84(1), 105(1), 129(1), 133(1) |
-| `src/client/registration-api.ts` | 126(1) |
 | `src/client/sales-api.test.ts` | 6(1), 46(1), 52(1), 78(1), 80(1), 101(2), 110(2), 120(2) |
-| `src/client/sales-api.ts` | 57(1), 198(1) |
 | `src/client/sw/handover.js` | 26(1) |
 | `src/client/sync-api.test.ts` | 7(1), 8(1), 16(1), 24(1), 58(1), 76(1), 99(1), 109(1) |
-| `src/client/types.ts` | 5(1) |
 | `src/server/auth.ts` | 103(1) |
 | `src/server/lib/ids.test.ts` | 5(1) |
 | `src/server/lib/ids.ts` | 4(1), 5(1) |
@@ -81,7 +79,6 @@ This exhaustive tracked-source sweep lists UUID generator calls and the canonica
 | `src/server/modules/sync/lookup-receipt.test.ts` | 14(1), 15(1), 16(1), 17(1), 19(1), 20(1) |
 | `src/server/modules/sync/service.ts` | 245(1), 367(1), 368(2), 455(2), 473(1) |
 | `src/server/modules/sync/settle.ts` | 141(1), 164(1), 195(1) |
-| `src/shared/contracts/auth.ts` | 2(1) |
 | `src/shared/contracts/customer-recovery.test.ts` | 13(1), 34(1), 41(1) |
 | `src/shared/contracts/station.test.ts` | 14(1), 21(1), 25(1), 32(1), 50(1), 53(1), 60(1), 61(1), 71(1), 73(1), 83(1) |
 | `tests/admin-access/admin-access.fixtures.ts` | 17(1), 18(1), 35(1) |
@@ -111,7 +108,6 @@ This exhaustive tracked-source sweep lists UUID generator calls and the canonica
 | `tests/e2e/automatic-mail-lifecycle.spec.ts` | 22(1), 64(1) |
 | `tests/e2e/campaign-timing-real.spec.ts` | 285(1), 383(1), 460(1) |
 | `tests/e2e/customer-changes.spec.ts` | 237(1), 531(1), 564(1) |
-| `tests/e2e/customer-registration.spec.ts` | 65(1) |
 | `tests/e2e/customers-cards.spec.ts` | 44(1), 149(1), 246(1), 250(1), 270(1), 303(1), 388(1), 453(1), 547(1), 609(1), 662(1), 824(1), 937(1), 1105(1) |
 | `tests/e2e/giveaway-recovered-phone-contract.spec.ts` | 22(1), 44(1) |
 | `tests/e2e/giveaway-recovered-phone-http.spec.ts` | 65(1), 82(1), 116(1), 127(1), 155(1), 189(1) |
@@ -215,6 +211,7 @@ This exhaustive tracked-source sweep lists UUID generator calls and the canonica
 | `tests/integration/station-management.test.ts` | 53(1), 55(1), 70(1), 120(1), 138(1), 155(1), 178(1), 181(1), 214(1), 229(1), 238(1), 247(1), 258(1), 281(1), 293(1), 315(1), 333(1), 345(1), 349(1), 374(1), 397(1), 418(1), 424(1), 440(1), 451(1), 497(1), 506(1), 517(1), 537(1), 560(1), 573(1), 600(1), 635(1), 666(1), 667(1), 668(1), 669(1) |
 | `tests/integration/station-price-visibility.test.ts` | 65(1), 66(1), 67(1), 98(1), 148(1), 220(1), 279(1), 283(1) |
 | `tests/integration/sync-sales.test.ts` | 29(1), 67(1), 79(1), 97(1), 116(1), 128(1), 138(1), 146(1), 189(1), 247(1), 278(2), 294(1), 526(1), 607(1), 653(1), 656(1), 676(1), 681(1), 754(1), 759(1), 799(1), 800(2), 804(1), 821(1), 828(1), 954(1), 962(1), 996(1), 1053(1), 1055(1), 1115(1), 1144(1), 1152(1), 1191(1) |
+| `tests/integration/whr-217-identifiers.test.ts` | 21(1), 37(1), 87(1), 126(1), 139(1), 149(1), 208(1) |
 | `tests/integration/zoho-diagnostics-adversarial.test.ts` | 66(1), 67(1), 83(1) |
 | `tests/integration/zoho-mail-adversarial.test.ts` | 46(1), 47(1), 69(1), 79(1), 194(1), 317(1) |
 | `tests/leaderboards/capture-fixture.ts` | 94(1) |
