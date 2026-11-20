@@ -2,15 +2,15 @@
 branch: core/WHR-210-report-jobs
 linear: WHR-210
 tier: high
-reviewed_head: 9e25e06f13640c116f02271f0a7f26cee42d9b8a
-rounds: 2
+reviewed_head: 76fb61bd04d6e4d4b695834806cc81112789183c
+rounds: 3
 builder: backend-engineer
 reviewers:
   code-reviewer: PASS
   security-reviewer: PASS
   integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 10
+dispatches: 13
 plan:
   goal: leased bounded resumable report-only orphan and upload reconciliation jobs
   files: jobs/orphans.ts, jobs/reconcile-uploads.ts, src/server/modules/maintenance/**, src/server/adapters/maintenance-storage.ts, prisma/schema.prisma, prisma/migrations/**, tests/integration/maintenance-jobs.test.ts, docs/engineering/contracts/operations.md, docs/ops/maintenance.md
@@ -21,10 +21,11 @@ invariants: [I-07, I-25, I-26, I-28, I-35, I-41, I-45, I-46, I-48, I-51, I-52]
 p1: [fixed runtime image packaging, fixed durable progress for healthy slow reads, fixed detached receipt seal coverage, fixed column-level write privilege detection]
 tickets: [WHR-221, WHR-174]
 ---
-Plan committed before builder dispatch. All three independent reviewers PASS in round 2 at the reviewed head; clean worktree/head verified after both rounds.
+Plan committed before builder dispatch. All three independent reviewers PASS in round 3 at the reviewed head; clean worktree/head verified after every round.
 Round 1 found one SEC-HIGH and three P1s: column grants bypassed role preflight, missing image entrypoints, page-wide timeout prevented progress, and unattached receipt seals escaped reconciliation. All were reproduced before repair and pass after repair.
 EM: typecheck/lint/build PASS (four pre-existing image warnings), UUID guard 26 tests/848 sources PASS, unit 1,024 PASS, timezone 5+5 PASS. Full Linux PostgreSQL16/MinIO gate: 82 suites / 1,561 tests PASS, zero skips, exit 0 (215.66s). Final job-source image build PASS; UID 1000 and both packaged CLI fail-closed checks PASS (expected sanitized invalid_configuration/exit 1, network disabled, no module errors).
 Merged reviewed staging UI base c65cc86 into fa19e55; no job/server/shared/schema/integration/helper/dependency/image path changed from reviewed 9e25e06. App-wide gates refreshed on the merge; all PR-owned non-evidence paths remain byte-identical to review.
+Round 3 reviews only the staging operator clarification after round-2 implementation PASS: shared entrypoint DATABASE_URL must alias the same restricted maintenance connection as MAINTENANCE_DATABASE_URL. Actual network-isolated image smoke confirms early refusal without the alias and job startup with it; no broad web credentials or code changes.
 Real PostgreSQL16 role is non-superuser/non-CREATEROLE/non-CREATEDB/non-BYPASSRLS; actual scoped MinIO STS session denies object put/delete/version delete/multipart abort/lifecycle changes. No new admin HTTP read or health projection.
 Named integration tests (`tests/integration/maintenance-jobs.test.ts`, 15 cases):
 - I-51 report-only runtime has no domain delete, evidence write or lifecycle authority on real PostgreSQL and MinIO
