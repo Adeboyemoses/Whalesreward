@@ -27,3 +27,11 @@ Independent test engineer owns tests/checklist/**, tests/e2e checklist and leade
 Run targeted failing tests before fixes and exact green reruns after. No rate resets, sleeps, retry/timeout increases, skips or broad permissive schemas. Use real compiled Next and disposable PostgreSQL for enabled flows. Recheck fidelity at 1440, 390 and 360. Local full-suite connection/camera limitations remain WHR-207; unchanged print-preview race remains WHR-123. Supported CI is mandatory.
 
 EM reruns final gates, dispatches code/security/integrity read-only on the same head for round 2, routes any fixes within round 3, validates evidence, opens a staging PR and merges only green checks. Feature PR must not change STATUS, coverage-map or lane files. READY includes PR/head, exact counts and smoke path; then stop.
+
+## Resume after WHR-217
+
+Earl authorized the resume on 20 November after WHR-217 merged. Rebased onto staging `7ea32387439081a665edaf39a35323464df3f74c`. The unchanged strict superseded-exclusion regression now accepts the actual UUIDv7 audit reference with no schema issues, then reaches the separate WHR-218 exact-copy assertion. The companion markup separates the terminal message and retained-history context without changing either sentence or the regression. Full green acceptance remains a gate, not an assumption.
+
+Formal review history continues: one of three rounds used, two remain. Twelve earlier dispatches plus this resume's checker and frontend dispatch make fourteen before round 2, above the high-tier flag. No review count reset. Independent acceptance must replace the three pending checker setup/locator mistakes with justified checks, rerun the unchanged strict regression, and capture fresh fidelity on the fixed source. Preserve the recovered-phone core regressions unchanged.
+
+The resumed transport fix also touches `src/client/admin-session.ts`: only a validated giveaway selection GET's domain refusal refreshes current session authority without signing out a still-authorized reader. Ordinary denial, real grant loss and session loss retain their existing clearing behavior. This scope addition is explicit; shared server contracts remain unchanged.
