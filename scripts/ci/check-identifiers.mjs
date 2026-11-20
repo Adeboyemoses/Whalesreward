@@ -25,13 +25,18 @@ export function scanSource(path, source) {
       source: source.split("\n")[line - 1].trim(),
     });
   }
+  // A SQL line comment may sit between a function identifier and its opening
+  // parenthesis. Match it only in that gap: stripping every `--` globally
+  // would erase unrelated TypeScript strings and change source evidence.
   for (const match of searchable.matchAll(
-    /\b(?:gen_random_uuid|uuid_generate_v4)"?\s*\(/gi,
+    /\b(?:gen_random_uuid|uuid_generate_v4)"?(?:\s|--[^\r\n]*(?:\r\n|\r|\n|$))*\(/gi,
   )) {
     add(match.index, "SQL v4 generator");
   }
   if (path.endsWith(".sql")) {
-    for (const match of searchable.matchAll(/\buuidv4"?\s*\(/gi))
+    for (const match of searchable.matchAll(
+      /\buuidv4"?(?:\s|--[^\r\n]*(?:\r\n|\r|\n|$))*\(/gi,
+    ))
       add(match.index, "SQL v4 generator");
   }
   if (path.endsWith(".prisma")) {
@@ -94,7 +99,9 @@ export function scanSource(path, source) {
           ts.isTemplateHead(node) ||
           ts.isTemplateMiddle(node) ||
           ts.isTemplateTail(node)) &&
-        /\buuidv4\s*\(/i.test(node.text) &&
+        /\buuidv4"?(?:\s|\/\*[\s\S]*?\*\/|--[^\r\n]*(?:\r\n|\r|\n|$))*\(/i.test(
+          node.text,
+        ) &&
         /\b(?:SELECT|INSERT|DEFAULT|RETURN)\b/i.test(node.text)
       )
         add(node.getStart(file), "SQL v4 generator");

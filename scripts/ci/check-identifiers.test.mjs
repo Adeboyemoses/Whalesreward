@@ -5,6 +5,7 @@ import { scanSource, applyAllowlist } from "./check-identifiers.mjs";
 const random = "random" + "UUID";
 const sqlV4 = "gen_random_" + "uuid";
 const extensionV4 = "uuid_generate_" + "v4";
+const coreV4 = "uuid" + "v4";
 
 for (const source of [
   `crypto.${random}()`,
@@ -19,6 +20,7 @@ for (const source of [
   'export { v4 as newId } from "uuid"',
   'require("uuid")["v4"]()',
   `db.query("INSERT INTO item(id) VALUES(pg_catalog.${sqlV4}())")`,
+  `db.query(\`SELECT pg_catalog."${coreV4}" /* gap */ -- rationale\n ()\`);`,
 ]) {
   test(`rejects TypeScript generator: ${source}`, () => {
     assert.ok(scanSource("src/example.ts", source).length > 0);
@@ -30,12 +32,30 @@ for (const source of [
   `CREATE TABLE item(id uuid DEFAULT public."${extensionV4}" ());`,
   `CREATE FUNCTION example() RETURNS uuid AS $$ BEGIN RETURN ${sqlV4}(); END $$ LANGUAGE plpgsql;`,
   `CREATE TABLE item(id uuid DEFAULT ${sqlV4} /* generator */ ());`,
+  `CREATE TABLE item(id uuid DEFAULT ${sqlV4} -- rationale\n ());`,
+  `CREATE TABLE item(id uuid DEFAULT public."${extensionV4}" /* gap */ -- rationale\n /* second gap */ ());`,
+  `CREATE TABLE item(id uuid DEFAULT pg_catalog."${coreV4}" -- rationale\r\n ());`,
   "CREATE TABLE item(id uuid DEFAULT " + "uuid" + "v4());",
 ]) {
   test(`rejects SQL generator: ${source}`, () => {
     assert.ok(scanSource("prisma/migrations/new/migration.sql", source).length);
   });
 }
+
+test("embedded SQL comments do not conceal generators or alter source evidence", () => {
+  const source = `db.query(\`SELECT ${sqlV4} -- rationale\n ()\`);`;
+  const findings = scanSource("src/example.ts", source);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].source, source.split("\n")[0]);
+  assert.equal(findings[0].line, 1);
+  assert.equal(
+    scanSource(
+      "src/example.ts",
+      `const watermark = "-- fictional"; db.query("SELECT ${sqlV4}()");`,
+    ).length,
+    1,
+  );
+});
 
 for (const source of [
   "id String @id @default(uuid())",
