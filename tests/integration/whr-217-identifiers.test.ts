@@ -205,8 +205,11 @@ it("WHR-217 legacy preflight refuses real historical supersession and preserves 
       });
       await db.query("ROLLBACK");
       expect(
-        (await db.query("SELECT to_regprocedure('whr_uuid_v7()') AS fn"))
-          .rows[0].fn,
+        (
+          await db.query(
+            "SELECT to_regprocedure(format('%I.whr_uuid_v7()',current_schema())) AS fn",
+          )
+        ).rows[0].fn,
       ).toBeNull();
       expect(
         (

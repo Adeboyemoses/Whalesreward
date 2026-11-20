@@ -10,7 +10,7 @@ blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
 dispatches: 0
 plan:
   goal: restore canonical UUIDv7 generation throughout persisted and public identifier paths
-  files: prisma/migrations/**, src/server/**, scripts/**, tests/**, .github/workflows/ci.yml, package.json, docs/engineering/**
+  files: prisma/migrations/**, src/server/**, scripts/**, tests/**, .github/workflows/ci.yml, package.json, docs/engineering/**, .codex/agents/platform-engineer.toml
   approach: additive SQL generator and supersession repair; explicit legacy preservation; repo-wide generator sweep and narrow non-ID allowlist guard
   tests: unchanged T2 strict regression, real HTTP supersede/detail/list, UUID version and variant, historical link preservation, guard adversarial self-tests, full required gates
   risks: immutable audit links and migration history must stay intact; legacy v4 values require explicit handling without contract relaxation
