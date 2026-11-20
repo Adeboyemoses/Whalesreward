@@ -11,11 +11,11 @@ import {
   formatResult,
   checkDatabaseEnvironment,
 } from "../../scripts/ops/review-evidence.mjs";
-import { randomUUID } from "node:crypto";
+import { v7 } from "uuid";
 
-const databaseName = `operator_${randomUUID().replaceAll("-", "")}`;
+const databaseName = `operator_${v7().replaceAll("-", "")}`;
 const databaseIdentifier = pg.escapeIdentifier(databaseName);
-const ownerName = `operator_owner_${randomUUID().replaceAll("-", "")}`;
+const ownerName = `operator_owner_${v7().replaceAll("-", "")}`;
 const ownerIdentifier = pg.escapeIdentifier(ownerName);
 const refusal =
   "Database environment identity is missing, invalid or does not match --environment. Ask Earl to verify the persisted database setting.";
@@ -76,7 +76,7 @@ async function setComment(comment: string | null) {
   );
 }
 async function input(action = "activate", apply = false) {
-  const station = randomUUID();
+  const station = v7();
   await db.pool.query(
     "INSERT INTO station(id,code,name,timezone,version) VALUES($1,$2,'Operator fixture','Africa/Lagos',1)",
     [station, station],
@@ -257,7 +257,7 @@ it("includes orphan approval revisions and refuses safe-integer exhaustion", asy
   const request = await input("activate", true);
   await db.pool.query(
     "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,'review-evidence-v1',$2,12,$3,'test',$4,'fixture')",
-    [randomUUID(), releaseDigest, request.stationId, request.activatedAt],
+    [v7(), releaseDigest, request.stationId, request.activatedAt],
   );
   expect(
     (await operate(db.pool, { ...request, expectedRevision: 13 })).policy
@@ -265,7 +265,7 @@ it("includes orphan approval revisions and refuses safe-integer exhaustion", asy
   ).toBe(13);
   await db.pool.query(
     "INSERT INTO review_evidence_approval(id,release,digest,revision,station_id,environment,activated_at,authorization_reference) VALUES($1,'review-evidence-v1',$2,9007199254740991,$3,'test',$4,'fixture')",
-    [randomUUID(), releaseDigest, request.stationId, request.activatedAt],
+    [v7(), releaseDigest, request.stationId, request.activatedAt],
   );
   await expect(operate(db.pool, request)).rejects.toThrow("exhausted");
   expect(await counts(request.stationId)).toEqual([3, 1]);

@@ -1,7 +1,8 @@
+import { v7 } from "uuid";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
-import { randomBytes, createHmac, randomUUID } from "node:crypto";
+import { randomBytes, createHmac } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import pg from "pg";
 import { test, expect } from "@playwright/test";
@@ -18,7 +19,7 @@ test("compiled web runtime automatically sends, keeps health responsive and drai
   const db = new pg.Pool({ connectionString: url.toString() });
   const secret = randomBytes(32).toString("hex");
   const inbox = "ada.williams@example.com";
-  const id = randomUUID();
+  const id = v7();
   let releaseMail: (() => void) | undefined;
   let received = 0;
   let output = "";
@@ -60,7 +61,7 @@ test("compiled web runtime automatically sends, keeps health responsive and drai
       .digest("hex");
     await db.query(
       "INSERT INTO mail_request(id,admin_id,purpose,generation,operation_id,target_digest,target_key_version,destination_email) SELECT $1,id,'verify_email',1,$2,$3,'v1',$4 FROM admin WHERE admin_code='ADMIN001'",
-      [id, randomUUID(), target, inbox],
+      [id, v7(), target, inbox],
     );
     await new Promise<void>((resolve) => mail.listen(0, "127.0.0.1", resolve));
     const address = mail.address();

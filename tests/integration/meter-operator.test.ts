@@ -3,7 +3,7 @@ import pg from "pg";
 import { readFile, readdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { v7 } from "uuid";
 import { spawnSync } from "node:child_process";
 import {
   operate,
@@ -22,9 +22,9 @@ import {
   type MeterProfile,
 } from "../../src/server/modules/reviews/meter-policy";
 
-const name = `meter_operator_${randomUUID().replaceAll("-", "")}`;
+const name = `meter_operator_${v7().replaceAll("-", "")}`;
 const identifier = pg.escapeIdentifier(name);
-const ownerName = `meter_owner_${randomUUID().replaceAll("-", "")}`;
+const ownerName = `meter_owner_${v7().replaceAll("-", "")}`;
 const ownerIdentifier = pg.escapeIdentifier(ownerName);
 let root: pg.Pool, pool: pg.Pool, databaseUrl: string, directory: string;
 beforeAll(async () => {
@@ -76,9 +76,9 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 async function fixture() {
-  const station = randomUUID(),
+  const station = v7(),
     product = "019a5000-0000-7000-8000-000000000001",
-    pump = randomUUID();
+    pump = v7();
   await pool.query(
     "INSERT INTO station(id,code,name,timezone,version) VALUES($1::uuid,$1::text,'Operator fixture','Africa/Lagos',1)",
     [station],
@@ -102,7 +102,7 @@ async function fixture() {
     expectedRevision: 1,
   });
   const profile: MeterProfile = {
-    id: randomUUID(),
+    id: v7(),
     version: 1,
     digest: "0".repeat(64),
     stationId: station,
@@ -116,8 +116,8 @@ async function fixture() {
     amountStepKobo: "1",
     quantityStep: "0.001",
     displayModel: "common_sale_nearest_steps",
-    verificationReference: randomUUID(),
-    approvalReference: randomUUID(),
+    verificationReference: v7(),
+    approvalReference: v7(),
   };
   profile.digest = profileDigest(profile);
   const content = profileContent(profile);
@@ -130,7 +130,7 @@ async function fixture() {
         content: {
           profileContent: content,
           measuredMeterIdentity: "Fictional laboratory meter",
-          measurementReference: randomUUID(),
+          measurementReference: v7(),
           verificationNotes: "Test-only nearest-common-sale measurements.",
         },
         authorizationReference: "TEST-MEASUREMENT",
@@ -330,7 +330,7 @@ it("rejects digest, scope, measured evidence and approval mismatch before writin
       b.profiles[0]!.digest = "0".repeat(64);
     },
     (b: typeof bundle) => {
-      b.verifications[0]!.stationId = randomUUID();
+      b.verifications[0]!.stationId = v7();
     },
     (b: typeof bundle) => {
       b.verifications[0]!.content.measuredMeterIdentity = "";
@@ -355,9 +355,9 @@ it("rejects overlapping profile coverage and unknown bundle fields", async () =>
   const b = structuredClone(bundle),
     p = {
       ...b.profiles[0]!,
-      id: randomUUID(),
-      verificationReference: randomUUID(),
-      approvalReference: randomUUID(),
+      id: v7(),
+      verificationReference: v7(),
+      approvalReference: v7(),
     };
   p.digest = profileDigest(p);
   b.profiles.push(p);
@@ -384,8 +384,8 @@ it("rejects reused profile identity with changed bytes and retains existing rows
   const b = structuredClone(bundle),
     p = b.profiles[0]!;
   p.amountStepKobo = "5";
-  p.verificationReference = randomUUID();
-  p.approvalReference = randomUUID();
+  p.verificationReference = v7();
+  p.approvalReference = v7();
   p.digest = profileDigest(p);
   b.verifications[0] = {
     ...b.verifications[0]!,
@@ -462,7 +462,7 @@ it("rejects invalid arguments without leaking raw input", async () => {
 it("rejects an approved bundle whose pump belongs to a different product", async () => {
   const { input, bundle } = await fixture();
   const p = bundle.profiles[0]!;
-  p.productId = randomUUID();
+  p.productId = v7();
   p.digest = profileDigest(p);
   bundle.verifications[0]!.content.profileContent = profileContent(p);
   Object.assign(bundle.approvals[0]!, {

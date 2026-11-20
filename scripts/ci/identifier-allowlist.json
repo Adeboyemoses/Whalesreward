@@ -1,0 +1,78 @@
+[
+  {
+    "path": "next.config.ts",
+    "source": ": (process.env.NEXT_PUBLIC_WHR_BUILD ?? crypto.randomUUID());",
+    "count": 1,
+    "reason": "Opaque build version stamp; no domain Id or UUIDv7 response field consumes it."
+  },
+  {
+    "path": "src/client/sw/handover.js",
+    "source": "const token = crypto.randomUUID();",
+    "count": 1,
+    "reason": "Ephemeral cross-window handover nonce; never persisted as an entity or operation ID."
+  },
+  {
+    "path": "src/server/modules/reviews/release-photo.ts",
+    "source": "const finalKey = `final/${environment}/held_release_sheet/${randomUUID()}`;",
+    "count": 1,
+    "reason": "Random private final and display storage path components; not domain identifiers (I-48)."
+  },
+  {
+    "path": "src/server/modules/reviews/release-photo.ts",
+    "source": "const displayKey = `final/${environment}/held_release_sheet/${randomUUID()}`;",
+    "count": 1,
+    "reason": "Random private final and display storage path components; not domain identifiers (I-48)."
+  },
+  {
+    "path": "src/server/modules/reviews/release-uploads.ts",
+    "source": "`staging/${policy.scope.environment}/held_release_sheet/${randomUUID()}`,",
+    "count": 1,
+    "reason": "Random private staging storage path component; upload and asset IDs are generated separately with newId()."
+  },
+  {
+    "path": "tests/admin-navigation/timings.spec.ts",
+    "source": "const documentId = crypto.randomUUID();",
+    "count": 1,
+    "reason": "Browser document correlation nonce for performance measurements only; never a domain ID."
+  },
+  {
+    "path": "tests/integration/database-waits.test.ts",
+    "source": "const schema = \"whr97_wait_\" + randomUUID().replaceAll(\"-\", \"\");",
+    "count": 1,
+    "reason": "Disposable PostgreSQL schema-name suffix only; no persisted/public entity identifier."
+  },
+  {
+    "path": "tests/price-adoption/helpers.ts",
+    "source": "const unique = crypto.randomUUID();",
+    "count": 1,
+    "reason": "Random fictional camera artwork watermark to prevent evidence byte reuse; never an entity ID."
+  },
+  {
+    "path": "tests/sales-history/helpers.ts",
+    "source": "const captureId = crypto.randomUUID();",
+    "count": 1,
+    "reason": "Random fictional camera artwork watermark to prevent evidence byte reuse; never an entity ID."
+  },
+  {
+    "path": "prisma/migrations/20261109181000_correction_receipt_guards/migration.sql",
+    "source": "SELECT gen_random_uuid(),s.purchase_id,j.code,'p20-'||s.policy_version::text,s.evaluated_at,1",
+    "count": 1,
+    "reason": "Immutable historical one-time internal purchase validation block backfill; preserve existing IDs, no public Id projection consumes them.",
+    "historical": true,
+    "sha256": "700248adc6789321d437ab97246aff606134beb39b7b2b4de9d9bd4235eab169"
+  },
+  {
+    "path": "prisma/migrations/20261116071000_giveaway_reconciliation/migration.sql",
+    "source": "aid:=gen_random_uuid();tid:=gen_random_uuid();at:=clock_timestamp();",
+    "count": 2,
+    "reason": "Immutable historical supersession function; replaced by whr_uuid_v7 generation in 20261120140000_canonical_uuid_v7; legacy rows fail explicitly without rewriting links.",
+    "historical": true,
+    "sha256": "d9ef82150ac749db7e4f5886df297e85fe82ee1efd299cd8f7f78855e3569292"
+  },
+  {
+    "path": "prisma/migrations/20261120140000_canonical_uuid_v7/migration.sql",
+    "source": "bytes:=uuid_send(gen_random_uuid()); -- entropy only, never an identifier",
+    "count": 1,
+    "reason": "Entropy only inside whr_uuid_v7: timestamp, version 7 and RFC variant bits are overwritten before any identifier is returned."
+  }
+]

@@ -53,7 +53,7 @@ export async function bindEnabledPeople(db: {
 export async function restoreUnknownPeople(db: ReleaseFixture["db"]) {
   await db.query(
     `INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified)
-    SELECT gen_random_uuid(),$1,u.id,u.id,b.version+1,true FROM auth_user u
+    SELECT whr_uuid_v7(),$1,u.id,u.id,b.version+1,true FROM auth_user u
     JOIN LATERAL(SELECT version,verified FROM held_release_person_binding WHERE user_id=u.id AND station_id=$1 ORDER BY version DESC LIMIT 1)b ON NOT b.verified WHERE u.enabled`,
     [seedId(8)],
   );
