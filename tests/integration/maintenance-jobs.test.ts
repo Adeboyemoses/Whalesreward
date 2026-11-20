@@ -237,6 +237,294 @@ it("I-52 bounded version pages resume after restart without replacing committed 
   expect(await f.domainDigest()).toBe(beforeDomain);
 }, 30_000);
 
+it.each(["UPDATE", "INSERT"] as const)(
+  "I-51 column-only %s privilege is refused before any storage inventory",
+  async (privilege) => {
+    await f.pool.query(
+      "CREATE TABLE domain_privilege_probe(id uuid,payload text)",
+    );
+    const grantee = privilege === "INSERT" ? "PUBLIC" : f.role;
+    await f.pool.query(
+      `GRANT ${privilege}(payload) ON domain_privilege_probe TO ${grantee}`,
+    );
+    const privileges = (
+      await f.runtime.query(
+        "SELECT has_table_privilege(current_user,'domain_privilege_probe',$1) AS whole,has_column_privilege(current_user,'domain_privilege_probe','payload',$1) AS column",
+        [privilege],
+      )
+    ).rows[0];
+    expect(privileges).toEqual({ whole: false, column: true });
+    let touched = false;
+    const actual = createMaintenanceStorage(f.storageConfig);
+    const storage: MaintenanceStorage = {
+      ...actual,
+      async listVersions(...args) {
+        touched = true;
+        return actual.listVersions(...args);
+      },
+    };
+    try {
+      await expect(
+        runMaintenance({ pool: f.runtime, storage, job: "orphans", limits }),
+      ).rejects.toMatchObject({ code: "unsafe_database_role" });
+      expect(touched).toBe(false);
+      expect(
+        (await f.pool.query("SELECT count(*)::int n FROM maintenance_run"))
+          .rows[0].n,
+      ).toBe(0);
+    } finally {
+      await f.pool.query(
+        `REVOKE ${privilege}(payload) ON domain_privilege_probe FROM ${grantee}`,
+      );
+    }
+  },
+);
+
+it("I-25/I-28 every retained receipt seal is reconciled even before fact attachment or asset validation", async () => {
+  const h = reviewFixtureHarness(f.pool),
+    bytes = await h.image(),
+    context = await h.context(bytes);
+  const observations: {
+    id: string;
+    assetId: string;
+    purchaseId: string;
+    key: string;
+    state: "missing" | "corrupt" | "valid";
+  }[] = [];
+  for (const state of ["missing", "corrupt", "valid"] as const) {
+    const submitted = await h.sync.submit(context.token, {
+      ...context.original,
+      operationId: newId(),
+    });
+    const upload = await h.sync.uploadPermission(
+      context.token,
+      submitted.status.purchaseId,
+      { operationId: newId(), ...context.original.photo },
+    );
+    const asset = (
+      await f.pool.query(
+        "SELECT staging_key,final_key,state FROM photo_asset WHERE id=$1",
+        [upload.uploadId],
+      )
+    ).rows[0];
+    expect(asset.final_key).toBeNull();
+    await f.put(asset.staging_key, bytes);
+    const id = newId(),
+      key = `final/seals/${id}`;
+    await f.pool.query(
+      "INSERT INTO photo_receipt_observation(id,station_id,purchase_id,asset_id,declared_digest,observed_digest,observed_bytes,sealed_key,receipt_at) VALUES($1,$2,$3,$4,$5,$5,$6,$7,clock_timestamp())",
+      [
+        id,
+        context.stationId,
+        submitted.status.purchaseId,
+        upload.uploadId,
+        sha256(bytes),
+        bytes.length,
+        key,
+      ],
+    );
+    if (state !== "missing")
+      await f.put(
+        key,
+        state === "valid" ? bytes : Buffer.alloc(bytes.length, 0x61),
+      );
+    observations.push({
+      id,
+      assetId: upload.uploadId,
+      purchaseId: submitted.status.purchaseId,
+      key,
+      state,
+    });
+  }
+  const first = observations[0]!,
+    another = newId(),
+    otherBytes = Buffer.from("another retained interrupted seal");
+  await f.pool.query(
+    "INSERT INTO photo_receipt_observation(id,station_id,purchase_id,asset_id,declared_digest,observed_digest,observed_bytes,sealed_key,receipt_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,clock_timestamp())",
+    [
+      another,
+      context.stationId,
+      first.purchaseId,
+      first.assetId,
+      sha256(bytes),
+      sha256(otherBytes),
+      otherBytes.length,
+      `final/seals/${another}`,
+    ],
+  );
+  expect(
+    (await f.pool.query("SELECT count(*)::int n FROM photo_receipt_fact"))
+      .rows[0].n,
+  ).toBe(0);
+  const before = await f.domainDigest(),
+    versions = await f.versions();
+  await complete("reconcile-uploads");
+  const findings = (
+    await f.pool.query(
+      "SELECT code,asset_id,purchase_id,reference_ids FROM maintenance_finding",
+    )
+  ).rows;
+  for (const observation of observations.filter((o) => o.state !== "valid")) {
+    expect(findings).toContainEqual({
+      code:
+        observation.state === "missing" ? "missing_object" : "digest_mismatch",
+      asset_id: observation.assetId,
+      purchase_id: observation.purchaseId,
+      reference_ids: expect.arrayContaining([observation.id]),
+    });
+  }
+  expect(findings).toContainEqual({
+    code: "missing_object",
+    asset_id: first.assetId,
+    purchase_id: first.purchaseId,
+    reference_ids: expect.arrayContaining([another]),
+  });
+  expect(
+    findings.some(
+      (row) =>
+        row.reference_ids.includes(observations[2]!.id) &&
+        ["missing_object", "digest_mismatch"].includes(row.code),
+    ),
+  ).toBe(false);
+  expect(await f.domainDigest()).toBe(before);
+  expect(await f.versions()).toEqual(versions);
+}, 60_000);
+
+async function delayedStagedAssets(count: number) {
+  const h = reviewFixtureHarness(f.pool),
+    bytes = await h.image(),
+    context = await h.context(bytes);
+  for (let n = 0; n < count; n++) {
+    const submitted = await h.sync.submit(context.token, {
+      ...context.original,
+      operationId: newId(),
+    });
+    const upload = await h.sync.uploadPermission(
+      context.token,
+      submitted.status.purchaseId,
+      { operationId: newId(), ...context.original.photo },
+    );
+    const asset = (
+      await f.pool.query("SELECT staging_key FROM photo_asset WHERE id=$1", [
+        upload.uploadId,
+      ])
+    ).rows[0];
+    await f.put(asset.staging_key, bytes);
+  }
+  const actual = createMaintenanceStorage(f.storageConfig);
+  let completedReads = 0;
+  const storage: MaintenanceStorage = {
+    ...actual,
+    async observe(key, versionId, maximumBytes, signal) {
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => {
+          clearTimeout(timer);
+          reject(new Error("fixture read aborted"));
+        };
+        const timer = setTimeout(() => {
+          signal.removeEventListener("abort", abort);
+          resolve();
+        }, 450);
+        signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) abort();
+      });
+      const observed = await actual.observe(
+        key,
+        versionId,
+        maximumBytes,
+        signal,
+      );
+      completedReads++;
+      return observed;
+    },
+  };
+  return { storage, reads: () => completedReads };
+}
+
+it("I-52 default 25-object pages checkpoint healthy 450ms reads beyond ten seconds and resume without replay", async () => {
+  const delayed = await delayedStagedAssets(25),
+    before = await f.domainDigest();
+  const bounded = { maxPages: 1, agedMs: 1 };
+  const start = Date.now();
+  const first = await runMaintenance({
+    pool: f.runtime,
+    storage: delayed.storage,
+    job: "reconcile-uploads",
+    limits: bounded,
+  });
+  expect(["continued", "succeeded"]).toContain(first.status);
+  const committed = (
+    await f.pool.query(
+      "SELECT id,page_no,counts FROM maintenance_page WHERE run_id=$1 ORDER BY page_no",
+      [first.runId],
+    )
+  ).rows;
+  expect(committed.length).toBeGreaterThan(0);
+  expect(
+    committed.reduce((total, row) => total + row.counts.scanned, 0),
+  ).toBeGreaterThan(0);
+  let last = first;
+  for (let n = 0; last.status !== "succeeded" && n < 4; n++) {
+    last = await runMaintenance({
+      pool: f.runtime,
+      storage: delayed.storage,
+      job: "reconcile-uploads",
+      limits: bounded,
+    });
+    expect(["continued", "succeeded"]).toContain(last.status);
+    expect(last.runId).toBe(first.runId);
+  }
+  expect(last.status).toBe("succeeded");
+  expect(last.counts.scanned).toBe(25);
+  expect(delayed.reads()).toBe(25);
+  expect(Date.now() - start).toBeGreaterThan(10_000);
+  expect(
+    (
+      await f.pool.query(
+        "SELECT id,page_no,counts FROM maintenance_page WHERE run_id=$1 ORDER BY page_no",
+        [first.runId],
+      )
+    ).rows.slice(0, committed.length),
+  ).toEqual(committed);
+  expect(await f.domainDigest()).toBe(before);
+}, 60_000);
+
+it("I-52 short leases checkpoint completed healthy reads before expiry and restart at the next asset", async () => {
+  const delayed = await delayedStagedAssets(6),
+    before = await f.domainDigest();
+  const bounded = {
+    pageSize: 3,
+    maxPages: 1,
+    agedMs: 1,
+    leaseMs: 2000,
+    objectDeadlineMs: 1000,
+  };
+  let last = await runMaintenance({
+    pool: f.runtime,
+    storage: delayed.storage,
+    job: "reconcile-uploads",
+    limits: bounded,
+  });
+  const runId = last.runId;
+  expect(last.status).toBe("continued");
+  expect(last.counts.scanned).toBeGreaterThan(0);
+  expect(last.counts.scanned).toBeLessThan(6);
+  for (let n = 0; last.status !== "succeeded" && n < 8; n++) {
+    last = await runMaintenance({
+      pool: f.runtime,
+      storage: delayed.storage,
+      job: "reconcile-uploads",
+      limits: bounded,
+    });
+    expect(["continued", "succeeded"]).toContain(last.status);
+    expect(last.runId).toBe(runId);
+  }
+  expect(last.status).toBe("succeeded");
+  expect(last.counts.scanned).toBe(6);
+  expect(delayed.reads()).toBe(6);
+  expect(await f.domainDigest()).toBe(before);
+}, 60_000);
+
 it("I-52 partial provider failure preserves a committed cursor and cannot advance complete watermark", async () => {
   await complete("orphans");
   const previousWatermark = (

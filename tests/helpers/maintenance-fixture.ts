@@ -88,6 +88,13 @@ async function readOnlySession(bucket: string) {
 }
 
 export async function maintenanceFixture() {
+  const local = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  if (
+    !process.env.DATABASE_URL ||
+    !local.has(new URL(process.env.DATABASE_URL).hostname) ||
+    !local.has(new URL(endpoint).hostname)
+  )
+    throw new Error("Maintenance fixtures require local PostgreSQL and MinIO");
   const db = await evidenceDatabase();
   const schema = (await db.pool.query("SELECT current_schema() AS s")).rows[0]
     .s as string;
