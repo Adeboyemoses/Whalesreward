@@ -278,7 +278,7 @@ Earl accepted WO-core-2 on 4 November 2026. Database constraints and pure helper
 | Admin 8 · Attendants and pump assignment | D01 D02 D04 D03 F04 F09 F10 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
 | Admin 9 · Station pumps | F01 F02 F03 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
 | Admin 10 · Product prices | F05 F06 F07 F08 | WO-app-5 | tests/design-parity/station/REPORT.md (42 fictional captures, 43 geometry files; scoped board/state differences below) | on-staging WO-app-5; Earl acceptance pending |
-| Admin 11 · Leaderboards and finalization | E01 E02 E04 E03 | WO-app-11 Stage 2a (WHR-23/WHR-172), WO-spec-4 | tests/design-parity/leaderboards/REPORT.md (14 native captures, 1440/390/360; adaptations and height limit documented) | Stage 2a on-staging; Stage 2b checklist forms/per-check rows pending; Earl M4 smoke pending |
+| Admin 11 · Leaderboards and finalization | E01 E02 E04 E03 and approved P-30 states | WO-app-11 Stage 2a/2b (WHR-23/WHR-172/WHR-187), WO-spec-4 | tests/design-parity/leaderboards/REPORT.md and tests/design-parity/giveaway-checklist/REPORT.md (48 current-source checklist captures, 1440/390/360; provenance and limits explicit) | Stage 2b on-staging at `c65cc86`; Earl M4 smoke pending |
 | Admin 12 · Reports | E05 E06 E07 | WO-app-12 (WHR-25), WO-spec-4 | tests/design-parity/reports/REPORT.md (1440/390 px; runtime-data/contract differences documented) | on-staging; Earl M4 smoke pending |
 | Admin 13 · Audit history | G01 G02 G03 G04 G05 | WO-app-10 | | todo |
 | Admin 14 · Settings | B07 T01 T03 T02 T04 | WO-app-13, WO-spec-4 (spec only) |  | todo |
@@ -897,6 +897,24 @@ Verification: EM typecheck/lint/build, 981 unit and real HTTP protocol 1 PASS. F
 
 Expected failures were observed before repair for ordinary, P-29, real HTTP and retained non-null original dates. EM: 981 unit, 1,453 PostgreSQL16 (77 suites, zero skips), timezone 5+5, HTTP 2, typecheck/lint/build, review self-tests 53 and guard 94 PASS. CI: 1,453 PostgreSQL, timezone 5+5, browser 426 passed/two retry passes/four existing skips, storage 1 and release 3 PASS. All three reviewers PASS in round 1 of 3. Existing WHR-174 cleanup failure passed on one unchanged CI job rerun; browser retry evidence is on WHR-177/WHR-83. Full callsite dispositions: [verification](../qa/verification-2026-11-18-original-date.md).
 
+
+## WO-app-11 Stage 2b giveaway checklist and granular outcomes (WHR-23 / WHR-187)
+
+[Feature PR #178](https://github.com/Adeboyemoses/Whalesreward/pull/178), merged green at `c65cc86146effcf87d10297b07b8e98bc2e6812c`. Head `766cc0644b8bb87379df5e924d5d585c78a740e3`; code/security/integrity PASS round 3 at `d670204`. This is UI consumption of unchanged WHR-178 projections/WHR-22 mutations, including WHR-208 and WHR-217; no new credit or eligibility rule.
+
+| Invariants / states | Named evidence | Status |
+|---|---|---|
+| I-07, I-09, I-11 | `giveaway-checklist-r1.spec.ts`: manager/person review eviction, first confirmation revalidation, lawful read-only history, direct independent URL and identical 429/503 cursor/view resume | on-staging; real HTTP/browser verified |
+| I-09, I-11 | `admin-checklist-lease.test.ts` generation/owner fencing; `giveaway-checklist-lease.spec.ts` same-URL manager/person remount and actual late pre-unmount response | semantic guard and real browser observations; old-source DOM leak not reproduced or claimed |
+| I-11, I-22, I-41, I-46 | `giveaway-checklist-lease.spec.ts`: uncertain initial phone-check replay after another admin saves the initial snapshot; original grant, identical body/ID, one effect and actual HTTP receipt | red before client fix, green after; server unchanged |
+| I-26, I-35, I-40, I-41, I-46 | `giveaway-checklist-protocol.spec.ts` and `giveaway-checklist-real.spec.ts`: exact incomplete-source proposal, independent approve/reject, same-person refusal, complete current check, immutable original sales | actual HTTP/browser; unrelated obligations remain blocking |
+| I-41, I-45, I-46 | `giveaway-checklist-real.spec.ts` historical accounts/leavers, empty/unavailable/current/stale checks and deadline/policy states; `giveaway-checklist-r1.spec.ts` missing-policy drafting and strict superseded history | no queue zero or pass inferred; canonical UUIDv7 assertion unchanged |
+| I-41, I-46 | unchanged `giveaway-recovered-phone-contract.spec.ts`/`giveaway-recovered-phone-http.spec.ts`, R1 recovery/duplicate-label browser case | replacement census required before recovered-phone empty check; immutable exclusions/snapshots retained |
+| I-41, I-46 | `leaderboards-real.spec.ts` new unchanged receipt identity/reopen; lease concurrent A/B history test; historical-preparation real browser case | latest server pointer, own receipt and original snapshot preparation distinct; snapshot detail/rows/sources unchanged |
+| I-42–I-46 / E02 | protocol and leaderboard cases cover all nine strict live outcomes, restricted/unknown states, server counts and distinct frozen historical checks | no fabricated granular pass; existing ranking/credit gates retained |
+| E02/E04 extensions and P-30 states | `tests/design-parity/giveaway-checklist/REPORT.md`: 48 current-source PNGs, 16 states, 1440/390/360, DPR 2, 394 measured phone controls at least 48 px, complete dimensions and zero page overflow | adapted written-brief fidelity verified; physical-device/full accessibility acceptance separate |
+
+EM typecheck/lint/build, 1,018 unit and 26 identifier-guard tests PASS; independent R2 focused real stack 18 passed. Final CI: 1,018 unit, 1,546 PostgreSQL16 integration, timezone 5+5, release 42, campaign-proof 1, ordinary browser 505 passed plus one existing WHR-177 retry pass/four existing skips, storage 1; all five required checks green. Local full optional-capture run 501 passed/5 failed/4 existing skips; ordinary-mode bounded final-head checks 8/8 and corrected native historical capture 1/1 passed. WHR-216 and WHR-220 preserve the observed test limitations; no failed composite run is relabelled passing. [Smoke](../qa/smoke-2026-11-20-giveaway-stage-2b-r1.md). Manual station/phone acceptance remains pending.
 
 ## WHR-208 recovered phone requires replacement census
 

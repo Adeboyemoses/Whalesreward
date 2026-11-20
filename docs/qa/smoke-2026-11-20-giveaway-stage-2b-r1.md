@@ -1,4 +1,16 @@
-# Giveaway Stage 2b: round-one fixes smoke
+# Giveaway Stage 2b smoke
+
+## READY on staging
+
+merged green at `c65cc86146effcf87d10297b07b8e98bc2e6812c` for [feature PR #178](https://github.com/Adeboyemoses/Whalesreward/pull/178). PR head `766cc0644b8bb87379df5e924d5d585c78a740e3`; independently reviewed code/QA `d670204db34bd5b24d543cd67689c763cf777d0a`. Code, security and integrity PASS in round 3/3; evidence validates. The feature PR contains no STATUS, coverage-map or lane changes; this separate records update supplies them.
+
+Final EM gates: typecheck, lint (four inherited image warnings), build, 1,018 unit tests and 26 identifier-guard tests PASS. Final CI: 1,018 unit, 1,546 PostgreSQL16 integration, timezone 5+5, release 42, campaign-proof 1, ordinary browser 505 passed plus one existing WHR-177 retry pass/four existing skips, storage 1; all five required checks green.
+
+Final local full capture run: 501 passed, 5 failed, 4 existing skips (510 total, 23 minutes). Exceptions were WHR-216's existing revocation-button race, one recovered-phone fixture timeout, both old historical capture readiness checks and optional concurrent-history capture settling (WHR-220). The historical test now waits for completed actual confirmation readiness; all original assertions remain. A single ordinary-mode final-head bounded check of all four affected flows across both projects passed 8/8 (1.6 minutes), including actual recovered-phone HTTP409 with unchanged stored state. Corrected final-head native historical capture passed 1/1 (33.4 seconds) with the strict geometry guard. No failed composite run is called green; no assertion, response schema, server guard, skip, retry or timeout policy was relaxed. Final CI is the supported full-stack merge gate.
+
+The signed-off 48 frames remain complete and frozen. The later optional attendant capture failed its guard while saved-result content expanded; it is not substituted for the complete desktop frame. The committed concurrent-history frames have 25 controls and CSS heights 14,047 / 20,327 / 20,825; actual latest B, own A and original snapshot are present. WHR-220 is a separate test-only follow-up.
+
+To repeat the round-two actual replay/history/authority checks, use the disposable local stack and `pnpm exec playwright test tests/e2e/giveaway-checklist-lease.spec.ts --workers=2`. Earlier records below describe the sequence and limits of independent verification; they do not override this close-out entry. Physical station/phone acceptance remains Earl's next step.
 
 **Latest independent fidelity sign-off:** final production equivalent to `3e8104f` / builder `45ab102`: 48 fresh frames, 16 states, 1440/390/360 CSS px, DPR 2, 394 phone controls at least 48 px, zero page overflow and matching complete PNG/document dimensions. Earlier counts below are historical execution records. Final EM gates, reviewer verdicts and CI are separate.
 
