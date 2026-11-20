@@ -1,0 +1,41 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 390,
+  "pageHeight": 4013,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 48
+    },
+    {
+      "label": "Approve phone unavailabilityReject proposal",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Review decision",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Back to phone census",
+      "width": 358,
+      "height": 48
+    },
+    {
+      "label": "Back to finalization checks",
+      "width": 358,
+      "height": 48
+    }
+  ]
+}

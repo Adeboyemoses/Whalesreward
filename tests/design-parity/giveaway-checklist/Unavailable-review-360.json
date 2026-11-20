@@ -1,0 +1,51 @@
+{
+  "viewport": {
+    "width": 360,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 360,
+  "pageHeight": 7898,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 48
+    },
+    {
+      "label": "Submit for independent approval",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Keep reviewing",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Cancel",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Select exact incomplete sale 01a1f9e7-caa7-72a0-b5ef-1676817e2df6",
+      "width": 252,
+      "height": 84
+    },
+    {
+      "label": "Fictional unavailable handset independently inspected by records",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Review unavailable-phone proposal",
+      "width": 286,
+      "height": 48
+    },
+    {
+      "label": "Back to phone census",
+      "width": 328,
+      "height": 48
+    }
+  ]
+}

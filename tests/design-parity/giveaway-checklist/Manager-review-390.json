@@ -1,0 +1,51 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 390,
+  "pageHeight": 4928,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 48
+    },
+    {
+      "label": "Confirm designation",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Keep reviewing",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Cancel",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Select an eligible managerAda Williams / TEST-01a1f9e7-112e-7299-a593-2d8c1bb3f8e8",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Fictional manager responsible for the complete census",
+      "width": 316,
+      "height": 48
+    },
+    {
+      "label": "Review designation",
+      "width": 160,
+      "height": 48
+    },
+    {
+      "label": "Refresh complete evidence",
+      "width": 358,
+      "height": 48
+    }
+  ]
+}

@@ -94,3 +94,66 @@ it("successful server auth transitions clear private memory before exposing thei
     transitionTo: "/admin/sign-in",
   });
 });
+
+it("refreshes a scoped selector refusal without signing out unchanged session grants", async () => {
+  const current = session("A", ["sales", "leaderboards", "giveawayFinalize"]);
+  const store = new AdminSessionStore((async (path: string) => {
+    if (path === "session") return current;
+    throw new AdminError("permission_denied", 403);
+  }) as typeof adminRequest);
+  store.adopt(current);
+  const epoch = store.getSnapshot().epoch;
+  await expect(
+    store.request(
+      "giveaway/019ab100-0000-7000-8000-000000000001/reconciliation/selection/phones?limit=1",
+    ),
+  ).rejects.toMatchObject({ code: "permission_denied" });
+  expect(store.getSnapshot().session?.account.id).toBe("A");
+  expect(store.getSnapshot().epoch).toBe(epoch);
+});
+it("a scoped selector refusal still clears changed authority and fences old responses", async () => {
+  const store = new AdminSessionStore((async (path: string) => {
+    if (path === "session") return session("A", ["leaderboards"]);
+    throw new AdminError("permission_denied", 403);
+  }) as typeof adminRequest);
+  store.adopt(session("A", ["sales", "leaderboards"]));
+  const epoch = store.getSnapshot().epoch;
+  store.lists.set("checklist:draft", ["private"]);
+  await expect(
+    store.request(
+      "giveaway/019ab100-0000-7000-8000-000000000001/reconciliation/selection/attendants",
+    ),
+  ).rejects.toBeInstanceOf(AdminError);
+  expect(store.getSnapshot().epoch).toBe(epoch + 1);
+  expect(store.lists.size).toBe(0);
+});
+it("ordinary denials and selector session expiry still sign out, and failed scope refresh is unavailable", async () => {
+  const ordinary = new AdminSessionStore((async () => {
+    throw new AdminError("permission_denied", 403);
+  }) as typeof adminRequest);
+  ordinary.adopt(session());
+  await expect(ordinary.request("users")).rejects.toBeInstanceOf(AdminError);
+  expect(ordinary.getSnapshot().session).toBeNull();
+  const expired = new AdminSessionStore((async () => {
+    throw new AdminError("unauthenticated", 401);
+  }) as typeof adminRequest);
+  expired.adopt(session());
+  await expect(
+    expired.request(
+      "giveaway/019ab100-0000-7000-8000-000000000001/reconciliation/selection/phones",
+    ),
+  ).rejects.toBeInstanceOf(AdminError);
+  expect(expired.getSnapshot().session).toBeNull();
+  const failed = new AdminSessionStore((async (path: string) => {
+    throw new AdminError(
+      path === "session" ? "network" : "permission_denied",
+      path === "session" ? 0 : 403,
+    );
+  }) as typeof adminRequest);
+  failed.adopt(session());
+  await expect(
+    failed.request(
+      "giveaway/019ab100-0000-7000-8000-000000000001/reconciliation/selection/phones",
+    ),
+  ).rejects.toMatchObject({ code: "scope_unavailable", status: 503 });
+});

@@ -1,0 +1,91 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 1440,
+  "pageHeight": 7294,
+  "controls": [
+    {
+      "label": "Back to leaderboards",
+      "width": 172,
+      "height": 40
+    },
+    {
+      "label": "Open review queue",
+      "width": 158,
+      "height": 40
+    },
+    {
+      "label": "Review uploads and sales",
+      "width": 191,
+      "height": 40
+    },
+    {
+      "label": "Campaign station manager",
+      "width": 208,
+      "height": 40
+    },
+    {
+      "label": "Phone census",
+      "width": 123,
+      "height": 40
+    },
+    {
+      "label": "Confirm and save snapshot",
+      "width": 208,
+      "height": 40
+    },
+    {
+      "label": "Keep reviewing",
+      "width": 134,
+      "height": 40
+    },
+    {
+      "label": "All customersCar ownerCommercial busThree-wheelerBikeKeg buyerCooking gas",
+      "width": 1112,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Refresh current readiness",
+      "width": 203,
+      "height": 40
+    },
+    {
+      "label": "View audit history",
+      "width": 142,
+      "height": 40
+    }
+  ]
+}

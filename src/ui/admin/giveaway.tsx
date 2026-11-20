@@ -46,6 +46,18 @@ import {
 } from "./giveaway-results";
 import { LeaderboardsPage, LiveRanking } from "./leaderboards";
 import { useAdminSession } from "./session";
+import { reconciliationHistorySelection } from "@/client/admin-checklist-state";
+import { ManagerPage } from "./checklist-manager";
+import { PhonesPage } from "./checklist-phones";
+import { UnavailablePage, ExclusionPage } from "./checklist-exclusions";
+import {
+  ChecklistPending,
+  useChecklistApi,
+  useChecklistMutation,
+} from "./checklist-common";
+import { LiveChecks, StoredChecks } from "./checklist-outcomes";
+import type { z } from "zod";
+import type { checklistProjectionSchema } from "@/shared/contracts/giveaway-projections";
 type Draft = {
   reason: string;
   preview: Preview | null;
@@ -57,6 +69,7 @@ type Draft = {
   message: string;
   stopped: boolean;
   savedId: string | null;
+  reconciliationId: string | null;
 };
 const emptyDraft: Draft = {
   reason: "",
@@ -66,6 +79,7 @@ const emptyDraft: Draft = {
   message: "",
   stopped: false,
   savedId: null,
+  reconciliationId: null,
 };
 export function LeaderboardsPortal({
   path,
@@ -74,6 +88,8 @@ export function LeaderboardsPortal({
   path: string[];
   session: AdminSession;
 }) {
+  if (path[1] === "finalize" && path[2] === "manager")
+    return <ManagerPage session={session} />;
   if (!session.permissions?.includes("leaderboards"))
     return (
       <Notice tone="danger" role="alert">
@@ -81,11 +97,37 @@ export function LeaderboardsPortal({
       </Notice>
     );
   if (!path[1]) return <LeaderboardsPage session={session} />;
+  if (path[1] === "finalize" && path[2] === "phones") {
+    if (!session.permissions?.includes("sales"))
+      return (
+        <Notice tone="warning">
+          Your current permissions do not allow this action.
+        </Notice>
+      );
+    if (path[3] && path[4] === "unavailable")
+      return (
+        <UnavailablePage key={path[3]} session={session} phoneId={path[3]} />
+      );
+    return <PhonesPage session={session} />;
+  }
+  if (path[1] === "finalize" && path[2] === "exclusions" && path[3]) {
+    if (!session.permissions?.includes("sales"))
+      return (
+        <Notice tone="warning">
+          Your current permissions do not allow this action.
+        </Notice>
+      );
+    return (
+      <ExclusionPage key={path[3]} session={session} exclusionId={path[3]} />
+    );
+  }
   if (path[1] !== "finalize" || (path[2] && path[2] !== "confirm"))
     return (
       <Notice>
-        Finalization checklist · not available yet. Return to{" "}
-        <Link href="/admin/leaderboards/finalize">finalization checks</Link>.
+        This record is unavailable.{" "}
+        <Link href="/admin/leaderboards/finalize">
+          Back to finalization checks
+        </Link>
       </Notice>
     );
   return <GiveawayPage session={session} confirming={path[2] === "confirm"} />;
@@ -112,7 +154,9 @@ const blockerCopy: Record<string, string> = {
 function ReadinessSheet({
   ready,
   session,
+  projection,
 }: {
+  projection: z.infer<typeof checklistProjectionSchema>;
   ready: Readiness;
   session: AdminSession;
 }) {
@@ -150,8 +194,8 @@ function ReadinessSheet({
         ]}
       />
       <p className="wr-help">
-        These groups overlap. Do not add the counts. Separate outcomes for the
-        nine checks are not available here.
+        These groups overlap. Do not add the counts. Per-check outcomes below
+        use the same server snapshot.
       </p>
       {ready.blockers.length > 0 && (
         <ul className="wr-giveaway-blockers">
@@ -203,11 +247,27 @@ function ReadinessSheet({
         </div>
       )}
 
-      <h3>Finalization checklist · not available yet</h3>
-      <p>
-        Manager designation, phone census, unavailable-phone proposals and
-        per-check results will be available in the next checklist stage.
-      </p>
+      <LiveChecks projection={projection} />
+      <div className="wr-row wr-giveaway-actions">
+        {session.role?.isOwner &&
+          session.permissions?.includes("settings") &&
+          sales && (
+            <Link
+              className="wr-btn wr-btn-secondary"
+              href="/admin/leaderboards/finalize/manager"
+            >
+              Campaign station manager
+            </Link>
+          )}
+        {sales && (
+          <Link
+            className="wr-btn wr-btn-secondary"
+            href="/admin/leaderboards/finalize/phones"
+          >
+            Phone census
+          </Link>
+        )}
+      </div>
       <KeyValueList
         items={[
           {
@@ -248,6 +308,8 @@ export function GiveawayPage({
   session: AdminSession;
   confirming?: boolean;
 }) {
+  const checklistApi = useChecklistApi();
+  const checklistMutation = useChecklistMutation();
   const api = useGiveawayApi(),
     { store, epoch } = useAdminSession(),
     router = useRouter(),
@@ -282,12 +344,15 @@ export function GiveawayPage({
   }
   const load = useCallback(async () => {
     const { campaign } = await api.campaign();
-    return {
-      campaign,
-      ready: campaign ? await api.readiness(campaign.id) : null,
-    };
-  }, [api]);
-  const result = useGiveawayRead("giveaway:current", load),
+    const projection = campaign
+      ? await checklistApi.checklist(campaign.id)
+      : null;
+    return { campaign, ready: projection?.readiness ?? null, projection };
+  }, [api, checklistApi]);
+  const result = useGiveawayRead(
+      `giveaway:current:${checklistMutation.serial}`,
+      load,
+    ),
     ready = result.data?.ready ?? null,
     campaign = ready?.campaign ?? result.data?.campaign ?? null;
   const previewLoad = useCallback(
@@ -300,6 +365,10 @@ export function GiveawayPage({
   const previewRead = useGiveawayRead(
     `preview:${draft.preview?.id ?? "none"}`,
     previewLoad,
+  );
+  const historicalIds = reconciliationHistorySelection(
+    draft.reconciliationId,
+    result.data?.projection?.latestStoredResultId,
   );
   const currentPreview = previewRead.data;
   const canConfirm = !!(
@@ -321,7 +390,7 @@ export function GiveawayPage({
       ? "giveawayRevise"
       : "giveawayFinalize",
     allowed = !!session.permissions?.includes(action);
-  const locked = busy || !!draft.pending;
+  const locked = busy || !!draft.pending || checklistMutation.locked;
   const fresh = () => {
     if (draft.pending) return;
     update({ ...emptyDraft });
@@ -371,6 +440,7 @@ export function GiveawayPage({
           message:
             "Reconciliation recorded. The saved result is unchanged; no new snapshot was created.",
           savedId: receipt.currentSnapshotId,
+          reconciliationId: receipt.reconciliationId,
         });
         if (mounted.current) {
           result.reload();
@@ -473,6 +543,7 @@ export function GiveawayPage({
           label: "Back to leaderboards",
         }}
       />
+      <ChecklistPending />
       <GiveawayReadState {...result} />
       {draft.message && <Notice role="status">{draft.message}</Notice>}
       {draft.error && (
@@ -533,7 +604,13 @@ export function GiveawayPage({
         </Notice>
       )}
       <div className="wr-two-col">
-        {ready && <ReadinessSheet ready={ready} session={session} />}{" "}
+        {ready && result.data?.projection && (
+          <ReadinessSheet
+            ready={ready}
+            session={session}
+            projection={result.data.projection}
+          />
+        )}{" "}
         {confirmView && draft.preview ? (
           <Sheet
             title={
@@ -632,6 +709,25 @@ export function GiveawayPage({
       </div>
       {!confirmView && campaign && (
         <>
+          {session.permissions?.includes("sales") && historicalIds.latest && (
+            <section aria-label="Latest historical reconciliation">
+              <h2>Latest historical reconciliation</h2>
+              <StoredChecks
+                campaignId={campaign.id}
+                id={historicalIds.latest}
+              />
+            </section>
+          )}
+          {session.permissions?.includes("sales") && historicalIds.own && (
+            <section aria-label="Your recorded reconciliation receipt">
+              <h2>Your recorded reconciliation receipt</h2>
+              <p>
+                This is your recorded historical receipt; the latest
+                reconciliation is reported separately by the server.
+              </p>
+              <StoredChecks campaignId={campaign.id} id={historicalIds.own} />
+            </section>
+          )}
           {(draft.savedId ?? campaign.latestSnapshotId) && (
             <SavedResult
               key={draft.savedId ?? campaign.latestSnapshotId!}
@@ -719,6 +815,12 @@ export function GiveawayPage({
       )}
       {confirmView && draft.preview && (
         <>
+          {session.permissions?.includes("sales") && (
+            <StoredChecks
+              campaignId={draft.preview.campaignId}
+              id={draft.preview.reconciliationId}
+            />
+          )}
           <CategoryField
             value={category}
             onChange={(value) =>
@@ -893,6 +995,12 @@ function SavedResult({
           </Notice>
           <h3>Final snapshot · revision {snapshot.number}</h3>
           <SnapshotSummary snapshot={snapshot} />
+          {session.permissions?.includes("sales") && (
+            <StoredChecks
+              campaignId={campaignId}
+              id={snapshot.reconciliationId}
+            />
+          )}
           <details>
             <summary>Saved campaign timing</summary>
             <TimingFacts timing={snapshot.timing} />

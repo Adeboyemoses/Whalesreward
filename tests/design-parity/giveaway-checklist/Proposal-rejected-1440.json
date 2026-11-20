@@ -1,0 +1,26 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "scale": 2
+  },
+  "pageWidth": 1440,
+  "pageHeight": 2111,
+  "controls": [
+    {
+      "label": "Back to finalization checks",
+      "width": 206,
+      "height": 40
+    },
+    {
+      "label": "Back to phone census",
+      "width": 1112,
+      "height": 40
+    },
+    {
+      "label": "Back to finalization checks",
+      "width": 1112,
+      "height": 40
+    }
+  ]
+}

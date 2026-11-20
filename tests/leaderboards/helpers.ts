@@ -149,6 +149,7 @@ export async function leaderboardRecords(
   }
   async function configure(
     state: "finished" | "before_cutoff" | "grace_open" = "finished",
+    options: { reconciliationPolicy?: boolean } = {},
   ) {
     campaignId = v7();
     const settingsId = v7();
@@ -172,10 +173,11 @@ export async function leaderboardRecords(
       "UPDATE campaign SET current_timing_version_id=$2,version=version+1 WHERE id=$1",
       [campaignId, settingsId],
     );
-    await pool.query(
-      "INSERT INTO station_reconciliation_policy(station_id,policy_version) VALUES($1,'reconciliation-v1') ON CONFLICT DO NOTHING",
-      [seedId(8)],
-    );
+    if (options.reconciliationPolicy !== false)
+      await pool.query(
+        "INSERT INTO station_reconciliation_policy(station_id,policy_version) VALUES($1,'reconciliation-v1') ON CONFLICT DO NOTHING",
+        [seedId(8)],
+      );
     return campaign();
   }
   async function phoneCheck(kind: "initial" | "revision" = "initial") {
