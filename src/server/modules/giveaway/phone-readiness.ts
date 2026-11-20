@@ -1,4 +1,5 @@
 import { hasConflictingPhoneExclusion } from "./phone-exclusion-conflicts";
+import { hasSameCensusRecovery } from "./phone-recovery";
 import { RECONCILIATION_DIGEST } from "./reconciliation-policy";
 import type pg from "pg";
 export type PhoneReadiness = {
@@ -89,6 +90,17 @@ export async function phoneReadiness(
     )
   ).rowCount;
   if (!liveManager) {
+    result.blockers.push("phone_check_required");
+    return result;
+  }
+  if (
+    await hasSameCensusRecovery(
+      db,
+      campaignId,
+      row.phone_census_id,
+      row.entries,
+    )
+  ) {
     result.blockers.push("phone_check_required");
     return result;
   }
