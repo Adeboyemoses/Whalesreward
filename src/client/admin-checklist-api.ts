@@ -252,6 +252,7 @@ export class AdminChecklistApi {
         !session.permissions?.includes("sales")
       )
         throw new AdminError("owner_required", 403);
+      if (replay) return;
       const context = await this.managerContext(
         p.campaignId,
         replay ? undefined : view?.viewToken,
@@ -288,6 +289,12 @@ export class AdminChecklistApi {
         throw new AdminError("exclusion_stale", 409);
       return;
     }
+    // An uncertain write is not a new discovery action. Its frozen kind can
+    // remain authorized after a successor changes the current campaign kind.
+    // No cached candidate review is shown while pending. The identical POST
+    // still checks the original action grant and live manager/person authority
+    // before returning a historical receipt; never rebase its request guard.
+    if (replay) return;
     const current = await this.checklist(p.campaignId);
     if (
       !inventoryAuthority(session, {
@@ -297,13 +304,13 @@ export class AdminChecklistApi {
       })
     )
       throw new AdminError("scope_lost", 403);
-    // A fresh narrow read validates canonical-person authority. For a pending
-    // replay use current bindings, never the original write's old guard.
+    // Initial confirmation validates canonical-person authority and the
+    // originally reviewed discovery view before sending a new effect.
     await this.read(
-      `${this.root(p.campaignId)}/selection/phones?${new URLSearchParams({ limit: "1", expectedView: replay ? current.view.viewToken : (view?.viewToken ?? current.view.viewToken) })}`,
+      `${this.root(p.campaignId)}/selection/phones?${new URLSearchParams({ limit: "1", expectedView: view?.viewToken ?? current.view.viewToken })}`,
       phoneSelectionSchema,
     );
-    if (!replay && !current.view.reconciliationPolicyVersion)
+    if (!current.view.reconciliationPolicyVersion)
       throw new AdminError("reconciliation_policy_unconfigured", 409);
   }
   private async legacyPages<T>(

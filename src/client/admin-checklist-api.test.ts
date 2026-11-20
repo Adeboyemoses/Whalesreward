@@ -214,3 +214,128 @@ it("enforces the 32 KiB bound with valid unique census partitions immediately ar
     expect.objectContaining({ code: "request_too_large", status: 413 }),
   );
 });
+
+it("keeps an initial uncertain check retry authorized without revision discovery after a snapshot successor", async () => {
+  const currentCampaign = {
+    id,
+    name: "Fictional campaign",
+    version: 9,
+    settingsVersionId: id,
+    dataVersion: "3",
+    latestSnapshotId: other,
+    reconciliationRequired: false,
+    reconciledDataVersion: "3",
+    timing: {
+      launchAt: "2026-11-01T00:00:00Z",
+      purchaseStart: "2026-11-02T00:00:00Z",
+      purchaseCutoff: "2026-11-03T00:00:00Z",
+      graceHours: 0,
+      uploadDeadline: "2026-11-03T00:00:00Z",
+      timezone: "Africa/Lagos",
+      policyVersion: "timing-v1",
+    },
+  };
+  const currentView = {
+    ...view,
+    kind: "revision",
+    guard: {
+      ...view.guard,
+      expectedVersion: 9,
+      expectedPreviousSnapshotId: other,
+    },
+  };
+  const names = [
+    "timing",
+    "holds",
+    "corrections",
+    "duplicates",
+    "two_person_proposals",
+    "uploads",
+    "complete_photo_deadline",
+    "eligibility",
+    "phone_census",
+  ];
+  const transport = vi
+    .fn()
+    .mockResolvedValue({
+      view: currentView,
+      readiness: {
+        campaign: currentCampaign,
+        asOf: view.asOf,
+        canPrepare: false,
+        canConfirm: false,
+        blockers: ["phone_check_required"],
+        counts: {
+          holds: "0",
+          corrections: "0",
+          duplicateFlags: "0",
+          uploads: "0",
+          policyBlocks: "0",
+        },
+        reconciliationPolicyVersion: "reconciliation-v1",
+        phoneCheck: {
+          managerAdminId: id,
+          censusVersion: 1,
+          phoneCheckId: id,
+          state: "stale",
+          pendingExclusions: "0",
+        },
+      },
+      checks: names.map((name) => ({
+        name,
+        outcome: name === "phone_census" ? "unresolved" : "resolved",
+        checked: "1",
+        blocking: name === "phone_census" ? null : "0",
+        unit:
+          name === "timing"
+            ? "campaigns"
+            : name === "phone_census"
+              ? "phones"
+              : "purchases",
+        reasonCodes: name === "phone_census" ? ["manager_ineligible"] : [],
+        links: [],
+        access: "restricted",
+      })),
+      latestStoredResultId: null,
+    });
+  const api = new AdminChecklistApi(transport as typeof adminRequest);
+  const pending = api.freeze(id, "check", {
+    operationId: id,
+    kind: "initial",
+    reason: "Physical inventory checked",
+    ...view.guard,
+    expectedCensusVersion: 1,
+    entries: [
+      {
+        phoneId: id,
+        expectedPhoneVersion: 1,
+        result: "empty",
+        exclusionId: null,
+      },
+    ],
+  });
+  const original = JSON.stringify(pending.body);
+  const session = {
+    state: "ready",
+    account: {
+      id,
+      adminId: id,
+      name: "Fictional manager",
+      username: "fictional.manager",
+    },
+    permissions: ["sales", "leaderboards", "giveawayFinalize"],
+  } as import("./admin-session").AdminSession;
+  await expect(
+    api.authorize(pending, undefined, session, true),
+  ).resolves.toBeUndefined();
+  expect(transport).not.toHaveBeenCalled();
+  expect(JSON.stringify(pending.body)).toBe(original);
+  await expect(
+    api.authorize(
+      pending,
+      undefined,
+      { ...session, permissions: ["sales", "leaderboards"] },
+      true,
+    ),
+  ).rejects.toMatchObject({ code: "scope_lost" });
+});

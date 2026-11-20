@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useEffectEvent,
   useMemo,
   useRef,
@@ -12,6 +13,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AdminError } from "@/client/admin-api";
+import { ReviewLeaseGate } from "@/client/admin-checklist-lease";
 import {
   AdminChecklistApi,
   checklistMessage,
@@ -102,6 +104,7 @@ type MemoryState = {
   validating: boolean;
 };
 class Memory {
+  readonly authorization = new ReviewLeaseGate();
   state: MemoryState = {
     change: null,
     phase: "idle",
@@ -126,7 +129,7 @@ class Memory {
     this.listeners.forEach((f) => f());
   }
 }
-export function useChecklistMutation() {
+export function useChecklistMutation(owner?: object) {
   const { store, epoch, session } = useAdminSession();
   const path = usePathname();
   const api = useChecklistApi();
@@ -152,7 +155,9 @@ export function useChecklistMutation() {
   }
   async function validate() {
     const c = memory.state.change;
-    if (!valid() || !c || !session) return false;
+    if (!valid() || !c || !session || !owner) return false;
+    const ticket = memory.authorization.begin(owner, path);
+    if (!ticket) return false;
     memory.set({ authorizedPath: null, validating: true });
     try {
       await api.authorize(
@@ -161,11 +166,20 @@ export function useChecklistMutation() {
         session,
         memory.state.phase === "pending",
       );
-      if (!valid() || memory.state.change !== c) return false;
+      if (
+        !valid() ||
+        memory.state.change !== c ||
+        !memory.authorization.accept(owner, path, ticket)
+      )
+        return false;
       memory.set({ authorizedPath: path, validating: false, error: "" });
       return true;
     } catch (e) {
-      if (valid() && memory.state.change === c) {
+      if (
+        valid() &&
+        memory.state.change === c &&
+        memory.authorization.current(owner, path, ticket)
+      ) {
         const transient =
           e instanceof AdminError &&
           (e.status === 0 || e.status === 429 || e.status >= 500);
@@ -189,7 +203,19 @@ export function useChecklistMutation() {
   }
   return {
     ...state,
-    authorized: state.authorizedPath === path,
+    authorized:
+      !!owner &&
+      state.authorizedPath === path &&
+      memory.authorization.authorized(owner, path),
+    mount: () => {
+      if (!owner) return;
+      memory.authorization.mount(owner, path);
+      memory.set({ authorizedPath: null, validating: false });
+      return () => {
+        if (memory.authorization.release(owner))
+          memory.set({ authorizedPath: null, validating: false });
+      };
+    },
     revalidate: validate,
     locked: state.phase !== "idle" || state.stopped,
     review: (build: () => Change) => {
@@ -269,9 +295,12 @@ export function useChecklistMutation() {
   };
 }
 export function ChecklistPending() {
-  const m = useChecklistMutation();
+  const [owner] = useState(() => ({}));
+  const m = useChecklistMutation(owner);
   const error = useRef<HTMLDivElement>(null);
   const path = usePathname();
+  const mount = useEffectEvent(() => m.mount());
+  useLayoutEffect(() => mount(), [path]);
   const change = m.change;
   const revalidate = useEffectEvent(() => m.revalidate());
   const busy = m.busy;

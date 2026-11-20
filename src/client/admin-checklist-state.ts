@@ -62,3 +62,14 @@ export function recoveryNeedsCensus(
       (e.state === "approved" || e.state === "superseded"),
   );
 }
+
+/** Own receipt identity is historical; only the fresh server pointer is latest. */
+export function reconciliationHistorySelection(
+  receiptId: string | null | undefined,
+  serverLatestId: string | null | undefined,
+) {
+  return {
+    latest: serverLatestId ?? null,
+    own: receiptId && receiptId !== serverLatestId ? receiptId : null,
+  };
+}

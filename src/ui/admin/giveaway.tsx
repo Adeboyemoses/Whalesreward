@@ -46,6 +46,7 @@ import {
 } from "./giveaway-results";
 import { LeaderboardsPage, LiveRanking } from "./leaderboards";
 import { useAdminSession } from "./session";
+import { reconciliationHistorySelection } from "@/client/admin-checklist-state";
 import { ManagerPage } from "./checklist-manager";
 import { PhonesPage } from "./checklist-phones";
 import { UnavailablePage, ExclusionPage } from "./checklist-exclusions";
@@ -364,6 +365,10 @@ export function GiveawayPage({
   const previewRead = useGiveawayRead(
     `preview:${draft.preview?.id ?? "none"}`,
     previewLoad,
+  );
+  const historicalIds = reconciliationHistorySelection(
+    draft.reconciliationId,
+    result.data?.projection?.latestStoredResultId,
   );
   const currentPreview = previewRead.data;
   const canConfirm = !!(
@@ -704,20 +709,25 @@ export function GiveawayPage({
       </div>
       {!confirmView && campaign && (
         <>
-          {session.permissions?.includes("sales") &&
-            (draft.reconciliationId ??
-              result.data?.projection?.latestStoredResultId) && (
-              <section aria-label="Latest historical reconciliation">
-                <h2>Latest historical reconciliation</h2>
-                <StoredChecks
-                  campaignId={campaign.id}
-                  id={
-                    (draft.reconciliationId ??
-                      result.data?.projection?.latestStoredResultId)!
-                  }
-                />
-              </section>
-            )}
+          {session.permissions?.includes("sales") && historicalIds.latest && (
+            <section aria-label="Latest historical reconciliation">
+              <h2>Latest historical reconciliation</h2>
+              <StoredChecks
+                campaignId={campaign.id}
+                id={historicalIds.latest}
+              />
+            </section>
+          )}
+          {session.permissions?.includes("sales") && historicalIds.own && (
+            <section aria-label="Your recorded reconciliation receipt">
+              <h2>Your recorded reconciliation receipt</h2>
+              <p>
+                This is your recorded historical receipt; the latest
+                reconciliation is reported separately by the server.
+              </p>
+              <StoredChecks campaignId={campaign.id} id={historicalIds.own} />
+            </section>
+          )}
           {(draft.savedId ?? campaign.latestSnapshotId) && (
             <SavedResult
               key={draft.savedId ?? campaign.latestSnapshotId!}

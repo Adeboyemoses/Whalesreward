@@ -74,3 +74,20 @@ it("requires a new census for retained approved or superseded approval on that c
     ),
   ).toBe(false);
 });
+
+it("uses the refreshed server latest pointer while keeping an older own receipt separately labelled", async () => {
+  const { reconciliationHistorySelection } =
+    await import("./admin-checklist-state");
+  expect(reconciliationHistorySelection("receipt-A", "receipt-A")).toEqual({
+    latest: "receipt-A",
+    own: null,
+  });
+  expect(reconciliationHistorySelection("receipt-A", "receipt-B")).toEqual({
+    latest: "receipt-B",
+    own: "receipt-A",
+  });
+  expect(reconciliationHistorySelection("receipt-A", undefined)).toEqual({
+    latest: null,
+    own: "receipt-A",
+  });
+});
