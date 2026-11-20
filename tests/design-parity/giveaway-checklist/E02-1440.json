@@ -5,7 +5,7 @@
     "scale": 2
   },
   "pageWidth": 1440,
-  "pageHeight": 4086,
+  "pageHeight": 4295,
   "controls": [
     {
       "label": "Back to leaderboards",
@@ -50,6 +50,21 @@
     {
       "label": "Review final snapshot",
       "width": 175,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
+      "height": 40
+    },
+    {
+      "label": "Refresh rankings",
+      "width": 145,
       "height": 40
     },
     {

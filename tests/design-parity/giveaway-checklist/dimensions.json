@@ -1,250 +1,464 @@
-{
-  "source": "d7625c3",
-  "capturedFrames": 30,
-  "phoneControls": 212,
-  "minimumPhoneControlHeight": 48,
-  "pageOverflowFrames": 0,
-  "fullPagePNGDimensionsMatch": true,
-  "frames": [
-    {
-      "state": "Census-review-1440",
+[
+  {
+    "file": "Census-review-1440.built.png",
+    "width": 2880,
+    "height": 8192,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 4096,
-      "pngWidth": 2880,
-      "pngHeight": 8192
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Census-review-360",
+    "pageHeight": 4096
+  },
+  {
+    "file": "Census-review-360.built.png",
+    "width": 720,
+    "height": 14290,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 7145,
-      "pngWidth": 720,
-      "pngHeight": 14290
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Census-review-390",
+    "pageHeight": 7145
+  },
+  {
+    "file": "Census-review-390.built.png",
+    "width": 780,
+    "height": 13838,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 6919,
-      "pngWidth": 780,
-      "pngHeight": 13838
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "E02-1440",
+    "pageHeight": 6919
+  },
+  {
+    "file": "Duplicate-label-controls-1440.built.png",
+    "width": 2880,
+    "height": 7658,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 4086,
-      "pngWidth": 2880,
-      "pngHeight": 8172
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "E02-360",
+    "pageHeight": 3829
+  },
+  {
+    "file": "Duplicate-label-controls-360.built.png",
+    "width": 720,
+    "height": 14606,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 7543,
-      "pngWidth": 720,
-      "pngHeight": 15086
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "E02-390",
+    "pageHeight": 7303
+  },
+  {
+    "file": "Duplicate-label-controls-390.built.png",
+    "width": 780,
+    "height": 14074,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 7293,
-      "pngWidth": 780,
-      "pngHeight": 14586
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Historical-preparation-1440",
+    "pageHeight": 7037
+  },
+  {
+    "file": "E02-1440.built.png",
+    "width": 2880,
+    "height": 8590,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 7130,
-      "pngWidth": 2880,
-      "pngHeight": 14260
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Historical-preparation-360",
+    "pageHeight": 4295
+  },
+  {
+    "file": "E02-360.built.png",
+    "width": 720,
+    "height": 15086,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 12312,
-      "pngWidth": 720,
-      "pngHeight": 24624
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Historical-preparation-390",
+    "pageHeight": 7543
+  },
+  {
+    "file": "E02-390.built.png",
+    "width": 780,
+    "height": 14586,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 11936,
-      "pngWidth": 780,
-      "pngHeight": 23872
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Manager-review-1440",
+    "pageHeight": 7293
+  },
+  {
+    "file": "Historical-preparation-1440.built.png",
+    "width": 2880,
+    "height": 14588,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 2127,
-      "pngWidth": 2880,
-      "pngHeight": 4254
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Manager-review-360",
+    "pageHeight": 7294
+  },
+  {
+    "file": "Historical-preparation-360.built.png",
+    "width": 720,
+    "height": 24624,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 5114,
-      "pngWidth": 720,
-      "pngHeight": 10228
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Manager-review-390",
+    "pageHeight": 12312
+  },
+  {
+    "file": "Historical-preparation-390.built.png",
+    "width": 780,
+    "height": 23872,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 4928,
-      "pngWidth": 780,
-      "pngHeight": 9856
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Phone-check-recorded-1440",
+    "pageHeight": 11936
+  },
+  {
+    "file": "Manager-review-1440.built.png",
+    "width": 2880,
+    "height": 4254,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 3161,
-      "pngWidth": 2880,
-      "pngHeight": 6322
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Phone-check-recorded-360",
+    "pageHeight": 2127
+  },
+  {
+    "file": "Manager-review-360.built.png",
+    "width": 720,
+    "height": 10228,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 6286,
-      "pngWidth": 720,
-      "pngHeight": 12572
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Phone-check-recorded-390",
+    "pageHeight": 5114
+  },
+  {
+    "file": "Manager-review-390.built.png",
+    "width": 780,
+    "height": 9856,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 6038,
-      "pngWidth": 780,
-      "pngHeight": 12076
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-approved-1440",
+    "pageHeight": 4928
+  },
+  {
+    "file": "Phone-check-recorded-1440.built.png",
+    "width": 2880,
+    "height": 6322,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 2149,
-      "pngWidth": 2880,
-      "pngHeight": 4298
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-approved-360",
+    "pageHeight": 3161
+  },
+  {
+    "file": "Phone-check-recorded-360.built.png",
+    "width": 720,
+    "height": 12612,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 4123,
-      "pngWidth": 720,
-      "pngHeight": 8246
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-approved-390",
+    "pageHeight": 6306
+  },
+  {
+    "file": "Phone-check-recorded-390.built.png",
+    "width": 780,
+    "height": 12116,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 3913,
-      "pngWidth": 780,
-      "pngHeight": 7826
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-pending-1440",
+    "pageHeight": 6058
+  },
+  {
+    "file": "Policy-blocked-census-1440.built.png",
+    "width": 2880,
+    "height": 5506,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 2349,
-      "pngWidth": 2880,
-      "pngHeight": 4698
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-pending-360",
+    "pageHeight": 2753
+  },
+  {
+    "file": "Policy-blocked-census-360.built.png",
+    "width": 720,
+    "height": 9520,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 4261,
-      "pngWidth": 720,
-      "pngHeight": 8522
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-pending-390",
+    "pageHeight": 4760
+  },
+  {
+    "file": "Policy-blocked-census-390.built.png",
+    "width": 780,
+    "height": 9068,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 4013,
-      "pngWidth": 780,
-      "pngHeight": 8026
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-rejected-1440",
+    "pageHeight": 4534
+  },
+  {
+    "file": "Proposal-approved-1440.built.png",
+    "width": 2880,
+    "height": 4298,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 2111,
-      "pngWidth": 2880,
-      "pngHeight": 4222
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-rejected-360",
+    "pageHeight": 2149
+  },
+  {
+    "file": "Proposal-approved-360.built.png",
+    "width": 720,
+    "height": 8246,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 4083,
-      "pngWidth": 720,
-      "pngHeight": 8166
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Proposal-rejected-390",
+    "pageHeight": 4123
+  },
+  {
+    "file": "Proposal-approved-390.built.png",
+    "width": 780,
+    "height": 7826,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 3873,
-      "pngWidth": 780,
-      "pngHeight": 7746
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Recovered-phone-choice-1440",
+    "pageHeight": 3913
+  },
+  {
+    "file": "Proposal-pending-1440.built.png",
+    "width": 2880,
+    "height": 4698,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 3079,
-      "pngWidth": 2880,
-      "pngHeight": 6158
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Recovered-phone-choice-360",
+    "pageHeight": 2349
+  },
+  {
+    "file": "Proposal-pending-360.built.png",
+    "width": 720,
+    "height": 8522,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 6010,
-      "pngWidth": 720,
-      "pngHeight": 12020
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Recovered-phone-choice-390",
+    "pageHeight": 4261
+  },
+  {
+    "file": "Proposal-pending-390.built.png",
+    "width": 780,
+    "height": 8026,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 5784,
-      "pngWidth": 780,
-      "pngHeight": 11568
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Unavailable-review-1440",
+    "pageHeight": 4013
+  },
+  {
+    "file": "Proposal-rejected-1440.built.png",
+    "width": 2880,
+    "height": 4222,
+    "viewport": {
       "width": 1440,
-      "pageWidth": 1440,
-      "height": 3722,
-      "pngWidth": 2880,
-      "pngHeight": 7444
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Unavailable-review-360",
+    "pageHeight": 2111
+  },
+  {
+    "file": "Proposal-rejected-360.built.png",
+    "width": 720,
+    "height": 8166,
+    "viewport": {
       "width": 360,
-      "pageWidth": 360,
-      "height": 7898,
-      "pngWidth": 720,
-      "pngHeight": 15796
+      "height": 1000,
+      "scale": 2
     },
-    {
-      "state": "Unavailable-review-390",
+    "pageHeight": 4083
+  },
+  {
+    "file": "Proposal-rejected-390.built.png",
+    "width": 780,
+    "height": 7746,
+    "viewport": {
       "width": 390,
-      "pageWidth": 390,
-      "height": 7562,
-      "pngWidth": 780,
-      "pngHeight": 15124
-    }
-  ]
-}
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3873
+  },
+  {
+    "file": "Read-only-proposal-history-1440.built.png",
+    "width": 2880,
+    "height": 3344,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 1672
+  },
+  {
+    "file": "Read-only-proposal-history-360.built.png",
+    "width": 720,
+    "height": 7700,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3850
+  },
+  {
+    "file": "Read-only-proposal-history-390.built.png",
+    "width": 780,
+    "height": 7236,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3618
+  },
+  {
+    "file": "Recovered-phone-choice-1440.built.png",
+    "width": 2880,
+    "height": 6286,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3143
+  },
+  {
+    "file": "Recovered-phone-choice-360.built.png",
+    "width": 720,
+    "height": 12388,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 6194
+  },
+  {
+    "file": "Recovered-phone-choice-390.built.png",
+    "width": 780,
+    "height": 11896,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 5948
+  },
+  {
+    "file": "Superseded-proposal-1440.built.png",
+    "width": 2880,
+    "height": 3344,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 1672
+  },
+  {
+    "file": "Superseded-proposal-360.built.png",
+    "width": 720,
+    "height": 7696,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3848
+  },
+  {
+    "file": "Superseded-proposal-390.built.png",
+    "width": 780,
+    "height": 7192,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 3596
+  },
+  {
+    "file": "Unavailable-review-1440.built.png",
+    "width": 2880,
+    "height": 4106,
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 2053
+  },
+  {
+    "file": "Unavailable-review-360.built.png",
+    "width": 720,
+    "height": 15796,
+    "viewport": {
+      "width": 360,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7898
+  },
+  {
+    "file": "Unavailable-review-390.built.png",
+    "width": 780,
+    "height": 15124,
+    "viewport": {
+      "width": 390,
+      "height": 1000,
+      "scale": 2
+    },
+    "pageHeight": 7562
+  }
+]

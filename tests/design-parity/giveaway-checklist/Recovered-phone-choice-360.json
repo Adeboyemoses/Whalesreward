@@ -5,7 +5,7 @@
     "scale": 2
   },
   "pageWidth": 360,
-  "pageHeight": 6010,
+  "pageHeight": 6194,
   "controls": [
     {
       "label": "Back to finalization checks",
@@ -68,7 +68,7 @@
       "height": 48
     },
     {
-      "label": "Pending inspectionInspected · nothing remains unsentUnavailable · approved proposal 01a1f613-997e-71c4-b724-39117c73680b",
+      "label": "Pending inspectionInspected · nothing remains unsentUnavailable · approved proposal 01a1f985-f895-7276-b612-a484f5266b51",
       "width": 252,
       "height": 48
     },

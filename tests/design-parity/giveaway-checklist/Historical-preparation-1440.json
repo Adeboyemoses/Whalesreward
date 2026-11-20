@@ -5,7 +5,7 @@
     "scale": 2
   },
   "pageWidth": 1440,
-  "pageHeight": 7130,
+  "pageHeight": 7294,
   "controls": [
     {
       "label": "Back to leaderboards",
@@ -45,6 +45,16 @@
     {
       "label": "All customersCar ownerCommercial busThree-wheelerBikeKeg buyerCooking gas",
       "width": 1112,
+      "height": 40
+    },
+    {
+      "label": "Previous",
+      "width": 91,
+      "height": 40
+    },
+    {
+      "label": "Next",
+      "width": 65,
       "height": 40
     },
     {

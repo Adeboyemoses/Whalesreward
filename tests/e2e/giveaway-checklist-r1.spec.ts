@@ -84,8 +84,8 @@ for (const authority of ["manager", "person"] as const) {
         );
       } else {
         await f.pool.query(
-          "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT gen_random_uuid(),station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
-          [f.userId],
+          "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT $2,station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+          [f.userId, v7()],
         );
       }
       await page
@@ -342,7 +342,7 @@ test("I-46 approved unavailability cannot select empty on the old census and dup
       .click();
     await expect(
       page.getByText(
-        "This phone is available again. Record a new census and phone check.",
+        "This phone is available again. Record a new census and phone check. Earlier exclusion decisions remain retained history; a fresh census must be recorded before inspection can be certified.",
         { exact: true },
       ),
     ).toBeVisible();
@@ -525,9 +525,13 @@ test("I-09 manager discovery refuses Settings timing mixed with a newer selector
   try {
     const campaign = await f.configure();
     let changed = false;
+    let settingsReads = 0;
     await page.route(/\/api\/admin\/settings(?:\?|$)/, async (route) => {
       const response = await route.fetch();
-      if (!changed) {
+      // First read discovers the campaign. Pin the context read itself, then
+      // advance the real campaign before its subsequent manager selector.
+      settingsReads += 1;
+      if (settingsReads === 2) {
         changed = true;
         const timing = v7();
         await f.pool.query(
@@ -578,8 +582,8 @@ test("I-09 first confirmation revalidates person authority before sending a prot
     const census = await f.census();
     await unavailableDraft(page, f, census.phones.items[0]!.id);
     await f.pool.query(
-      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT gen_random_uuid(),station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
-      [f.userId],
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT $2,station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+      [f.userId, v7()],
     );
     const posts: string[] = [];
     page.on("request", (r) => {
@@ -634,8 +638,8 @@ test("I-09 losing person verification retains lawful census exclusion and check 
     const exclusionId = await approve(f, census.phones.items[0]!.id);
     await f.certify(census.phones.items[0]!.id, exclusionId);
     await f.pool.query(
-      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT gen_random_uuid(),station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
-      [f.userId],
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) SELECT $2,station_id,user_id,person_id,version+1,false FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+      [f.userId, v7()],
     );
     const selectors: string[] = [];
     page.on("request", (r) => {
@@ -648,8 +652,19 @@ test("I-09 losing person verification retains lawful census exclusion and check 
     ).toBeVisible();
     await expect(
       page
-        .getByText("Phone unavailable · exclusion approved", { exact: false })
+        .getByText("Earlier evidence is stale. Review this phone again.", {
+          exact: false,
+        })
         .first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", {
+        name: `Recorded approved exclusion ${exclusionId}`,
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Phone check ID", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByLabel("Phone-check reason", { exact: true }),

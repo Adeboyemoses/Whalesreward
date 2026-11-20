@@ -306,7 +306,7 @@ for (const decision of ["approve", "reject"] as const) {
           decision === "approve"
             ? "Phone unavailability approved. Record a current complete phone check before preparing the result."
             : "Proposal rejected. This phone still needs inspection or a new proposal.",
-          { exact: false },
+          { exact: true },
         ),
       ).toBeVisible();
       await expect(

@@ -5,7 +5,7 @@
     "scale": 2
   },
   "pageWidth": 1440,
-  "pageHeight": 3722,
+  "pageHeight": 2053,
   "controls": [
     {
       "label": "Back to finalization checks",
@@ -13,22 +13,7 @@
       "height": 40
     },
     {
-      "label": "Submit for independent approval",
-      "width": 246,
-      "height": 40
-    },
-    {
-      "label": "Keep reviewing",
-      "width": 134,
-      "height": 40
-    },
-    {
-      "label": "Cancel",
-      "width": 78,
-      "height": 40
-    },
-    {
-      "label": "Select exact incomplete sale 01a1f613-b66e-7649-9435-f4abbea50395",
+      "label": "Select exact incomplete sale 01a1f986-0950-74c3-8ff6-d7b0169c6bb9",
       "width": 1036,
       "height": 51
     },
