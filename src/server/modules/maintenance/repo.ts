@@ -48,7 +48,8 @@ async function assertRole(db: pg.PoolClient) {
       WHERE n.nspname=current_schema() AND c.relkind IN ('r','p')
       AND c.relname NOT IN ('maintenance_run','maintenance_job','maintenance_object','maintenance_page','maintenance_finding')
       AND (has_table_privilege(current_user,c.oid,'INSERT') OR has_table_privilege(current_user,c.oid,'UPDATE')
-        OR has_table_privilege(current_user,c.oid,'DELETE') OR has_table_privilege(current_user,c.oid,'TRUNCATE')))
+        OR has_table_privilege(current_user,c.oid,'DELETE') OR has_table_privilege(current_user,c.oid,'TRUNCATE')
+        OR has_any_column_privilege(current_user,c.oid,'INSERT') OR has_any_column_privilege(current_user,c.oid,'UPDATE')))
     AS unsafe`)
   ).rows[0]?.unsafe;
   if (unsafe !== false) throw new MaintenanceError("unsafe_database_role");
@@ -131,6 +132,7 @@ export async function claimRun(
       cursor: run.cursor,
       pageNo: run.page_no,
       deadline: state.completion_deadline,
+      expiresAt: state.lease_until,
       job,
     };
   });
@@ -175,7 +177,7 @@ export async function commitPage(
   page: Page,
   limits: Limits,
 ): Promise<void> {
-  await transaction(pool, async (db) => {
+  const renewedUntil = await transaction(pool, async (db) => {
     const run = await fenced(db, lease);
     const counts = checkedCounts(page.counts),
       totals = checkedCounts(run.outcome ?? {});
@@ -238,14 +240,14 @@ export async function commitPage(
         page.complete,
       ],
     );
-    await db.query(
+    const updated = await db.query<{ lease_until: Date | null }>(
       `UPDATE maintenance_job SET heartbeat_at=clock_timestamp(),
       lease_until=CASE WHEN $3 THEN NULL ELSE least(completion_deadline,clock_timestamp()+$4*interval '1 millisecond') END,
       lease_owner=CASE WHEN $3 THEN NULL ELSE lease_owner END,
       next_due_at=CASE WHEN $3 THEN clock_timestamp()+$5*interval '1 millisecond' ELSE next_due_at END,
       last_complete_watermark=CASE WHEN $3 THEN $6 ELSE last_complete_watermark END,
       last_succeeded_at=CASE WHEN $3 THEN clock_timestamp() ELSE last_succeeded_at END,
-      last_outcome=CASE WHEN $3 THEN 'succeeded' ELSE 'running' END WHERE job=$1 AND run_id=$2`,
+      last_outcome=CASE WHEN $3 THEN 'succeeded' ELSE 'running' END WHERE job=$1 AND run_id=$2 RETURNING lease_until`,
       [
         lease.job,
         lease.runId,
@@ -255,7 +257,9 @@ export async function commitPage(
         lease.cutoff,
       ],
     );
+    return updated.rows[0]!.lease_until;
   });
+  if (renewedUntil) lease.expiresAt = renewedUntil;
   lease.cursor = page.cursor;
   lease.pageNo++;
 }

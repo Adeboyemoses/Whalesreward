@@ -25,8 +25,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "job:retention": "node jobs/retention.ts",
-    "job:orphans": "node jobs/orphans.ts",
-    "job:reconcile-uploads": "node jobs/reconcile-uploads.ts",
+    "job:orphans": "node jobs/run-maintenance.mjs orphans",
+    "job:reconcile-uploads": "node jobs/run-maintenance.mjs reconcile-uploads",
     "job:backup-manifest": "node jobs/backup-manifest.ts"
   },
   "dependencies": {

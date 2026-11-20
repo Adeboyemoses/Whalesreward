@@ -37,6 +37,7 @@ export function maintenanceLimits(input: Partial<Limits> = {}): Limits {
 }
 export class MaintenanceError extends Error {
   readonly code:
+    | "budget_exhausted"
     | "invalid_limits"
     | "lease_lost"
     | "database_unavailable"
@@ -45,6 +46,7 @@ export class MaintenanceError extends Error {
     | "invalid_configuration";
   constructor(
     code:
+      | "budget_exhausted"
       | "invalid_limits"
       | "lease_lost"
       | "database_unavailable"
@@ -104,6 +106,7 @@ export type Lease = {
   cursor: Cursor;
   pageNo: number;
   deadline: Date;
+  expiresAt: Date;
   job: MaintenanceJob;
 };
 export type Page = {
@@ -114,3 +117,29 @@ export type Page = {
 };
 export const scheduleMs = (job: MaintenanceJob) =>
   job === "orphans" ? 3600000 : 900000;
+
+/** Leave room to persist the completed-object checkpoint before authority ends. */
+export const checkpointReserveMs = (limits: Limits) =>
+  Math.max(
+    1,
+    Math.min(
+      5000,
+      Math.floor(limits.leaseMs / 4),
+      Math.floor(limits.sliceMs / 4),
+    ),
+  );
+export function providerSignal(
+  lease: Lease,
+  limits: Limits,
+  parent: AbortSignal,
+): AbortSignal {
+  const remaining =
+    Math.min(lease.deadline.getTime(), lease.expiresAt.getTime()) -
+    Date.now() -
+    checkpointReserveMs(limits);
+  if (remaining < 1) throw new MaintenanceError("budget_exhausted");
+  return AbortSignal.any([
+    parent,
+    AbortSignal.timeout(Math.min(limits.objectDeadlineMs, remaining)),
+  ]);
+}

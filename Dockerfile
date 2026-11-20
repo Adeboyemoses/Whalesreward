@@ -16,10 +16,10 @@ RUN test "$(cat .nvmrc)" = "$(node --version | cut -c 2-)" \
 FROM dependencies AS build
 COPY next.config.ts tsconfig.json postcss.config.mjs ./
 COPY src ./src
-COPY jobs/admin-mail.ts ./jobs/admin-mail.ts
+COPY jobs ./jobs
 COPY public ./public
 RUN pnpm build \
-    && pnpm exec esbuild jobs/admin-mail.ts --bundle --platform=node --format=esm --packages=external --outfile=jobs/admin-mail.mjs
+    && pnpm exec esbuild jobs/admin-mail.ts jobs/orphans.ts jobs/reconcile-uploads.ts --bundle --platform=node --format=esm --packages=external --outdir=jobs --out-extension:.js=.mjs
 
 FROM base AS runtime
 ENV NODE_ENV=production PORT=8080 HOSTNAME=0.0.0.0
@@ -29,7 +29,7 @@ COPY --from=dependencies --chown=node:node /app/package.json /app/pnpm-lock.yaml
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/next.config.ts ./next.config.ts
 COPY --from=build --chown=node:node /app/public ./public
-COPY --from=build --chown=node:node /app/jobs/admin-mail.mjs ./jobs/admin-mail.mjs
+COPY --from=build --chown=node:node /app/jobs/admin-mail.mjs /app/jobs/orphans.mjs /app/jobs/reconcile-uploads.mjs /app/jobs/run-maintenance.mjs ./jobs/
 COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node prisma.config.ts ./prisma.config.ts
 COPY --chown=node:node scripts/deploy/entrypoint.mjs ./scripts/deploy/entrypoint.mjs

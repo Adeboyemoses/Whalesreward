@@ -10,6 +10,9 @@
 !postcss.config.mjs
 !jobs/
 !jobs/admin-mail.ts
+!jobs/orphans.ts
+!jobs/reconcile-uploads.ts
+!jobs/run-maintenance.mjs
 !src/
 !src/**
 !public/

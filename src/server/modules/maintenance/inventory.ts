@@ -3,6 +3,7 @@ import type { MaintenanceStorage } from "../../adapters/maintenance-storage.ts";
 import { evidenceRead } from "./repo.ts";
 import {
   MaintenanceError,
+  providerSignal,
   type Cursor,
   type Finding,
   type Lease,
@@ -68,7 +69,7 @@ export async function orphanPage(
     `${phase}/`,
     lease.cursor.provider,
     limits.pageSize,
-    signal,
+    providerSignal(lease, limits, signal),
   );
   const findings: Finding[] = [];
   let agedStaged = 0,
@@ -150,6 +151,13 @@ async function expectedPage(pool: pg.Pool, lease: Lease, limits: Limits) {
       LEFT JOIN photo_receipt_observation o ON o.id=f.observation_id
       WHERE a.created_at<=$1
       UNION ALL
+      SELECT 'receipt:'||o.id::text,o.asset_id,o.purchase_id,o.sealed_key,o.observed_digest,o.observed_bytes::text,
+        false,false,o.id,o.observed_digest,o.observed_bytes::text,o.sealed_key
+      FROM photo_receipt_observation o WHERE o.receipt_at<=$1
+        AND NOT EXISTS(SELECT 1 FROM photo_asset a JOIN photo_receipt_fact f ON f.asset_id=a.id
+          WHERE a.id=o.asset_id AND f.observation_id=o.id AND a.final_key=o.sealed_key
+          AND a.validated_digest=o.observed_digest AND a.validated_bytes=o.observed_bytes)
+      UNION ALL
       SELECT 'sheet:'||s.id::text,s.id,s.purchase_id,coalesce(v.final_key,s.staging_key),s.sha256,s.bytes::text,
         v.asset_id IS NULL AND s.created_at<=$1::timestamptz-$4*interval '1 millisecond',false,NULL::uuid,NULL,NULL,NULL
       FROM held_release_sheet s LEFT JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.created_at<=$1
@@ -195,7 +203,7 @@ export async function reconciliationPage(
       asset.object_key,
       null,
       8388608,
-      signal,
+      providerSignal(lease, limits, signal),
     );
     if (!observed) add("missing_object");
     if (!asset.digest) add("missing_digest");
