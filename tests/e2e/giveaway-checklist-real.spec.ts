@@ -735,6 +735,17 @@ test("I-46 historical preparation checks retain their original pass while refres
     await page
       .getByRole("button", { name: "Review final snapshot", exact: true })
       .click();
+    // Frozen checks can load before the confirmation route's current reads.
+    // Its enabled confirmation requires the live projection and exact preview
+    // to finish and agree; the prior draft's visible fields are insufficient.
+    await expect(page).toHaveURL(/\/admin\/leaderboards\/finalize\/confirm$/);
+    const currentChecks = page.getByRole("region", {
+      name: "Finalization checklist",
+      exact: true,
+    });
+    await expect(currentChecks.getByRole("heading", { level: 4 })).toHaveCount(
+      9,
+    );
     await expect(
       page.getByRole("heading", {
         name: "Historical preparation checklist",
@@ -753,6 +764,15 @@ test("I-46 historical preparation checks retain their original pass while refres
     const prior = await historical.innerText();
     for (const width of [1440, 390, 360]) {
       await page.setViewportSize({ width, height: 1000 });
+      await expect(
+        page.getByRole("button", {
+          name: "Confirm and save snapshot",
+          exact: true,
+        }),
+      ).toBeEnabled();
+      await expect(
+        page.getByText("Loading finalization evidence…", { exact: true }),
+      ).toHaveCount(0);
       await captureChecklist(page, "Historical-preparation");
     }
     await f.sale({ state: "received", amount: "1470001" });
