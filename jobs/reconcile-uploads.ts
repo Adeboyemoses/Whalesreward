@@ -1,1 +1,2 @@
-console.info("Upload reconciliation is not implemented; no changes made.");
+import { maintenanceMain } from "../src/server/modules/maintenance/runtime.ts";
+await maintenanceMain("reconcile-uploads");
