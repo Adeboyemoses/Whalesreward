@@ -1,22 +1,22 @@
 # lane:core
-WO-core-16a (WHR-210) report-only scheduled jobs: READY since 2026-11-20
+WO-core-16c (WHR-211) restricted monitoring, health signals and redaction: READY since 2026-11-23
 
 ## In flight
-- [Feature PR #180](https://github.com/Adeboyemoses/Whalesreward/pull/180) merged green into staging at `3db6b78`. Head `c56ca89985e73b91d8bfd10da78bb510e9e16402`; final reviewed head `76fb61b`, job implementation `9e25e06`.
-- Orphan inventory and upload reconciliation use fenced single-runner leases, bounded per-object checkpoints, immutable private count/UUID reports and heartbeat/due/deadline/complete-watermark fields for WO-core-16c. No evidence/revision/receipt/credit/campaign mutations, deletion or lifecycle changes.
-- Code/security/integrity PASS round 3/3. Round 1 fixed column-write grants, image packaging, slow-read progress and detached receipt coverage; round 3 is staging connection-alias documentation only. Evidence `.review/core__WHR-210-report-jobs.md` validates.
-- EM: typecheck/lint/build, 1,024 unit, 1,561 PostgreSQL16/82 suites/zero skips (15 maintenance cases), timezone 5+5, identifier guard26/848 sources, actual image/non-root/CLI/staging-alias smoke PASS. All job operations use restricted non-superuser roles and scoped read-only MinIO sessions.
-- Final CI five checks green: integration1,561 after one unchanged WHR-221 retry; browser503 plus three retry passes/four existing skips; release42/campaign1/storage1. Shared records are separate from the feature PR.
+- Feature PR [PR #183](https://github.com/Adeboyemoses/Whalesreward/pull/183) to staging; merged at `dc291253257aa78944793871d1a051e7c27bc4cd`; head `55de49094e8001994504772a6a5f06ce093cc1eb`, reviewed source `6990736`. Shared records are in this separate docs PR.
+- Count-only job/API/backlog signals and protected deploy check; public health unchanged. All 139 API route files/147 methods/39 families audited with synthetic canaries.
+- Code/security/integrity PASS round 2/3. Logger arbitrary-field, child-binding and message leaks fixed; code P1 early window expiry fixed with exact 300000 ms FIFO regressions.
+- EM typecheck/lint/build, 1,035 unit, 1,573 PostgreSQL/84 suites, 12 targeted real HTTP/non-superuser PostgreSQL, timezone 5+5 and identifiers 26 PASS. All five CI checks green: browser 506/four existing skips/zero retries, release 42, campaign 1, storage 1. Native timing-fixture flake and isolated 8/8 pass recorded on WHR-221; Chromium locally sandbox-blocked.
 
 ## Next
-- Stop at READY. Earl verifies deployed staging using docs/ops/maintenance.md; both staging database URL bindings must use the same restricted maintenance connection. No backup/monitoring work order started.
+- Earl follows docs/ops/production.md section 4: signed-in deploy assertion, DO uptime/platform alerts, private recipients/access/retention and synthetic deployed failure/recovery checks.
+- WHR-226 tracks deployed ingress redaction and remaining independent alert semantics/notification proof. WHR-154 startup diagnostics remain separately gated.
+- READY means stop. No next work order started; no deployed monitoring or pilot readiness claimed.
 
 ## Earl's gos
-- 20 Nov 2026: “Start WHR-210 (WO-core-16a).” “No cloud resources.” “Feature PRs must not edit STATUS, coverage-map or lanes files.” “Then stop.”
+- 2026-11-23: “Start WHR-211 (WO-core-16c).” Build section 4, no service setup, review cap 3, open to staging and merge when green; report READY then stop.
 
 ## Risks
-- Production execution remains blocked by WHR-206; WHR-56 removal/lifecycle prohibitions remain unconditional. Inventory watermarks are not backup coverage. No cloud resources or main promotion touched.
-- Existing fixture issues: WHR-221 native/CI timing, WHR-174 operator cleanup, WHR-216 review-control revocation and WHR-177 leaderboard deadlock. Assertions, domain deadlines and CI retry settings unchanged.
-- Dispatch flag: 13 > 8; review rounds remain within cap 3. Runtime model ID unavailable.
+- Native DO status checks do not establish JSON/version/policy semantics; protected snapshots are not an alert service. Per-process counters reset on restart/backward clock and are not fleet totals.
+- No cloud, processor, policy activation, client data, main promotion, retention removal or backup completion. Ten dispatches exceeds high-tier flag 8; rounds remain within cap.
 
-dispatches=13 prs=2 rounds_max=3 escalations=0 model=unavailable
+dispatches=10 prs=2 rounds_max=2 escalations=0 model=unavailable
