@@ -1,40 +1,59 @@
 import { logger } from "../../lib/logger";
-/** Five minute, pathless per-process counters. Restarts reset coverage; never a fleet total. */
+/** Exact (now-300000ms, now] pathless per-process counters; never fleet totals.
+ * Restarts and backward wall-clock jumps reset incomplete coverage. Equal-ms
+ * observations share one bucket, so integer timestamps bound the FIFO to at most
+ * 300000 buckets. Linked eviction plus running totals makes updates amortized O(1).
+ */
 export function createTelemetry() {
-  const buckets = new Map<
-    number,
-    { requests: number; serverErrors: number; throttled: number }
-  >();
+  type Counts = { requests: number; serverErrors: number; throttled: number };
+  type Bucket = Counts & { at: number; next?: Bucket };
+  let first: Bucket | undefined;
+  let last: Bucket | undefined;
+  let lastNow: number | undefined;
+  const total: Counts = { requests: 0, serverErrors: 0, throttled: 0 };
   const prune = (now: number) => {
-    for (const minute of buckets.keys())
-      if (
-        minute <= Math.floor(now / 60000) - 5 ||
-        minute > Math.floor(now / 60000)
-      )
-        buckets.delete(minute);
+    if (!Number.isSafeInteger(now))
+      throw new RangeError("Invalid telemetry clock");
+    if (lastNow !== undefined && now < lastNow) {
+      first = last = undefined;
+      total.requests = total.serverErrors = total.throttled = 0;
+    }
+    lastNow = now;
+    while (first && first.at <= now - 300000) {
+      total.requests -= first.requests;
+      total.serverErrors -= first.serverErrors;
+      total.throttled -= first.throttled;
+      first = first.next;
+    }
+    if (!first) last = undefined;
   };
   return {
     record(status: number, now = Date.now()) {
       prune(now);
-      const minute = Math.floor(now / 60000);
-      const b = buckets.get(minute) ?? {
-        requests: 0,
-        serverErrors: 0,
-        throttled: 0,
-      };
-      b.requests++;
-      if (status >= 500) b.serverErrors++;
-      if (status === 429) b.throttled++;
-      buckets.set(minute, b);
+      if (!last || last.at !== now) {
+        const bucket: Bucket = {
+          at: now,
+          requests: 0,
+          serverErrors: 0,
+          throttled: 0,
+        };
+        if (last) last.next = bucket;
+        else first = bucket;
+        last = bucket;
+      }
+      last.requests++;
+      total.requests++;
+      if (status >= 500) {
+        last.serverErrors++;
+        total.serverErrors++;
+      }
+      if (status === 429) {
+        last.throttled++;
+        total.throttled++;
+      }
     },
     snapshot(now = Date.now()) {
       prune(now);
-      const total = { requests: 0, serverErrors: 0, throttled: 0 };
-      for (const b of buckets.values()) {
-        total.requests += b.requests;
-        total.serverErrors += b.serverErrors;
-        total.throttled += b.throttled;
-      }
       return {
         ...total,
         alert:
