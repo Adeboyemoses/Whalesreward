@@ -134,14 +134,16 @@ describe("WHR-211 real HTTP route-family log-redaction audit", () => {
     owner = await f.owner();
     attendant = randomBytes(32).toString("hex");
     const context = newId();
+    // The 24-hour check compares exact instants; use one statement-stable clock.
+    // Separate clock_timestamp() calls can exceed the limit by microseconds.
     await f.pool.query(
       `INSERT INTO capture_context(id,attendant_id,assignment_id,signed_in_at,offline_expires_at,seller_name,seller_username,device_binding_digest)
-      VALUES($1,$2,$3,clock_timestamp(),clock_timestamp()+interval '24 hours','Grace Okon','grace.okon','fictional-redaction-device')`,
+      VALUES($1,$2,$3,statement_timestamp(),statement_timestamp()+interval '24 hours','Grace Okon','grace.okon','fictional-redaction-device')`,
       [context, fixtureId(6), fixtureId(18)],
     );
     await f.pool.query(
       `INSERT INTO auth_session(id,user_id,secret_verifier,expires_at,auth_version,last_online_sign_in_at,assignment_id,capture_context_id,created_at)
-      VALUES($1,$2,$3,clock_timestamp()+interval '1 day',1,clock_timestamp(),$4,$5,clock_timestamp())`,
+      VALUES($1,$2,$3,statement_timestamp()+interval '1 day',1,statement_timestamp(),$4,$5,statement_timestamp())`,
       [newId(), fixtureId(3), digest(attendant), fixtureId(18), context],
     );
     sale = (await historicalSale(f.pool, {})).id;
