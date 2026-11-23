@@ -1,8 +1,11 @@
+import { withOperationalTelemetry } from "../../../server/modules/monitoring/telemetry";
 import { healthResponse } from "@/server/modules/health/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   return healthResponse(request);
 }
+
+export const GET = withOperationalTelemetry(handleGET);

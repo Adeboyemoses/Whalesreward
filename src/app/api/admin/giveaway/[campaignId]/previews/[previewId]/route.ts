@@ -1,5 +1,6 @@
+import { withOperationalTelemetry } from "../../../../../../../server/modules/monitoring/telemetry";
 import { handleGiveaway } from "@/server/modules/giveaway/http";
-export async function GET(
+async function handleGET(
   request: Request,
   context: { params: Promise<{ campaignId: string; previewId: string }> },
 ) {
@@ -13,3 +14,5 @@ export async function GET(
     undefined,
   );
 }
+
+export const GET = withOperationalTelemetry(handleGET);

@@ -1,5 +1,8 @@
+import { withOperationalTelemetry } from "../../../../server/modules/monitoring/telemetry";
 import { handleAdmin } from "@/server/modules/admin-access/http";
 export const runtime = "nodejs";
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   return handleAdmin(request, "sign-in");
 }
+
+export const POST = withOperationalTelemetry(handlePOST);

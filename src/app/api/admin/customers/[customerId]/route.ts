@@ -1,6 +1,7 @@
+import { withOperationalTelemetry } from "../../../../../server/modules/monitoring/telemetry";
 import { handleCardsCustomers } from "../../../../../server/modules/cards/http";
 export const runtime = "nodejs";
-export async function GET(
+async function handleGET(
   request: Request,
   context: { params: Promise<{ customerId: string }> },
 ) {
@@ -12,3 +13,5 @@ export async function GET(
     params.customerId,
   );
 }
+
+export const GET = withOperationalTelemetry(handleGET);

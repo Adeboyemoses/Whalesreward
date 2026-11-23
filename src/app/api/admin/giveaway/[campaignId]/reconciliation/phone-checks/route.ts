@@ -1,9 +1,12 @@
+import { withOperationalTelemetry } from "../../../../../../../server/modules/monitoring/telemetry";
 import { handlePhones } from "../../../../../../../server/modules/giveaway/phone-http";
 export const runtime = "nodejs";
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ campaignId: string }> },
 ) {
   const p = await context.params;
   return handlePhones(request, "certify", p.campaignId);
 }
+
+export const POST = withOperationalTelemetry(handlePOST);

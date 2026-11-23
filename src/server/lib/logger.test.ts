@@ -27,7 +27,7 @@ it("redacts sensitive structured fields at any nesting depth without mutating in
   };
   logger.info(source, "purchase.received");
   const output = lines.join("");
-  expect(output).toContain("purchase-1");
+  expect(output).not.toContain("purchase-1");
   expect(output).not.toContain("secret-");
   expect(source.phone).toBe("secret-phone");
 });
@@ -71,4 +71,38 @@ it("redacts P-23 receipt bytes and evidence at any nesting depth", () => {
     "purchase.received",
   );
   expect(lines.join("")).not.toContain("receipt-canary");
+});
+it("drops arbitrary request data, messages, raw errors and forged safe keys", () => {
+  const lines: string[] = [];
+  const log = createLogger({
+    write: (line: string) => {
+      lines.push(line);
+    },
+  });
+  const canary = "PRIVATE_CANARY_08012345678";
+  log.child({ headers: { arbitrary: canary }, hostname: canary }).error(
+    {
+      event: canary,
+      reason: canary,
+      status: canary,
+      body: canary,
+      query: { x: canary },
+      err: new Error(canary),
+      counts: { scanned: canary },
+    },
+    canary,
+  );
+  log.info(canary);
+  log.info({
+    event: "maintenance.finished",
+    job: "orphans",
+    status: "succeeded",
+    counts: { scanned: 7, arbitrary: canary },
+  });
+  expect(lines.join("")).not.toContain(canary);
+  expect(JSON.parse(lines[2]!)).toMatchObject({
+    event: "maintenance.finished",
+    counts: { scanned: 7 },
+  });
+  expect(lines.join("")).not.toContain("hostname");
 });
