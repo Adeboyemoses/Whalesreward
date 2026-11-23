@@ -43,3 +43,25 @@ it("successful job becomes overdue at next due plus bounded slice, never before 
     jobSignal("orphans", row, new Date(now.getTime() + 1)).alerts,
   ).toContain("missed_schedule");
 });
+
+it("a failed run never becomes healthy from an earlier complete watermark and malformed counts are omitted", () => {
+  const result = jobSignal(
+    "orphans",
+    {
+      last_outcome: "failed",
+      heartbeat_at: now,
+      last_complete_watermark: now,
+      outcome: {
+        scanned: 4,
+        findings: "08012345678",
+        missingObject: -1,
+        digestMismatch: Infinity,
+        unknown: 5,
+      },
+    },
+    now,
+  );
+  expect(result.alerts).toContain("failed_run");
+  expect(result.lastCompleteWatermark).toBe(now.toISOString());
+  expect(result.counts).toEqual({ scanned: 4 });
+});

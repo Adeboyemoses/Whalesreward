@@ -80,6 +80,36 @@ export function withOperationalTelemetry<Args extends unknown[]>(
         event: "api.error_threshold",
         ...operationalTelemetry.snapshot(),
       });
-    return response;
+    if (!response.body) return response;
+    const reader = response.body.getReader();
+    const safeBody = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          const chunk = await reader.read();
+          if (chunk.done) {
+            controller.close();
+            reader.releaseLock();
+          } else controller.enqueue(chunk.value);
+        } catch {
+          logger.error({ event: "api.stream_failed", errors: 1 });
+          controller.error(new Error("Response stream unavailable"));
+          reader.releaseLock();
+        }
+      },
+      async cancel() {
+        try {
+          await reader.cancel();
+        } catch {
+          /* Never propagate provider errors to framework logs. */
+        } finally {
+          reader.releaseLock();
+        }
+      },
+    });
+    return new Response(safeBody, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   };
 }

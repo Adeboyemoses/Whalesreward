@@ -1,6 +1,7 @@
 import pino, { type DestinationStream } from "pino";
 
 const events = new Set([
+  "api.stream_failed",
   "api.unhandled_failure",
   "api.error_threshold",
   "purchase.received",

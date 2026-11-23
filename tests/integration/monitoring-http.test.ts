@@ -107,6 +107,41 @@ it("durable failed and stale schedules survive a monitoring reader restart", asy
   expect(job.alerts).toEqual(["failed_run", "missed_schedule"]);
   expect(job.errorCode).toBe("storage_unavailable");
 });
+it("revocation committed during configuration read prevents a protected response", async () => {
+  const blocker = await fixture.pool.connect();
+  await blocker.query("BEGIN");
+  await blocker.query(
+    "LOCK TABLE station_timing_policy IN ACCESS EXCLUSIVE MODE",
+  );
+  try {
+    const responsePromise = call();
+    let blocked = false;
+    for (let n = 0; n < 60; n++) {
+      const waiting = await fixture.pool.query(
+        "SELECT 1 FROM pg_stat_activity WHERE pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%station_timing_policy%' LIMIT 1",
+      );
+      if (waiting.rowCount) {
+        blocked = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect(blocked).toBe(true);
+    await fixture.pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
+      fixtureId(2),
+    ]);
+    await blocker.query("COMMIT");
+    const response = await responsePromise;
+    expect([401, 403]).toContain(response.status);
+    expect(await response.text()).not.toContain("missingPolicies");
+  } finally {
+    await blocker.query("ROLLBACK").catch(() => {});
+    blocker.release();
+    await fixture.pool.query("UPDATE auth_user SET enabled=true WHERE id=$1", [
+      fixtureId(2),
+    ]);
+  }
+});
 it("live permission revocation removes monitoring and deploy-check access immediately", async () => {
   await fixture.pool.query("UPDATE auth_user SET enabled=false WHERE id=$1", [
     fixtureId(2),
