@@ -1,7 +1,8 @@
+import { withOperationalTelemetry } from "../../../../../../../server/modules/monitoring/telemetry";
 import { handleStation } from "@/server/modules/station/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ attendantId: string }> },
 ) {
@@ -11,3 +12,5 @@ export async function POST(
     (await context.params).attendantId,
   );
 }
+
+export const POST = withOperationalTelemetry(handlePOST);

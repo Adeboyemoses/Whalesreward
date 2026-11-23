@@ -1,3 +1,5 @@
+import { withOperationalTelemetry } from "../../../../server/modules/monitoring/telemetry";
 import { handleGiveaway } from "@/server/modules/giveaway/http";
-export const GET = (request: Request) =>
-  handleGiveaway(request, "leaderboards");
+const handleGET = (request: Request) => handleGiveaway(request, "leaderboards");
+
+export const GET = withOperationalTelemetry(handleGET);

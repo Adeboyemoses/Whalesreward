@@ -1,5 +1,8 @@
+import { withOperationalTelemetry } from "../../../../server/modules/monitoring/telemetry";
 import { handleAdmin } from "@/server/modules/admin-access/http";
 export const runtime = "nodejs";
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   return handleAdmin(request, "assignable-roles");
 }
+
+export const GET = withOperationalTelemetry(handleGET);

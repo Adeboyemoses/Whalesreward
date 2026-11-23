@@ -1,3 +1,6 @@
+import { withOperationalTelemetry } from "../../../../../server/modules/monitoring/telemetry";
 import { handleSettings } from "../../../../../server/modules/settings/http";
 export const runtime = "nodejs";
-export const GET = (request: Request) => handleSettings(request, "history");
+const handleGET = (request: Request) => handleSettings(request, "history");
+
+export const GET = withOperationalTelemetry(handleGET);

@@ -1,6 +1,9 @@
+import { withOperationalTelemetry } from "../../../../server/modules/monitoring/telemetry";
 import { handleStation } from "@/server/modules/station/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export function GET(request: Request) {
+function handleGET(request: Request) {
   return handleStation(request, "assignment-candidates");
 }
+
+export const GET = withOperationalTelemetry(handleGET);

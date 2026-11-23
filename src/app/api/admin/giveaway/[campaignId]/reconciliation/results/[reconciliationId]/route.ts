@@ -1,5 +1,6 @@
+import { withOperationalTelemetry } from "../../../../../../../../server/modules/monitoring/telemetry";
 import { handleProjection } from "../../../../../../../../server/modules/giveaway/projection-http";
-export async function GET(
+async function handleGET(
   request: Request,
   context: {
     params: Promise<{ campaignId: string; reconciliationId: string }>;
@@ -8,3 +9,5 @@ export async function GET(
   const p = await context.params;
   return handleProjection(request, "results", p.campaignId, p.reconciliationId);
 }
+
+export const GET = withOperationalTelemetry(handleGET);

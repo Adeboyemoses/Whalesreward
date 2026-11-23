@@ -1,5 +1,8 @@
+import { withOperationalTelemetry } from "../../../../../server/modules/monitoring/telemetry";
 import { handleReports } from "@/server/modules/reports/http";
 export const runtime = "nodejs";
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   return handleReports(request, "sources");
 }
+
+export const POST = withOperationalTelemetry(handlePOST);

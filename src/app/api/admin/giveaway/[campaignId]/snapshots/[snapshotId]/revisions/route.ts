@@ -1,5 +1,6 @@
+import { withOperationalTelemetry } from "../../../../../../../../server/modules/monitoring/telemetry";
 import { handleGiveaway } from "@/server/modules/giveaway/http";
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ campaignId: string; snapshotId: string }> },
 ) {
@@ -12,3 +13,5 @@ export async function POST(
     p.snapshotId,
   );
 }
+
+export const POST = withOperationalTelemetry(handlePOST);

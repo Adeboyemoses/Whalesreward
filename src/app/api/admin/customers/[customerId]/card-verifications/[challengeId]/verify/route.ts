@@ -1,6 +1,7 @@
+import { withOperationalTelemetry } from "../../../../../../../../server/modules/monitoring/telemetry";
 import { handleCustomerRecovery } from "../../../../../../../../server/modules/customers/recovery-http";
 export const runtime = "nodejs";
-export async function POST(
+async function handlePOST(
   request: Request,
   context: { params: Promise<{ customerId: string; challengeId: string }> },
 ) {
@@ -12,3 +13,5 @@ export async function POST(
     params.challengeId,
   );
 }
+
+export const POST = withOperationalTelemetry(handlePOST);
