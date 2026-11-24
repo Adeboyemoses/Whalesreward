@@ -23,7 +23,10 @@ import { transaction, receipt, type LiveAdmin } from "../admin-access/repo";
 import type { AdminConfig } from "../admin-access/config";
 import { AuthError } from "../auth/errors";
 import { newId } from "../../lib/ids";
-import { releasePerson } from "../reviews/release-people";
+import {
+  releasePerson,
+  requireIndependentReleasePerson,
+} from "../reviews/release-people";
 import { phoneReadiness } from "./phone-readiness";
 type Kind = "initial" | "revision";
 type Phone = {
@@ -556,9 +559,42 @@ export function createPhoneService(
         ).rows[0];
         if (!e) fail("not_found", 404);
         grant(actor, e.content.kind);
-        const a = await releasePerson(db, c.station_id, actor.user_id),
-          p = await releasePerson(db, c.station_id, e.content.proposerUserId);
-        if (a.personId === p.personId) fail("independent_admin_required", 403);
+        let p = null;
+        if (b.decision === "approve") {
+          try {
+            p = await releasePerson(db, c.station_id, e.content.proposerUserId);
+          } catch (error) {
+            if (
+              !(error instanceof AuthError) ||
+              error.code !== "independence_unverifiable"
+            )
+              throw error;
+            fail("exclusion_stale");
+          }
+        }
+        let a;
+        try {
+          a = await requireIndependentReleasePerson(
+            db,
+            c.station_id,
+            actor.user_id,
+            [e.content.proposerUserId],
+            {
+              allowRevokedExcluded: b.decision === "reject",
+              frozenProposer: {
+                userId: e.content.proposerUserId,
+                person: e.content.proposerPerson,
+              },
+            },
+          );
+        } catch (error) {
+          if (
+            error instanceof AuthError &&
+            error.code === "independent_reviewer_required"
+          )
+            fail("independent_admin_required", 403);
+          throw error;
+        }
         return domainReceipt(
           db,
           config,
@@ -567,11 +603,17 @@ export function createPhoneService(
           { ...b, campaignId, exclusionId },
           async () => {
             if (
-              e.content.proposerPerson?.bindingId !== p.bindingId ||
-              e.content.proposerPerson?.version !== p.version
+              p &&
+              (e.content.proposerPerson?.bindingId !== p.bindingId ||
+                e.content.proposerPerson?.version !== p.version)
             )
               fail("exclusion_stale");
-            if (e.version !== b.expectedVersion) fail("version_conflict");
+            if (
+              e.version !== b.expectedVersion ||
+              (b.expectedCampaignVersion !== undefined &&
+                c.version !== b.expectedCampaignVersion)
+            )
+              fail("version_conflict");
             if (e.state !== "pending")
               fail(
                 e.state === "superseded"
@@ -579,11 +621,12 @@ export function createPhoneService(
                   : "exclusion_closed",
               );
             if (
-              e.content.censusId !== c.phone_census_id ||
-              e.content.designationId !== c.manager_designation_id ||
-              e.content.settingsVersionId !== c.current_timing_version_id ||
-              e.content.previousSnapshotId !== c.latest_snapshot_id ||
-              e.content.policyVersion !== c.policy_version
+              b.decision === "approve" &&
+              (e.content.censusId !== c.phone_census_id ||
+                e.content.designationId !== c.manager_designation_id ||
+                e.content.settingsVersionId !== c.current_timing_version_id ||
+                e.content.previousSnapshotId !== c.latest_snapshot_id ||
+                e.content.policyVersion !== c.policy_version)
             )
               fail("exclusion_stale");
             if (b.decision === "approve") {
@@ -607,21 +650,25 @@ export function createPhoneService(
               ).rowCount;
               if (!live) fail("permission_denied", 403);
             }
-            await readyTime(db, c, e.content.kind);
-            const phone = (await census(db, c)).find(
-              (p) => p.id === e.content.phoneId,
-            )!;
-            await partial(
-              db,
-              c,
-              e.content.partialSources.map(
-                (s: { purchaseId: string; purchaseVersion: number }) => ({
-                  purchaseId: s.purchaseId,
-                  expectedPurchaseVersion: s.purchaseVersion,
-                }),
-              ),
-              phone,
-            );
+            // The retained phone identifier is sufficient for rejection. Current
+            // census/source sufficiency and policy readiness apply only to approval.
+            if (b.decision === "approve") {
+              await readyTime(db, c, e.content.kind);
+              const phone = (await census(db, c)).find(
+                (p) => p.id === e.content.phoneId,
+              )!;
+              await partial(
+                db,
+                c,
+                e.content.partialSources.map(
+                  (s: { purchaseId: string; purchaseVersion: number }) => ({
+                    purchaseId: s.purchaseId,
+                    expectedPurchaseVersion: s.purchaseVersion,
+                  }),
+                ),
+                phone,
+              );
+            }
             if (
               b.decision === "approve" &&
               (await hasConflictingPhoneExclusion(
@@ -642,7 +689,7 @@ export function createPhoneService(
                 : "giveaway_phone_unavailable_rejected",
               {
                 phoneExclusionId: exclusionId,
-                phoneId: phone.id,
+                phoneId: e.content.phoneId,
                 exclusionVersion: e.version + 1,
                 phoneExclusionState:
                   b.decision === "approve" ? "approved" : "rejected",

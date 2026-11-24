@@ -445,7 +445,12 @@ export function ExclusionPage({
   const m = useChecklistMutation();
   const load = useCallback(async () => {
     const campaign = await api.campaign();
-    return campaign ? api.exclusion(campaign.id, exclusionId) : null;
+    return campaign
+      ? {
+          ...(await api.exclusion(campaign.id, exclusionId)),
+          expectedCampaignVersion: campaign.version,
+        }
+      : null;
   }, [api, exclusionId]);
   const r = useChecklistRead(`exclusion:${exclusionId}:${m.serial}`, load);
   const e = r.data;
@@ -506,6 +511,7 @@ export function ExclusionPage({
                       {
                         operationId: checklistOperation(),
                         expectedVersion: e.version,
+                        expectedCampaignVersion: e.expectedCampaignVersion,
                         decision: draft.decision,
                         reason: draft.reason,
                       },

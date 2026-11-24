@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { newId } from "../../src/server/lib/ids";
 import { digest } from "../../src/server/modules/auth/crypto";
+import * as releasePeople from "../../src/server/modules/reviews/release-people";
 import { createHeldReleaseService } from "../../src/server/modules/reviews/release-service";
 import { reviewEvidenceV2ReleaseArtifact } from "../../src/server/modules/reviews/release-v2";
 import {
@@ -2008,6 +2009,137 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).proposal.state,
     ).toBe("rejected");
   });
+  it.each(["unbind", "rebind"] as const)(
+    "WHR-225 %s proposer permits independent P-29 rejection in preflight and commit without credit",
+    async (change) => {
+      const x = await fixture();
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const destination = change === "unbind" ? x.people[0] : newId();
+      if (change === "rebind")
+        await db.pool.query(
+          "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+          [destination, x.f.stationId],
+        );
+      await db.pool.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+        [newId(), x.f.stationId, x.actors[0], destination],
+      );
+      const guard = {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+      };
+      await expect(
+        x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...guard,
+          outcome: "approve",
+        }),
+      ).rejects.toMatchObject({ code: "proposal_stale" });
+      const before = (
+        await db.pool.query(
+          "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+          [x.sale.purchaseId],
+        )
+      ).rows;
+      const result = await x.svc.decide(
+        x.reviewerToken,
+        x.sale.purchaseId,
+        proposal.id,
+        { ...guard, operationId: newId(), outcome: "reject" },
+      );
+      expect(result.proposal.state).toBe("rejected");
+      expect(result.decision.result).toBeNull();
+      expect(
+        (
+          await db.pool.query(
+            "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+            [x.sale.purchaseId],
+          )
+        ).rows,
+      ).toEqual(before);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    },
+  );
+  it("WHR-225 revocation between P-29 preflight and commit retains independent rejection", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const original = releasePeople.requireIndependentReleasePerson;
+    let calls = 0;
+    const spy = vi
+      .spyOn(releasePeople, "requireIndependentReleasePerson")
+      .mockImplementation(async (...args) => {
+        calls++;
+        if (calls === 2)
+          await args[0].query(
+            "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+            [newId(), x.f.stationId, x.actors[0], x.people[0]],
+          );
+        return original(...args);
+      });
+    try {
+      expect(
+        (
+          await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+            ...(await x.h.guard(x.sale.purchaseId)),
+            expectedProposalVersion: 1,
+            outcome: "reject",
+          })
+        ).proposal.state,
+      ).toBe("rejected");
+      expect(calls).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it.each([0, 2])(
+    "WHR-225 rebinding excluded actor %s cannot launder historical self-review",
+    async (excluded) => {
+      const x = await fixture();
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const replacement = newId();
+      await db.pool.query(
+        "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+        [replacement, x.f.stationId],
+      );
+      for (const [user, person] of [
+        [x.actors[excluded], replacement],
+        [x.actors[1], x.people[excluded]],
+      ])
+        await db.pool.query(
+          "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+          [newId(), x.f.stationId, user, person],
+        );
+      await expect(
+        x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...(await x.h.guard(x.sale.purchaseId)),
+          expectedProposalVersion: 1,
+          outcome: "reject",
+        }),
+      ).rejects.toMatchObject({ code: "independent_reviewer_required" });
+      expect(
+        (await x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id))
+          .state,
+      ).toBe("pending");
+    },
+  );
   it("SR-03 proposer demotion prevents approval but independent rejection remains available", async () => {
     const x = await fixture();
     const { proposal } = await x.svc.propose(

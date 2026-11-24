@@ -45,12 +45,19 @@ export const exclusionSchema = z.strictObject({
     )
     .max(100),
 });
-export const exclusionDecisionSchema = z.strictObject({
-  operationId: authId,
-  expectedVersion: version,
-  decision: z.enum(["approve", "reject"]),
-  reason,
-});
+export const exclusionDecisionSchema = z
+  .strictObject({
+    operationId: authId,
+    expectedCampaignVersion: version.optional(),
+    expectedVersion: version,
+    decision: z.enum(["approve", "reject"]),
+    reason,
+  })
+  .refine(
+    (input) =>
+      input.decision !== "reject" ||
+      input.expectedCampaignVersion !== undefined,
+  );
 export const phoneCheckSchema = z.strictObject({
   ...common,
   entries: z

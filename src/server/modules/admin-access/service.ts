@@ -32,6 +32,8 @@ import {
   type LiveAdmin,
 } from "./repo";
 import { enqueue, deliveryConfigured, invalidateMail } from "./mail";
+import { stationId } from "../station/repo";
+import { invalidatePersonDependants } from "../giveaway/person-invalidation";
 export { signIn, getSession, signOut, firstPassword } from "./sessions";
 export function validPermissions(codes: PermissionCode[]) {
   for (const code of codes) {
@@ -252,6 +254,10 @@ export async function adminWrite(
             );
             await revoke(db, old.accountId);
             if (!p.enabled) await invalidateMail(db, old.accountId, false);
+            if (old.enabled && !p.enabled)
+              await invalidatePersonDependants(db, await stationId(db), [
+                old.accountId,
+              ]);
             const user = await userView(db, old.id);
             await audit(
               db,

@@ -100,3 +100,7 @@ Required meaningful tests against real disposable PostgreSQL: dry run/list write
 | [WHR-225](https://linear.app/phaneum/issue/WHR-225) | Conservative invalidation, explicit redesignation and reachable independent rejection, including historical-alias fence | Full dependency tracking with stale rejection expansion deferred | Keep all pending blockers/history; no live changes |
 
 Earl approved all three Option A choices on 24 Nov 2026. WHR-227 implements the approved contract; its merge does not authorize environment-specific execution or policy activation. Q-576 still requires Whales to identify the real manager/independent approver privately. No names, staff IDs or private references are to be supplied in Linear.
+
+### WHR-227 phone-decision request guard
+
+`POST /api/admin/giveaway/:campaignId/reconciliation/exclusions/:exclusionId/decision` retains its existing approval shape. Rejection requires `expectedCampaignVersion` (positive integer) alongside `expectedVersion` (current exclusion transition version), `operationId`, `decision: "reject"` and `reason`. Missing campaign guards fail `400 invalid_request`; stale supplied guards fail `409 version_conflict`. Approval may also supply the campaign guard; the UI freezes both versions for either decision. Replays retain their immutable receipt after current reviewer authority and conservative identity checks.

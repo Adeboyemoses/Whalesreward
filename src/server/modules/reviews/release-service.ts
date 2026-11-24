@@ -161,6 +161,7 @@ async function independent(
   purchaseId: string,
   actorId: string,
   proposerId?: string,
+  options: Parameters<typeof requireIndependentReleasePerson>[4] = {},
 ) {
   const users = (
     await db.query<{ id: string }>(
@@ -174,6 +175,7 @@ async function independent(
     stationId,
     actorId,
     proposerId ? [...users, proposerId] : users,
+    options,
   );
 }
 async function receipt(
@@ -749,7 +751,22 @@ export function createHeldReleaseService({
         p = await sale.purchase(db, purchaseId, a.stationId),
         r = await scopedProposal(db, proposalId, purchaseId, a.stationId);
       requirePermission(a, permissions[r.target_kind]);
-      await independent(db, a.stationId, purchaseId, a.user_id, r.proposer_id);
+      if (body.outcome === "approve") {
+        try {
+          await releasePerson(db, a.stationId, r.proposer_id);
+        } catch (error) {
+          if (
+            !(error instanceof AuthError) ||
+            error.code !== "independence_unverifiable"
+          )
+            throw error;
+          return fail("proposal_stale", 409);
+        }
+      }
+      await independent(db, a.stationId, purchaseId, a.user_id, r.proposer_id, {
+        allowRevokedExcluded: body.outcome === "reject",
+        frozenProposer: { userId: r.proposer_id, person: r.provenance.person },
+      });
       const old = await receipt(
         db,
         a.user_id,
@@ -791,12 +808,31 @@ export function createHeldReleaseService({
       const p = await sale.purchase(db, purchaseId, a.stationId),
         r = await scopedProposal(db, proposalId, purchaseId, a.stationId);
       requirePermission(a, permissions[r.target_kind]);
+      if (body.outcome === "approve") {
+        try {
+          await releasePerson(db, a.stationId, r.proposer_id);
+        } catch (error) {
+          if (
+            !(error instanceof AuthError) ||
+            error.code !== "independence_unverifiable"
+          )
+            throw error;
+          return fail("proposal_stale", 409);
+        }
+      }
       const person = await independent(
         db,
         a.stationId,
         purchaseId,
         a.user_id,
         r.proposer_id,
+        {
+          allowRevokedExcluded: body.outcome === "reject",
+          frozenProposer: {
+            userId: r.proposer_id,
+            person: r.provenance.person,
+          },
+        },
       );
       const old = await receipt(
         db,
