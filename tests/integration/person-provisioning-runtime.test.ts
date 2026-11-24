@@ -4,6 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import pg from "pg";
+import { z } from "zod";
 import { parseArguments, operate } from "../../scripts/ops/person.mjs";
 import { newId } from "../../src/server/lib/ids";
 import { issueSession } from "../../src/server/modules/admin-access/sessions";
@@ -363,7 +364,7 @@ async function provisionedFixture() {
   };
 }
 
-describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
+describe("WHR-227 provisioned-data runtime boundaries", () => {
   let f: Awaited<ReturnType<typeof provisionedFixture>>;
   beforeEach(async () => {
     vi.resetModules();
@@ -663,6 +664,9 @@ describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
       f.campaignId,
       "managers",
     );
+    const viewToken = z
+      .object({ view: z.object({ viewToken: z.string() }) })
+      .parse(view).view.viewToken;
     const prepared = await prepareGiveaway(
       f.pool,
       f.owner.token,
@@ -705,7 +709,7 @@ describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
         f.campaignId,
         "managers",
         undefined,
-        { expectedView: view.view.viewToken },
+        { expectedView: viewToken },
       ),
     ).rejects.toMatchObject({ code: "read_view_stale" });
     expect(
