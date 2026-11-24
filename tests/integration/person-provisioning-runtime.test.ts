@@ -21,7 +21,10 @@ import {
   confirmGiveaway,
 } from "../../src/server/modules/giveaway/service";
 import { readProjection } from "../../src/server/modules/giveaway/projections";
-import { fixtureId } from "../helpers/cards-adversarial-fixture";
+import {
+  fixtureId,
+  historicalSale,
+} from "../helpers/cards-adversarial-fixture";
 
 /** Only account/domain fixtures use SQL. Every canonical person and binding is
  * written by the same operator boundary used outside tests, as a non-superuser. */
@@ -489,6 +492,17 @@ describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
     ).rows[0];
     expect(c.manager_designation_id).toBeNull();
     expect(c.phone_check_id).toBeNull();
+    expect(
+      (
+        await f.pool.query(
+          "SELECT state FROM giveaway_phone_exclusion_transition WHERE exclusion_id=$1 ORDER BY version DESC LIMIT 1",
+          [exclusionId],
+        )
+      ).rows[0].state,
+    ).toBe("pending");
+    expect(
+      (await readReadiness(f.pool, f.independent.token, f.campaignId)).blockers,
+    ).toContain("phone_exclusion_pending");
     const request = await f.http(),
       path = `/api/admin/giveaway/${f.campaignId}/reconciliation/exclusions/${exclusionId}/decision`;
     const decision = {
@@ -734,6 +748,7 @@ describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
       f.config,
     );
     expect(unchanged.data).toMatchObject({ state: "unchanged" });
+    const unchangedGuard = await f.guard();
     await f.op(
       "verify",
       [
@@ -751,6 +766,74 @@ describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
     expect(
       (await readReadiness(f.pool, f.owner.token, f.campaignId)).blockers,
     ).toContain("phone_check_required");
+    await expect(
+      prepareGiveaway(
+        f.pool,
+        f.owner.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          kind: "revision",
+          reason: "Fictional stale unchanged confirmation",
+          ...unchangedGuard,
+        },
+        f.config,
+      ),
+    ).rejects.toMatchObject({ code: "version_conflict" });
+    await expect(
+      prepareGiveaway(
+        f.pool,
+        f.owner.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          kind: "revision",
+          reason: "Fictional fresh guard without fresh check",
+          ...(await f.guard()),
+        },
+        f.config,
+      ),
+    ).rejects.toMatchObject({ code: "finalization_blocked" });
+    await historicalSale(f.pool, {});
+    await f.censusAndCheck("revision");
+    const revision = await prepareGiveaway(
+      f.pool,
+      f.owner.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "revision",
+        reason: "Fictional changed results",
+        ...(await f.guard()),
+      },
+      f.config,
+    );
+    const revisionPreview = revision.data as {
+      id: string;
+      contentDigest: string;
+    };
+    expect(revisionPreview.id).toBeTypeOf("string");
+    const revisionGuard = await f.guard();
+    await f.op(
+      "unbind",
+      ["--user", f.alias.userId, "--expected-binding-version", "4"],
+      "identity_uncertain",
+    );
+    await expect(
+      confirmGiveaway(
+        f.pool,
+        f.owner.token,
+        f.campaignId,
+        {
+          operationId: newId(),
+          previewId: revisionPreview.id,
+          contentDigest: revisionPreview.contentDigest,
+          ...revisionGuard,
+        },
+        revisionGuard.expectedPreviousSnapshotId!,
+        f.config,
+      ),
+    ).rejects.toMatchObject({ code: "version_conflict" });
     expect(
       (
         await f.pool.query(
