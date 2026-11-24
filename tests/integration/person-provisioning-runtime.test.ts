@@ -6,6 +6,11 @@ import type { AddressInfo } from "node:net";
 import pg from "pg";
 import { z } from "zod";
 import { parseArguments, operate } from "../../scripts/ops/person.mjs";
+import {
+  operate as operateRelease,
+  parseArguments as releaseArguments,
+  releaseV2Digest,
+} from "../../scripts/ops/review-evidence.mjs";
 import { newId } from "../../src/server/lib/ids";
 import { issueSession } from "../../src/server/modules/admin-access/sessions";
 import { createPhoneService } from "../../src/server/modules/giveaway/phones";
@@ -26,6 +31,20 @@ import {
   fixtureId,
   historicalSale,
 } from "../helpers/cards-adversarial-fixture";
+
+async function waitForBlocked(pool: pg.Pool, fragment: string) {
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const found = await pool.query(
+      "SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND usename=current_user AND wait_event_type='Lock' AND position($1 in query)>0",
+      [fragment],
+    );
+    if (found.rowCount) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(
+    `Competing transaction did not reach expected ${fragment} lock`,
+  );
+}
 
 /** Only account/domain fixtures use SQL. Every canonical person and binding is
  * written by the same operator boundary used outside tests, as a non-superuser. */
@@ -856,5 +875,221 @@ describe("WHR-227 provisioned-data runtime boundaries", () => {
         )
       ).rows,
     ).toEqual(frozen);
+  }, 60000);
+
+  it("I-07 v2 activation waiting behind provisioning rechecks every enabled account before writing an approval", async () => {
+    await f.provision();
+    await expect(
+      assertReleaseV2Installation(f.pool, f.stationId),
+    ).resolves.toBeUndefined();
+    const unbindArgs = [
+      "unbind",
+      "--station",
+      f.stationId,
+      "--environment",
+      "test",
+      "--user",
+      f.alias.userId,
+      "--expected-binding-version",
+      "2",
+      "--authorization",
+      "FICTIONAL-ACTIVATION-RACE",
+      "--reason-code",
+      "identity_uncertain",
+    ];
+    const preview = await operate(f.pool, parseArguments(unbindArgs));
+    const activation = releaseArguments([
+      "activate",
+      "--release",
+      "review-evidence-v2",
+      "--station",
+      f.stationId,
+      "--environment",
+      "test",
+      "--digest",
+      releaseV2Digest,
+      "--authorization",
+      "FICTIONAL-RELEASE-AUTH",
+      "--activated-at",
+      "2026-11-01T00:00:00Z",
+      "--apply",
+      "--expected-revision",
+      "1",
+    ]);
+    const releasePreview = await operateRelease(f.pool, {
+      ...activation,
+      apply: false,
+      expectedRevision: null,
+    });
+    expect(releasePreview).toMatchObject({
+      applied: false,
+      policy: { revision: 1 },
+    });
+    const blocker = await f.pool.connect();
+    await blocker.query("BEGIN");
+    await blocker.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('reporting:'||$1::text,0))",
+      [f.stationId],
+    );
+    const changed = operate(
+      f.pool,
+      parseArguments([
+        ...unbindArgs,
+        "--apply",
+        "--expected-revision",
+        String(preview.revision),
+      ]),
+    );
+    let attempted: ReturnType<typeof operateRelease> | undefined;
+    try {
+      // The operator owns security_state while waiting downstream. The real
+      // activation command must wait and then observe the revoked binding.
+      await waitForBlocked(f.pool, "reporting:");
+      attempted = operateRelease(f.pool, activation);
+      await waitForBlocked(f.pool, "security_state");
+    } finally {
+      await blocker.query("COMMIT");
+      blocker.release();
+    }
+    expect(attempted).toBeDefined();
+    const outcomes = await Promise.allSettled([changed, attempted!]);
+    expect(outcomes[0]).toMatchObject({
+      status: "fulfilled",
+      value: { result: "applied" },
+    });
+    expect(outcomes[1]).toMatchObject({
+      status: "rejected",
+      reason: { message: "release_policy_unconfigured" },
+    });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM review_evidence_approval",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM review_evidence_configuration",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    await expect(
+      assertReleaseV2Installation(f.pool, f.stationId),
+    ).rejects.toThrow("release_policy_unconfigured");
+  }, 60000);
+
+  it("I-46 giveaway confirmation queued behind provisioning cannot consume an obsolete preview or freeze stale phone evidence", async () => {
+    await f.provision();
+    await f.designate();
+    await f.censusAndCheck();
+    const prepared = await prepareGiveaway(
+      f.pool,
+      f.owner.token,
+      f.campaignId,
+      {
+        operationId: newId(),
+        kind: "initial",
+        reason: "Fictional concurrent confirmation",
+        ...(await f.guard()),
+      },
+      f.config,
+    );
+    const preview = prepared.data as { id: string; contentDigest: string };
+    const confirmInput = {
+      operationId: newId(),
+      previewId: preview.id,
+      contentDigest: preview.contentDigest,
+      ...(await f.guard()),
+    };
+    const unbindArgs = [
+      "unbind",
+      "--station",
+      f.stationId,
+      "--environment",
+      "test",
+      "--user",
+      f.alias.userId,
+      "--expected-binding-version",
+      "2",
+      "--authorization",
+      "FICTIONAL-CONFIRM-RACE",
+      "--reason-code",
+      "identity_uncertain",
+    ];
+    const mutationPreview = await operate(f.pool, parseArguments(unbindArgs));
+    const blocker = await f.pool.connect();
+    await blocker.query("BEGIN");
+    await blocker.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('reporting:'||$1::text,0))",
+      [f.stationId],
+    );
+    const changed = operate(
+      f.pool,
+      parseArguments([
+        ...unbindArgs,
+        "--apply",
+        "--expected-revision",
+        String(mutationPreview.revision),
+      ]),
+    );
+    let confirmed: ReturnType<typeof confirmGiveaway> | undefined;
+    try {
+      await waitForBlocked(f.pool, "reporting:");
+      confirmed = confirmGiveaway(
+        f.pool,
+        f.owner.token,
+        f.campaignId,
+        confirmInput,
+        undefined,
+        f.config,
+      );
+      await waitForBlocked(f.pool, "security_state");
+    } finally {
+      await blocker.query("COMMIT");
+      blocker.release();
+    }
+    expect(confirmed).toBeDefined();
+    const outcomes = await Promise.allSettled([changed, confirmed!]);
+    expect(outcomes[0]).toMatchObject({
+      status: "fulfilled",
+      value: { result: "applied" },
+    });
+    expect(outcomes[1]).toMatchObject({
+      status: "rejected",
+      reason: { code: "version_conflict" },
+    });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM giveaway_snapshot WHERE campaign_id=$1",
+          [f.campaignId],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM giveaway_preview_consumption WHERE preview_id=$1",
+          [preview.id],
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT phone_check_id,reconciliation_required FROM campaign WHERE id=$1",
+          [f.campaignId],
+        )
+      ).rows[0],
+    ).toMatchObject({ phone_check_id: null, reconciliation_required: true });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM audit_event WHERE action='giveaway_finalized'",
+        )
+      ).rows[0].n,
+    ).toBe(0);
   }, 60000);
 });
