@@ -173,11 +173,19 @@ export async function leaderboardRecords(
       "UPDATE campaign SET current_timing_version_id=$2,version=version+1 WHERE id=$1",
       [campaignId, settingsId],
     );
-    if (options.reconciliationPolicy !== false)
+    if (options.reconciliationPolicy === false) {
+      // Model historical unconfigured state in this disposable browser schema.
       await pool.query(
-        "INSERT INTO station_reconciliation_policy(station_id,policy_version) VALUES($1,'reconciliation-v1') ON CONFLICT DO NOTHING",
+        "ALTER TABLE station_reconciliation_policy DISABLE TRIGGER USER",
+      );
+      await pool.query(
+        "DELETE FROM station_reconciliation_policy WHERE station_id=$1",
         [seedId(8)],
       );
+      await pool.query(
+        "ALTER TABLE station_reconciliation_policy ENABLE TRIGGER USER",
+      );
+    }
     return campaign();
   }
   async function phoneCheck(kind: "initial" | "revision" = "initial") {

@@ -960,7 +960,7 @@ describe("P-28 recorded policy and health acceptance", () => {
       result = await health();
     expect(result.response.status).toBe(200);
     expect(result.body.policies.timing).toBe("configured");
-    expect(result.body.policies.reconciliation).toBe("unconfigured");
+    expect(result.body.policies.reconciliation).toBe("configured");
     expect(Object.keys(result.body.policies)).toHaveLength(12);
     expect((await settings()).campaign).toBeNull();
     expect((await settings()).timingPolicyVersion).toBe("campaign-timing-v1");

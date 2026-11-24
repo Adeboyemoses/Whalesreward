@@ -884,6 +884,15 @@ test("I-46 missing campaign values and reconciliation policy stay blocked and un
       "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional unconfigured checklist',1,true)",
       [seedId(99), seedId(8)],
     );
+
+    // Historical missing-binding state, only in this disposable test schema.
+    await f.pool.query(
+      "ALTER TABLE station_reconciliation_policy DISABLE TRIGGER USER",
+    );
+    await f.pool.query("DELETE FROM station_reconciliation_policy");
+    await f.pool.query(
+      "ALTER TABLE station_reconciliation_policy ENABLE TRIGGER USER",
+    );
     await page.goto("/admin/leaderboards/finalize");
     const checks = page.getByRole("region", {
       name: "Finalization checklist",
