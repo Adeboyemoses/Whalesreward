@@ -612,9 +612,19 @@ describe.sequential("WHR-227 provisioned-data runtime boundaries", () => {
       managerAdminId: f.owner.adminId,
       reason: "Fictional manager race",
     });
+    let waiting = 0;
+    for (let attempt = 0; attempt < 100 && waiting < 2; attempt++) {
+      waiting = (
+        await held.query(
+          "SELECT count(*)::int n FROM pg_stat_activity WHERE datname=current_database() AND usename=current_user AND wait_event_type='Lock' AND query LIKE '%security_state%'",
+        )
+      ).rows[0].n;
+      if (waiting < 2) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     await held.query("COMMIT");
     held.release();
     const results = await Promise.allSettled([disable, designate]);
+    expect(waiting).toBeGreaterThanOrEqual(2);
     expect(results[0]!.status).toBe("fulfilled");
     const live = (
       await f.pool.query(
