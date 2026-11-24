@@ -646,7 +646,7 @@ describe("WHR-26 independent settings transaction verification", () => {
     const protectedResult = await call(healthResponse);
     expect(protectedResult.response.status).toBe(200);
     expect(protectedResult.body.policies.timing).toBe("configured");
-    expect(protectedResult.body.policies.reconciliation).toBe("unconfigured");
+    expect(protectedResult.body.policies.reconciliation).toBe("configured");
     expect(protectedResult.body.fullyConfigured).toBe(false);
     expect(protectedResult.body.policies).not.toHaveProperty("retention");
     expect(protectedResult.body.policies).not.toHaveProperty("timingPolicy");

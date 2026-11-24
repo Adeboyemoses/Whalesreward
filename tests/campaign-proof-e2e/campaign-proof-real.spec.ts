@@ -60,10 +60,6 @@ async function setupBounds(f: ReleaseFixture) {
     "UPDATE campaign SET reconciliation_required=true,version=version+1 WHERE id=$1",
     [c.id],
   );
-  await f.db.query(
-    "INSERT INTO station_reconciliation_policy(station_id,policy_version) VALUES($1,'reconciliation-v1') ON CONFLICT DO NOTHING",
-    [seedId(8)],
-  );
   return campaign(f);
 }
 async function timelyPhoto(f: ReleaseFixture, purchaseId: string) {

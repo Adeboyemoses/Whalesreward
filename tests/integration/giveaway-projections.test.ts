@@ -136,6 +136,14 @@ it("T-21 policy missing differs from zero and not_applicable without synthesizin
   const originalUrl = process.env.DATABASE_URL;
   const unconfigured = await cardsFixture();
   try {
+    // Historical missing-binding state, only in this disposable test schema.
+    await unconfigured.pool.query(
+      "ALTER TABLE station_reconciliation_policy DISABLE TRIGGER USER",
+    );
+    await unconfigured.pool.query("DELETE FROM station_reconciliation_policy");
+    await unconfigured.pool.query(
+      "ALTER TABLE station_reconciliation_policy ENABLE TRIGGER USER",
+    );
     const campaign = newId(),
       token = await unconfigured.owner();
     await unconfigured.pool.query(

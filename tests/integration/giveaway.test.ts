@@ -90,6 +90,14 @@ describe("M4 exact leaderboards", () => {
     ).rejects.toMatchObject({ code: "read_view_stale" });
   });
   it("I-46 missing policy timing and phone checks block initial preparation without audit", async () => {
+    // Historical missing-binding state, only in this disposable test schema.
+    await f.pool.query(
+      "ALTER TABLE station_reconciliation_policy DISABLE TRIGGER USER",
+    );
+    await f.pool.query("DELETE FROM station_reconciliation_policy");
+    await f.pool.query(
+      "ALTER TABLE station_reconciliation_policy ENABLE TRIGGER USER",
+    );
     const campaignId = newId();
     await f.pool.query(
       "INSERT INTO campaign(id,station_id,name,version,reconciliation_required) VALUES($1,$2,'Fictional giveaway',1,true)",

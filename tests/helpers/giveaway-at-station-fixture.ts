@@ -31,13 +31,6 @@ export async function giveawayAtStation(
     "UPDATE campaign SET current_timing_version_id=$2,version=version+1 WHERE id=$1",
     [campaignId, settingsId],
   );
-  await f.pool.query(
-    "INSERT INTO reconciliation_policy_definition(policy_version,evaluator_identity,approval_reference,partial_uploads) VALUES('reconciliation-v1','reconciliation-v1','WHR-158 / WHR-162 / Earl 16 Nov 2026','exact_incomplete') ON CONFLICT DO NOTHING",
-  );
-  await f.pool.query(
-    "INSERT INTO station_reconciliation_policy(station_id,policy_version) VALUES($1,'reconciliation-v1')",
-    [stationId],
-  );
   const binding = (
     await pool.query(
       "SELECT 1 FROM held_release_person_binding WHERE station_id=$1 AND user_id=$2",
