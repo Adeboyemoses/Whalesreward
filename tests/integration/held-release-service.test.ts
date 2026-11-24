@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import { database } from "../../src/server/lib/db";
 import { readSales } from "../../src/server/modules/sales/service";
 import { saleDetailSchema } from "../../src/shared/contracts/sales";
 import { z } from "zod";
@@ -2382,4 +2384,152 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).toBe(0);
     },
   );
+  it("WHR-225 real HTTP P-29 rejection authenticates a non-superuser transaction and closes revoked proposer without credit", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    await db.pool.query(
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+      [newId(), x.f.stationId, x.actors[0], x.people[0]],
+    );
+    const schema = (await db.pool.query("SELECT current_schema() AS schema"))
+      .rows[0].schema;
+    const role = `release_http_${randomBytes(6).toString("hex")}`;
+    await db.pool.query(
+      `CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE`,
+    );
+    await db.pool.query(`GRANT USAGE ON SCHEMA ${schema} TO ${role}`);
+    await db.pool.query(
+      `GRANT ALL ON ALL TABLES IN SCHEMA ${schema} TO ${role}`,
+    );
+    await db.pool.query(
+      `GRANT ALL ON ALL SEQUENCES IN SCHEMA ${schema} TO ${role}`,
+    );
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set(
+      "options",
+      `-c search_path=${schema},public -c role=${role}`,
+    );
+    const previousUrl = process.env.DATABASE_URL,
+      previousOrigin = process.env.BETTER_AUTH_URL;
+    process.env.DATABASE_URL = url.toString();
+    const { POST } =
+      await import("../../src/app/api/admin/sales/[purchaseId]/release-proposals/[proposalId]/decision/route");
+    let origin = "";
+    const path = `/api/admin/sales/${x.sale.purchaseId}/release-proposals/${proposal.id}/decision`;
+    const server = createServer(async (incoming, outgoing) => {
+      try {
+        if (incoming.url !== path) {
+          outgoing.writeHead(404);
+          outgoing.end();
+          return;
+        }
+        const chunks: Buffer[] = [];
+        for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
+        const response = await POST(
+          new Request(origin + path, {
+            method: incoming.method,
+            headers: incoming.headers as Record<string, string>,
+            body: Buffer.concat(chunks),
+          }),
+          {
+            params: Promise.resolve({
+              purchaseId: x.sale.purchaseId,
+              proposalId: proposal.id,
+            }),
+          },
+        );
+        outgoing.writeHead(
+          response.status,
+          Object.fromEntries(response.headers),
+        );
+        outgoing.end(await response.text());
+      } catch {
+        outgoing.writeHead(500);
+        outgoing.end();
+      }
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("HTTP fixture unavailable");
+    origin = `http://127.0.0.1:${address.port}`;
+    process.env.BETTER_AUTH_URL = origin;
+    const request = {
+      ...(await x.h.guard(x.sale.purchaseId)),
+      expectedProposalVersion: 1,
+      outcome: "reject",
+      reason: "Fictional independent stale proposal closure",
+    };
+    const holds = (
+      await db.pool.query(
+        "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+        [x.sale.purchaseId],
+      )
+    ).rows;
+    const call = (body: unknown, token?: string) =>
+      fetch(origin + path, {
+        method: "POST",
+        headers: {
+          Origin: origin,
+          "Content-Type": "application/json",
+          ...(token ? { Cookie: `__Host-whr-admin-session=${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10000),
+      });
+    try {
+      expect(
+        (
+          await database().query(
+            "SELECT rolsuper FROM pg_roles WHERE rolname=current_user",
+          )
+        ).rows[0].rolsuper,
+      ).toBe(false);
+      expect((await call(request)).status).toBe(401);
+      const stale = await call(
+        { ...request, outcome: "approve" },
+        x.reviewerToken,
+      );
+      expect(stale.status).toBe(409);
+      expect((await stale.json()).error.code).toBe("proposal_stale");
+      const response = await call(request, x.reviewerToken);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      const result = await response.json();
+      expect(result.data.proposal.state).toBe("rejected");
+      expect(result.data.decision.result).toBeNull();
+      const replay = await call(request, x.reviewerToken);
+      expect(replay.status).toBe(200);
+      expect((await replay.json()).data).toEqual(result.data);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+            [x.sale.purchaseId],
+          )
+        ).rows,
+      ).toEqual(holds);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await database().end();
+      process.env.DATABASE_URL = previousUrl;
+      process.env.BETTER_AUTH_URL = previousOrigin;
+      await db.pool.query(`DROP OWNED BY ${role}`);
+      await db.pool.query(`DROP ROLE ${role}`);
+    }
+  }, 30000);
 });
