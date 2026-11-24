@@ -961,3 +961,17 @@ Feature PR [PR #183](https://github.com/Adeboyemoses/Whalesreward/pull/183), mer
 | Five-minute API error threshold | monitoring `telemetry.test.ts`: `retains all errors within the exact five-minute window across a minute boundary`; `expires only events at or before the rolling cutoff and preserves status totals`; `sanitizes errors raised after response return and preserves headers and null bodies` | on-staging per-process counts; resets and stream failures do not establish fleet availability |
 
 EM: 1,035 unit; 1,573 real PostgreSQL/84 suites; 12 targeted real HTTP/non-superuser PostgreSQL; timezone 5+5; identifier guard 26; typecheck/lint/build PASS. CI: all five checks green; 506 ordinary browser passes/four existing skips/zero retries, release 42, campaign 1 and storage 1. Final native rerun had an existing timing-fixture parse failure (1,572 plus isolated 8/8), recorded on WHR-221; the earlier full native run and final Linux run each passed all 1,573. The runbook's signed-in deployment assertion checks missing policy names/states and lookup issuance readiness; WHR-154 startup lifecycle is separate. No DO service was created. Earl verifies native uptime capabilities, restricted log retention/access and received failure/recovery notifications under WHR-226 before live logging/pilot.
+
+
+## WHR-229: reconciliation policy station bootstrap (READY, 2026-11-24)
+
+[Feature PR #187](https://github.com/Adeboyemoses/Whalesreward/pull/187) merged green at `5283e0108fdf15420dbc8b3045f487ba6dbf8ad4`; reviewed code `c777b1a`, PR head `596dc5795984e9e30a7b5d07d53c084acc41c7ba`. Shared records are separate from the feature PR.
+
+| Invariant / boundary | Verification | Status and limits |
+|---|---|---|
+| I-45, I-46 | `reconciliation-station-binding.test.ts`: `WHR-229 upgrade binds every existing station and new stations; replay preserves bindings and seeds nothing else`; exact definition guard cases and incompatible immutable binding refusal | on-staging; real PostgreSQL upgrade/fresh bootstrap/replay; only approved policy bindings seeded |
+| I-07, I-45, I-46 | `reconciliation-bootstrap-http.test.ts`: `WHR-229 migration-configured real HTTP health, readiness and checklist permit a full phone census and check`; missing binding and evaluator/digest/partial-upload/approval mismatch cases | on-staging; real socket HTTP and PostgreSQL; protected/public health, readiness, nine checks, census and certification; fixture binding inserts removed |
+
+Red proof: fixture binding removal returned reconciliation_policy_unconfigured before census validation; the migration restored the expected result. Thirteen new tests passed independently with all three reviewers, round 1/3, zero findings. CI: all five checks green, unit 1,046, integration 1,626/89 suites, timezone 5+5, ordinary browser 506/four existing skips, release 42, campaign-proof 1, storage 1. Native WHR-221 rate-refill flake and rejected task-specific database name were verified by focused 18/18 and allowed-database 7/7 reruns; no assertions or guards weakened.
+
+Sweep: timing already has a production migration/backfill/trigger; review-evidence and meter have production activation writers; canonical people have ops:person from WHR-227. No additional migrated-definition/fixture-only-station-binding gap found. No dates, people, campaign values or phone checks seeded; no deployed/client acceptance claimed.
