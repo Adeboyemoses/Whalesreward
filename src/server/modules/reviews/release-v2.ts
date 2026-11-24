@@ -23,6 +23,7 @@ export const reviewEvidenceV2Installation = Object.freeze({
   proposals: true,
   canonicalPersonBinding: true,
   sheetPurpose: true,
+  sheetUploaderBindingVersion: true,
   independentDecisions: true,
   auditTransitions: true,
   contributionConsistency: true,
@@ -44,7 +45,21 @@ export async function assertReleaseV2Installation(
       AND to_regclass('giveaway_preview') IS NOT NULL
       AND to_regclass('giveaway_preview_consumption') IS NOT NULL
       AND to_regclass('giveaway_phone_check') IS NOT NULL
-      AND to_regclass('photo_receipt_fact') IS NOT NULL AS installed`,
+      AND to_regclass('photo_receipt_fact') IS NOT NULL
+      AND (SELECT count(*) FROM pg_catalog.pg_attribute
+       WHERE attrelid=to_regclass('held_release_sheet') AND attnum>0 AND NOT attisdropped
+       AND ((attname='uploader_binding_id' AND atttypid='uuid'::regtype)
+        OR (attname='uploader_binding_version' AND atttypid='integer'::regtype)))=2
+      AND EXISTS(SELECT 1 FROM pg_catalog.pg_trigger
+       WHERE tgrelid=to_regclass('held_release_sheet') AND tgname='held_release_sheet_binding_guard'
+       AND tgenabled IN ('O','A') AND NOT tgisinternal
+       AND tgfoid=to_regprocedure('guard_release_sheet_binding()'))
+      AND EXISTS(SELECT 1 FROM pg_catalog.pg_constraint
+       WHERE conrelid=to_regclass('held_release_sheet') AND conname='held_release_sheet_binding_pair'
+       AND contype='c' AND convalidated)
+      AND EXISTS(SELECT 1 FROM pg_catalog.pg_constraint
+       WHERE conrelid=to_regclass('held_release_sheet') AND conname='held_release_sheet_binding_identity'
+       AND contype='f' AND convalidated) AS installed`,
   );
   if (!tables.rows[0]?.installed)
     throw new Error("release_policy_unconfigured");

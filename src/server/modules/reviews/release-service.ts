@@ -38,6 +38,7 @@ import {
   requireIndependentReleasePerson,
 } from "./release-people";
 import { classifyReleaseAdmission } from "./release-admission";
+import { requireCurrentReleaseSheetBinding } from "./release-sheet-binding";
 import { writeReleaseAudit } from "./release-audit";
 import {
   pinReleaseV2Policy,
@@ -349,6 +350,7 @@ async function inspectPhotos(
   body: ReleaseProposalInput,
   personId: string,
   uploaderId: string,
+  retainedProposalId?: string,
 ) {
   const meter = await inspectReviewEvidence(db, storage, purchaseId, {
     assetId: body.meterAssetId,
@@ -357,17 +359,25 @@ async function inspectPhotos(
   });
   const s = (
     await db.query<{ final_key: string; sha256: string; bytes: number }>(
-      `SELECT v.final_key,s.sha256,s.bytes FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.id=$1 AND s.purchase_id=$2 AND s.purpose='held_release_sheet' AND ((s.uploader_person_id=$3 AND s.uploader_id=$4 AND s.target=$5::jsonb) OR EXISTS(SELECT 1 FROM held_release_proposal p WHERE p.sheet_asset_id=s.id AND p.purchase_id=s.purchase_id))`,
+      `SELECT v.final_key,s.sha256,s.bytes FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id WHERE s.id=$1 AND s.purchase_id=$2 AND s.purpose='held_release_sheet' AND ((s.uploader_person_id=$3 AND s.uploader_id=$4 AND s.target=$5::jsonb) OR EXISTS(SELECT 1 FROM held_release_proposal p WHERE p.sheet_asset_id=s.id AND p.purchase_id=s.purchase_id AND ($6::uuid IS NULL OR p.id=$6)))`,
       [
         body.sheetAssetId,
         purchaseId,
         personId,
         uploaderId,
         JSON.stringify(body.target),
+        retainedProposalId ?? null,
       ],
     )
   ).rows[0];
   if (!s) return fail("evidence_unavailable", 422);
+  if (!retainedProposalId)
+    await requireCurrentReleaseSheetBinding(
+      db,
+      body.sheetAssetId,
+      purchaseId,
+      "evidence_unavailable",
+    );
   let bytes: Buffer;
   try {
     bytes = await storage.read(s.final_key, SYNC_LIMITS.maxBytes);
@@ -393,7 +403,15 @@ async function recheckPhotos(
   purchaseId: string,
   body: ReleaseProposalInput,
   checked: Awaited<ReturnType<typeof inspectPhotos>>,
+  freshAttachment: boolean,
 ) {
+  if (freshAttachment)
+    await requireCurrentReleaseSheetBinding(
+      db,
+      body.sheetAssetId,
+      purchaseId,
+      "evidence_unavailable",
+    );
   const row = await db.query(
     `SELECT s.id FROM held_release_sheet s JOIN held_release_sheet_validation v ON v.asset_id=s.id JOIN photo_asset m ON m.id=$3 AND m.purchase_id=s.purchase_id WHERE s.id=$1 AND s.purchase_id=$2 AND s.sha256=$4 AND v.final_key=$5 AND m.state='validated' AND m.validated_digest=$6 AND m.validated_digest=(SELECT expected_photo_digest FROM purchase WHERE id=$2)`,
     [
@@ -655,7 +673,7 @@ export function createHeldReleaseService({
         return fail("proposal_pending", 409);
       const candidate = await sale.candidate(db, p);
       await validateFacts(db, purchaseId, body, candidate);
-      await recheckPhotos(db, purchaseId, body, photos);
+      await recheckPhotos(db, purchaseId, body, photos, true);
       const evaluation = await classifyReleaseAdmission(db, purchaseId, body);
       const id = newId(),
         joint = await consistency(db, purchaseId, evaluation, id, body.outcome);
@@ -800,6 +818,7 @@ export function createHeldReleaseService({
               preflight.row.content,
               preflight.row.proposer_person_id,
               preflight.row.proposer_id,
+              preflight.row.id,
             ),
           )
         : null;
@@ -907,7 +926,7 @@ export function createHeldReleaseService({
         await target(db, purchaseId, r.content.target);
         await validateFacts(db, purchaseId, r.content, candidate);
         if (!checkedPhotos) return fail();
-        await recheckPhotos(db, purchaseId, r.content, checkedPhotos);
+        await recheckPhotos(db, purchaseId, r.content, checkedPhotos, false);
         const evaluation = await classifyReleaseAdmission(
           db,
           purchaseId,

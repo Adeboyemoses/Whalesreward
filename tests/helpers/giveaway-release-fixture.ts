@@ -53,7 +53,7 @@ export async function heldReleaseRuntimeFixture(
   const sheet = newId(),
     bytes = await x.h.image();
   await db.pool.query(
-    "INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,clock_timestamp()+interval '15 minutes')",
+    "INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at,uploader_binding_id,uploader_binding_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,clock_timestamp()+interval '15 minutes',(SELECT id FROM held_release_person_binding WHERE station_id=$3 AND user_id=$4 ORDER BY version DESC LIMIT 1),(SELECT version FROM held_release_person_binding WHERE station_id=$3 AND user_id=$4 ORDER BY version DESC LIMIT 1))",
     [
       sheet,
       x.sale.purchaseId,
