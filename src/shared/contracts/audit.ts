@@ -67,6 +67,19 @@ const permissions = z.enum([
   "roles",
 ]);
 export const auditFieldValues = {
+  provisioningEventId: auditId,
+  canonicalPersonId: auditId,
+  provisioningRevision: positive,
+  provisioningBindingCount: count,
+  authorizationReference: z.string().regex(/^[A-Za-z0-9._-]{1,200}$/),
+  provisioningReasonCode: z.enum([
+    "initial_provisioning",
+    "alias_link",
+    "identity_correction",
+    "identity_uncertain",
+    "offboarding",
+    "verification_completed",
+  ]),
   releaseProposalId: auditId,
   releaseDecisionId: auditId,
   releaseState: z.enum(["pending", "approved", "rejected", "superseded"]),
@@ -289,6 +302,7 @@ export const auditTargetKinds = [
   "pump",
   "review_evidence_approval",
   "review_evidence_configuration",
+  "person_provisioning_event",
 ] as const;
 export type AuditTargetKind = (typeof auditTargetKinds)[number];
 type Rule = {
@@ -306,6 +320,85 @@ const rule = (
   optional?: Rule["optional"],
 ): Rule => ({ area, targets: [target], actors, fields, optional });
 export const auditRules = {
+  person_created: rule(
+    "access",
+    "person_provisioning_event",
+    ["system:person-provisioning"],
+    [
+      "provisioningEventId",
+      "canonicalPersonId",
+      "provisioningRevision",
+      "provisioningBindingCount",
+      "authorizationReference",
+      "provisioningReasonCode",
+    ],
+  ),
+  person_account_bound: rule(
+    "access",
+    "person_provisioning_event",
+    ["system:person-provisioning"],
+    [
+      "provisioningEventId",
+      "canonicalPersonId",
+      "provisioningRevision",
+      "provisioningBindingCount",
+      "authorizationReference",
+      "provisioningReasonCode",
+    ],
+  ),
+  person_account_rebound: rule(
+    "access",
+    "person_provisioning_event",
+    ["system:person-provisioning"],
+    [
+      "provisioningEventId",
+      "canonicalPersonId",
+      "provisioningRevision",
+      "provisioningBindingCount",
+      "authorizationReference",
+      "provisioningReasonCode",
+    ],
+  ),
+  person_account_unbound: rule(
+    "access",
+    "person_provisioning_event",
+    ["system:person-provisioning"],
+    [
+      "provisioningEventId",
+      "canonicalPersonId",
+      "provisioningRevision",
+      "provisioningBindingCount",
+      "authorizationReference",
+      "provisioningReasonCode",
+    ],
+  ),
+  person_bindings_disabled: rule(
+    "access",
+    "person_provisioning_event",
+    ["system:person-provisioning"],
+    [
+      "provisioningEventId",
+      "canonicalPersonId",
+      "provisioningRevision",
+      "provisioningBindingCount",
+      "authorizationReference",
+      "provisioningReasonCode",
+    ],
+  ),
+  person_binding_verified: rule(
+    "access",
+    "person_provisioning_event",
+    ["system:person-provisioning"],
+    [
+      "provisioningEventId",
+      "canonicalPersonId",
+      "provisioningRevision",
+      "provisioningBindingCount",
+      "authorizationReference",
+      "provisioningReasonCode",
+    ],
+  ),
+
   held_release_proposed: rule(
     "sales",
     "purchase",
@@ -744,6 +837,7 @@ export const auditActorSchema = z.discriminatedUnion("kind", [
       "retention",
       "access",
       "operations",
+      "person-provisioning",
     ]),
     nameAtEvent: text,
   }),

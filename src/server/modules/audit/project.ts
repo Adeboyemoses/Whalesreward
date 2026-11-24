@@ -143,6 +143,8 @@ export async function eventStation(
     settings: "SELECT station_id FROM settings_version WHERE id=$1",
     review_evidence_approval:
       "SELECT station_id FROM review_evidence_approval WHERE id=$1",
+    person_provisioning_event:
+      "SELECT station_id FROM person_provisioning_event WHERE id=$1",
     review_evidence_configuration:
       "SELECT station_id FROM review_evidence_configuration WHERE id=$1",
   };
@@ -382,6 +384,7 @@ export function projectAudit(
     pump: "assignments",
     review_evidence_approval: "settings",
     review_evidence_configuration: "settings",
+    person_provisioning_event: "users",
   };
   const historicalArea = [
     "reports",

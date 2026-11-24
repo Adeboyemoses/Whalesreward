@@ -15,6 +15,18 @@ const M =
   "meterPolicyRelease meterPolicyRevision meterProfileId meterEvaluationId meterConclusion";
 // Independent transcription of the normative M3 action/field matrix.
 const matrix: Record<string, string> = {
+  person_created:
+    "provisioningEventId canonicalPersonId provisioningRevision provisioningBindingCount authorizationReference provisioningReasonCode",
+  person_account_bound:
+    "provisioningEventId canonicalPersonId provisioningRevision provisioningBindingCount authorizationReference provisioningReasonCode",
+  person_account_rebound:
+    "provisioningEventId canonicalPersonId provisioningRevision provisioningBindingCount authorizationReference provisioningReasonCode",
+  person_account_unbound:
+    "provisioningEventId canonicalPersonId provisioningRevision provisioningBindingCount authorizationReference provisioningReasonCode",
+  person_bindings_disabled:
+    "provisioningEventId canonicalPersonId provisioningRevision provisioningBindingCount authorizationReference provisioningReasonCode",
+  person_binding_verified:
+    "provisioningEventId canonicalPersonId provisioningRevision provisioningBindingCount authorizationReference provisioningReasonCode",
   held_release_proposed:
     "releaseProposalId releaseState releaseTargetKind releaseOutcome sheetAssetId proposerId reviewPolicyRelease reviewPolicyRevision",
   held_release_approved: `releaseProposalId releaseState releaseTargetKind releaseOutcome sheetAssetId proposerId reviewPolicyRelease reviewPolicyRevision releaseDecisionId approverId releaseConclusion decisionId reviewEvaluationId ${V} ${G}`,

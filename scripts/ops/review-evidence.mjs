@@ -159,6 +159,8 @@ export async function operate(pool, input) {
         : "BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY",
     );
     await checkDatabaseEnvironment(db, input.environment);
+    // WHR-227: serialize installation identity checks against provisioning.
+    await db.query("SELECT id FROM security_state WHERE id=true FOR SHARE");
     await db.query(
       "SELECT pg_advisory_xact_lock(hashtextextended('review-evidence:'||$1::text||':'||$2::text,0))",
       [input.stationId, input.environment],
