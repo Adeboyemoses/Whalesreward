@@ -2384,6 +2384,56 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).toBe(0);
     },
   );
+  it("WHR-225 recovery actor rebind cannot launder a historical recovery-person alias", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const recoveryUser = newId(),
+      recoveryPerson = newId(),
+      replacement = newId();
+    await db.pool.query(
+      "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'admin',$2,$2,'Fictional recovery actor',true,1,false,clock_timestamp())",
+      [recoveryUser, `recovery.${recoveryUser}`],
+    );
+    await db.pool.query(
+      "INSERT INTO admin(id,user_id,admin_code,role_id,version) VALUES($1,$2,$3,$4,1)",
+      [newId(), recoveryUser, `TEST-${recoveryUser}`, fixtureId(1)],
+    );
+    await db.pool.query(
+      "INSERT INTO auth_session(id,user_id,secret_verifier,expires_at,auth_version,last_online_sign_in_at) VALUES($1,$2,$3,clock_timestamp()+interval '1 hour',1,clock_timestamp())",
+      [newId(), recoveryUser, digest(randomBytes(32).toString("hex"))],
+    );
+    await db.pool.query(
+      "INSERT INTO held_release_person(id,station_id) VALUES($1,$3),($2,$3)",
+      [recoveryPerson, replacement, x.f.stationId],
+    );
+    await db.pool.query(
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,1,true)",
+      [newId(), x.f.stationId, recoveryUser, recoveryPerson],
+    );
+    await recoveredCorrection(x, recoveryUser);
+    for (const [user, person] of [
+      [recoveryUser, replacement],
+      [x.actors[1], recoveryPerson],
+    ])
+      await db.pool.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+        [newId(), x.f.stationId, user, person],
+      );
+    await expect(
+      x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "reject",
+      }),
+    ).rejects.toMatchObject({ code: "independent_reviewer_required" });
+    expect(
+      (await x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id)).state,
+    ).toBe("pending");
+  });
   it("WHR-225 real HTTP P-29 rejection authenticates a non-superuser transaction and closes revoked proposer without credit", async () => {
     const x = await fixture();
     const { proposal } = await x.svc.propose(

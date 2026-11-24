@@ -3,6 +3,7 @@ import { it, expect } from "vitest";
 import { giveawayFixture } from "../helpers/giveaway-fixture";
 import { historicalSale } from "../helpers/cards-adversarial-fixture";
 import { readReadiness } from "../../src/server/modules/giveaway/service";
+import { invalidatePersonDependants } from "../../src/server/modules/giveaway/person-invalidation";
 import { adminWrite } from "../../src/server/modules/admin-access/service";
 import { config } from "../helpers/cards-adversarial-fixture";
 import { newId } from "../../src/server/lib/ids";
@@ -1045,14 +1046,26 @@ it("WHR-225 phone rejection requires current campaign guard and survives revoked
         ["019a5000-0000-7000-8000-000000000002"],
       )
     ).rows[0];
-    await f.pool.query(
-      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
-      [newId(), binding.station_id, binding.user_id, binding.person_id],
-    );
-    await f.pool.query(
-      "UPDATE campaign SET manager_designation_id=NULL,phone_check_id=NULL,version=version+1,reconciliation_required=true WHERE id=$1",
-      [f.campaignId],
-    );
+    const mutation = await f.pool.connect();
+    try {
+      await mutation.query("BEGIN");
+      await mutation.query(
+        "SELECT id FROM security_state WHERE id=true FOR UPDATE",
+      );
+      await mutation.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+        [newId(), binding.station_id, binding.user_id, binding.person_id],
+      );
+      await invalidatePersonDependants(mutation, binding.station_id, [
+        binding.user_id,
+      ]);
+      await mutation.query("COMMIT");
+    } catch (error) {
+      await mutation.query("ROLLBACK");
+      throw error;
+    } finally {
+      mutation.release();
+    }
     const request = {
       operationId: newId(),
       expectedVersion: 1,
