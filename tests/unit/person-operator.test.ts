@@ -57,3 +57,11 @@ it("WHR-227 output has no error or profile fallback", () => {
     '{"result":"not_recorded","revision":1}',
   );
 });
+
+it("WHR-227 opaque references admit every specified ASCII prefix and no extra restriction", () => {
+  for (const reference of [".REF", "_REF", "-REF", "--REF", "0REF"]) {
+    const args = create.slice();
+    args[args.indexOf("--authorization") + 1] = reference;
+    expect(parseArguments(args).authorizationReference).toBe(reference);
+  }
+});

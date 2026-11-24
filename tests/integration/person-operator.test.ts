@@ -144,7 +144,7 @@ async function bound(verified = false) {
 async function totals() {
   return (
     await pool.query(
-      "SELECT (SELECT count(*) FROM person_provisioning_event)::int events,(SELECT count(*) FROM audit_event)::int audit,(SELECT data_version::text FROM station_reporting_state WHERE station_id=$1) generation,(SELECT count(*) FROM held_release_person_binding)::int bindings",
+      "SELECT (SELECT count(*) FROM person_provisioning_event)::int events,(SELECT count(*) FROM audit_event)::int audit,(SELECT data_version::text FROM station_reporting_state WHERE station_id=$1) generation,(SELECT count(*) FROM held_release_person_binding)::int bindings,(SELECT count(*) FROM person_identity_invalidation)::int markers,(SELECT count(*) FROM person_provisioning_campaign)::int campaign_events",
       [stationId],
     )
   ).rows[0];
@@ -572,4 +572,31 @@ it("WHR-227 malformed arguments and connection errors never echo values or load 
   expect(run.status).toBe(1);
   expect(run.stderr.trim()).toBe("invalid_arguments");
   expect(run.stdout + run.stderr).not.toContain("fixture-private");
+});
+
+it("WHR-227 rebind retains old person inventory and disable never revokes an alias already rebound elsewhere", async () => {
+  const { p, u } = await bound(true);
+  const destination = await person();
+  await mutate("rebind", [
+    "--user",
+    u,
+    "--person",
+    destination,
+    "--expected-binding-version",
+    "2",
+  ]);
+  expect((await operate(pool, input("list", ["--person", p]))).rows).toEqual([
+    expect.objectContaining({ personId: p, userId: null }),
+  ]);
+  const before = await totals();
+  expect((await mutate("disable", ["--person", p])).result).toBe("no_change");
+  expect(await totals()).toEqual(before);
+  const history = await operate(
+    pool,
+    input("list", ["--user", u, "--history"]),
+  );
+  expect(history.rows).toHaveLength(3);
+  expect(
+    history.rows.find((b: { effective: boolean }) => b.effective),
+  ).toMatchObject({ personId: destination, version: 3, verified: false });
 });

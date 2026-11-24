@@ -167,8 +167,7 @@ export function parseArguments(args) {
     const flag = flags[i];
     if (values.has(flag)) fail("invalid_arguments");
     if (switches.has(flag)) values.set(flag, true);
-    else if (valued.has(flag) && flags[i + 1] && !flags[i + 1].startsWith("--"))
-      values.set(flag, flags[++i]);
+    else if (valued.has(flag) && flags[i + 1]) values.set(flag, flags[++i]);
     else fail("invalid_arguments");
   }
   if (values.has("--apply") && values.has("--dry-run"))
@@ -230,19 +229,17 @@ async function scope(db, input) {
 }
 async function inventory(db, stationId) {
   // Fetch only safe identifiers/state. Profiles and evidence are never selected.
-  const [accounts, people, bindings] = await Promise.all([
-    db.query(
-      "SELECT u.id,u.kind,u.enabled,(a.id IS NOT NULL) is_admin FROM auth_user u LEFT JOIN admin a ON a.user_id=u.id ORDER BY u.id",
-    ),
-    db.query(
-      "SELECT id FROM held_release_person WHERE station_id=$1 ORDER BY id",
-      [stationId],
-    ),
-    db.query(
-      "SELECT id,user_id,person_id,version,verified FROM held_release_person_binding WHERE station_id=$1 ORDER BY user_id,version",
-      [stationId],
-    ),
-  ]);
+  const accounts = await db.query(
+    "SELECT u.id,u.kind,u.enabled,(a.id IS NOT NULL) is_admin FROM auth_user u LEFT JOIN admin a ON a.user_id=u.id ORDER BY u.id",
+  );
+  const people = await db.query(
+    "SELECT id FROM held_release_person WHERE station_id=$1 ORDER BY id",
+    [stationId],
+  );
+  const bindings = await db.query(
+    "SELECT id,user_id,person_id,version,verified FROM held_release_person_binding WHERE station_id=$1 ORDER BY user_id,version",
+    [stationId],
+  );
   const latest = new Map();
   for (const b of bindings.rows) {
     const previous = latest.get(b.user_id);
@@ -347,7 +344,7 @@ async function list(db, input, rev, inv) {
         kind: a.kind,
         effective: true,
       });
-  const associated = new Set(inv.bindings.map((b) => b.person_id));
+  const associated = new Set(selected.map((b) => b.person_id));
   for (const p of inv.people)
     if (!associated.has(p.id))
       rows.push({
@@ -545,6 +542,21 @@ export async function operate(pool, rawInput) {
       );
     }
     await scope(db, input);
+    if (input.apply && input.action !== "create") {
+      await db.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended('reporting:'||$1::text,0))",
+        [input.stationId],
+      );
+      const state = await db.query(
+        "SELECT station_id FROM station_reporting_state WHERE station_id=$1 FOR UPDATE",
+        [input.stationId],
+      );
+      if (state.rowCount !== 1) fail("reporting_state_missing");
+      await db.query(
+        "SELECT id FROM campaign WHERE station_id=$1 ORDER BY id FOR UPDATE",
+        [input.stationId],
+      );
+    }
     const rev = await revision(db, input);
     const inv = await inventory(db, input.stationId);
     if (input.action === "list") {
