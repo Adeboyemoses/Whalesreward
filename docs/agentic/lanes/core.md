@@ -1,22 +1,21 @@
 # lane:core
-WO-core-16c (WHR-211) restricted monitoring, health signals and redaction: READY since 2026-11-23
+WO-core-9g (WHR-227) canonical-person operator provisioning: READY since 2026-11-24
 
 ## In flight
-- Feature PR [PR #183](https://github.com/Adeboyemoses/Whalesreward/pull/183) to staging; merged at `dc291253257aa78944793871d1a051e7c27bc4cd`; head `55de49094e8001994504772a6a5f06ce093cc1eb`, reviewed source `6990736`. Shared records are in this separate docs PR.
-- Count-only job/API/backlog signals and protected deploy check; public health unchanged. All 139 API route files/147 methods/39 families audited with synthetic canaries.
-- Code/security/integrity PASS round 2/3. Logger arbitrary-field, child-binding and message leaks fixed; code P1 early window expiry fixed with exact 300000 ms FIFO regressions.
-- EM typecheck/lint/build, 1,035 unit, 1,573 PostgreSQL/84 suites, 12 targeted real HTTP/non-superuser PostgreSQL, timezone 5+5 and identifiers 26 PASS. All five CI checks green: browser 506/four existing skips/zero retries, release 42, campaign 1, storage 1. Native timing-fixture flake and isolated 8/8 pass recorded on WHR-221; Chromium locally sandbox-blocked.
+- [Feature PR #185](https://github.com/Adeboyemoses/Whalesreward/pull/185) merged green to staging at `b1827eaeac6a1b963902f3a0e44916926ff21c35`; head `ac6aa11039d6f2bbb5148985347534815cedfb09`, reviewed source `a807d267991c1fe63094ca02f05f6cf5058de626`. Shared records are in this separate docs PR.
+- `ops:person` supplies guarded read-only previews, explicit verified bindings and immutable provenance. Effective identity changes invalidate live giveaway state and clear affected manager designations; historical aliases fence stale P-29/phone rejection and new paper uploads.
+- Code/security/integrity PASS round 2/3. The reviewed P1 now pins each paper reservation to its exact binding; stale fresh use refuses while attached history and successful receipts remain readable.
+- EM typecheck/lint/build, 1,046 unit, 1,613 PostgreSQL/87 suites, timezone 5+5 and identifiers 26 PASS. CI: all five checks green; ordinary browser 504 passed plus two retry passes/four existing skips, release 42, campaign 1 and storage 1. Browser retries are tracked in WHR-228.
 
 ## Next
-- Earl follows docs/ops/production.md section 4: signed-in deploy assertion, DO uptime/platform alerts, private recipients/access/retention and synthetic deployed failure/recovery checks.
-- WHR-226 tracks deployed ingress redaction and remaining independent alert semantics/notification proof. WHR-154 startup diagnostics remain separately gated.
-- READY means stop. No next work order started; no deployed monitoring or pilot readiness claimed.
+- Earl follows docs/ops/person-provisioning.md for the fictional staging walkthrough. Private verification, complete enabled-account coverage and separate v2/configuration authorization precede deployed execution.
+- READY means stop. No next work order started; no real identities or policy activation claimed.
 
 ## Earl's gos
-- 2026-11-23: “Start WHR-211 (WO-core-16c).” Build section 4, no service setup, review cap 3, open to staging and merge when green; report READY then stop.
+- 2026-11-24: “Run code, security and integrity reviewers (round cap 3), open the PR to staging, merge when green, and report READY with PR, head SHA, test counts and named tests. Then stop.”
 
 ## Risks
-- Native DO status checks do not establish JSON/version/policy semantics; protected snapshots are not an alert service. Per-process counters reset on restart/backward clock and are not fleet totals.
-- No cloud, processor, policy activation, client data, main promotion, retention removal or backup completion. Ten dispatches exceeds high-tier flag 8; rounds remain within cap.
+- Operator references attest private checks; account count is not person count. Unknown historical identity remains blocked. Staging provisioning and end-of-M4 smoke remain Earl-run.
+- Local Chromium is sandbox-blocked; CI browser proof is recorded above. Fifteen dispatches exceeds the high-tier flag after daemon recovery/fix verification; review cap was respected. No cloud or main promotion.
 
-dispatches=10 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=15 prs=2 rounds_max=2 escalations=0 model=unavailable
