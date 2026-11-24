@@ -282,9 +282,16 @@ export class AdminChecklistApi {
         )
       )
         throw new AdminError("scope_lost", 403);
+      const campaign =
+        p.body.expectedCampaignVersion === undefined || replay
+          ? null
+          : await this.campaign();
       if (
         !replay &&
-        (e.version !== p.body.expectedVersion || e.state !== "pending")
+        (e.version !== p.body.expectedVersion ||
+          e.state !== "pending" ||
+          (p.body.expectedCampaignVersion !== undefined &&
+            campaign?.version !== p.body.expectedCampaignVersion))
       )
         throw new AdminError("exclusion_stale", 409);
       return;

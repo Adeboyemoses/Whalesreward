@@ -580,6 +580,15 @@ it("SR-07 v2 deactivation remains available without installation and SR-08 write
     release: "review-evidence-v2" as const,
     digest: releaseV2Digest,
   };
+  const preview = await operate(db.pool, {
+    ...inactive,
+    apply: false,
+    expectedRevision: null,
+  });
+  expect(preview.applied).toBe(false);
+  expect(preview.policy.revision).toBe(1);
+  expect(await counts(inactive.stationId)).toEqual([0, 0]);
+  expect(await auditRows(inactive.stationId)).toEqual([]);
   const result = await operate(db.pool, inactive);
   expect(result.policy).toMatchObject({
     release: "review-evidence-v2" as const,

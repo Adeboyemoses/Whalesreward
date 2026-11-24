@@ -1,6 +1,6 @@
 # Canonical person provisioning — WO-spec-3q / WHR-222
 
-Specification only, 23 Nov 2026. Earl commissioned an **Earl-run operator command** on 22 November and directly authorized this specification session. The command, ledger and invalidation rules below are proposed implementation work, not installed functionality or permission to mutate data. Rook reviews, then Earl approves the open choices. [T-24](../decisions/technical.md) records the settled delivery approach only. [Operator walkthrough](../../ops/person-provisioning.md).
+Specification approved for implementation, 24 Nov 2026 (WHR-227). Earl commissioned an **Earl-run operator command** on 22 November and directly authorized this specification session. Earl approved Option A in WHR-223, WHR-224 and WHR-225: all-enabled-account readiness, private manual verification with opaque references, and conservative invalidation. WHR-227 implements these rules; deployed execution requires separate environment-specific authorization. [T-24](../decisions/technical.md) records the settled delivery approach only. [Operator walkthrough](../../ops/person-provisioning.md).
 
 Read with [M3 P-29](m3.md#people-and-access), [M4 P-30](m4.md), [review-evidence operations](../../ops/review-evidence.md), and Earl's decisions on [WHR-144](https://linear.app/phaneum/issue/WHR-144) and [WHR-158](https://linear.app/phaneum/issue/WHR-158). Different accounts/sessions never establish different people. Permissions, original-attendant/recovery exclusions and independent approval remain required.
 
@@ -22,15 +22,15 @@ Verification belongs to a **specific binding version**, not a transferable perso
 
 ## Command contract
 
-Proposed entry point: `pnpm ops:people <action>`. It is not yet a package script. Unknown flags/positionals, conflicting flags, malformed IDs, unsafe references, missing scope and cross-station targets fail before writes with safe closed error codes; never echo raw values/errors. Bind SQL parameters throughout. No connection-string/file/dotenv option. All invocations except `--help` require explicit `--station <UUID>` and `--environment development|test|staging|production` and compare the exact persisted database comment as below.
+Entry point: `pnpm ops:person <action>` (WHR-227). `create-person` and `disable-person` are accepted aliases for `create` and `disable`. Unknown flags/positionals, conflicting flags, malformed IDs, unsafe references, missing scope and cross-station targets fail before writes with safe closed error codes; never echo raw values/errors. Bind SQL parameters throughout. No connection-string/file/dotenv option. All invocations except `--help` require explicit `--station <UUID>` and `--environment development|test|staging|production` and compare the exact persisted database comment as below.
 
 | Action and material flags | Proposed effect | Recommendation and reason |
 |---|---|---|
-| `create-person --person <new-UUIDv7>` | Insert one identity; no binding or verification | Operator chooses a fresh opaque ID before preview so apply's reviewed target is stable; never reuse an existing ID as an upsert |
+| `create --person <new-UUIDv7>` | Insert one identity; no binding or verification | Operator chooses a fresh opaque ID before preview so apply's reviewed target is stable; never reuse an existing ID as an upsert |
 | `bind --user <auth_user-UUID> --person <UUID> --expected-binding-version 0` | Version 1 association, `verified=false`; account must have no binding history | Separates identity assertion from verification; no silent overwrite |
 | `rebind --user <UUID> --person <different-UUID> --expected-binding-version V` | Append V+1 to the new person, `verified=false` | Explicitly exposes a change of human; never carries verified authority forward |
 | `unbind --user <UUID> --expected-binding-version V` | Append V+1 with prior person and `verified=false` | Schema requires a non-null person; this is an append-only revocation, not deletion |
-| `disable-person --person <UUID>` | Append unverified successors for every currently verified alias of that person, including disabled accounts, atomically | Revokes all known alias bindings, preserving person/history; it does not disable auth accounts or prevent later expressly authorized re-verification |
+| `disable --person <UUID>` | Append unverified successors for every currently verified alias of that person, including disabled accounts, atomically | Revokes all known alias bindings, preserving person/history; it does not disable auth accounts or prevent later expressly authorized re-verification |
 | `verify --user <UUID> --person <UUID> --expected-binding-version V --verification-reference <REF>` | Append V+1 for that exact current person with `verified=true` | Fresh accountable check for each alias; no `--verified true` shortcut on bind/rebind |
 | `list [--user <UUID> | --person <UUID>] [--history] [--cursor <opaque>] [--limit 1..100]` | Read-only bounded inventory, default 25; no mutation options | Safe inventory and uncertain-commit reconciliation without granting authority |
 
@@ -85,18 +85,22 @@ Recommend **keep every enabled account bound** ([WHR-223](https://linear.app/pha
 
 No requirement is added to ordinary attendant capture/registration solely because v2 is inactive. Two distinct admins are a minimum installation prerequisite, not proof that their per-kind grants, exclusions or live sessions qualify. A third independent person can be necessary when one admin also sold/recovered the target purchase.
 
-## One proposed core work order
+## Implementing core work order
 
-After Rook review and Earl approval, commission **one core provisioning work order** for the CLI/package script, additive operator-event/child storage and typed audit entries, shared transactional identity service, historical exclusion safety, giveaway/access invalidation and rejection-only historical-proposer closure for both stale P-29 and phone exclusions. Inputs are this contract, existing P-29/P-30 and WHR-223–225 answers. No app linking screen or seed-only workaround. Coordinate contract changes in the same PR. Do not execute this future work from WHR-222.
+Earl commissioned **WHR-227 / WO-core-9g** on 24 November for the CLI/package script, additive operator-event/child storage and typed audit entries, shared transactional identity service, historical exclusion safety, giveaway/access invalidation and rejection-only historical-proposer closure for both stale P-29 and phone exclusions. Inputs are this contract, existing P-29/P-30 and WHR-223–225 answers. No app linking screen or seed-only workaround. Coordinate contract changes in the same PR. WHR-222 remains the specification record; WHR-227 owns implementation.
 
 Required meaningful tests against real disposable PostgreSQL: dry run/list write nothing; all mutations reject wrong/missing database comment and spoofed settings; malformed/reference/foreign inputs disclose nothing; default unverified binding and explicit verify; many aliases/one latest association; stale next revision/binding version and concurrent first bind/verify/rebind; atomic disable-person across all aliases; failures roll back audit/generation; uncertain commit reconciles without duplicate revision; read-only pagination; no history mutation/truncation by non-superuser. Assert every enabled attendant gate, disabled historical identity, alias attendant/recovery exclusion before/after rebind, bound-version stale proposal and rejection (including proposer unbind/rebind/disable at both P-29 preflight and commit, no hold/contribution change, and a live alias of the original attendant/recovery actor still denied), manager clearance/redesignation, stale phone-exclusion rejection without live proposer, new phone check needed, initial/revision/unchanged preview invalidation, immutable approved history/snapshots and races against v2 activation/approval/giveaway confirm. Unit-test safe CLI output/error redaction. Run full core gates plus integration; flow changes also require e2e. Staging smoke in the linked runbook is **planned**, not passing evidence.
 
-## Questions and default boundary
+## Approved choices and execution boundary
 
-| Question | Option A / recommendation | Option B | Default from 23 Nov 2026 |
+| Decision | Approved Option A (24 Nov 2026) | Alternative considered | Previous default (23 Nov 2026) |
 |---|---|---|---|
 | [WHR-223](https://linear.app/phaneum/issue/WHR-223) | Keep all-enabled-account gate for the integrity reason above | Admin-only global gate with unchanged per-sale checks | Document A; retain current runtime gate |
 | [WHR-224](https://linear.app/phaneum/issue/WHR-224) | Earl's private manual verification with opaque per-binding evidence reference | Require a second private human witness per verification | No provisioning/verification until approval |
 | [WHR-225](https://linear.app/phaneum/issue/WHR-225) | Conservative invalidation, explicit redesignation and reachable independent rejection, including historical-alias fence | Full dependency tracking with stale rejection expansion deferred | Keep all pending blockers/history; no live changes |
 
-These are recommendations for review, not permission to activate a high-risk default. Specification may merge; Rook review then Earl's policy approval and a separately reviewed core implementation precede Earl's explicit environment-specific execution. Q-576 still requires Whales to identify the real manager/independent approver privately. No names, staff IDs or private references are to be supplied in Linear.
+Earl approved all three Option A choices on 24 Nov 2026. WHR-227 implements the approved contract; its merge does not authorize environment-specific execution or policy activation. Q-576 still requires Whales to identify the real manager/independent approver privately. No names, staff IDs or private references are to be supplied in Linear.
+
+### WHR-227 phone-decision request guard
+
+`POST /api/admin/giveaway/:campaignId/reconciliation/exclusions/:exclusionId/decision` retains its existing approval shape. Rejection requires `expectedCampaignVersion` (positive integer) alongside `expectedVersion` (current exclusion transition version), `operationId`, `decision: "reject"` and `reason`. Missing campaign guards fail `400 invalid_request`; stale supplied guards fail `409 version_conflict`. Approval may also supply the campaign guard; the UI freezes both versions for either decision. Replays retain their immutable receipt after current reviewer authority and conservative identity checks.

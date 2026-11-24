@@ -73,6 +73,7 @@ test("I-11/I-46 real HTTP checklist selects exact incomplete sales, retains disa
       {
         operationId: v7(),
         expectedVersion: e.version,
+        expectedCampaignVersion: (await f.campaign()).version,
         decision: "reject",
         reason: "Fictional independent phone attribution not yet confirmed",
       },

@@ -13,6 +13,7 @@ import { payloadDigest } from "../sync/canonical";
 import { AuthError } from "../auth/errors";
 import { releaseAuthority } from "./release-authority";
 import { prepareReleaseSheet } from "./release-photo";
+import { requireCurrentReleaseSheetBinding } from "./release-sheet-binding";
 import { pinReleaseV2Policy, type ReviewEnvironment } from "./config";
 
 type Sheet = {
@@ -101,6 +102,7 @@ export function createReleaseUploadsService({
     await db.query("SELECT id FROM held_release_sheet WHERE id=$1 FOR UPDATE", [
       sheet.id,
     ]);
+    await requireCurrentReleaseSheetBinding(db, sheet.id, sheet.purchase_id);
     if (
       (
         await db.query(
@@ -173,7 +175,7 @@ export function createReleaseUploadsService({
         }
         const id = newId();
         await db.query(
-          `INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,clock_timestamp()+interval '15 minutes')`,
+          `INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at,uploader_binding_id,uploader_binding_version) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,clock_timestamp()+interval '15 minutes',$10,$11)`,
           [
             id,
             purchaseId,
@@ -184,6 +186,8 @@ export function createReleaseUploadsService({
             input.sha256,
             input.bytes,
             `staging/${policy.scope.environment}/held_release_sheet/${randomUUID()}`,
+            auth.person.bindingId,
+            auth.person.version,
           ],
         );
         const data = { uploadId: id, assetId: id };

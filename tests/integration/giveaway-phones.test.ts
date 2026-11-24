@@ -3,6 +3,9 @@ import { it, expect } from "vitest";
 import { giveawayFixture } from "../helpers/giveaway-fixture";
 import { historicalSale } from "../helpers/cards-adversarial-fixture";
 import { readReadiness } from "../../src/server/modules/giveaway/service";
+import { invalidatePersonDependants } from "../../src/server/modules/giveaway/person-invalidation";
+import { adminWrite } from "../../src/server/modules/admin-access/service";
+import { config } from "../helpers/cards-adversarial-fixture";
 import { newId } from "../../src/server/lib/ids";
 
 it("P-30 census cannot omit a historical attendant account", async () => {
@@ -144,6 +147,7 @@ it("P-30 independent opposing reviewers apply one immutable decision and replay 
       f.phones.decide(b.token, f.campaignId, String(p.result.exclusion.id), {
         ...first,
         operationId: newId(),
+        expectedCampaignVersion: (await f.guard()).expectedVersion,
         decision: "reject",
       }),
     ]);
@@ -955,6 +959,215 @@ it("P-30 phone certification compares PostgreSQL microseconds strictly after the
     ).resolves.toMatchObject({ census: { version: 2 } });
   } finally {
     f.pool.connect = originalConnect;
+    await f.close();
+  }
+}, 30000);
+
+it("WHR-225 disabling a designated manager clears live certification and retains immutable designation history", async () => {
+  const f = await giveawayFixture();
+  try {
+    const a = await reviewer(f);
+    await f.phones.designate(f.token, f.campaignId, {
+      operationId: newId(),
+      expectedVersion: (await f.guard()).expectedVersion,
+      managerAdminId: a.adminId,
+      reason: "Fictional replacement manager",
+    });
+    const before = (
+      await f.pool.query(
+        "SELECT c.version,c.manager_designation_id,r.data_version::text FROM campaign c JOIN station_reporting_state r ON r.station_id=c.station_id WHERE c.id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    const designation = (
+      await f.pool.query(
+        "SELECT to_jsonb(d) AS value FROM giveaway_manager_designation d WHERE id=$1",
+        [before.manager_designation_id],
+      )
+    ).rows[0];
+    await adminWrite(
+      f.pool,
+      config,
+      f.token,
+      "users-access",
+      {
+        operationId: newId(),
+        expectedVersion: 1,
+        expectedRoleVersion: 1,
+        roleId: a.roleId,
+        enabled: false,
+        reason: "Fictional manager offboarding",
+      },
+      a.adminId,
+    );
+    const after = (
+      await f.pool.query(
+        "SELECT c.version,c.manager_designation_id,c.phone_check_id,c.reconciliation_required,r.data_version::text FROM campaign c JOIN station_reporting_state r ON r.station_id=c.station_id WHERE c.id=$1",
+        [f.campaignId],
+      )
+    ).rows[0];
+    expect(after.manager_designation_id).toBeNull();
+    expect(after.phone_check_id).toBeNull();
+    expect(after.reconciliation_required).toBe(true);
+    expect(after.version).toBe(before.version + 1);
+    expect(BigInt(after.data_version)).toBe(BigInt(before.data_version) + 1n);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT to_jsonb(d) AS value FROM giveaway_manager_designation d WHERE id=$1",
+          [before.manager_designation_id],
+        )
+      ).rows[0],
+    ).toEqual(designation);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT verified FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+          [a.userId],
+        )
+      ).rows[0].verified,
+    ).toBe(true);
+    await expect(
+      f.phones.check(a.token, f.campaignId, {}),
+    ).rejects.toBeDefined();
+  } finally {
+    await f.close();
+  }
+}, 30000);
+
+it("WHR-225 phone rejection requires current campaign guard and survives revoked proposer and stale designation", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f);
+    const binding = (
+      await f.pool.query(
+        "SELECT * FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+        ["019a5000-0000-7000-8000-000000000002"],
+      )
+    ).rows[0];
+    const mutation = await f.pool.connect();
+    try {
+      await mutation.query("BEGIN");
+      await mutation.query(
+        "SELECT id FROM security_state WHERE id=true FOR UPDATE",
+      );
+      await mutation.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+        [newId(), binding.station_id, binding.user_id, binding.person_id],
+      );
+      await invalidatePersonDependants(mutation, binding.station_id, [
+        binding.user_id,
+      ]);
+      await mutation.query("COMMIT");
+    } catch (error) {
+      await mutation.query("ROLLBACK");
+      throw error;
+    } finally {
+      mutation.release();
+    }
+    const request = {
+      operationId: newId(),
+      expectedVersion: 1,
+      expectedCampaignVersion: (await f.guard()).expectedVersion,
+      decision: "reject",
+      reason: "Fictional stale closure",
+    };
+    await expect(
+      f.phones.decide(a.token, f.campaignId, String(p.result.exclusion.id), {
+        ...request,
+        decision: "approve",
+      }),
+    ).rejects.toMatchObject({ code: "exclusion_stale" });
+    await expect(
+      f.phones.decide(a.token, f.campaignId, String(p.result.exclusion.id), {
+        ...request,
+        expectedCampaignVersion: request.expectedCampaignVersion - 1,
+      }),
+    ).rejects.toMatchObject({ code: "version_conflict" });
+    await expect(
+      f.phones.decide(a.token, f.campaignId, String(p.result.exclusion.id), {
+        ...request,
+        expectedCampaignVersion: undefined,
+      }),
+    ).rejects.toBeDefined();
+    const rejected = await f.phones.decide(
+      a.token,
+      f.campaignId,
+      String(p.result.exclusion.id),
+      request,
+    );
+    expect(rejected.exclusion.state).toBe("rejected");
+    expect(
+      await f.phones.decide(
+        a.token,
+        f.campaignId,
+        String(p.result.exclusion.id),
+        request,
+      ),
+    ).toEqual(rejected);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT count(*)::int n FROM giveaway_phone_exclusion_transition WHERE exclusion_id=$1",
+          [p.result.exclusion.id],
+        )
+      ).rows[0].n,
+    ).toBe(2);
+    expect(
+      (
+        await f.pool.query(
+          "SELECT manager_designation_id,phone_check_id,reconciliation_required FROM campaign WHERE id=$1",
+          [f.campaignId],
+        )
+      ).rows[0],
+    ).toMatchObject({
+      manager_designation_id: null,
+      phone_check_id: null,
+      reconciliation_required: true,
+    });
+  } finally {
+    await f.close();
+  }
+}, 30000);
+it("WHR-225 historical proposer alias cannot reject after rebinding the proposer to another person", async () => {
+  const f = await giveawayFixture();
+  try {
+    const p = await unavailable(f),
+      a = await reviewer(f, true),
+      replacement = newId();
+    const binding = (
+      await f.pool.query(
+        "SELECT * FROM held_release_person_binding WHERE user_id=$1 ORDER BY version DESC LIMIT 1",
+        ["019a5000-0000-7000-8000-000000000002"],
+      )
+    ).rows[0];
+    await f.pool.query(
+      "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+      [replacement, binding.station_id],
+    );
+    await f.pool.query(
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+      [newId(), binding.station_id, binding.user_id, replacement],
+    );
+    await expect(
+      f.phones.decide(a.token, f.campaignId, String(p.result.exclusion.id), {
+        operationId: newId(),
+        expectedVersion: 1,
+        expectedCampaignVersion: (await f.guard()).expectedVersion,
+        decision: "reject",
+        reason: "Fictional historical alias closure",
+      }),
+    ).rejects.toMatchObject({ code: "independent_admin_required" });
+    expect(
+      (
+        await f.pool.query(
+          "SELECT state FROM giveaway_phone_exclusion_transition WHERE exclusion_id=$1 ORDER BY version DESC LIMIT 1",
+          [p.result.exclusion.id],
+        )
+      ).rows[0].state,
+    ).toBe("pending");
+  } finally {
     await f.close();
   }
 }, 30000);

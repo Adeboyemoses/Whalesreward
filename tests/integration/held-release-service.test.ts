@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import { database } from "../../src/server/lib/db";
 import { readSales } from "../../src/server/modules/sales/service";
 import { saleDetailSchema } from "../../src/shared/contracts/sales";
 import { z } from "zod";
@@ -5,6 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { newId } from "../../src/server/lib/ids";
 import { digest } from "../../src/server/modules/auth/crypto";
+import * as releasePeople from "../../src/server/modules/reviews/release-people";
 import { createHeldReleaseService } from "../../src/server/modules/reviews/release-service";
 import { reviewEvidenceV2ReleaseArtifact } from "../../src/server/modules/reviews/release-v2";
 import {
@@ -52,7 +55,7 @@ async function fixture(kind: "card" | "price" | "date" | "capture" = "card") {
   const sheet = newId(),
     bytes = await x.h.image();
   await db.pool.query(
-    "INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,clock_timestamp()+interval '15 minutes')",
+    "INSERT INTO held_release_sheet(id,purchase_id,station_id,uploader_id,uploader_person_id,target,sha256,bytes,staging_key,expires_at,uploader_binding_id,uploader_binding_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,clock_timestamp()+interval '15 minutes',(SELECT id FROM held_release_person_binding WHERE station_id=$3 AND user_id=$4 ORDER BY version DESC LIMIT 1),(SELECT version FROM held_release_person_binding WHERE station_id=$3 AND user_id=$4 ORDER BY version DESC LIMIT 1))",
     [
       sheet,
       x.sale.purchaseId,
@@ -2008,6 +2011,137 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).proposal.state,
     ).toBe("rejected");
   });
+  it.each(["unbind", "rebind"] as const)(
+    "WHR-225 %s proposer permits independent P-29 rejection in preflight and commit without credit",
+    async (change) => {
+      const x = await fixture();
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const destination = change === "unbind" ? x.people[0] : newId();
+      if (change === "rebind")
+        await db.pool.query(
+          "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+          [destination, x.f.stationId],
+        );
+      await db.pool.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+        [newId(), x.f.stationId, x.actors[0], destination],
+      );
+      const guard = {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+      };
+      await expect(
+        x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...guard,
+          outcome: "approve",
+        }),
+      ).rejects.toMatchObject({ code: "proposal_stale" });
+      const before = (
+        await db.pool.query(
+          "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+          [x.sale.purchaseId],
+        )
+      ).rows;
+      const result = await x.svc.decide(
+        x.reviewerToken,
+        x.sale.purchaseId,
+        proposal.id,
+        { ...guard, operationId: newId(), outcome: "reject" },
+      );
+      expect(result.proposal.state).toBe("rejected");
+      expect(result.decision.result).toBeNull();
+      expect(
+        (
+          await db.pool.query(
+            "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+            [x.sale.purchaseId],
+          )
+        ).rows,
+      ).toEqual(before);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    },
+  );
+  it("WHR-225 revocation between P-29 preflight and commit retains independent rejection", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const original = releasePeople.requireIndependentReleasePerson;
+    let calls = 0;
+    const spy = vi
+      .spyOn(releasePeople, "requireIndependentReleasePerson")
+      .mockImplementation(async (...args) => {
+        calls++;
+        if (calls === 2)
+          await args[0].query(
+            "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+            [newId(), x.f.stationId, x.actors[0], x.people[0]],
+          );
+        return original(...args);
+      });
+    try {
+      expect(
+        (
+          await x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+            ...(await x.h.guard(x.sale.purchaseId)),
+            expectedProposalVersion: 1,
+            outcome: "reject",
+          })
+        ).proposal.state,
+      ).toBe("rejected");
+      expect(calls).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it.each([0, 2])(
+    "WHR-225 rebinding excluded actor %s cannot launder historical self-review",
+    async (excluded) => {
+      const x = await fixture();
+      const { proposal } = await x.svc.propose(
+        x.token,
+        x.sale.purchaseId,
+        x.body,
+      );
+      const replacement = newId();
+      await db.pool.query(
+        "INSERT INTO held_release_person(id,station_id) VALUES($1,$2)",
+        [replacement, x.f.stationId],
+      );
+      for (const [user, person] of [
+        [x.actors[excluded], replacement],
+        [x.actors[1], x.people[excluded]],
+      ])
+        await db.pool.query(
+          "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+          [newId(), x.f.stationId, user, person],
+        );
+      await expect(
+        x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+          ...(await x.h.guard(x.sale.purchaseId)),
+          expectedProposalVersion: 1,
+          outcome: "reject",
+        }),
+      ).rejects.toMatchObject({ code: "independent_reviewer_required" });
+      expect(
+        (await x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id))
+          .state,
+      ).toBe("pending");
+    },
+  );
   it("SR-03 proposer demotion prevents approval but independent rejection remains available", async () => {
     const x = await fixture();
     const { proposal } = await x.svc.propose(
@@ -2250,4 +2384,202 @@ describe("P-29 dormant two-person service on real Postgres", () => {
       ).toBe(0);
     },
   );
+  it("WHR-225 recovery actor rebind cannot launder a historical recovery-person alias", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    const recoveryUser = newId(),
+      recoveryPerson = newId(),
+      replacement = newId();
+    await db.pool.query(
+      "INSERT INTO auth_user(id,kind,username,username_normalized,display_name,enabled,auth_version,must_change_password,updated_at) VALUES($1,'admin',$2,$2,'Fictional recovery actor',true,1,false,clock_timestamp())",
+      [recoveryUser, `recovery.${recoveryUser}`],
+    );
+    await db.pool.query(
+      "INSERT INTO admin(id,user_id,admin_code,role_id,version) VALUES($1,$2,$3,$4,1)",
+      [newId(), recoveryUser, `TEST-${recoveryUser}`, fixtureId(1)],
+    );
+    await db.pool.query(
+      "INSERT INTO auth_session(id,user_id,secret_verifier,expires_at,auth_version,last_online_sign_in_at) VALUES($1,$2,$3,clock_timestamp()+interval '1 hour',1,clock_timestamp())",
+      [newId(), recoveryUser, digest(randomBytes(32).toString("hex"))],
+    );
+    await db.pool.query(
+      "INSERT INTO held_release_person(id,station_id) VALUES($1,$3),($2,$3)",
+      [recoveryPerson, replacement, x.f.stationId],
+    );
+    await db.pool.query(
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,1,true)",
+      [newId(), x.f.stationId, recoveryUser, recoveryPerson],
+    );
+    await recoveredCorrection(x, recoveryUser);
+    for (const [user, person] of [
+      [recoveryUser, replacement],
+      [x.actors[1], recoveryPerson],
+    ])
+      await db.pool.query(
+        "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,true)",
+        [newId(), x.f.stationId, user, person],
+      );
+    await expect(
+      x.svc.decide(x.reviewerToken, x.sale.purchaseId, proposal.id, {
+        ...(await x.h.guard(x.sale.purchaseId)),
+        expectedProposalVersion: 1,
+        outcome: "reject",
+      }),
+    ).rejects.toMatchObject({ code: "independent_reviewer_required" });
+    expect(
+      (await x.svc.get(x.reviewerToken, x.sale.purchaseId, proposal.id)).state,
+    ).toBe("pending");
+  });
+  it("WHR-225 real HTTP P-29 rejection authenticates a non-superuser transaction and closes revoked proposer without credit", async () => {
+    const x = await fixture();
+    const { proposal } = await x.svc.propose(
+      x.token,
+      x.sale.purchaseId,
+      x.body,
+    );
+    await db.pool.query(
+      "INSERT INTO held_release_person_binding(id,station_id,user_id,person_id,version,verified) VALUES($1,$2,$3,$4,2,false)",
+      [newId(), x.f.stationId, x.actors[0], x.people[0]],
+    );
+    const schema = (await db.pool.query("SELECT current_schema() AS schema"))
+      .rows[0].schema;
+    const role = `release_http_${randomBytes(6).toString("hex")}`;
+    await db.pool.query(
+      `CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE`,
+    );
+    await db.pool.query(`GRANT USAGE ON SCHEMA ${schema} TO ${role}`);
+    await db.pool.query(
+      `GRANT ALL ON ALL TABLES IN SCHEMA ${schema} TO ${role}`,
+    );
+    await db.pool.query(
+      `GRANT ALL ON ALL SEQUENCES IN SCHEMA ${schema} TO ${role}`,
+    );
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set(
+      "options",
+      `-c search_path=${schema},public -c role=${role}`,
+    );
+    const previousUrl = process.env.DATABASE_URL,
+      previousOrigin = process.env.BETTER_AUTH_URL;
+    process.env.DATABASE_URL = url.toString();
+    const { POST } =
+      await import("../../src/app/api/admin/sales/[purchaseId]/release-proposals/[proposalId]/decision/route");
+    let origin = "";
+    const path = `/api/admin/sales/${x.sale.purchaseId}/release-proposals/${proposal.id}/decision`;
+    const server = createServer(async (incoming, outgoing) => {
+      try {
+        if (incoming.url !== path) {
+          outgoing.writeHead(404);
+          outgoing.end();
+          return;
+        }
+        const chunks: Buffer[] = [];
+        for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
+        const response = await POST(
+          new Request(origin + path, {
+            method: incoming.method,
+            headers: incoming.headers as Record<string, string>,
+            body: Buffer.concat(chunks),
+          }),
+          {
+            params: Promise.resolve({
+              purchaseId: x.sale.purchaseId,
+              proposalId: proposal.id,
+            }),
+          },
+        );
+        outgoing.writeHead(
+          response.status,
+          Object.fromEntries(response.headers),
+        );
+        outgoing.end(await response.text());
+      } catch {
+        outgoing.writeHead(500);
+        outgoing.end();
+      }
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("HTTP fixture unavailable");
+    origin = `http://127.0.0.1:${address.port}`;
+    process.env.BETTER_AUTH_URL = origin;
+    const request = {
+      ...(await x.h.guard(x.sale.purchaseId)),
+      expectedProposalVersion: 1,
+      outcome: "reject",
+      reason: "Fictional independent stale proposal closure",
+    };
+    const holds = (
+      await db.pool.query(
+        "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+        [x.sale.purchaseId],
+      )
+    ).rows;
+    const call = (body: unknown, token?: string) =>
+      fetch(origin + path, {
+        method: "POST",
+        headers: {
+          Origin: origin,
+          "Content-Type": "application/json",
+          ...(token ? { Cookie: `__Host-whr-admin-session=${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10000),
+      });
+    try {
+      expect(
+        (
+          await database().query(
+            "SELECT rolsuper FROM pg_roles WHERE rolname=current_user",
+          )
+        ).rows[0].rolsuper,
+      ).toBe(false);
+      expect((await call(request)).status).toBe(401);
+      const stale = await call(
+        { ...request, outcome: "approve" },
+        x.reviewerToken,
+      );
+      expect(stale.status).toBe(409);
+      expect((await stale.json()).error.code).toBe("proposal_stale");
+      const response = await call(request, x.reviewerToken);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      const result = await response.json();
+      expect(result.data.proposal.state).toBe("rejected");
+      expect(result.data.decision.result).toBeNull();
+      const replay = await call(request, x.reviewerToken);
+      expect(replay.status).toBe(200);
+      expect((await replay.json()).data).toEqual(result.data);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT to_jsonb(h) value FROM purchase_hold h WHERE purchase_id=$1 ORDER BY id",
+            [x.sale.purchaseId],
+          )
+        ).rows,
+      ).toEqual(holds);
+      expect(
+        (
+          await db.pool.query(
+            "SELECT count(*)::int n FROM sale_decision WHERE purchase_id=$1",
+            [x.sale.purchaseId],
+          )
+        ).rows[0].n,
+      ).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await database().end();
+      process.env.DATABASE_URL = previousUrl;
+      process.env.BETTER_AUTH_URL = previousOrigin;
+      await db.pool.query(`DROP OWNED BY ${role}`);
+      await db.pool.query(`DROP ROLE ${role}`);
+    }
+  }, 30000);
 });
