@@ -616,7 +616,7 @@ describe("WHR-227 provisioned-data runtime boundaries", () => {
     let waiting = 0;
     for (let attempt = 0; attempt < 100 && waiting < 2; attempt++) {
       waiting = (
-        await held.query(
+        await f.pool.query(
           "SELECT count(*)::int n FROM pg_stat_activity WHERE datname=current_database() AND usename=current_user AND wait_event_type='Lock' AND query LIKE '%security_state%'",
         )
       ).rows[0].n;
