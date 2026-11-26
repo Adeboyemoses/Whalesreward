@@ -92,7 +92,7 @@ E='([[:space:];&|"]|\\"|$)' # end of an argument
 G="git${W}+(-.*${W}+)?"
 
 # 1. Secrets (T3): never read, copy or print .env files, keys or credential stores.
-envs="$(printf '%s' "$event" | grep -oE '(^|[^A-Za-z0-9_.-])\.env(\.[A-Za-z0-9_-]+)?' | sed 's/^[^.]*//' | grep -vx '\.env\.example' || true)"
+envs="$(printf '%s' "$event" | grep -oiE '(^|[^A-Za-z0-9_.-])\.env(\.[A-Za-z0-9_-]+)?' | sed 's/^[^.]*//' | grep -vix '\.env\.example' || true)"
 if [ -n "$envs" ] && has "${B}(cat|less|more|head|tail|grep|rg|sed|awk|cp|mv|scp|base64|xxd|od|strings|open|source|diff|bat|nl|cut|sort|tee)${W}"; then
   block "reading or copying .env files is T3. Report the path only and use .env.example for variable names."
 fi
@@ -128,8 +128,9 @@ fi
 # real config mutation. Unknown/ambiguous qualified config fails closed.
 V='[A-Za-z0-9_./:=@,+%-]+'
 GO="(-[Cc]${W}+${V}|-[Cc]${V}|--(git-dir|work-tree|namespace|config-env|super-prefix)=${V}|--(git-dir|work-tree|namespace|config-env|super-prefix)${W}+${V}|--(no-pager|paginate|bare|no-replace-objects|literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs|no-optional-locks|no-lazy-fetch|no-advice)|-p)"
-if has "${B}${G}add(${W}[^;&|]*)?${W}(-A|--all|\.|\*|:/|-u|-f|--force)${E}"; then
-  block "stage explicit paths; never git add -A / --all / . / * / -u, and never -f/--force (it stages gitignored files: .env, node_modules, build output)."
+if has "${B}${G}add(${W}[^;&|]*)?${W}(\.|\*|:/|-[A-Za-z]*[fAu][A-Za-z]*|--f[a-z-]*|--a[a-z-]*|--u[a-z-]*)${E}" \
+   || has "${B}${G}add${W}+([^;&|]*${W}+)?--pathspec[a-z-]*"; then
+  block "stage explicit paths; never git add -A / --all / . / * / -u / --update, nor -f/--force (any short-option group containing f/A/u, any --force/--all/--update abbreviation) or --pathspec-from-file (they stage gitignored files: .env, node_modules, build output)."
 fi
 # Force-staging aside, never stage a .env path at all; it is the gateway to `git show :.env`.
 if [ -n "$envs" ] && has "${B}${G}add${W}"; then

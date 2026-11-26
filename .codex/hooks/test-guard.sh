@@ -252,6 +252,30 @@ deny  'git add src/config/.env.local'
 allow 'git add src/server/modules/purchases/accept.ts'
 allow 'git add -p src/ui/Button.tsx'
 
+# WHR-232 (security review 8): the force flag hides in bundled short options, option
+# abbreviations, and --pathspec-from-file; catch every spelling, not just -f/--force.
+deny  'git add -vf .env'
+deny  'git add -nf dist/bundle.js'
+deny  'git add --fo .env'
+deny  'git add --for node_modules/evil'
+deny  'git add --pathspec-from-file=leak.txt'
+deny  'git add --pathspec-from-file leak.txt'
+allow 'git add -v src/ui/Button.tsx'
+
+# WHR-232 (security review 9): force hides regardless of letter order in a short-option
+# group (-fv, not only -vf), and long options abbreviate (--f, --up, --al, --pathspec-fr).
+deny  'git add -fv dist/bundle.js'
+deny  'git add -fp node_modules/evil'
+deny  'git add --f dist/bundle.js'
+deny  'git add --up'
+deny  'git add --al'
+deny  'git add --pathspec-fr leak.txt'
+allow 'git add -pv src/ui/Button.tsx'
+# Residual (accepted, defence-in-depth): shell quoting/backslash around the flag
+# (git add -'f' dist/x) defeats the force-hygiene regex, but the .env path rule still
+# blocks the secret case through any quoting; the sandbox and reviewers are the controls.
+deny  "git add -f .env"
+
 # WHR-232: file-tool events are judged on their path, never on file contents.
 fdeny  '{"tool_name":"Read","tool_input":{"file_path":"/w/.env"}}'
 fdeny  '{"tool_name":"Read","tool_input":{"file_path":"/w/.env.local"}}'
