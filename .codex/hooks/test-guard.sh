@@ -244,6 +244,14 @@ fdeny  '{"tool_name":"Read","tool_input":{"file_path":"/w/.npmrc"}}'
 allow 'git log --oneline -5'
 allow 'cat package.json'
 
+# WHR-232 (security review 7): force-staging secrets past .gitignore is the gateway to git show :.env.
+deny  'git add -f .env'
+deny  'git add --force node_modules/evil'
+deny  'git add -f dist/bundle.js'
+deny  'git add src/config/.env.local'
+allow 'git add src/server/modules/purchases/accept.ts'
+allow 'git add -p src/ui/Button.tsx'
+
 # WHR-232: file-tool events are judged on their path, never on file contents.
 fdeny  '{"tool_name":"Read","tool_input":{"file_path":"/w/.env"}}'
 fdeny  '{"tool_name":"Read","tool_input":{"file_path":"/w/.env.local"}}'

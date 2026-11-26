@@ -128,8 +128,12 @@ fi
 # real config mutation. Unknown/ambiguous qualified config fails closed.
 V='[A-Za-z0-9_./:=@,+%-]+'
 GO="(-[Cc]${W}+${V}|-[Cc]${V}|--(git-dir|work-tree|namespace|config-env|super-prefix)=${V}|--(git-dir|work-tree|namespace|config-env|super-prefix)${W}+${V}|--(no-pager|paginate|bare|no-replace-objects|literal-pathspecs|glob-pathspecs|noglob-pathspecs|icase-pathspecs|no-optional-locks|no-lazy-fetch|no-advice)|-p)"
-if has "${B}${G}add(${W}[^;&|]*)?${W}(-A|--all|\.|\*|:/|-u)${E}"; then
-  block "stage explicit paths; never git add -A / --all / . / * / -u (worktree symlinks and node_modules leak)."
+if has "${B}${G}add(${W}[^;&|]*)?${W}(-A|--all|\.|\*|:/|-u|-f|--force)${E}"; then
+  block "stage explicit paths; never git add -A / --all / . / * / -u, and never -f/--force (it stages gitignored files: .env, node_modules, build output)."
+fi
+# Force-staging aside, never stage a .env path at all; it is the gateway to `git show :.env`.
+if [ -n "$envs" ] && has "${B}${G}add${W}"; then
+  block "don't git add a .env path; secrets stay out of git. Report the path only."
 fi
 if has "${B}${G}commit${W}+([^;&|]*${W})?-[A-Za-z]*a[A-Za-z]*${E}"; then
   block "no git commit -a / -am; stage explicit paths first."
