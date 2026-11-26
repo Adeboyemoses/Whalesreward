@@ -22,12 +22,44 @@
       "Bash(gh repo edit *)",
       "Bash(gh repo rename *)",
       "Bash(gh repo archive *)"
+    ],
+    "allow": [
+      "Bash(cd *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git worktree *)",
+      "Bash(git restore *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "Bash(gh auth status)",
+      "Bash(gh repo view *)",
+      "Bash(docker compose up -d *)",
+      "Bash(docker compose down *)",
+      "Bash(docker compose ps *)",
+      "Bash(docker compose logs *)",
+      "Bash(pnpm install --frozen-lockfile)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test:integration)",
+      "Bash(pnpm test:e2e)",
+      "Bash(pnpm build)",
+      "Bash(pnpm dev)"
     ]
   },
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob",
         "hooks": [
           {
             "type": "command",
