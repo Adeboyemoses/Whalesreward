@@ -31,6 +31,10 @@ expect_tier medium docs/engineering/decisions/INDEX.md
 expect_tier high .do/app.production.yaml
 expect_tier high src/server/adapters/storage/spaces.ts
 expect_tier high AGENTS.md
+expect_tier high CLAUDE.md
+expect_tier high .claude/agents/code-reviewer.md
+expect_tier high .claude/settings.json
+expect_tier high .mcp.json
 expect_tier high .codex/agents/code-reviewer.toml
 expect_tier high .agents/skills/log-decision/SKILL.md
 expect_tier high src/server/modules/purchases/accept.ts
