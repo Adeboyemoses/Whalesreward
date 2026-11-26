@@ -1,22 +1,23 @@
 # lane:core
-WO-core-16c (WHR-211) restricted monitoring, health signals and redaction: READY since 2026-11-23
+WO-core-1h (WHR-232) port the operating model from Codex to Claude Code (Antigravity): READY since 2026-11-26.
 
 ## In flight
-- Feature PR [PR #183](https://github.com/Adeboyemoses/Whalesreward/pull/183) to staging; merged at `dc291253257aa78944793871d1a051e7c27bc4cd`; head `55de49094e8001994504772a6a5f06ce093cc1eb`, reviewed source `6990736`. Shared records are in this separate docs PR.
-- Count-only job/API/backlog signals and protected deploy check; public health unchanged. All 139 API route files/147 methods/39 families audited with synthetic canaries.
-- Code/security/integrity PASS round 2/3. Logger arbitrary-field, child-binding and message leaks fixed; code P1 early window expiry fixed with exact 300000 ms FIFO regressions.
-- EM typecheck/lint/build, 1,035 unit, 1,573 PostgreSQL/84 suites, 12 targeted real HTTP/non-superuser PostgreSQL, timezone 5+5 and identifiers 26 PASS. All five CI checks green: browser 506/four existing skips/zero retries, release 42, campaign 1, storage 1. Native timing-fixture flake and isolated 8/8 pass recorded on WHR-221; Chromium locally sandbox-blocked.
+- Feature PR [PR #189](https://github.com/Adeboyemoses/Whalesreward/pull/189) merged into staging at `a03a89de1e5a4193b1f851b710581d76d5c06430`; feature and reviewed head `e54fb1f`. Shared records are in this separate docs PR. Earl's setup self-check in Antigravity is pending.
+- CLAUDE.md imports a now-tool-neutral AGENTS.md. Eight agents live in `.claude/agents/*.md`: five builders inherit the session model with Read/Grep/Glob/Edit/Write/Bash; the three reviewers run on opus with only Read/Grep/Glob/Bash (no edit or write). The `.codex/**` wiring is left working so both surfaces run the same model.
+- The shared guard (`.codex/hooks/guard.sh`) is extended to Claude's file tools: path values are parsed with jq (python3 fallback), so `.env*`, credentials, `.git` metadata and `product-docs/` writes are blocked by path. `.claude/settings.json` denies cloud/repo admin, sets TZ=UTC and empty attribution, and wires the PreToolUse hook via `${CLAUDE_PROJECT_DIR}`. Linear is wired through `.mcp.json` (OAuth; no token in the repo).
+- CLAUDE.md, `.claude/**` and `.mcp.json` are routed high tier (routing.conf), asserted by test-review.sh; guard self-test covers Claude event shapes. docs/agentic/setup.md gains the Antigravity steps and the 5-minute self-check.
+
+## Review
+- High tier, two rounds. code-reviewer, security-reviewer and integrity-reviewer agents all PASS. Round 1: code FAIL on a P0 and security SEC-MED on the same gap — only the five builders had been ported, so dispatching a reviewer in Claude Code would fall back to a write-capable general agent. Round 2 added the three reviewer `.md` files (read-only, opus) and narrowed `gh run`; code and security re-reviewed PASS, integrity's round-1 PASS stands (the change is integrity-neutral).
+- The security verdict is the **security-reviewer agent's**, not a human reviewer's. Accepted residuals (defence-in-depth, not reachable per that review): a shell-quoted `git add` force flag defeats the hygiene regex (the `.env`-path rule still blocks the secret case); the guard matcher covers Bash and the file tools, not MCP write tools (`.mcp.json` declares only Linear).
 
 ## Next
-- Earl follows docs/ops/production.md section 4: signed-in deploy assertion, DO uptime/platform alerts, private recipients/access/retention and synthetic deployed failure/recovery checks.
-- WHR-226 tracks deployed ingress redaction and remaining independent alert semantics/notification proof. WHR-154 startup diagnostics remain separately gated.
-- READY means stop. No next work order started; no deployed monitoring or pilot readiness claimed.
+- Verification: Earl runs the setup self-check in a Claude Code session in Antigravity and pastes the result. READY means stop. No next work order is started; `.codex/**` cleanup, if wanted, is a separate later work order.
 
 ## Earl's gos
-- 2026-11-23: “Start WHR-211 (WO-core-16c).” Build section 4, no service setup, review cap 3, open to staging and merge when green; report READY then stop.
+- 2026-11-26: "Open the records PR now (low tier, docs only): STATUS.md and docs/agentic/lanes/core.md for WHR-232, including the session model you actually ran (opus) and 'Earl's self-check pending'."
 
 ## Risks
-- Native DO status checks do not establish JSON/version/policy semantics; protected snapshots are not an alert service. Per-process counters reset on restart/backward clock and are not fleet totals.
-- No cloud, processor, policy activation, client data, main promotion, retention removal or backup completion. Ten dispatches exceeds high-tier flag 8; rounds remain within cap.
+- The guard is a tripwire over the sandbox, branch protection and review, not the boundary. Dispatch count 5 is within the high-tier flag of 8; two rounds within cap 3. No cloud, main promotion, client data or secret touched.
 
-dispatches=10 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=5 prs=2 rounds_max=2 escalations=0 model=opus
