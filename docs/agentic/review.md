@@ -21,7 +21,7 @@ The tier decides who reviews a PR and how many fix rounds it gets. The routing l
 - Money, quantity and time helpers (`src/shared/money*`, `src/shared/quantity*`, `src/server/lib/time*`).
 - A destructive or backfilling migration (DROP, TRUNCATE, DELETE, type change, rename).
 - Retention, deletion and backup jobs.
-- Enforcement and agent files: `AGENTS.md`, `.codex/**`, `.agents/**`, `scripts/review/**`, `.github/**`, `docs/agentic/soul.md`, `.review/README.md`.
+- Enforcement and agent files: `AGENTS.md`, `CLAUDE.md`, `.claude/**` (agents, settings, guard wiring), `.mcp.json`, `.codex/**`, `.agents/**`, `scripts/review/**`, `.github/**`, `docs/agentic/soul.md`, `.review/README.md`.
 
 Docs-only PRs (`*.md` outside the enforcement list) need no evidence file.
 
@@ -40,7 +40,8 @@ At the round cap with a blocker still open, the EM gives Earl an A/B with a defa
 ## How reviewers run
 
 - Dispatch the tier's reviewers in parallel. Each gets the branch, the base, the issue, the plan (high tier) and the invariant IDs in play.
-- Reviewers are read-only and diff-scoped (by instruction; subagents inherit the session sandbox, so the EM checks the worktree is clean and the head unchanged after each review): `git diff origin/staging...<branch>`, `git show <branch>:<path>`, `rg`, and running tests inside the worktree path the EM names. They never `checkout`, `switch`, `stash`, `reset`, edit or commit.
+- **Never review a diff in the session that wrote it.** Each reviewer runs in its own fresh context: a subagent from the `.claude/agents/<role>.md` definition (reviewers carry no edit or write tools and run on opus), or, where subagents aren't available, a separate session or thread given that role's file as its instructions. At most three reviewer subagents run at once.
+- Reviewers are read-only and diff-scoped (by the tool allowlist and by instruction; a subagent still inherits the session sandbox, so the EM checks the worktree is clean and the head unchanged after each review): `git diff origin/staging...<branch>`, `git show <branch>:<path>`, `rg`, and running tests inside the worktree path the EM names. They never `checkout`, `switch`, `stash`, `reset`, edit or commit.
 - Each reviewer ends with a `REVIEW-VERDICT` block:
 
 ```

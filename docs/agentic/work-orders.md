@@ -21,7 +21,8 @@
 ```
 Lane:          lane:<core|app|spec>
 Milestone:     M<n> (docs/engineering/roadmap.md)
-Session model: <model>, reasoning <effort>
+Session model: <opus for lane:core and lane:spec; sonnet for lane:app>, reasoning <effort>
+               (reviewers always run on opus, whatever the session model)
 Goal:          <one sentence>
 Scope:         <child issues only>
 Inputs:        <board IDs, decision notes, F&R and TRD sections, invariant IDs, decision IDs>

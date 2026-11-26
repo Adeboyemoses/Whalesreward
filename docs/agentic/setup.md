@@ -1,6 +1,6 @@
 # One-time setup (Earl)
 
-Do these once, in order, before the first Codex session. Steps marked **you** are yours by design: they involve accounts, credentials or repository settings that agents may not touch (soul.md T2/T3).
+Do these once, in order, before the first agent session (Codex, or Claude Code in Antigravity). Steps marked **you** are yours by design: they involve accounts, credentials or repository settings that agents may not touch (soul.md T2/T3).
 
 ## 1. Check the product docs link
 
@@ -24,10 +24,10 @@ git add AGENTS.md README.md STATUS.md .gitignore .codex .agents .github .review 
 git commit -m "chore: Codex operating model and engineering guidelines"
 ```
 
-- The repository is **public** under your **adeboyemoses** GitHub account (Earl's choice, 4 Nov 2026; branch protection on a private personal repo would need GitHub Pro) (suggested name `whales-rewards`). It moves to the client or an organisation at handover, under whatever source-ownership terms the contract sets. Add it as `origin` over **HTTPS** (`git remote add origin https://github.com/Adeboyemoses/Whalesreward.git`) and run `gh auth setup-git`: Codex runs commands without your shell's SSH agent, so SSH pushes would fail. Push `staging`, then create `main` from it: `git push -u origin staging && git push origin staging:main`.
+- The repository is **public** under your **adeboyemoses** GitHub account (Earl's choice, 4 Nov 2026; branch protection on a private personal repo would need GitHub Pro) (suggested name `whales-rewards`). It moves to the client or an organisation at handover, under whatever source-ownership terms the contract sets. Add it as `origin` over **HTTPS** (`git remote add origin https://github.com/Adeboyemoses/Whalesreward.git`) and run `gh auth setup-git`: agents run commands without your shell's SSH agent, so SSH pushes would fail. Push `staging`, then create `main` from it: `git push -u origin staging && git push origin staging:main`.
 - Set the default branch to `staging`.
 - Branch protection on `staging`: require a PR and the status checks `gate-self-test`, `build`, `integration`, `e2e` and `review-evidence`; block force pushes; squash merges only.
-- Branch protection on `main`: require a PR and the checks `gate-self-test`, `build`, `integration` and `e2e` (not `review-evidence`, which runs only on PRs into `staging`); no direct pushes, no force pushes; merge commits only. Codex opens the `staging` → `main` promotion PR and **you merge it yourself in GitHub**. (Codex works through your own `gh` login, so its PRs are authored by you and GitHub won't let you approve them; your own merge is the control.)
+- Branch protection on `main`: require a PR and the checks `gate-self-test`, `build`, `integration` and `e2e` (not `review-evidence`, which runs only on PRs into `staging`); no direct pushes, no force pushes; merge commits only. The EM opens the `staging` → `main` promotion PR and **you merge it yourself in GitHub**. (The agent works through your own `gh` login, so its PRs are authored by you and GitHub won't let you approve them; your own merge is the control.)
 - Make sure `gh auth status` shows the adeboyemoses account.
 
 ## 3. Codex (**you**)
@@ -55,6 +55,30 @@ bash .codex/hooks/test-guard.sh
 
 Expected decisions are `allow`, `forbidden`, and `allow`, respectively. Policy checks evaluate command matching; they do not prove a command ran or that a hook is trusted in a restarted terminal.
 
+## 3b. Claude Code in Antigravity (**you**)
+
+The same repo runs in Claude Code (inside Antigravity). The operating model is identical; only the wiring differs.
+
+1. **Open the repository root** (the folder with `CLAUDE.md` and `AGENTS.md`) in Antigravity. Claude Code loads `CLAUDE.md`, which imports `AGENTS.md`. Trust the project when asked.
+2. **Make sure `jq` (or `python3`) is on PATH** — the guard parses file-tool paths with it. `command -v jq || command -v python3` should print a path.
+3. **The guard must be live.** Open `/hooks`. Under **PreToolUse** you must see an entry running `.codex/hooks/guard.sh`, matching `Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Grep|Glob`. If it is missing, `.claude/settings.json` was added mid-session: open `/hooks` once (that reloads config) or restart Antigravity, then look again. Do not run mutating tasks until it is listed — without it you rely only on AGENTS.md self-enforcement, the reviewers and CI.
+4. **Connect Linear:** run `/mcp` and sign in to `linear` (OAuth from `.mcp.json`; no token is stored in the repo).
+5. **Check agents load:** ask "List the subagents you can use". You should see the eight agents in `.claude/agents/`. Reviewers (code, security, integrity) run on opus with no edit/write tools; builders inherit the session model. If subagents aren't available, run each role as a separate session given its `.claude/agents/<role>.md` as instructions (never review a diff in the session that wrote it).
+6. **Session model** per lane: opus for `lane:core` and `lane:spec`, sonnet for `lane:app`; reviewers always opus. Record the model actually used in the lane file.
+
+### 5-minute self-check (run after 3 or 3b)
+
+| Check | Command / action | Expected |
+|---|---|---|
+| Guard self-test | `bash .codex/hooks/test-guard.sh` | `... passed, 0 failed` |
+| Review-gate self-test | `bash scripts/review/test-review.sh` | `... passed, 0 failed` |
+| Secret read blocked | ask the agent to read `.env` | a guard BLOCKED message (`whales-rewards guard: BLOCKED: ...`), not merely a polite decline |
+| Stage-all blocked | ask it to run `git add -A` | blocked: "stage explicit paths" |
+| Reviewers are read-only | open `.claude/agents/code-reviewer.md` (Claude Code) | `tools: Read, Grep, Glob, Bash` — no Edit/Write; `model: opus` |
+| Linear connects | `/mcp` (Claude Code) or `codex mcp login linear` | connected; a work-order read works |
+
+The secret-read check is the one that matters: it must be the guard refusing, not the model declining. If a self-test fails or `/hooks` does not list the guard, stop and raise it — do not work around it.
+
 ## 4. Local services
 
 Install Docker Desktop, and Android platform tools (`adb`) for the M1 phone test.
@@ -63,7 +87,7 @@ WO-core-1 adds `docker-compose.yml` (Postgres, Mailpit, MinIO); after that, `doc
 
 ## 5. Start a session
 
-Prompt for the first session (paste into Codex):
+Prompt for the first session (paste into Codex, or Claude Code in Antigravity):
 
 ```
 You are the engineering manager for lane:core. Work order: WO-core-1 (Linear WHR). Follow AGENTS.md.
