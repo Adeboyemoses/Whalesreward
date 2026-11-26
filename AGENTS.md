@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Codex reads this first, every session. Keep it under 10 KB; everything else is read on demand.
+This is the first file every agent reads, every session (Claude Code reads it through `CLAUDE.md`, which imports it). Keep it tool-neutral and under 10 KB; everything else is read on demand.
 
 **Whales Rewards** is the one-station fuel and cooking-gas loyalty MVP that Cloudrock Technologies is building for Whales Empire (brand: Whales Energy). It has two surfaces in one Next.js app: the **attendant PWA** (Android phones, outdoors, often offline) and the **admin portal** (desktop). "Build X" means code unless the work order says otherwise.
 
@@ -52,8 +52,8 @@ Code lanes change a contract only through a `lane:spec` child issue or a PR that
 Tests live with the lane of the code they test. `lane:app` may propose a `src/shared/**` change; `lane:core` reviews and merges it.
 
 - Work only the children of the work order named in the session prompt, and only if it carries Earl's approval line ([rules](docs/agentic/work-orders.md#approval)). No work order: ask Earl for one. Don't pick work yourself.
-- The EM coordinates. It writes code only for fixes of about 10 lines, docs, git operations and triage. Builders (`.codex/agents/*.toml`) write feature code, each in its own worktree under `.worktrees/`. Nobody runs `git checkout` or `git switch` in the main checkout.
-- If subagents are unavailable in your Codex surface, run each builder or reviewer as a separate Codex thread with that agent's instructions. **Never review a diff in the thread that wrote it.**
+- The EM coordinates. It writes code only for fixes of about 10 lines, docs, git operations and triage. Builders write feature code, each in its own worktree under `.worktrees/`; their definitions live in `.claude/agents/` (Claude Code) and `.codex/agents/` (Codex), kept in step. Nobody runs `git checkout` or `git switch` in the main checkout.
+- If subagents are unavailable in your agent surface, run each builder or reviewer as a separate session or thread with that agent's instructions. **Never review a diff in the thread that wrote it.**
 - Found work becomes a Linear issue labelled `found-in:<WO>`, never extra scope.
 - Session records follow the standing rule below; lane files stay within 3 KB with the metric line last.
 
@@ -73,7 +73,7 @@ Tests live with the lane of the code they test. `lane:app` may propose a `src/sh
 - **Evidence or no merge.** `.review/<branch with / as __>.md` is committed in the PR ([format](.review/README.md)). The `review-evidence` CI check enforces it.
 - Re-run every gate yourself on the final head before opening a PR. A builder's "green" is unverified. Gates: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`, plus `pnpm test:integration` when `prisma/**` or `src/server/**` changed and `pnpm test:e2e` when a user flow changed.
 - The EM merges reviewed PRs into `staging`. **`staging` → `main`: the EM opens the promotion PR and Earl merges it himself.** The EM merges it only on Earl's explicit go in the current session naming the PR, with `WHR_MAIN_GO=<today>`, and records his words in the lane file.
-- Nobody bypasses the review gate from Codex. If Earl wants a bypass, he merges it himself in GitHub.
+- Nobody bypasses the review gate from an agent session. If Earl wants a bypass, he merges it himself in GitHub.
 
 ## Standing rules
 
