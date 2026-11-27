@@ -1,24 +1,23 @@
 # lane:app
-WO-app-11 (WHR-23 / WHR-187) giveaway Stage 2b: READY since 2026-11-20
+WO-app-13c (WHR-230) campaign date/time pickers and timezone list: READY since 2026-11-27
 
 ## In flight
-- [Feature PR #178](https://github.com/Adeboyemoses/Whalesreward/pull/178): merged green at `c65cc86146effcf87d10297b07b8e98bc2e6812c`. Final head `766cc0644b8bb87379df5e924d5d585c78a740e3`; independently reviewed source/QA `d670204db34bd5b24d543cd67689c763cf777d0a`.
-- Manager designation, complete historical phone/account census, guarded recovery and certification, exact incomplete-sale unavailable proposals and independent decisions; E02 has nine server-reported live outcomes, distinct from frozen historical passes. WHR-178/WHR-22 contracts and mutations unchanged; WHR-208/217 consumed from staging.
-- Code/security/integrity PASS round 3/3; evidence validates. EM typecheck/lint/build, 1,018 unit and 26 identifier-guard tests PASS. Final CI: 1,018 unit, 1,546 PostgreSQL16 integration, timezone 5+5, release 42, campaign-proof 1, ordinary browser 505 passed plus one existing WHR-177 retry pass/four existing skips, storage 1; all five required checks green.
-- Independent final fidelity: 48 current-source PNGs/16 states at 1440/390/360, DPR 2, 394 measured phone controls at least 48 px; scoped limits explicit. Smoke: docs/qa/smoke-2026-11-20-giveaway-stage-2b-r1.md.
+- [Feature PR #192](https://github.com/Adeboyemoses/Whalesreward/pull/192): merged green at `9722daaa2a61c95d4ae4aa1c804eecd9dd8fb871`. Final reviewed head `17f47eac19e9136652d1a4143a6c28a1cb7258bc`.
+- Screens-only: launch/purchase-start/purchase-cutoff become date+time pickers plus a searchable IANA timezone combobox (`src/ui/pickers.tsx`), replacing free-text ISO/timezone entry. Wall-clock input reads in the selected campaign timezone (Africa/Lagos first/default), converted via an Intl-only DST-aware helper to the explicit-offset instant the server already accepts; no contract or wire-format change.
+- Round 1: test-engineer found, and the builder fixed, a real bug (new campaign's date/time pair could never complete); reviewers raised two non-blocking a11y P2s, fixed round 2. Round 3 (test-only): repaired two pre-existing specs this PR's field-split broke and fixed a CI resource-contention regression (merged a standalone picker spec into the shared-fixture file). Code/integrity PASS round 3/3, zero findings; Earl authorized the round-cap exception. Evidence: `.review/app__WHR-230-pickers.md`.
+- EM: typecheck/lint/build clean, unit 1,055/1,055, `test:time` 14/14 under TZ=UTC and TZ=America/New_York, `campaign-timing-real.spec.ts` 22 passed/2 skipped (worker-shared DB, expected). Fidelity 1440/390/360px: no diffs, 48px targets, keyboard focus confirmed.
 - Separate records PR keeps STATUS/coverage/lane files out of the feature PR.
 
 ## Next
-- Stop after READY. WHR-23/187 remain In Review for Earl's end-of-M4/station-phone acceptance. No next work order or main promotion.
+- Stop after READY. WHR-230 stays In Review for Earl's phone/staging recheck of campaign set-up. WHR-236 (combobox has no "UTC" entry) is a separate found-work product question, not a blocker. No next work order or main promotion.
 
 ## Earl's gos
-- 2026-11-20: “WHR-217 has merged. Rebase your Stage 2b branch onto the latest origin/staging, rerun the strict superseded-exclusion regression unchanged, then continue your remaining review rounds on the round-1 fixes under the same rules.”
-- “When everything is green, open and merge the PR, and report READY with PR, head SHA, test counts and the smoke runbook.”
+- 2026-11-27: "Yes, authorize round 3 and merge" — exceeding the medium-tier round cap for a test-only CI-coverage fix, both reviewers PASS; recorded in `.review/app__WHR-230-pickers.md`.
 
 ## Risks
-- Real manager/approver identities and campaign values remain operational inputs; no phones or queues are certified by screenshots. No cloud, policy activation or main action occurred.
-- WHR-220 tracks optional concurrent-history capture settling; selected committed frames are complete. WHR-216 tracks the existing revocation-test race. Full local capture run 501 passed/5 failed/4 existing skips; one final ordinary-mode bounded check passed 8/8, corrected native historical capture 1/1. No fabricated clean-local-suite claim.
-- Old-source lifecycle browser baselines passed; no reproduced DOM leak claimed. Four inherited image warnings; physical-device/accessibility audits remain separate.
-- Feature dispatches 23 exceed high-tier flag 8. One separate docs review adds one; no review-cap escalation. Runtime model ID is unavailable.
+- WHR-236: TimezoneCombobox has no selectable "UTC" entry (`Intl.supportedValuesOf` never returns that alias); filed as found-in:WHR-230, open for Rook/Earl.
+- WHR-237: the brand-new-campaign regression test self-skips on the shared worker DB and never actually ran in this session's verification; found-in:WHR-230, open.
+- Earl's phone/staging verification of campaign set-up with the new pickers remains pending; no acceptance inferred.
+- Feature dispatches 9 exceed the medium-tier flag (>4); round 3 exceeded the round cap of 2 with Earl's recorded go, not an unflagged overrun.
 
-dispatches=24 prs=2 rounds_max=3 escalations=0 model=unknown
+dispatches=9 prs=2 rounds_max=3 escalations=1 model=claude-sonnet-5-5
