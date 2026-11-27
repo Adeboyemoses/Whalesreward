@@ -7,7 +7,7 @@ rounds: 2
 builder: EM (docs/sample-only, no builder dispatched)
 reviewers:
   code-reviewer: PASS (round 2)
-  integrity-reviewer: PENDING
+  integrity-reviewer: PASS
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
 dispatches: 5
 plan:
@@ -50,7 +50,9 @@ EM correction: the earlier dispatch used security-reviewer (PASS, no
 findings), but `required-reviewers.sh origin/staging...HEAD` actually names
 integrity-reviewer for this diff (its float-near-money heuristic fires on
 the sample's `excelNumber` stub — itself a WHR-235 finding). integrity-
-reviewer is dispatched fresh against `reviewed_head`; this is its first
-round, not a retry. The two wording-nit fixes were reverted out of this head
-(kept in WHR-235 instead) so `reviewed_head` matches exactly what was
-reviewed.
+reviewer PASS (no INTEGRITY-P1; confirms nothing here can touch real data —
+`renderer.ts` untouched, sample script unreferenced by any production path)
+with 2 more non-blocking findings (Source sales quantity-unit wording nit;
+confirms the header-freeze wording nit), both added to WHR-235. The two
+wording-nit fixes were reverted out of this head so `reviewed_head` matches
+exactly what both reviewers saw.
