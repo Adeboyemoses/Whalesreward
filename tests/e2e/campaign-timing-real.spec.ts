@@ -94,10 +94,11 @@ async function confirmTiming(page: Page) {
 // resolves to an instant yet. This test keeps that regression covered.
 //
 // It must run first in this file: this worker's schema is freshly migrated
-// with no campaign row yet, and every later test here creates or seeds one
-// (the campaign-to-station relation is unique), so this is the only point
-// at which a genuinely brand-new, campaign-free state is available without
-// standing up a second isolated schema. An `expect` below enforces that
+// with no campaign row yet, but the very next test (I-45 Owner creates or
+// edits...) creates one if none exists, and the station-to-campaign
+// relation is unique, so this is the only point at which a genuinely
+// brand-new, campaign-free state is available without standing up a
+// second isolated schema. An `expect` below enforces that
 // assumption instead of silently `test.skip()`-ing past it the way the
 // original version of this test did, which made it never actually run.
 test("WHR-230 a brand-new campaign's date+time pickers can be completed by filling date then time", async ({
@@ -569,10 +570,8 @@ test.describe("WHR-230 pickers and timezone", () => {
     return response;
   }
 
-  /** Seeds a campaign directly through the giveaway review/confirm API, bypassing
-   * the UI entirely. See the "BUG" test below: the split date/time pickers cannot
-   * currently combine a blank date+time pair through two independent field edits,
-   * so the create flow cannot be driven through the UI yet.
+  /** Seeds a campaign directly through the giveaway review/confirm API, so
+   * these tests don't depend on driving the create flow through the UI.
    */
   async function seedTiming(
     page: Page,
@@ -749,5 +748,4 @@ test.describe("WHR-230 pickers and timezone", () => {
       await f.close();
     }
   });
-
 });
