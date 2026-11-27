@@ -1,0 +1,161 @@
+{
+  "viewport": 360,
+  "document": 360,
+  "controls": [
+    {
+      "label": "_r_0_",
+      "type": "INPUT",
+      "rect": {
+        "x": 37,
+        "y": 1155,
+        "width": 286,
+        "height": 48,
+        "top": 1155,
+        "right": 323,
+        "bottom": 1203,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_1_",
+      "type": "date",
+      "rect": {
+        "x": 37,
+        "y": 1309,
+        "width": 286,
+        "height": 48,
+        "top": 1309,
+        "right": 323,
+        "bottom": 1357,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_2_",
+      "type": "time",
+      "rect": {
+        "x": 37,
+        "y": 1393,
+        "width": 286,
+        "height": 48,
+        "top": 1393,
+        "right": 323,
+        "bottom": 1441,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_3_",
+      "type": "date",
+      "rect": {
+        "x": 37,
+        "y": 1529,
+        "width": 286,
+        "height": 48,
+        "top": 1529,
+        "right": 323,
+        "bottom": 1577,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_4_",
+      "type": "time",
+      "rect": {
+        "x": 37,
+        "y": 1613,
+        "width": 286,
+        "height": 48,
+        "top": 1613,
+        "right": 323,
+        "bottom": 1661,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_5_",
+      "type": "date",
+      "rect": {
+        "x": 37,
+        "y": 1705,
+        "width": 286,
+        "height": 48,
+        "top": 1705,
+        "right": 323,
+        "bottom": 1753,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_6_",
+      "type": "time",
+      "rect": {
+        "x": 37,
+        "y": 1789,
+        "width": 286,
+        "height": 48,
+        "top": 1789,
+        "right": 323,
+        "bottom": 1837,
+        "left": 37
+      }
+    },
+    {
+      "label": "_r_7_",
+      "type": "INPUT",
+      "rect": {
+        "x": 37,
+        "y": 1881,
+        "width": 286,
+        "height": 48,
+        "top": 1881,
+        "right": 323,
+        "bottom": 1929,
+        "left": 37
+      }
+    },
+    {
+      "label": "Reason for change",
+      "type": "TEXTAREA",
+      "rect": {
+        "x": 37,
+        "y": 2079,
+        "width": 286,
+        "height": 96,
+        "top": 2079,
+        "right": 323,
+        "bottom": 2175,
+        "left": 37
+      }
+    },
+    {
+      "label": "Review changes",
+      "type": "submit",
+      "rect": {
+        "x": 37,
+        "y": 2235,
+        "width": 138.296875,
+        "height": 48,
+        "top": 2235,
+        "right": 175.296875,
+        "bottom": 2283,
+        "left": 37
+      }
+    },
+    {
+      "label": "Cancel",
+      "type": "button",
+      "rect": {
+        "x": 183.296875,
+        "y": 2235,
+        "width": 78.09375,
+        "height": 48,
+        "top": 2235,
+        "right": 261.390625,
+        "bottom": 2283,
+        "left": 183.296875
+      }
+    }
+  ],
+  "comboboxExpanded": "false"
+}
