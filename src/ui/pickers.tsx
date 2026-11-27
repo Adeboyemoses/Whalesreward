@@ -280,6 +280,14 @@ export function TimezoneCombobox({
             setActiveIndex(-1);
           }}
           onKeyDown={onKeyDown}
+          onBlur={() => {
+            setOpen(false);
+            setQuery(value);
+            setActiveIndex(-1);
+          }}
+          aria-activedescendant={
+            open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined
+          }
         />
         {open && filtered.length > 0 && (
           <ul
@@ -289,7 +297,12 @@ export function TimezoneCombobox({
             aria-label={typeof label === "string" ? label : "Timezone options"}
           >
             {filtered.map((zone, index) => (
-              <li key={zone} role="option" aria-selected={zone === value}>
+              <li
+                key={zone}
+                id={`${listId}-${index}`}
+                role="option"
+                aria-selected={zone === value}
+              >
                 <button
                   type="button"
                   className={cx(
