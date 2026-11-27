@@ -11,10 +11,8 @@ text line per fact, wrapped character-by-character at the current font's
 measured width, with no tables, no repeated headers and no source-row detail
 at all (the PDF today stops at the groups table; only the Excel copy lists
 individual sales). Its Excel file is a single "Report" sheet of key/value
-rows with a separate "Source sales" sheet; the Source sales sheet freezes
-its header row (`views: [{ state: "frozen", ySplit: 1 }]`) but neither sheet
-bolds its header or has an autofilter, and the Report sheet has no header
-row at all. Money is formatted `0.00` (no thousands
+rows with a separate "Source sales" sheet; neither sheet has a bold/frozen
+header row or an autofilter. Money is formatted `0.00` (no thousands
 separator) and currency is spelled out as the code (`NGN 169500.00`), never
 the ₦ sign — `StandardFonts.Helvetica` has no glyph for it, and the renderer
 never attempts to draw it, so its escape-fallback path for unencodable
@@ -66,7 +64,7 @@ One continuous flow, paginated by content height, not by section:
    exclusion labels as the summary), and a compact Flags column (`Dup`,
    `Corr`, both, or `—`) carrying over the current PDF's duplicate/correction
    counts at the row level. The existing document-level line — "Included
-   duplicate flags: N; pending corrections: N" — stays in the Summary
+   duplicate flags: N · Pending corrections: N" — stays in the Summary
    section above.
 6. **Footer** on every page: "Page X of Y".
 
