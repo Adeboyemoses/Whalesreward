@@ -772,6 +772,66 @@ body {
 @media (max-width: 900px) {
   .wr-settings-days { height: var(--control-h); }
 }
+/* WHR-230: the campaign date/time pair sits in one row on wide screens and
+   stacks on the phone; both wr-input children keep the standard control
+   heights so they stay usable at 390px and 360px. */
+.wr-settings-datetime { align-items: flex-start; }
+.wr-settings-datetime > .wr-field { flex: 1 1 200px; min-width: 0; }
+@media (max-width: 480px) {
+  .wr-settings-datetime { flex-direction: column; }
+  .wr-settings-datetime > .wr-field { flex-basis: auto; width: 100%; }
+}
+/* WHR-230: a searchable timezone combobox built only from existing
+   wr-field/wr-input/wr-list tokens, no new colours or shadows. The option
+   panel reuses wr-list's card chrome and wr-list-row's row metrics so each
+   option keeps the 48px/44px tap target the phone requires. */
+.wr-combobox { position: relative; }
+.wr-combobox-control { position: relative; }
+.wr-combobox-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  background: var(--surface-000);
+  border: 1px solid var(--line-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.wr-combobox-option {
+  display: block;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.wr-combobox-option:hover,
+.wr-combobox-option-active {
+  background: var(--whale-050);
+}
+.wr-combobox-option-selected {
+  font-weight: 600;
+}
+.wr-admin .wr-combobox-option {
+  min-height: var(--control-h-desktop);
+}
+@media (max-width: 900px) {
+  .wr-admin .wr-combobox-option {
+    min-height: var(--control-h);
+  }
+}
 
 /* B02/E05–E07 use vendored component tokens; wider report tables scroll locally. */
 .wr-report-page,

@@ -9,64 +9,51 @@
       "rect": {
         "x": 16,
         "y": -14,
-        "width": 137,
+        "width": 137.71875,
         "height": 48,
         "top": -14,
-        "right": 153,
+        "right": 153.71875,
         "bottom": 34,
         "left": 16
       }
     },
     {
-      "label": "",
+      "label": "Confirm changes",
       "rect": {
         "x": 37,
-        "y": 147,
-        "width": 223,
+        "y": 614,
+        "width": 142.890625,
         "height": 48,
-        "top": 147,
-        "right": 260,
-        "bottom": 195,
+        "top": 614,
+        "right": 179.890625,
+        "bottom": 662,
         "left": 37
       }
     },
     {
-      "label": "Reason for change",
+      "label": "Keep editing",
       "rect": {
-        "x": 37,
-        "y": 399,
-        "width": 286,
-        "height": 96,
-        "top": 399,
-        "right": 323,
-        "bottom": 495,
-        "left": 37
-      }
-    },
-    {
-      "label": "Review changes",
-      "rect": {
-        "x": 37,
-        "y": 555,
-        "width": 138,
+        "x": 187.890625,
+        "y": 614,
+        "width": 115.484375,
         "height": 48,
-        "top": 555,
-        "right": 175,
-        "bottom": 603,
-        "left": 37
+        "top": 614,
+        "right": 303.375,
+        "bottom": 662,
+        "left": 187.890625
       }
     },
     {
       "label": "Cancel",
       "rect": {
-        "x": 183,
-        "y": 555,
-        "width": 78,
+        "x": 37,
+        "y": 670,
+        "width": 78.09375,
         "height": 48,
-        "top": 555,
-        "right": 261,
-        "bottom": 603,
-        "left": 183
+        "top": 670,
+        "right": 115.09375,
+        "bottom": 718,
+        "left": 37
       }
     }
   ],
@@ -75,22 +62,27 @@
       "x": 16,
       "y": 58,
       "width": 328,
-      "height": 566,
+      "height": 681,
       "top": 58,
       "right": 344,
-      "bottom": 624,
+      "bottom": 739,
       "left": 16
     },
     {
       "x": 16,
-      "y": 648,
+      "y": 763,
       "width": 328,
-      "height": 258,
-      "top": 648,
+      "height": 218,
+      "top": 763,
       "right": 344,
-      "bottom": 906,
+      "bottom": 981,
       "left": 16
     }
   ],
-  "tables": []
+  "tables": [
+    {
+      "width": 284,
+      "scrollWidth": 284
+    }
+  ]
 }

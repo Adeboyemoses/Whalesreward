@@ -7,75 +7,75 @@
     {
       "label": "Back to settings",
       "rect": {
-        "x": 1263,
-        "y": -66,
-        "width": 137,
+        "x": 1262.28125,
+        "y": 70,
+        "width": 137.71875,
         "height": 40,
-        "top": -66,
+        "top": 70,
         "right": 1400,
-        "bottom": -26,
-        "left": 1263
+        "bottom": 110,
+        "left": 1262.28125
       }
     },
     {
       "label": "Confirm changes",
       "rect": {
         "x": 309,
-        "y": 908,
-        "width": 143,
+        "y": 1044,
+        "width": 142.890625,
         "height": 40,
-        "top": 908,
-        "right": 452,
-        "bottom": 948,
+        "top": 1044,
+        "right": 451.890625,
+        "bottom": 1084,
         "left": 309
       }
     },
     {
       "label": "Keep editing",
       "rect": {
-        "x": 460,
-        "y": 908,
-        "width": 115,
+        "x": 459.890625,
+        "y": 1044,
+        "width": 115.484375,
         "height": 40,
-        "top": 908,
-        "right": 575,
-        "bottom": 948,
-        "left": 460
+        "top": 1044,
+        "right": 575.375,
+        "bottom": 1084,
+        "left": 459.890625
       }
     },
     {
       "label": "Cancel",
       "rect": {
-        "x": 583,
-        "y": 908,
-        "width": 78,
+        "x": 583.375,
+        "y": 1044,
+        "width": 78.09375,
         "height": 40,
-        "top": 908,
-        "right": 661,
-        "bottom": 948,
-        "left": 583
+        "top": 1044,
+        "right": 661.46875,
+        "bottom": 1084,
+        "left": 583.375
       }
     }
   ],
   "sheets": [
     {
       "x": 288,
-      "y": -2,
+      "y": 134,
       "width": 614.953125,
       "height": 971,
-      "top": -2,
+      "top": 134,
       "right": 902.953125,
-      "bottom": 969,
+      "bottom": 1105,
       "left": 288
     },
     {
       "x": 926.953125,
-      "y": -2,
+      "y": 134,
       "width": 473.03125,
       "height": 971,
-      "top": -2,
+      "top": 134,
       "right": 1399.984375,
-      "bottom": 969,
+      "bottom": 1105,
       "left": 926.953125
     }
   ],

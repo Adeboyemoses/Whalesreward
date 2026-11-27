@@ -8,12 +8,12 @@
       "label": "Back to settings",
       "rect": {
         "x": 16,
-        "y": 808,
-        "width": 137,
+        "y": 994,
+        "width": 137.71875,
         "height": 48,
-        "top": 808,
-        "right": 153,
-        "bottom": 856,
+        "top": 994,
+        "right": 153.71875,
+        "bottom": 1042,
         "left": 16
       }
     },
@@ -21,38 +21,38 @@
       "label": "Confirm changes",
       "rect": {
         "x": 37,
-        "y": 2394,
-        "width": 143,
+        "y": 2660,
+        "width": 142.890625,
         "height": 48,
-        "top": 2394,
-        "right": 180,
-        "bottom": 2442,
+        "top": 2660,
+        "right": 179.890625,
+        "bottom": 2708,
         "left": 37
       }
     },
     {
       "label": "Keep editing",
       "rect": {
-        "x": 188,
-        "y": 2394,
-        "width": 115,
+        "x": 187.890625,
+        "y": 2660,
+        "width": 115.484375,
         "height": 48,
-        "top": 2394,
-        "right": 303,
-        "bottom": 2442,
-        "left": 188
+        "top": 2660,
+        "right": 303.375,
+        "bottom": 2708,
+        "left": 187.890625
       }
     },
     {
       "label": "Cancel",
       "rect": {
         "x": 37,
-        "y": 2450,
-        "width": 78,
+        "y": 2716,
+        "width": 78.09375,
         "height": 48,
-        "top": 2450,
-        "right": 115,
-        "bottom": 2498,
+        "top": 2716,
+        "right": 115.09375,
+        "bottom": 2764,
         "left": 37
       }
     }
@@ -60,22 +60,22 @@
   "sheets": [
     {
       "x": 16,
-      "y": 880,
+      "y": 1066,
       "width": 358,
-      "height": 1639,
-      "top": 880,
+      "height": 1719,
+      "top": 1066,
       "right": 374,
-      "bottom": 2519,
+      "bottom": 2785,
       "left": 16
     },
     {
       "x": 16,
-      "y": 2543,
+      "y": 2809,
       "width": 358,
       "height": 242,
-      "top": 2543,
+      "top": 2809,
       "right": 374,
-      "bottom": 2785,
+      "bottom": 3051,
       "left": 16
     }
   ],

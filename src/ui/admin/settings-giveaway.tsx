@@ -13,7 +13,16 @@ import {
   type TimingReview,
   type FrozenTiming,
 } from "@/client/admin-settings-api";
-import { Button, TextField, Notice, DataTable, KeyValueList } from "@/ui";
+import {
+  Button,
+  TextField,
+  Notice,
+  DataTable,
+  KeyValueList,
+  TimezoneCombobox,
+  wallClockToInstant,
+  instantToWallClock,
+} from "@/ui";
 import { Sheet } from "./station-common";
 import { useAdminSession } from "./session";
 export function timingReason(s: Settings, session: AdminSession) {
@@ -55,7 +64,18 @@ const fields = [
   ["graceHours", "Upload grace period (hours)"],
 ] as const;
 type Values = Record<(typeof fields)[number][0], string>;
+type WallParts = { date: string; time: string };
+type WallClockKey = "launchAt" | "purchaseStart" | "purchaseCutoff";
 type Draft = Values & {
+  // The wall-clock date/time text the user is editing for each instant
+  // field, kept independently of the committed ISO instant in `launchAt` /
+  // `purchaseStart` / `purchaseCutoff` above. This is the source of truth
+  // for what the date/time <TextField>s display: it holds a provisional,
+  // not-yet-complete edit (e.g. a date typed in before its time) without
+  // waiting on `wallClockToInstant`, which can only resolve once both parts
+  // are present. The ISO fields are derived from this and re-derived
+  // whenever the timezone changes.
+  wall: Record<WallClockKey, WallParts>;
   reason: string;
   review: TimingReview | null;
   pending: FrozenTiming | null;
@@ -77,21 +97,32 @@ export function GiveawayEditor({
 }) {
   const { store, epoch } = useAdminSession(),
     router = useRouter();
-  const [draft, setDraft] = useState<Draft>(
-    () =>
-      (store.lists.get("settings:giveaway") as Draft | undefined) ?? {
-        launchAt: settings.campaign?.timing.launchAt ?? "",
-        purchaseStart: settings.campaign?.timing.purchaseStart ?? "",
-        purchaseCutoff: settings.campaign?.timing.purchaseCutoff ?? "",
-        timezone: settings.campaign?.timing.timezone ?? "",
-        graceHours: settings.campaign?.timing.graceHours?.toString() ?? "",
-        reason: "",
-        review: null,
-        pending: null,
-        error: "",
-        stale: false,
+  const [draft, setDraft] = useState<Draft>(() => {
+    const persisted = store.lists.get("settings:giveaway") as
+      | Draft
+      | undefined;
+    if (persisted) return persisted;
+    const timezone = settings.campaign?.timing.timezone ?? "Africa/Lagos";
+    const wallFor = (value: string | null | undefined): WallParts =>
+      instantToWallClock(value, timezone) ?? { date: "", time: "" };
+    return {
+      launchAt: settings.campaign?.timing.launchAt ?? "",
+      purchaseStart: settings.campaign?.timing.purchaseStart ?? "",
+      purchaseCutoff: settings.campaign?.timing.purchaseCutoff ?? "",
+      timezone,
+      graceHours: settings.campaign?.timing.graceHours?.toString() ?? "",
+      wall: {
+        launchAt: wallFor(settings.campaign?.timing.launchAt),
+        purchaseStart: wallFor(settings.campaign?.timing.purchaseStart),
+        purchaseCutoff: wallFor(settings.campaign?.timing.purchaseCutoff),
       },
-  );
+      reason: "",
+      review: null,
+      pending: null,
+      error: "",
+      stale: false,
+    };
+  });
   const [busy, setBusy] = useState(false),
     flight = useRef(false),
     alive = useRef(true);
@@ -336,30 +367,106 @@ export function GiveawayEditor({
               void act(false);
             }}
           >
-            {fields.map(([key, label]) => (
-              <TextField
-                key={key}
-                label={label}
-                value={draft[key]}
-                disabled={busy || draft.stale}
-                inputMode={key === "graceHours" ? "numeric" : undefined}
-                helper={
-                  key === "timezone"
-                    ? "Enter the campaign timezone, for example an IANA zone name. Dates must include their explicit UTC offset."
-                    : key === "graceHours"
-                      ? "Whole hours. Use 0 for no additional grace."
-                      : "Enter an exact ISO date and time with offset, including seconds (YYYY-MM-DDTHH:mm:ss+HH:mm)."
+            <TimezoneCombobox
+              label="Campaign timezone"
+              value={draft.timezone}
+              disabled={busy || draft.stale}
+              helper="Search by IANA zone name, for example Africa/Lagos. The dates below are wall-clock time in this zone."
+              onChange={(zone) => {
+                // A field that already resolves to a committed instant keeps
+                // that same absolute instant (switching the campaign's zone
+                // doesn't move launch/purchase moments); only its displayed
+                // wall-clock text is re-expressed in the new zone. A field
+                // still mid-edit (no instant yet) keeps its literal,
+                // not-yet-resolved text untouched -- there is no instant to
+                // re-express it from.
+                const wall = { ...draft.wall };
+                for (const key of [
+                  "launchAt",
+                  "purchaseStart",
+                  "purchaseCutoff",
+                ] as const) {
+                  if (draft[key])
+                    wall[key] =
+                      instantToWallClock(draft[key], zone) ?? wall[key];
                 }
-                onChange={(e) =>
-                  save({
-                    ...draft,
-                    [key]: e.target.value,
-                    review: null,
-                    error: "",
-                  })
-                }
-              />
-            ))}
+                save({ ...draft, wall, timezone: zone, review: null, error: "" });
+              }}
+            />
+            {(
+              [
+                ["launchAt", "Launch"],
+                ["purchaseStart", "Purchase start"],
+                ["purchaseCutoff", "Purchase cutoff"],
+              ] as const
+            ).map(([key, label]) => {
+              // The wall-clock text itself is the source of truth for what
+              // these two fields display, so a provisional edit to one part
+              // of the pair (e.g. a date typed in before its time) survives
+              // re-render even though `wallClockToInstant` cannot resolve an
+              // ISO instant yet.
+              const wall = draft.wall[key];
+              function setWallClock(part: "date" | "time", raw: string) {
+                const nextWall: WallParts =
+                  part === "date"
+                    ? { ...wall, date: raw }
+                    : { ...wall, time: raw };
+                const iso =
+                  nextWall.date && nextWall.time
+                    ? wallClockToInstant(
+                        nextWall.date,
+                        nextWall.time,
+                        draft.timezone,
+                      )
+                    : null;
+                save({
+                  ...draft,
+                  [key]: iso ?? "",
+                  wall: { ...draft.wall, [key]: nextWall },
+                  review: null,
+                  error: "",
+                });
+              }
+              return (
+                <div key={key} className="wr-row wr-settings-datetime">
+                  <TextField
+                    type="date"
+                    label={`${label} date`}
+                    value={wall.date}
+                    disabled={busy || draft.stale}
+                    onChange={(e) => setWallClock("date", e.target.value)}
+                  />
+                  <TextField
+                    type="time"
+                    step={1}
+                    label={`${label} time`}
+                    value={wall.time}
+                    disabled={busy || draft.stale}
+                    helper={
+                      key === "launchAt"
+                        ? "Wall-clock time in the campaign timezone above, with seconds."
+                        : undefined
+                    }
+                    onChange={(e) => setWallClock("time", e.target.value)}
+                  />
+                </div>
+              );
+            })}
+            <TextField
+              label="Upload grace period (hours)"
+              value={draft.graceHours}
+              disabled={busy || draft.stale}
+              inputMode="numeric"
+              helper="Whole hours. Use 0 for no additional grace."
+              onChange={(e) =>
+                save({
+                  ...draft,
+                  graceHours: e.target.value,
+                  review: null,
+                  error: "",
+                })
+              }
+            />
             <p className="wr-notice">
               Upload deadline (derived): shown by the server after Review
               changes.

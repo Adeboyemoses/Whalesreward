@@ -7,14 +7,14 @@
     {
       "label": "Back to settings",
       "rect": {
-        "x": 1263,
+        "x": 1262.28125,
         "y": 70,
-        "width": 137,
+        "width": 137.71875,
         "height": 40,
         "top": 70,
         "right": 1400,
         "bottom": 110,
-        "left": 1263
+        "left": 1262.28125
       }
     },
     {
@@ -22,10 +22,10 @@
       "rect": {
         "x": 309,
         "y": 524,
-        "width": 143,
+        "width": 142.890625,
         "height": 40,
         "top": 524,
-        "right": 452,
+        "right": 451.890625,
         "bottom": 564,
         "left": 309
       }
@@ -33,27 +33,27 @@
     {
       "label": "Keep editing",
       "rect": {
-        "x": 460,
+        "x": 459.890625,
         "y": 524,
-        "width": 115,
+        "width": 115.484375,
         "height": 40,
         "top": 524,
-        "right": 575,
+        "right": 575.375,
         "bottom": 564,
-        "left": 460
+        "left": 459.890625
       }
     },
     {
       "label": "Cancel",
       "rect": {
-        "x": 583,
+        "x": 583.375,
         "y": 524,
-        "width": 78,
+        "width": 78.09375,
         "height": 40,
         "top": 524,
-        "right": 661,
+        "right": 661.46875,
         "bottom": 564,
-        "left": 583
+        "left": 583.375
       }
     }
   ],
