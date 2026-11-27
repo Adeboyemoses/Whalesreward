@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "TZ=UTC vitest run --project unit",
+    "test": "TZ=UTC vitest run --project unit --project timing",
     "test:integration": "TZ=UTC vitest run --project integration",
     "test:time": "TZ=UTC vitest run --project time && TZ=America/New_York vitest run --project time",
     "test:e2e": "TZ=UTC playwright test",
@@ -52,7 +52,6 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@pdf-lib/fontkit": "^1.1.1",
     "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "4.3.4",
     "@types/node": "26.6.6",

@@ -148,23 +148,31 @@ describe("report export renderer — Stage 2 structure", () => {
     expect(baseFonts.some((f) => f.includes("Helvetica"))).toBe(false);
   });
 
-  it("caps the PDF source sales table at 500 rows, printing a one-line count instead above the cap", async () => {
-    expect(SOURCE_TABLE_CAP).toBe(500);
-    const rowsAt = (n: number): ReportSource[] =>
-      Array.from({ length: n }, (_, i) => ({
-        ...row,
-        purchaseId: id,
-        saleCode: `S${String(i).padStart(4, "0")}`,
-      }));
-    const atCap = await renderReportExport(snapshot(rowsAt(SOURCE_TABLE_CAP), "pdf")),
-      overCap = await renderReportExport(snapshot(rowsAt(SOURCE_TABLE_CAP + 1), "pdf"));
-    const atCapPages = (await PDFDocument.load(atCap.bytes)).getPageCount(),
-      overCapPages = (await PDFDocument.load(overCap.bytes)).getPageCount();
-    // One row over the cap drops the whole per-row table for a single summary
-    // line, so the page count falls sharply instead of growing by one row.
-    expect(atCapPages).toBeGreaterThan(5);
-    expect(overCapPages).toBeLessThan(atCapPages);
-  });
+  it(
+    "caps the PDF source sales table at 500 rows, printing a one-line count instead above the cap",
+    async () => {
+      expect(SOURCE_TABLE_CAP).toBe(500);
+      const rowsAt = (n: number): ReportSource[] =>
+        Array.from({ length: n }, (_, i) => ({
+          ...row,
+          purchaseId: id,
+          saleCode: `S${String(i).padStart(4, "0")}`,
+        }));
+      const atCap = await renderReportExport(snapshot(rowsAt(SOURCE_TABLE_CAP), "pdf")),
+        overCap = await renderReportExport(snapshot(rowsAt(SOURCE_TABLE_CAP + 1), "pdf"));
+      const atCapPages = (await PDFDocument.load(atCap.bytes)).getPageCount(),
+        overCapPages = (await PDFDocument.load(overCap.bytes)).getPageCount();
+      // One row over the cap drops the whole per-row table for a single summary
+      // line, so the page count falls sharply instead of growing by one row.
+      expect(atCapPages).toBeGreaterThan(5);
+      expect(overCapPages).toBeLessThan(atCapPages);
+    },
+    // Rendering two 500+ row PDFs under a loaded, parallel CI runner can
+    // exceed vitest's 5s default harness timeout well before the assertion
+    // even runs; give it the same generous headroom renderer-pdf-text.test.ts
+    // uses for comparable non-trivial renders.
+    20000,
+  );
 
   it("renders a long run-on name without overflowing by hard-breaking it inside its column", async () => {
     const wide: ReportSource = {
@@ -174,18 +182,30 @@ describe("report export renderer — Stage 2 structure", () => {
     const out = await renderReportExport(snapshot([wide], "pdf"));
     const pdf = await PDFDocument.load(out.bytes);
     expect(pdf.getPageCount()).toBeGreaterThan(0);
+    // pdf-lib can only confirm the document parses; it is not CMap-aware,
+    // so it cannot read the hard-broken name's actual drawn text or
+    // position (pdf-lib's own font is subsetted by glyph ID — see
+    // renderer-pdf-text.test.ts's doc comment). The real proof that each
+    // wrapped line actually stays inside the Attendant / pump column, and
+    // never bleeds into Product, is the x-extent assertion in
+    // renderer-pdf-text.test.ts ("keeps a long run-on attendant name's
+    // hard-broken lines inside the Attendant / pump column's x-range").
   });
 
-  it("completes well within the 5s cardStorageDeadline budget at the sources limit", async () => {
-    const many: ReportSource[] = Array.from({ length: 5000 }, (_, i) => ({
-      ...row,
-      purchaseId: id,
-      saleCode: `S${i}`,
-    }));
-    const start = Date.now();
-    await renderReportExport(snapshot(many, "xlsx"));
-    expect(Date.now() - start).toBeLessThan(5000);
-  });
+  it(
+    "completes well within the 5s cardStorageDeadline budget at the sources limit",
+    async () => {
+      const many: ReportSource[] = Array.from({ length: 5000 }, (_, i) => ({
+        ...row,
+        purchaseId: id,
+        saleCode: `S${i}`,
+      }));
+      const start = Date.now();
+      await renderReportExport(snapshot(many, "xlsx"));
+      expect(Date.now() - start).toBeLessThan(5000);
+    },
+    20000,
+  );
 });
 
 describe("Dockerfile ships the vendored report fonts into the runtime image", () => {

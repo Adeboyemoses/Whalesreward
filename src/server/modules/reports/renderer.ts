@@ -282,6 +282,15 @@ function buildSummarySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
   styleHeaderRow(sheet, totalsHeader, 3);
   sizeColumns(sheet, ["Report ID", "Value", "Unit"]);
   sheet.getColumn(1).width = 20;
+  // Column B holds the "As of (Lagos time)" datetime (~20 chars formatted)
+  // and spend totals that are plausibly ₦10,000,000.00 or more at one
+  // station — widthFor()'s generic 12-char default renders those as ######
+  // in Excel/LibreOffice. The excluded-states block's extra currency
+  // columns (C onward, one per currency beyond the first) are never sized
+  // by sizeColumns at all, so they fall back to the ~8.43-char default.
+  sheet.getColumn(2).width = Math.max(sheet.getColumn(2).width ?? 0, 24);
+  for (let i = 0; i < currencies.length; i++)
+    sheet.getColumn(3 + i).width = Math.max(sheet.getColumn(3 + i).width ?? 0, 18);
   // The preamble and totals/excluded rows above were never individually
   // committed (only the totals header was) — flush them in order now.
   sheet.eachRow((row) => guardRow(row));
@@ -749,7 +758,7 @@ async function renderPdf(
     ];
     const rows = r.groups.items.map((g) => [
       makeCell(
-        g.product ?? g.attendant?.name ?? g.pump?.name ?? g.key,
+        g.product ? (PRODUCT_LABEL[g.product] ?? g.product) : (g.attendant?.name ?? g.pump?.name ?? g.key),
         regular,
         8,
         columns[0]!.width,
@@ -780,11 +789,18 @@ async function renderPdf(
       { header: "Sale code", width: 50, align: "left" },
       { header: "Date", width: 55, align: "left" },
       { header: "Evidence", width: 50, align: "left" },
-      { header: "Attendant / pump", width: 95, align: "left" },
+      // "Attendant / pump" and "Status" give up the width "Amount" needs:
+      // at 55pt an amount of ₦1,000,000.00 or more (a plausible single
+      // sale) had no space to wrap at, so wrapWord hard-broke it mid-digit
+      // (e.g. "₦1,234,567." over "89"). 85pt clears even a ten-digit naira
+      // amount (near the amountKobo contract's practical ceiling) without
+      // a character break, and the column widths still sum to
+      // USABLE_WIDTH, which drawTable asserts at runtime.
+      { header: "Attendant / pump", width: 75, align: "left" },
       { header: "Product", width: 45, align: "left" },
-      { header: "Amount", width: 55, align: "right" },
+      { header: "Amount", width: 85, align: "right" },
       { header: "Quantity", width: 60, align: "right" },
-      { header: "Status", width: 75, align: "left" },
+      { header: "Status", width: 65, align: "left" },
       { header: "Flags", width: 30, align: "left" },
     ];
     const rows = sources.map((s) => {
