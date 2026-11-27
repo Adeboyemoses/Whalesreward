@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import ExcelJS from "exceljs";
 import { PDFDocument, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
@@ -152,20 +153,32 @@ function widthFor(header: string): number {
   if (header.length <= 6) return 12;
   return Math.min(42, header.length + 4);
 }
-function styleHeader(
-  sheet: ExcelJS.Worksheet,
-  headerRow: number,
-  colCount: number,
-  { freeze = true }: { freeze?: boolean } = {},
-) {
-  sheet.getRow(headerRow).font = { bold: true };
-  if (freeze) {
-    sheet.views = [{ state: "frozen", ySplit: headerRow }];
-    sheet.autoFilter = {
-      from: { row: headerRow, column: 1 },
-      to: { row: headerRow, column: colCount },
-    };
-  }
+/** `ExcelJS.stream.xlsx.WorkbookWriter`'s sheet freeze (`views`) can only be
+ * set at `addWorksheet(name, options)` time — the streaming worksheet's
+ * `views` is a getter with no setter, so assigning it after creation throws.
+ * Every sheet here freezes at its header row, so this is the one shape
+ * needed. */
+function freezeAtRow(headerRow: number): Partial<ExcelJS.WorksheetView>[] {
+  return [{ state: "frozen", ySplit: headerRow }];
+}
+/** Bolds the header row and autofilters it. `autoFilter` (unlike `views`)
+ * stays a plain writable property on the streaming worksheet, so it can be
+ * set any time before `sheet.commit()` — this never commits the row
+ * itself, so it is safe to call before the sheet's data rows exist. */
+function styleHeaderRow(sheet: ExcelJS.Worksheet, headerRow: ExcelJS.Row, colCount: number) {
+  headerRow.font = { bold: true };
+  sheet.autoFilter = {
+    from: { row: headerRow.number, column: 1 },
+    to: { row: headerRow.number, column: colCount },
+  };
+}
+/** Same, but for a sheet built row-by-row with each row committed
+ * immediately (the Source sales sheet) — the header row is itself
+ * committed here, guarded like every other row. */
+function commitHeaderRow(sheet: ExcelJS.Worksheet, headerRow: ExcelJS.Row, colCount: number) {
+  styleHeaderRow(sheet, headerRow, colCount);
+  guardRow(headerRow);
+  headerRow.commit();
 }
 function sizeColumns(sheet: ExcelJS.Worksheet, headers: string[]) {
   headers.forEach((h, i) => (sheet.getColumn(i + 1).width = widthFor(h)));
@@ -174,8 +187,52 @@ function sizeColumns(sheet: ExcelJS.Worksheet, headers: string[]) {
 // user-influenced text value below is a plain string cell.
 const text = (v: string) => v;
 
+/** The formula-injection guard: a report export must never carry a live
+ * formula cell. Run inline, per row, right before that row commits — not as
+ * a second full pass over every sheet after the fact, which would itself be
+ * a meaningful chunk of render time at the Source sales sheet's real
+ * row-count ceiling (WHR-231 Stage 2 timing fix). */
+function guardRow(row: ExcelJS.Row) {
+  row.eachCell((cell) => {
+    if (cell.type === ExcelJS.ValueType.Formula)
+      throw new Error("formula cell is never permitted in a report export");
+  });
+}
+
+/** Frozen, shared style objects. ExcelJS's style manager caches by object
+ * *identity* (a `WeakMap`), not by content, and `Cell` otherwise builds a
+ * fresh, never-shared `{}` style object per cell. With `useStyles: true`,
+ * that means the style manager's slow (hash + register) path runs for
+ * every single cell, not just styled ones. Explicitly assigning one of
+ * these shared instances to every cell — including plain cells, via
+ * `NO_STYLE` — turns that into the `WeakMap` fast path and is what makes
+ * the Source sales sheet's 2.6M-cell write fast. Verified empirically: this
+ * alone took 100k-row XLSX render time from ~4s to ~2s on top of the
+ * streaming writer (see WHR-231 Stage 2 timing fix). */
+const NO_STYLE: Readonly<Partial<ExcelJS.Style>> = Object.freeze({});
+const DAY_STYLE: Readonly<Partial<ExcelJS.Style>> = Object.freeze({ numFmt: DAY_NUMFMT });
+const INSTANT_STYLE: Readonly<Partial<ExcelJS.Style>> = Object.freeze({ numFmt: INSTANT_NUMFMT });
+const QUANTITY_STYLE: Readonly<Partial<ExcelJS.Style>> = Object.freeze({ numFmt: QUANTITY_NUMFMT });
+function moneyStyleCache() {
+  const cache = new Map<string, Readonly<Partial<ExcelJS.Style>>>();
+  return (currency: string): Readonly<Partial<ExcelJS.Style>> => {
+    let style = cache.get(currency);
+    if (!style) {
+      style = Object.freeze({ numFmt: moneyNumFmt(currency) });
+      cache.set(currency, style);
+    }
+    return style;
+  };
+}
+
+// Fixed, unconditional preamble: "Report ID" through "Timezone" (8 rows)
+// plus one blank separator row, always — so the totals header's row number
+// is known before the sheet (and its freeze view) is created.
+const SUMMARY_PREAMBLE_ROWS = 9;
+
 function buildSummarySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
-  const sheet = book.addWorksheet("Summary"),
+  const headerRowNumber = SUMMARY_PREAMBLE_ROWS + 1,
+    sheet = book.addWorksheet("Summary", { views: freezeAtRow(headerRowNumber) }),
     { report: r } = snapshot;
   sheet.addRow(["Report ID", text(snapshot.id)]);
   sheet.addRow(["Period", r.filters.from, "to", r.filters.to]);
@@ -188,6 +245,8 @@ function buildSummarySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
   sheet.addRow(["Timezone", text(r.timezone)]);
   sheet.addRow([]);
   const totalsHeader = sheet.addRow(["Metric", "Value", "Unit"]);
+  if (totalsHeader.number !== headerRowNumber)
+    throw new Error("Summary sheet preamble row count drifted from its freeze row");
   const addTotalsBlock = (t: Totals) => {
     sheet.addRow(["Purchases", excelNumber(t.purchases)]);
     for (const s of t.spend) {
@@ -220,15 +279,17 @@ function buildSummarySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
     ]);
     currencies.forEach((c, i) => (row.getCell(3 + i).numFmt = moneyNumFmt(c)));
   }
-  styleHeader(sheet, totalsHeader.number, 3);
+  styleHeaderRow(sheet, totalsHeader, 3);
   sizeColumns(sheet, ["Report ID", "Value", "Unit"]);
   sheet.getColumn(1).width = 20;
-  return sheet;
+  // The preamble and totals/excluded rows above were never individually
+  // committed (only the totals header was) — flush them in order now.
+  sheet.eachRow((row) => guardRow(row));
+  sheet.commit();
 }
 
 function buildDailySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
-  const sheet = book.addWorksheet("Daily"),
-    { daily } = snapshot.report,
+  const { daily } = snapshot.report,
     currencies = currenciesOf(daily.map((d) => d.totals)),
     headers = [
       "Day",
@@ -236,8 +297,10 @@ function buildDailySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
       ...currencies.map((c) => `Recorded spend (${c})`),
       "Litres",
       "Kilograms",
-    ];
-  sheet.addRow(headers);
+    ],
+    sheet = book.addWorksheet("Daily", { views: freezeAtRow(1) });
+  sizeColumns(sheet, headers);
+  const headerRow = sheet.addRow(headers);
   for (const d of daily) {
     const row = sheet.addRow([
       dayToDate(d.day),
@@ -251,14 +314,13 @@ function buildDailySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
     row.getCell(3 + currencies.length).numFmt = QUANTITY_NUMFMT;
     row.getCell(4 + currencies.length).numFmt = QUANTITY_NUMFMT;
   }
-  styleHeader(sheet, 1, headers.length);
-  sizeColumns(sheet, headers);
-  return sheet;
+  styleHeaderRow(sheet, headerRow, headers.length);
+  sheet.eachRow((row) => guardRow(row));
+  sheet.commit();
 }
 
 function buildGroupsSheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
-  const sheet = book.addWorksheet("Groups"),
-    items = snapshot.report.groups.items,
+  const items = snapshot.report.groups.items,
     currencies = currenciesOf(items.map((g) => g.totals)),
     headers = [
       "Group",
@@ -268,8 +330,10 @@ function buildGroupsSheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
       ...currencies.map((c) => `Recorded spend (${c})`),
       "Litres",
       "Kilograms",
-    ];
-  sheet.addRow(headers);
+    ],
+    sheet = book.addWorksheet("Groups", { views: freezeAtRow(1) });
+  sizeColumns(sheet, headers);
+  const headerRow = sheet.addRow(headers);
   for (const g of items) {
     const row = sheet.addRow([
       text(g.product ?? g.attendant?.name ?? g.pump?.name ?? g.key),
@@ -284,9 +348,9 @@ function buildGroupsSheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
     row.getCell(5 + currencies.length).numFmt = QUANTITY_NUMFMT;
     row.getCell(6 + currencies.length).numFmt = QUANTITY_NUMFMT;
   }
-  styleHeader(sheet, 1, headers.length);
-  sizeColumns(sheet, headers);
-  return sheet;
+  styleHeaderRow(sheet, headerRow, headers.length);
+  sheet.eachRow((row) => guardRow(row));
+  sheet.commit();
 }
 
 const SOURCE_HEADERS = [
@@ -317,9 +381,26 @@ const SOURCE_HEADERS = [
   "Duplicate flag",
   "Correction pending",
 ];
+// Column numbers (1-based) of SOURCE_HEADERS that ever carry a numFmt —
+// used below to assign a shared, frozen style object per cell instead of
+// `cell.numFmt = ...`, which is what makes 100k rows fast (see NO_STYLE's
+// doc comment). Must stay in sync with SOURCE_HEADERS by inspection; a
+// mismatch would show up immediately as a wrong-looking exported column.
+const SALE_DATE_COL = 4,
+  APP_CAPTURED_COL = 6,
+  VERIFIED_DATE_COL = 7,
+  SERVER_RECEIVED_COL = 8,
+  AMOUNT_COL = 17,
+  LITRES_COL = 19,
+  KILOGRAMS_COL = 20;
+
 function buildSourceSheet(book: ExcelJS.Workbook, sources: ReportSource[]) {
-  const sheet = book.addWorksheet("Source sales");
-  sheet.addRow(SOURCE_HEADERS);
+  const sheet = book.addWorksheet("Source sales", { views: freezeAtRow(1) });
+  sizeColumns(sheet, SOURCE_HEADERS);
+  const headerRow = sheet.addRow(SOURCE_HEADERS);
+  commitHeaderRow(sheet, headerRow, SOURCE_HEADERS.length);
+
+  const moneyStyle = moneyStyleCache();
   for (const s of sources) {
     const row = sheet.addRow([
       s.purchaseId,
@@ -349,36 +430,53 @@ function buildSourceSheet(book: ExcelJS.Workbook, sources: ReportSource[]) {
       s.duplicateFlag,
       s.correctionPending,
     ]);
-    row.getCell(4).numFmt = DAY_NUMFMT;
-    row.getCell(6).numFmt = INSTANT_NUMFMT;
-    if (s.verifiedSaleDate) row.getCell(7).numFmt = DAY_NUMFMT;
-    row.getCell(8).numFmt = INSTANT_NUMFMT;
-    row.getCell(17).numFmt = moneyNumFmt(s.currency);
-    row.getCell(19).numFmt = QUANTITY_NUMFMT;
-    row.getCell(20).numFmt = QUANTITY_NUMFMT;
+    row.eachCell((cell, col) => {
+      if (col === SALE_DATE_COL) cell.style = DAY_STYLE;
+      else if (col === APP_CAPTURED_COL) cell.style = INSTANT_STYLE;
+      else if (col === VERIFIED_DATE_COL) cell.style = s.verifiedSaleDate ? DAY_STYLE : NO_STYLE;
+      else if (col === SERVER_RECEIVED_COL) cell.style = INSTANT_STYLE;
+      else if (col === AMOUNT_COL) cell.style = moneyStyle(s.currency);
+      else if (col === LITRES_COL || col === KILOGRAMS_COL) cell.style = QUANTITY_STYLE;
+      else cell.style = NO_STYLE;
+      if (cell.type === ExcelJS.ValueType.Formula)
+        throw new Error("formula cell is never permitted in a report export");
+    });
+    row.commit();
   }
-  styleHeader(sheet, 1, SOURCE_HEADERS.length);
-  sizeColumns(sheet, SOURCE_HEADERS);
-  return sheet;
+  sheet.commit();
 }
 
+/** ExcelJS's default in-memory `Workbook` builds every cell as a permanent
+ * object and only serializes the whole file in one pass at the very end;
+ * at the Source sales sheet's real ceiling (REPORT_LIMITS.sources, 2.6M
+ * cells across the four sheets) that final pass alone took over 16s,
+ * systematically blowing the 5s `cardStorageDeadline` every time (WHR-231
+ * Stage 2 timing fix). `stream.xlsx.WorkbookWriter` writes each row's XML
+ * (and zip-compresses it) as soon as it is committed instead, so the cost
+ * is paid incrementally during the loop rather than in one blocking burst
+ * at the end — and, combined with the shared style objects above, the
+ * Source sales sheet's 100k-row ceiling now renders in ~2s, verified
+ * empirically. `useSharedStrings: false` also measured faster here: this
+ * sheet's text columns (IDs, codes, names) have little enough repetition
+ * that shared-string bookkeeping is pure overhead, not a saving. */
 async function renderXlsx(
   snapshot: ReportSnapshot,
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const book = new ExcelJS.Workbook();
+  const stream = new PassThrough();
+  const chunks: Buffer[] = [];
+  stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const book = new ExcelJS.stream.xlsx.WorkbookWriter({
+    stream,
+    useStyles: true,
+    useSharedStrings: false,
+  });
   buildSummarySheet(book, snapshot);
   buildDailySheet(book, snapshot);
   buildGroupsSheet(book, snapshot);
   buildSourceSheet(book, snapshot.sources);
-  for (const ws of book.worksheets)
-    ws.eachRow((row) =>
-      row.eachCell((cell) => {
-        if (cell.type === ExcelJS.ValueType.Formula)
-          throw new Error("formula cell is never permitted in a report export");
-      }),
-    );
+  await book.commit();
   return {
-    bytes: new Uint8Array(await book.xlsx.writeBuffer()),
+    bytes: new Uint8Array(Buffer.concat(chunks)),
     contentType:
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   };
