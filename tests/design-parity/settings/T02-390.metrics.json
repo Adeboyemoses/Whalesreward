@@ -9,10 +9,10 @@
       "rect": {
         "x": 16,
         "y": -38,
-        "width": 137,
+        "width": 137.71875,
         "height": 48,
         "top": -38,
-        "right": 153,
+        "right": 153.71875,
         "bottom": 10,
         "left": 16
       }
@@ -22,10 +22,10 @@
       "rect": {
         "x": 37,
         "y": 123,
-        "width": 253,
+        "width": 252.5625,
         "height": 48,
         "top": 123,
-        "right": 290,
+        "right": 289.5625,
         "bottom": 171,
         "left": 37
       }
@@ -48,10 +48,10 @@
       "rect": {
         "x": 37,
         "y": 513,
-        "width": 138,
+        "width": 138.296875,
         "height": 48,
         "top": 513,
-        "right": 175,
+        "right": 175.296875,
         "bottom": 561,
         "left": 37
       }
@@ -59,14 +59,14 @@
     {
       "label": "Cancel",
       "rect": {
-        "x": 183,
+        "x": 183.296875,
         "y": 513,
-        "width": 78,
+        "width": 78.09375,
         "height": 48,
         "top": 513,
-        "right": 261,
+        "right": 261.390625,
         "bottom": 561,
-        "left": 183
+        "left": 183.296875
       }
     }
   ],

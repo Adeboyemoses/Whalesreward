@@ -8,12 +8,12 @@
       "label": "Back to settings",
       "rect": {
         "x": 16,
-        "y": 944,
-        "width": 137,
+        "y": 994,
+        "width": 137.71875,
         "height": 48,
-        "top": 944,
-        "right": 153,
-        "bottom": 992,
+        "top": 994,
+        "right": 153.71875,
+        "bottom": 1042,
         "left": 16
       }
     },
@@ -21,38 +21,38 @@
       "label": "Confirm changes",
       "rect": {
         "x": 37,
-        "y": 1510,
-        "width": 143,
+        "y": 1560,
+        "width": 142.890625,
         "height": 48,
-        "top": 1510,
-        "right": 180,
-        "bottom": 1558,
+        "top": 1560,
+        "right": 179.890625,
+        "bottom": 1608,
         "left": 37
       }
     },
     {
       "label": "Keep editing",
       "rect": {
-        "x": 188,
-        "y": 1510,
-        "width": 115,
+        "x": 187.890625,
+        "y": 1560,
+        "width": 115.484375,
         "height": 48,
-        "top": 1510,
-        "right": 303,
-        "bottom": 1558,
-        "left": 188
+        "top": 1560,
+        "right": 303.375,
+        "bottom": 1608,
+        "left": 187.890625
       }
     },
     {
       "label": "Cancel",
       "rect": {
         "x": 37,
-        "y": 1566,
-        "width": 78,
+        "y": 1616,
+        "width": 78.09375,
         "height": 48,
-        "top": 1566,
-        "right": 115,
-        "bottom": 1614,
+        "top": 1616,
+        "right": 115.09375,
+        "bottom": 1664,
         "left": 37
       }
     }
@@ -60,22 +60,22 @@
   "sheets": [
     {
       "x": 16,
-      "y": 1016,
+      "y": 1066,
       "width": 358,
       "height": 619,
-      "top": 1016,
+      "top": 1066,
       "right": 374,
-      "bottom": 1635,
+      "bottom": 1685,
       "left": 16
     },
     {
       "x": 16,
-      "y": 1659,
+      "y": 1709,
       "width": 358,
-      "height": 198,
-      "top": 1659,
+      "height": 178,
+      "top": 1709,
       "right": 374,
-      "bottom": 1857,
+      "bottom": 1887,
       "left": 16
     }
   ],

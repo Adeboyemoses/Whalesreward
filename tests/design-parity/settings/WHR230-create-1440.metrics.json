@@ -1,0 +1,161 @@
+{
+  "viewport": 1440,
+  "document": 1440,
+  "controls": [
+    {
+      "label": "_r_0_",
+      "type": "INPUT",
+      "rect": {
+        "x": 309,
+        "y": 223,
+        "width": 572.953125,
+        "height": 40,
+        "top": 223,
+        "right": 881.953125,
+        "bottom": 263,
+        "left": 309
+      }
+    },
+    {
+      "label": "_r_1_",
+      "type": "date",
+      "rect": {
+        "x": 309,
+        "y": 351,
+        "width": 282.46875,
+        "height": 40,
+        "top": 351,
+        "right": 591.46875,
+        "bottom": 391,
+        "left": 309
+      }
+    },
+    {
+      "label": "_r_2_",
+      "type": "time",
+      "rect": {
+        "x": 599.46875,
+        "y": 351,
+        "width": 282.484375,
+        "height": 40,
+        "top": 351,
+        "right": 881.953125,
+        "bottom": 391,
+        "left": 599.46875
+      }
+    },
+    {
+      "label": "_r_3_",
+      "type": "date",
+      "rect": {
+        "x": 309,
+        "y": 479,
+        "width": 282.46875,
+        "height": 40,
+        "top": 479,
+        "right": 591.46875,
+        "bottom": 519,
+        "left": 309
+      }
+    },
+    {
+      "label": "_r_4_",
+      "type": "time",
+      "rect": {
+        "x": 599.46875,
+        "y": 479,
+        "width": 282.484375,
+        "height": 40,
+        "top": 479,
+        "right": 881.953125,
+        "bottom": 519,
+        "left": 599.46875
+      }
+    },
+    {
+      "label": "_r_5_",
+      "type": "date",
+      "rect": {
+        "x": 309,
+        "y": 563,
+        "width": 282.46875,
+        "height": 40,
+        "top": 563,
+        "right": 591.46875,
+        "bottom": 603,
+        "left": 309
+      }
+    },
+    {
+      "label": "_r_6_",
+      "type": "time",
+      "rect": {
+        "x": 599.46875,
+        "y": 563,
+        "width": 282.484375,
+        "height": 40,
+        "top": 563,
+        "right": 881.953125,
+        "bottom": 603,
+        "left": 599.46875
+      }
+    },
+    {
+      "label": "_r_7_",
+      "type": "INPUT",
+      "rect": {
+        "x": 309,
+        "y": 647,
+        "width": 572.953125,
+        "height": 40,
+        "top": 647,
+        "right": 881.953125,
+        "bottom": 687,
+        "left": 309
+      }
+    },
+    {
+      "label": "Reason for change",
+      "type": "TEXTAREA",
+      "rect": {
+        "x": 309,
+        "y": 817,
+        "width": 572.953125,
+        "height": 96,
+        "top": 817,
+        "right": 881.953125,
+        "bottom": 913,
+        "left": 309
+      }
+    },
+    {
+      "label": "Review changes",
+      "type": "submit",
+      "rect": {
+        "x": 309,
+        "y": 955,
+        "width": 138.296875,
+        "height": 40,
+        "top": 955,
+        "right": 447.296875,
+        "bottom": 995,
+        "left": 309
+      }
+    },
+    {
+      "label": "Cancel",
+      "type": "button",
+      "rect": {
+        "x": 455.296875,
+        "y": 955,
+        "width": 78.09375,
+        "height": 40,
+        "top": 955,
+        "right": 533.390625,
+        "bottom": 995,
+        "left": 455.296875
+      }
+    }
+  ],
+  "comboboxExpanded": "false"
+}

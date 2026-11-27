@@ -8,12 +8,12 @@
       "label": "Back to settings",
       "rect": {
         "x": 16,
-        "y": -624,
-        "width": 137,
+        "y": -716,
+        "width": 137.71875,
         "height": 48,
-        "top": -624,
-        "right": 153,
-        "bottom": -576,
+        "top": -716,
+        "right": 153.71875,
+        "bottom": -668,
         "left": 16
       }
     },
@@ -21,38 +21,38 @@
       "label": "Confirm changes",
       "rect": {
         "x": 37,
-        "y": 1064,
-        "width": 143,
+        "y": 992,
+        "width": 142.890625,
         "height": 48,
-        "top": 1064,
-        "right": 180,
-        "bottom": 1112,
+        "top": 992,
+        "right": 179.890625,
+        "bottom": 1040,
         "left": 37
       }
     },
     {
       "label": "Keep editing",
       "rect": {
-        "x": 188,
-        "y": 1064,
-        "width": 115,
+        "x": 187.890625,
+        "y": 992,
+        "width": 115.484375,
         "height": 48,
-        "top": 1064,
-        "right": 303,
-        "bottom": 1112,
-        "left": 188
+        "top": 992,
+        "right": 303.375,
+        "bottom": 1040,
+        "left": 187.890625
       }
     },
     {
       "label": "Cancel",
       "rect": {
         "x": 37,
-        "y": 1120,
-        "width": 78,
+        "y": 1048,
+        "width": 78.09375,
         "height": 48,
-        "top": 1120,
-        "right": 115,
-        "bottom": 1168,
+        "top": 1048,
+        "right": 115.09375,
+        "bottom": 1096,
         "left": 37
       }
     }
@@ -60,22 +60,22 @@
   "sheets": [
     {
       "x": 16,
-      "y": -552,
+      "y": -644,
       "width": 328,
-      "height": 1741,
-      "top": -552,
+      "height": 1761,
+      "top": -644,
       "right": 344,
-      "bottom": 1189,
+      "bottom": 1117,
       "left": 16
     },
     {
       "x": 16,
-      "y": 1213,
+      "y": 1141,
       "width": 328,
       "height": 242,
-      "top": 1213,
+      "top": 1141,
       "right": 344,
-      "bottom": 1455,
+      "bottom": 1383,
       "left": 16
     }
   ],
