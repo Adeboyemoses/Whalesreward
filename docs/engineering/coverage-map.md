@@ -25,6 +25,20 @@ Final feature [CI 44210059868](https://github.com/Adeboyemoses/Whalesreward/acti
 
 [Smoke runbook](../qa/smoke-2026-11-17-two-person-release.md) retains keyboard/tab, assistive-technology, geometry, contrast, zoom and physical-phone checks. WHR-180 inherited mobile admin navigation is visible/tracked, not silently accepted as a feature fix. Unconfigured staging shows R17. READY does not authorize v2 activation.
 
+## WO-app-13c campaign date/time pickers and timezone list READY (WHR-230)
+
+[Feature PR #192](https://github.com/Adeboyemoses/Whalesreward/pull/192) merged green at `9722daaa2a61c95d4ae4aa1c804eecd9dd8fb871`; final reviewed head `17f47eac19e9136652d1a4143a6c28a1cb7258bc`. Screens only, against the unchanged WO-core-14b/WHR-150 timing contract (`src/shared/contracts/settings.ts`): launch/purchase-start/purchase-cutoff are now date+time picker pairs, and the timezone field is a searchable combobox over `Intl.supportedValuesOf("timeZone")` (Africa/Lagos first and default). `src/ui/pickers.tsx` reads the wall-clock input in the selected campaign timezone and converts it, via an Intl-only DST-aware offset calculation, to the same explicit-offset ISO instant the server already accepts; report from/to dates use the same calendar. Code/integrity PASS round 3 of 3 (Earl-authorized round-cap exception for a test-only fix); evidence in [.review/app__WHR-230-pickers.md](../../.review/app__WHR-230-pickers.md).
+
+| Invariants / boundary | Named verification | Status |
+|---|---|---|
+| I-45/I-45a timing inputs, read in the correct zone | `src/ui/pickers.time.test.ts`: `wallClockToInstant`/`instantToWallClock` round-trip across Africa/Lagos (no DST) and America/New_York/Europe/London (DST boundaries), both under TZ=UTC and TZ=America/New_York; `timezoneOptions()` puts Africa/Lagos first and always retains the campaign's stored zone | on-staging; client-side conversion only, server timing contract unchanged |
+
+| Board row / written states | Named verification | Status |
+|---|---|---|
+| Admin campaign set-up: launch/purchase-start/purchase-cutoff pickers, timezone combobox | [tests/design-parity/settings/pickers-fidelity.spec.ts](../../tests/design-parity/settings/pickers-fidelity.spec.ts): 1440/390/360px, no horizontal overflow, 48px phone tap targets, keyboard focus rings on the combobox and the launch date/time fields, keyboard-only filter/arrow/Enter selection; [tests/e2e/campaign-timing-real.spec.ts](../../tests/e2e/campaign-timing-real.spec.ts) `WHR-230 pickers and timezone` group: real-stack edit with the browser timezone forced to Asia/Tokyo (away from Lagos and the picked zone), and locked/read-only rendering. The group's own brand-new-campaign regression test self-skips once a campaign already exists on the shared worker database (expected on a run where an earlier test in the file created one — this is the EM's reported 2 skips, both projects); the fix it targets is instead exercised by the file's create-path I-45 test against a fresh database | on-staging; scoped to this screen's changed controls, not a full settings-surface re-check |
+
+A brand-new campaign's date/time pair could not previously be completed (display state was derived purely from the committed instant each render); fixed with independent per-field provisional wall-clock state in `settings-giveaway.tsx`. Found-work: WHR-237 (make the dedicated regression test run unconditionally, e.g. its own clean campaign state, rather than self-skip) and WHR-236 (the combobox has no selectable "UTC" entry) are both open, not fixed here.
+
 ## WO-core-14b Owner campaign setup READY (WHR-150)
 
 [Feature PR #143](https://github.com/Adeboyemoses/Whalesreward/pull/143) merged at `36f1210` with five green PR checks. Code/security/integrity PASS round 3 at `9780c30`; evidence-only PR head `b42ecd4`. EM typecheck/lint/build/Prisma, unit 871, PostgreSQL 1,154, timezone 5+5 and Linux browser 360/four existing skips PASS. This separate records merge completes READY; Earl's end-of-M4 smoke remains pending.
