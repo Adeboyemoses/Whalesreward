@@ -83,6 +83,53 @@ async function confirmTiming(page: Page) {
   expect((await response).status()).toBe(201);
 }
 
+// Regression test for a bug found and fixed during WHR-230. The
+// `setWallClock` closure in src/ui/admin/settings-giveaway.tsx originally
+// re-derived `wall` only from the already-*committed* `draft[key]` instant
+// on every render, so filling just one of a date/time pair while the other
+// was still blank (true of every field on a brand-new campaign) could never
+// complete the pair -- the just-typed value was wiped on the next render.
+// settings-giveaway.tsx now holds each field's wall-clock text in
+// `draft.wall` as its own source of truth, independent of whether the pair
+// resolves to an instant yet. This test keeps that regression covered.
+//
+// It must run first in this file: this worker's schema is freshly migrated
+// with no campaign row yet, and every later test here creates or seeds one
+// (the campaign-to-station relation is unique), so this is the only point
+// at which a genuinely brand-new, campaign-free state is available without
+// standing up a second isolated schema. An `expect` below enforces that
+// assumption instead of silently `test.skip()`-ing past it the way the
+// original version of this test did, which made it never actually run.
+test("WHR-230 a brand-new campaign's date+time pickers can be completed by filling date then time", async ({
+  page,
+}) => {
+  const f = await settingsFixture(page, null);
+  try {
+    const before = await readSettings(page);
+    expect(
+      before.campaign,
+      "This test must run first in the file to start from a campaign-free state",
+    ).toBeNull();
+    await page.goto("/admin/settings/giveaway");
+    await expect(
+      page
+        .getByRole("link", { name: "Create campaign", exact: true })
+        .or(page.getByText("Create campaign"))
+        .first(),
+    ).toBeVisible();
+    await page.getByLabel("Launch date", { exact: true }).fill("2026-02-01");
+    await page.getByLabel("Launch time", { exact: true }).fill("09:00:00");
+    await expect(
+      page.getByLabel("Launch date", { exact: true }),
+    ).toHaveValue("2026-02-01");
+    await expect(
+      page.getByLabel("Launch time", { exact: true }),
+    ).toHaveValue("09:00:00");
+  } finally {
+    await f.close();
+  }
+});
+
 test("I-45 Owner creates or edits explicit timing through review and history; cancel writes nothing", async ({
   page,
 }) => {
@@ -703,46 +750,4 @@ test.describe("WHR-230 pickers and timezone", () => {
     }
   });
 
-  // --- Regression test for a bug found and fixed during WHR-230. The
-  // `setWallClock` closure in src/ui/admin/settings-giveaway.tsx originally
-  // re-derived `wall` only from the already-*committed* `draft[key]` instant
-  // on every render, so filling just one of a date/time pair while the other
-  // was still blank (true of every field on a brand-new campaign) could never
-  // complete the pair -- the just-typed value was wiped on the next render.
-  // settings-giveaway.tsx now holds each field's wall-clock text in
-  // `draft.wall` as its own source of truth, independent of whether the pair
-  // resolves to an instant yet. This test keeps that regression covered.
-  test("WHR-230 a brand-new campaign's date+time pickers can be completed by filling date then time", async ({
-    page,
-  }) => {
-    const f = await settingsFixture(page, null);
-    try {
-      const before = await readSettings(page);
-      if (before.campaign) {
-        test.skip(
-          true,
-          "A campaign already exists in this fixture database; this bug only reproduces from a brand-new (no campaign) state.",
-        );
-      }
-      await page.goto("/admin/settings/giveaway");
-      await expect(
-        page
-          .getByRole("link", { name: "Create campaign", exact: true })
-          .or(page.getByText("Create campaign"))
-          .first(),
-      ).toBeVisible();
-      await page
-        .getByLabel("Launch date", { exact: true })
-        .fill("2026-02-01");
-      await page.getByLabel("Launch time", { exact: true }).fill("09:00:00");
-      await expect(
-        page.getByLabel("Launch date", { exact: true }),
-      ).toHaveValue("2026-02-01");
-      await expect(
-        page.getByLabel("Launch time", { exact: true }),
-      ).toHaveValue("09:00:00");
-    } finally {
-      await f.close();
-    }
-  });
 });
