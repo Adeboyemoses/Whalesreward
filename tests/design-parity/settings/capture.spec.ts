@@ -8,6 +8,7 @@ import {
   reviewIntent,
   daysLabel,
 } from "../../settings/helpers";
+import { instantToWallClock } from "../../../src/ui/pickers";
 
 test.use({ trace: "off", video: "off", screenshot: "off" });
 test.setTimeout(60000);
@@ -92,16 +93,34 @@ test("B07 T01 T03 T02 T04 independent 1440px settings fidelity and phone layout"
     ).toBeVisible();
     await capture(page, "B07-1440");
     await page.goto("/admin/settings/giveaway");
-    await expect(page.getByLabel("Launch", { exact: true })).toBeVisible();
-    for (const [label, value] of [
+    // Confirms the form rendered for a brand-new campaign before driving it.
+    await expect(
+      page.getByLabel("Launch date", { exact: true }),
+    ).toBeVisible();
+    const zone = "Africa/Lagos";
+    // The timezone must be committed before the date/time pairs: each pair
+    // is interpreted as wall-clock time in whichever zone is currently
+    // selected (see editTiming in tests/e2e/campaign-timing-real.spec.ts).
+    const tzInput = page.getByRole("combobox", { name: "Campaign timezone" });
+    await tzInput.click();
+    await tzInput.fill(zone);
+    await page.getByRole("option", { name: zone, exact: true }).click();
+    await expect(tzInput).toHaveValue(zone);
+    for (const [label, instant] of [
       ["Launch", "2035-03-01T00:00:00Z"],
       ["Purchase start", "2035-03-02T00:00:00Z"],
       ["Purchase cutoff", "2035-03-09T01:59:59Z"],
-      ["Campaign timezone", "Africa/Lagos"],
-      ["Upload grace period (hours)", "0"],
-      ["Reason for change", "Fictional campaign timing discussion"],
-    ])
-      await page.getByLabel(label!, { exact: true }).fill(value!);
+    ] as const) {
+      const wall = instantToWallClock(instant, zone)!;
+      await page.getByLabel(`${label} date`, { exact: true }).fill(wall.date);
+      await page.getByLabel(`${label} time`, { exact: true }).fill(wall.time);
+    }
+    await page
+      .getByLabel("Upload grace period (hours)", { exact: true })
+      .fill("0");
+    await page
+      .getByLabel("Reason for change", { exact: true })
+      .fill("Fictional campaign timing discussion");
     await capture(page, "T01-1440");
     const review = page.waitForResponse((r) =>
       r.url().endsWith("/settings/giveaway/review"),
