@@ -1,22 +1,22 @@
 # lane:core
-WO-core-16c (WHR-211) restricted monitoring, health signals and redaction: READY since 2026-11-23
+WO-core-13b (WHR-231) designed report PDF and structured Excel export: READY since 2026-11-27
 
 ## In flight
-- Feature PR [PR #183](https://github.com/Adeboyemoses/Whalesreward/pull/183) to staging; merged at `dc291253257aa78944793871d1a051e7c27bc4cd`; head `55de49094e8001994504772a6a5f06ce093cc1eb`, reviewed source `6990736`. Shared records are in this separate docs PR.
-- Count-only job/API/backlog signals and protected deploy check; public health unchanged. All 139 API route files/147 methods/39 families audited with synthetic canaries.
-- Code/security/integrity PASS round 2/3. Logger arbitrary-field, child-binding and message leaks fixed; code P1 early window expiry fixed with exact 300000 ms FIFO regressions.
-- EM typecheck/lint/build, 1,035 unit, 1,573 PostgreSQL/84 suites, 12 targeted real HTTP/non-superuser PostgreSQL, timezone 5+5 and identifiers 26 PASS. All five CI checks green: browser 506/four existing skips/zero retries, release 42, campaign 1, storage 1. Native timing-fixture flake and isolated 8/8 pass recorded on WHR-221; Chromium locally sandbox-blocked.
+- Stage 1 brief [PR #191](https://github.com/Adeboyemoses/Whalesreward/pull/191) merged to staging (approved by Earl 27 Nov). Stage 2 renderer [PR #196](https://github.com/Adeboyemoses/Whalesreward/pull/196) merged to staging at `5cbc5460e1f21dff9dc9561e23abaf17a3cdcb21`.
+- Full rewrite of `renderer.ts`: A4 PDF (500-row-capped source sales, headers repeated per page, Noto Sans for ₦/names) and 4-sheet XLSX (Summary/Daily/Groups/Source sales, real Lagos-time Date cells, ₦ numFmt). Fonts vendored at `src/server/modules/reports/fonts/`, proven to ship in the runtime image.
+- test-engineer's worst-case timing test found a real, systematic bug: XLSX render at the 100,000-row ceiling took ~10-11s against the real 5s `cardStorageDeadline` budget. Fixed (streaming WorkbookWriter + shared style objects) to ~2-3s; margin unverified on production hardware — see WHR-238.
+- Stage 2 review: high tier (`m4.md` touched), code/security/integrity. 3 rounds (cap 3): round 1 FAIL (1 P1 + 4 P2, fixed), round 2 PASS all three, round 3 (scoped to a post-review sample-regeneration commit) PASS all three.
 
 ## Next
-- Earl follows docs/ops/production.md section 4: signed-in deploy assertion, DO uptime/platform alerts, private recipients/access/retention and synthetic deployed failure/recovery checks.
-- WHR-226 tracks deployed ingress redaction and remaining independent alert semantics/notification proof. WHR-154 startup diagnostics remain separately gated.
-- READY means stop. No next work order started; no deployed monitoring or pilot readiness claimed.
+- No next work order started. READY means stop.
+- WHR-238 (found-in:WHR-231) batches 7 non-blocking review notes: devDependencies in the prod image, a display-only date derivation, a slightly-circular PDF layout test, a misleading code comment, the 100k-row timing margin being unverified on production hardware, a plan.files gap, and a stale sample-generation credit in the Stage 1 brief.
 
 ## Earl's gos
-- 2026-11-23: “Start WHR-211 (WO-core-16c).” Build section 4, no service setup, review cap 3, open to staging and merge when green; report READY then stop.
+- 2026-11-26: "Draft by Rook... Approved by Earl, 26 Nov 2026, brief first" — PR #191 (brief, staging).
+- 2026-11-27: Earl's approval comment on WHR-231/WHR-235 folding in the 500-row PDF cap and other Stage 2 decision items — PR #196 (staging).
 
 ## Risks
-- Native DO status checks do not establish JSON/version/policy semantics; protected snapshots are not an alert service. Per-process counters reset on restart/backward clock and are not fleet totals.
-- No cloud, processor, policy activation, client data, main promotion, retention removal or backup completion. Ten dispatches exceeds high-tier flag 8; rounds remain within cap.
+- Stage 1 dispatches (5, medium tier) and Stage 2 dispatches (13, high tier) both exceed their tier's dispatch flag (4 medium / 8 high) — driven by the round-1 FAIL fix cycle and the post-review sample-regeneration re-review, not scope creep; no round cap was exceeded.
+- The 100,000-row XLSX timing margin (~2-3s vs the real 5s budget) is only measured on development hardware, not the production `apps-s-1vcpu-1gb` instance — tracked in WHR-238.
 
-dispatches=10 prs=2 rounds_max=2 escalations=0 model=unavailable
+dispatches=18 prs=2 rounds_max=3 escalations=0 model=claude-sonnet-5
