@@ -46,7 +46,7 @@ async function extractText(bytes: Uint8Array): Promise<string> {
  * run — both already in the same unit-space as the PDF page (595.28 x
  * 841.89 pt, see renderer.ts's PAGE_WIDTH/PAGE_HEIGHT), so no viewport
  * scaling is needed since `getTextContent()` is called with no viewport. */
-type PositionedItem = { str: string; x: number; y: number; width: number };
+type PositionedItem = { str: string; x: number; y: number; width: number; height: number };
 async function extractItemsPerPage(bytes: Uint8Array): Promise<PositionedItem[][]> {
   const doc = await loadPdfJsDocument(bytes);
   const pages: PositionedItem[][] = [];
@@ -55,18 +55,65 @@ async function extractItemsPerPage(bytes: Uint8Array): Promise<PositionedItem[][
     const content = await page.getTextContent();
     pages.push(
       content.items
-        .filter((item): item is typeof item & { str: string; transform: number[]; width: number } =>
-          "str" in item,
+        .filter(
+          (item): item is typeof item & {
+            str: string;
+            transform: number[];
+            width: number;
+            height: number;
+          } => "str" in item,
         )
         .map((item) => ({
           str: item.str,
           x: item.transform[4]!,
           y: item.transform[5]!,
           width: item.width,
+          // pdfjs reports `height` directly on each text-content item — for
+          // these single-font-size, unrotated runs it comes back equal to
+          // the drawn font size (verified empirically against renderer.ts's
+          // own `size` argument to `drawText`), which is a defensible
+          // stand-in for the glyph's vertical extent above the baseline.
+          height: item.height,
         })),
     );
   }
   return pages;
+}
+
+/** Catches an inter-section vertical collision: a heading or footnote from
+ * one part of the page landing at the same y-position (or closer than a
+ * line height) as content from an adjacent, different section. Two items
+ * that legitimately share a baseline (same table row, different columns)
+ * are fine as long as their x-ranges don't intersect — this only flags a
+ * pair whose x-ranges overlap (within a small epsilon, to tolerate
+ * floating-point column boundaries) *and* whose y-ranges (baseline to
+ * baseline + height, since text is drawn upward from the baseline) also
+ * overlap. */
+function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number, epsilon: number): boolean {
+  return aStart < bEnd - epsilon && bStart < aEnd - epsilon;
+}
+function assertNoCollisions(pages: PositionedItem[][]) {
+  pages.forEach((rawItems, pageIndex) => {
+    // Empty-string items (pdfjs still emits one per blank wrapped line, e.g.
+    // from `wrapText`'s no-words fallback) carry no visible glyph and so
+    // can never visually collide with anything — excluding them avoids a
+    // meaningless false positive, not the real signal this test is for.
+    const items = rawItems.filter((it) => it.str.trim() !== "");
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i]!,
+          b = items[j]!;
+        if (a.str === b.str && a.x === b.x && a.y === b.y) continue; // identical draw, not a real pair
+        const xOverlap = rangesOverlap(a.x, a.x + a.width, b.x, b.x + b.width, 0.5);
+        if (!xOverlap) continue;
+        const yOverlap = rangesOverlap(a.y, a.y + a.height, b.y, b.y + b.height, 0);
+        if (yOverlap)
+          throw new Error(
+            `page ${pageIndex + 1}: text items collide — "${a.str}" @ (x=${a.x.toFixed(2)}, y=${a.y.toFixed(2)}, w=${a.width.toFixed(2)}, h=${a.height}) overlaps "${b.str}" @ (x=${b.x.toFixed(2)}, y=${b.y.toFixed(2)}, w=${b.width.toFixed(2)}, h=${b.height})`,
+          );
+      }
+    }
+  });
 }
 
 /** Source sales table column layout, copied from renderer.ts's `columns`
@@ -333,4 +380,50 @@ describe("report export renderer — PDF real text extraction (pdfjs-dist, CMap-
     expect(text).toContain("Cooking gas");
     expect(text).not.toContain("cooking_gas");
   });
+
+  it("WHR-239 I-defect: never collides two text items across sections — small fixture (one row)", async () => {
+    const out = await renderReportExport(snapshot([row]));
+    const pages = await extractItemsPerPage(out.bytes);
+    assertNoCollisions(pages);
+  });
+
+  it(
+    "WHR-239 I-defect: never collides two text items across sections — many-row fixture (SOURCE_TABLE_CAP rows, multi-page Daily/Groups/Source sales)",
+    async () => {
+      const rows: ReportSource[] = Array.from(
+        { length: SOURCE_TABLE_CAP },
+        (_, i) => ({ ...row, purchaseId: id, saleCode: `S${String(i).padStart(4, "0")}` }),
+      );
+      const out = await renderReportExport(snapshot(rows));
+      const pages = await extractItemsPerPage(out.bytes);
+      assertNoCollisions(pages);
+    },
+    20000,
+  );
+
+  it(
+    "WHR-239 I-defect: never collides two text items across sections — 366-day fixture (one row per day)",
+    async () => {
+      const days: ReportSource[] = Array.from({ length: 366 }, (_, i) => {
+        const d = new Date(Date.UTC(2025, 0, 1) + i * 86400000);
+        const day = d.toISOString().slice(0, 10);
+        return { ...row, purchaseId: id, saleCode: `D${String(i).padStart(4, "0")}`, saleDate: day, verifiedSaleDate: day };
+      });
+      const out = await renderReportExport(snapshot(days));
+      const pages = await extractItemsPerPage(out.bytes);
+      assertNoCollisions(pages);
+    },
+    20000,
+  );
+
+  it(
+    "WHR-239 I-defect: never collides two text items across sections — long run-on attendant name fixture",
+    async () => {
+      const wide: ReportSource = { ...row, attendant: { ...row.attendant, name: "W".repeat(200) } };
+      const out = await renderReportExport(snapshot([wide]));
+      const pages = await extractItemsPerPage(out.bytes);
+      assertNoCollisions(pages);
+    },
+    15000,
+  );
 });

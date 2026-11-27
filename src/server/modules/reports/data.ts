@@ -29,7 +29,7 @@ export async function reportAuthority(
   const actor = await requireAdminSession(db, token);
   requirePermission(actor, permission);
   const stations = (
-    await db.query("SELECT id,timezone FROM station ORDER BY id LIMIT 2")
+    await db.query("SELECT id,timezone,name FROM station ORDER BY id LIMIT 2")
   ).rows;
   if (stations.length !== 1)
     throw new AuthError("temporarily_unavailable", 503);
@@ -165,6 +165,7 @@ export function reportFromRows(
   asOf: string,
   dataVersion: string,
   rows: ReportSource[],
+  station: { id: string; name: string } | null = null,
 ): Report {
   const included = rows.filter((r) => r.included),
     groups = new Map<string, ReportSource[]>(),
@@ -211,6 +212,7 @@ export function reportFromRows(
   });
   return {
     filters,
+    station,
     asOf,
     timezone: "Africa/Lagos",
     dataVersion,

@@ -91,6 +91,16 @@ const PRODUCT_LABEL: Record<string, string> = {
   cooking_gas: "Cooking gas",
 };
 
+/** No existing admin-facing label convention for the purchase `state` or
+ * `exclusion` enums was found (grepped `src/ui/admin/**`, `src/client/**`);
+ * this is a simple, consistent fallback — underscores become spaces,
+ * sentence case — so the Source sales sheet never shows a raw snake_case
+ * enum code (e.g. "photo_pending" -> "Photo pending"). */
+function sentenceCase(code: string): string {
+  const s = code.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** Distinct currencies across a set of spend-bearing totals, NGN first, for
  * a stable column/row order; defaults to NGN alone when nothing is excluded
  * or earned yet so the common single-currency header always reads plainly. */
@@ -235,7 +245,14 @@ function buildSummarySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
     sheet = book.addWorksheet("Summary", { views: freezeAtRow(headerRowNumber) }),
     { report: r } = snapshot;
   sheet.addRow(["Report ID", text(snapshot.id)]);
-  sheet.addRow(["Period", r.filters.from, "to", r.filters.to]);
+  const periodRow = sheet.addRow([
+    "Period",
+    dayToDate(r.filters.from),
+    "to",
+    dayToDate(r.filters.to),
+  ]);
+  periodRow.getCell(2).numFmt = DAY_NUMFMT;
+  periodRow.getCell(4).numFmt = DAY_NUMFMT;
   sheet.addRow(["Product filter", text(r.filters.product ?? "All products")]);
   sheet.addRow(["Group by", text(r.filters.groupBy)]);
   const asOfRow = sheet.addRow(["As of (Lagos time)", lagosInstantDate(r.asOf)]);
@@ -345,7 +362,11 @@ function buildGroupsSheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
   const headerRow = sheet.addRow(headers);
   for (const g of items) {
     const row = sheet.addRow([
-      text(g.product ?? g.attendant?.name ?? g.pump?.name ?? g.key),
+      text(
+        g.product
+          ? PRODUCT_LABEL[g.product] ?? g.product
+          : g.attendant?.name ?? g.pump?.name ?? g.key,
+      ),
       text(g.attendant?.staffCode ?? ""),
       text(g.pump?.code ?? ""),
       excelNumber(g.totals.purchases),
@@ -416,7 +437,7 @@ function buildSourceSheet(book: ExcelJS.Workbook, sources: ReportSource[]) {
       s.saleCode,
       s.revisionId ?? "",
       dayToDate(s.saleDate),
-      s.dateEvidence,
+      s.dateEvidence === "verified" ? "Verified" : "Reported",
       lagosInstantDate(s.appCapturedAt),
       s.verifiedSaleDate ? dayToDate(s.verifiedSaleDate) : "",
       lagosInstantDate(s.serverReceivedAt),
@@ -427,14 +448,14 @@ function buildSourceSheet(book: ExcelJS.Workbook, sources: ReportSource[]) {
       s.pump.id,
       s.pump.code,
       s.pump.name,
-      s.product,
+      PRODUCT_LABEL[s.product] ?? s.product,
       excelNumber(money(s.amountKobo)),
       s.currency,
       s.unit === "litre" ? excelNumber(s.quantity) : excelNumber("0"),
       s.unit === "kilogram" ? excelNumber(s.quantity) : excelNumber("0"),
-      s.state,
+      sentenceCase(s.state),
       s.included,
-      s.exclusion ?? "",
+      s.exclusion ? sentenceCase(s.exclusion) : "",
       s.valuesSource,
       s.duplicateFlag,
       s.correctionPending,
@@ -525,8 +546,13 @@ class Cursor {
   ensure(height: number) {
     if (this.y - height < BOTTOM) this.newPage();
   }
+  // Bottom-anchored, matching `drawTable`'s `drawRow()`: `this.y` is the top
+  // of the text's box, and the glyph is drawn downward from there (baseline
+  // = this.y - size), not upward from the baseline. A plain `line()` call
+  // handing off to or from a table must share one convention or their
+  // glyphs land on top of each other at the section boundary (WHR-239).
   text(value: string, x: number, size: number, font: PDFFont) {
-    this.page.drawText(value, { x, y: this.y, size, font });
+    this.page.drawText(value, { x, y: this.y - size, size, font });
   }
   line(text: string, size = 10, bold = false, gap = 4) {
     const font = bold ? this.bold : this.regular;
@@ -700,7 +726,14 @@ async function renderPdf(
   const cursor = new Cursor(doc, regular, bold);
 
   // Header
-  cursor.line("Whales Rewards — operational report", 14, true, 6);
+  cursor.line(
+    r.station
+      ? `Whales Rewards — operational report — ${r.station.name}`
+      : "Whales Rewards — operational report",
+    14,
+    true,
+    6,
+  );
   cursor.line(`${formatDay(r.filters.from)} through ${formatDay(r.filters.to)} inclusive (${r.timezone})`);
   cursor.line("Date basis: Verified or reported sale date");
   cursor.line(`Prepared ${formatLagos(r.asOf)}`);
@@ -714,11 +747,21 @@ async function renderPdf(
   const includedDup = sources.filter((s) => s.included && s.duplicateFlag).length,
     includedCorr = sources.filter((s) => s.included && s.correctionPending).length;
   cursor.line(`Included duplicate flags: ${includedDup}; pending corrections: ${includedCorr}`);
-  cursor.line("Excluded from totals:", 10, true);
-  for (const e of r.excluded) {
-    cursor.line(`  ${e.state}: ${plural(e.records, "record")}`);
-    for (const s of e.spend) cursor.line(`    ${formatMoneyText(s.amountKobo, s.currency)}`);
-  }
+  // One line, states joined with " · ", exactly as the admin screen's
+  // notice reads (E05-Reports.html: "Excluded from totals: 2 pending
+  // (₦17,000.00) · 2 cancelled (₦14,000.00)."). A state with zero records
+  // is omitted, matching that example (only 2 of the 4 possible states
+  // are ever shown there).
+  const excludedParts = r.excluded
+    .filter((e) => e.records !== "0")
+    .map((e) => {
+      const spendText = e.spend.length
+        ? e.spend.map((s) => formatMoneyText(s.amountKobo, s.currency)).join(" + ")
+        : "₦0.00";
+      return `${e.records} ${e.state} (${spendText})`;
+    });
+  if (excludedParts.length)
+    cursor.line(`Excluded from totals: ${excludedParts.join(" · ")}`, 10);
 
   // Daily
   if (r.daily.length) {

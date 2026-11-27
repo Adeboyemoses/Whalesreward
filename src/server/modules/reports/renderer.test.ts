@@ -192,6 +192,59 @@ describe("report export renderer — Stage 2 structure", () => {
     // hard-broken lines inside the Attendant / pump column's x-range").
   });
 
+  it("WHR-239 I-defect: shows the display label ('PMS'/'Diesel'/'Cooking gas'), never the bare product enum code, in the Groups sheet when grouped by product", async () => {
+    const pmsRow = row;
+    const dieselRow: ReportSource = { ...row, purchaseId: id, saleCode: "S002", product: "diesel", unit: "litre" };
+    const keroseneRow: ReportSource = { ...row, purchaseId: id, saleCode: "S003", product: "kerosene", unit: "litre" };
+    const gasRow: ReportSource = {
+      ...row,
+      purchaseId: id,
+      saleCode: "S004",
+      product: "cooking_gas",
+      unit: "kilogram",
+      quantity: "12.5",
+    };
+    const sources = [pmsRow, dieselRow, keroseneRow, gasRow];
+    const productFilters = { ...filters, groupBy: "product" as const };
+    const out = await renderReportExport({
+      id,
+      format: "xlsx",
+      sources,
+      report: reportFromRows(productFilters, "2026-11-13T11:00:00Z", "5", sources),
+    });
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(Uint8Array.from(out.bytes).buffer);
+
+    // Raw enum codes that must always be display-mapped before they reach a
+    // cell. "kerosene" is deliberately excluded: its label ("Kerosene") and
+    // raw code differ only by case, so it proves nothing either way here.
+    const RAW_PRODUCT_CODES = ["pms", "diesel", "cooking_gas"];
+    const bareStringValues = (sheet: ExcelJS.Worksheet): string[] => {
+      const values: string[] = [];
+      sheet.eachRow((r) =>
+        r.eachCell((c) => {
+          if (typeof c.value === "string") values.push(c.value);
+        }),
+      );
+      return values;
+    };
+
+    for (const sheetName of ["Summary", "Daily", "Groups", "Source sales"] as const) {
+      const sheet = book.getWorksheet(sheetName)!;
+      const values = bareStringValues(sheet);
+      for (const raw of RAW_PRODUCT_CODES)
+        expect(values, `${sheetName} sheet must never show the bare code "${raw}"`).not.toContain(raw);
+    }
+
+    const groupsSheet = book.getWorksheet("Groups")!;
+    const groupLabels = (groupsSheet.getColumn(1).values as unknown[]).filter(
+      (v): v is string => typeof v === "string",
+    );
+    expect(groupLabels).toContain("PMS");
+    expect(groupLabels).toContain("Diesel");
+    expect(groupLabels).toContain("Cooking gas");
+  });
+
   it(
     "completes well within the 5s cardStorageDeadline budget at the sources limit",
     async () => {
