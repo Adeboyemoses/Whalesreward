@@ -1,7 +1,7 @@
 ---
 branch: docs/WHR-230-ready
 linear: WHR-230
-tier: low
+tier: docs
 reviewed_head: f28192e
 rounds: 2
 builder: engineering-manager
