@@ -2,15 +2,15 @@
 branch: core/WHR-231-stage-2-renderer
 linear: WHR-231
 tier: high
-reviewed_head: 7d97565
-rounds: 2
+reviewed_head: b36cad4
+rounds: 3
 builder: backend-engineer, test-engineer
 reviewers:
-  code-reviewer: PASS (round 2)
-  security-reviewer: PASS
-  integrity-reviewer: PASS
+  code-reviewer: PASS (round 3)
+  security-reviewer: PASS (round 3)
+  integrity-reviewer: PASS (round 3)
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 10
+dispatches: 13
 plan:
   goal: Stage 2 of WHR-231 — port the approved brief into renderer.ts: a table-based A4 PDF (500-row-capped source sales) and a 4-sheet XLSX (Summary, Daily, Groups, Source sales), embedding a vendored open-licence font for ₦, within the existing 5s render budget at REPORT_LIMITS ceilings
   files: src/server/modules/reports/renderer.ts (full rewrite), src/server/modules/reports/renderer.test.ts, renderer-pdf-text.test.ts, renderer-timing.test.ts (new), src/server/modules/reports/reports.test.ts (column-order updates), tests/integration/reports-currency-adversarial.test.ts, reports-exports-adversarial.test.ts (4-sheet updates), src/server/modules/reports/fonts/** (NotoSans TTFs + OFL.txt, vendored), Dockerfile (ship fonts to runtime image), package.json/pnpm-lock.yaml (@pdf-lib/fontkit to dependencies, pdfjs-dist devDependency for test PDF-text extraction), docs/engineering/contracts/m4.md (Reports and exports section — 500-row PDF cap, 4-sheet XLSX)
@@ -30,6 +30,8 @@ test-engineer's worst-case timing tests caught a real, systematic bug: rendering
 
 Round 1: code-reviewer FAIL (1 P1 — the new timing tests were flaky under parallel CI load and unverified under production-class hardware; 4 P2s — Summary sheet `######` from a too-narrow column, PDF Groups table printing raw product enums inconsistent with the same document's Summary section, PDF Amount column hard-breaking large sums mid-number, and layout tests that didn't actually prove "no overlap"/"headers repeat"). security-reviewer and integrity-reviewer both PASSed round 1 with only non-blocking notes. Round 2: all 5 fixed — timing tests isolated into their own sequential vitest project with explicit timeouts; Summary columns widened; PDF-only product-label fix; Amount column widened to 85pt; new pdfjs-dist item-geometry tests that genuinely fail without the fixes (verified). All three reviewers re-confirmed PASS at the new head; code-reviewer's only remaining item was a P3 (this file's `plan.files` doesn't list the round-2 `vitest.config.ts`/test-script change) — left as-is since `plan:` can't change after the head it describes was reviewed; noted here instead, in WHR-238. Round cap for high tier is 3; used 2.
 
-Five non-blocking notes across both rounds (devDependencies shipping in the prod image via a pre-existing Dockerfile pattern; a display-only date-field judgment call; a slightly-circular Daily-table test; a misleading code comment about the money contract's ceiling; the 100k-row timing margin being unverified on production-class hardware) batched into WHR-238 rather than reopening this PR.
+Five non-blocking notes across rounds 1-2 (devDependencies shipping in the prod image via a pre-existing Dockerfile pattern; a display-only date-field judgment call; a slightly-circular Daily-table test; a misleading code comment about the money contract's ceiling; the 100k-row timing margin being unverified on production-class hardware) batched into WHR-238 rather than reopening this PR.
 
-Gates run by the EM on the final head (7d97565): `pnpm typecheck` clean, `pnpm lint` 0 errors (4 pre-existing unrelated warnings), `pnpm test` 1077/1077 (run twice), targeted `pnpm test:integration` on the three reports-touching files 14/14, `pnpm build` green.
+Round 3 (scoped delta only): after rounds 1-2 closed at 7d97565, I added a follow-up commit (b36cad4) regenerating `docs/design/samples/report-sample.{pdf,xlsx}` from the real `renderReportExport` via a new `scripts/design/render-report-samples-stage2.ts` (work order item 4, "attach a fresh sample PDF and XLSX"), replacing Stage 1's hand-drawn mockups — no renderer or test logic touched. The CI `review-evidence` gate correctly caught this as a diff change requiring re-review; I dispatched all three reviewers fresh, scoped to just that commit. All three PASSed at b36cad4 (used as `reviewed_head`, since that is the head they actually reviewed). code-reviewer and integrity-reviewer both independently flagged the same P3 — the brief's "Samples" section still credits the Stage 1 mockup script, which writes the same output paths and would silently overwrite the real samples if rerun — left unfixed here (fixing it would move the head past what was reviewed, and round cap for high tier is 3, already used) and batched to WHR-238 instead. integrity-reviewer also independently rebuilt the sample files from the unchanged renderer and confirmed the committed bytes match exactly (only timestamps differ).
+
+Gates run by the EM on the final head (b36cad4): `pnpm typecheck` clean, `pnpm lint` 0 errors (4 pre-existing unrelated warnings), `pnpm test` 1077/1077, targeted `pnpm test:integration` on the three reports-touching files 13/13, `pnpm build` green.
