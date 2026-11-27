@@ -13,8 +13,7 @@ dispatches: 9
 invariants: [I-45]
 p1: []
 tickets: [WHR-236]
-escalation: Earl authorized round 3 (test-only CI-coverage fix, both reviewers PASS, no
-  findings) on 2026-11-27
+escalation: Earl authorized round 3 (test-only CI-coverage fix, both reviewers PASS) on 2026-11-27
 ---
 
 WO-app-13c (WHR-230), screens only: date/time pickers + searchable IANA timezone list
