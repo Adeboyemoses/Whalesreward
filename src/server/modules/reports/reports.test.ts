@@ -147,8 +147,9 @@ describe("reports strict bounds and exact arithmetic", () => {
     expect(source.rowCount).toBe(3);
     expect(source.getCell("K2").value).toBe(row.attendant.name);
     expect(source.getCell("L2").value).toBe(row.attendant.username);
-    expect(source.getCell("R2").value).toBe(1234.56);
-    expect(source.getCell("T2").value).toBe(1.234567);
+    expect(source.getCell("Q2").value).toBe(1234.56);
+    expect(source.getCell("S2").value).toBe(1.234567);
+    expect(source.getCell("T2").value).toBe(0);
     expect(source.getCell("V3").value).toBe(false);
     for (const ws of b.worksheets)
       ws.eachRow((r) =>

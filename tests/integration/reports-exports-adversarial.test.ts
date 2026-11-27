@@ -534,7 +534,9 @@ describe("WO-core-13 frozen report export adversaries", () => {
       book = new ExcelJS.Workbook();
     await book.xlsx.load(Uint8Array.from(file.bytes).buffer);
     expect(book.worksheets.map((s) => s.name)).toEqual([
-      "Report",
+      "Summary",
+      "Daily",
+      "Groups",
       "Source sales",
     ]);
     const sheet = book.getWorksheet("Source sales")!;

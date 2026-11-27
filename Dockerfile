@@ -30,6 +30,7 @@ COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/next.config.ts ./next.config.ts
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/jobs/admin-mail.mjs /app/jobs/orphans.mjs /app/jobs/reconcile-uploads.mjs /app/jobs/run-maintenance.mjs ./jobs/
+COPY --from=build --chown=node:node /app/src/server/modules/reports/fonts ./src/server/modules/reports/fonts
 COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node prisma.config.ts ./prisma.config.ts
 COPY --chown=node:node scripts/deploy/entrypoint.mjs ./scripts/deploy/entrypoint.mjs

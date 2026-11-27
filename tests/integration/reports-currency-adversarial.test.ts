@@ -200,37 +200,47 @@ describe("M4 prospective currency projections on real PostgreSQL", () => {
     );
     const book = new ExcelJS.Workbook();
     await book.xlsx.load(Uint8Array.from(file.bytes).buffer);
-    const reportSheet = book.getWorksheet("Report")!,
+    const summarySheet = book.getWorksheet("Summary")!,
+      groupsSheet = book.getWorksheet("Groups")!,
       sourceSheet = book.getWorksheet("Source sales")!;
     const spend: unknown[][] = [],
-      excluded: unknown[][] = [],
+      excludedByState = new Map<string, unknown[]>(),
       groups: unknown[] = [];
-    reportSheet.eachRow((row) => {
+    summarySheet.eachRow((row) => {
       if (row.getCell(1).value === "Spend")
-        spend.push([row.getCell(2).value, row.getCell(3).value]);
-      if (row.getCell(1).value === "Excluded spend")
-        excluded.push([row.getCell(2).value, row.getCell(3).value]);
-      if (row.getCell(1).value === "Group") groups.push(row.getCell(2).value);
+        spend.push([row.getCell(3).value, row.getCell(2).value]);
+      if (["cancelled", "held", "pending", "ineligible"].includes(row.getCell(1).value as string))
+        excludedByState.set(row.getCell(1).value as string, [
+          row.getCell(3).value,
+          row.getCell(4).value,
+        ]);
+    });
+    groupsSheet.eachRow((row, i) => {
+      if (i > 1) groups.push(row.getCell(1).value);
     });
     expect(spend.slice(0, 2)).toEqual([
       ["NGN", 90002],
       ["USD", 1],
     ]);
-    expect(excluded).toEqual([
-      ["NGN", 6],
-      ["NGN", 3],
-      ["USD", 4],
-      ["USD", 5],
-    ]);
+    // Excluded block header is "State, Records, Spend (NGN), Spend (USD)" —
+    // a row per exclusion state, columns 3/4 are the per-currency amount.
+    expect(excludedByState.get("cancelled")).toEqual([6, 0]);
+    expect(excludedByState.get("held")).toEqual([3, 4]);
+    expect(excludedByState.get("pending")).toEqual([0, 5]);
+    expect(excludedByState.get("ineligible")).toEqual([0, 0]);
     expect(groups).toEqual(["cooking_gas", "pms"]);
     expect(sourceSheet.rowCount).toBe(8);
+    const headers = sourceSheet.getRow(1).values as string[],
+      currencyCol = headers.indexOf("Currency"),
+      amountCol = headers.indexOf("Amount"),
+      includedCol = headers.indexOf("Included in totals");
     for (const [id, currency, , included, displayAmount] of expected) {
       const row = sourceSheet
         .getRows(2, 7)!
         .find((row) => row.getCell(1).value === id)!;
-      expect(row.getCell(19).value).toBe(currency);
-      expect(row.getCell(18).value).toBe(displayAmount);
-      expect(row.getCell(22).value).toBe(included);
+      expect(row.getCell(currencyCol).value).toBe(currency);
+      expect(row.getCell(amountCol).value).toBe(displayAmount);
+      expect(row.getCell(includedCol).value).toBe(included);
     }
   });
 });
