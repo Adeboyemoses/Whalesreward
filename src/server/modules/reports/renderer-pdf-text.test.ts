@@ -366,6 +366,19 @@ describe("report export renderer — PDF real text extraction (pdfjs-dist, CMap-
     expect(it.x + it.width).toBeLessThanOrEqual(col.right);
   });
 
+  it("WHR-240: a frozen snapshot saved before the station field existed (key entirely absent, not just null) still renders, without a station name", async () => {
+    const snap = snapshot([row]);
+    // Simulate a pre-migration frozen_snapshot JSONB row: `station` is not
+    // `null`, the key is entirely absent, as real old JSONB would be after
+    // `JSON.parse`. `station` is optional on `Report` precisely so this
+    // compiles without `as any`.
+    delete snap.report.station;
+    const out = await renderReportExport(snap);
+    const text = await extractText(out.bytes);
+    expect(text).toContain("Whales Rewards — operational report");
+    expect(text).not.toContain("Whales Rewards — operational report — ");
+  });
+
   it("shows the friendly 'Cooking gas' product label in the Groups table, never the raw 'cooking_gas' enum value, document-wide", async () => {
     const gas: ReportSource = { ...row, product: "cooking_gas", unit: "kilogram" };
     const gasFilters = { ...filters, groupBy: "product" as const, product: "cooking_gas" as const };
