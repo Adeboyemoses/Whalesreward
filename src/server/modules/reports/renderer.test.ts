@@ -245,6 +245,25 @@ describe("report export renderer — Stage 2 structure", () => {
     expect(groupLabels).toContain("Cooking gas");
   });
 
+  it("WHR-239 round 2: shows the display label, never the bare product enum code, in the Summary sheet's Product filter row when a product filter is set", async () => {
+    const productFilters = { ...filters, product: "cooking_gas" as const };
+    const sources = [{ ...row, product: "cooking_gas" as const, unit: "kilogram" as const, quantity: "12.5" }];
+    const out = await renderReportExport({
+      id,
+      format: "xlsx",
+      sources,
+      report: reportFromRows(productFilters, "2026-11-13T11:00:00Z", "5", sources),
+    });
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(Uint8Array.from(out.bytes).buffer);
+    const sheet = book.getWorksheet("Summary")!;
+    let productFilterValue: unknown;
+    sheet.eachRow((r) => {
+      if (r.getCell(1).value === "Product filter") productFilterValue = r.getCell(2).value;
+    });
+    expect(productFilterValue).toBe("Cooking gas");
+  });
+
   it(
     "completes well within the 5s cardStorageDeadline budget at the sources limit",
     async () => {

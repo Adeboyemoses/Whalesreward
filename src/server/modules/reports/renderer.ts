@@ -253,7 +253,10 @@ function buildSummarySheet(book: ExcelJS.Workbook, snapshot: ReportSnapshot) {
   ]);
   periodRow.getCell(2).numFmt = DAY_NUMFMT;
   periodRow.getCell(4).numFmt = DAY_NUMFMT;
-  sheet.addRow(["Product filter", text(r.filters.product ?? "All products")]);
+  sheet.addRow([
+    "Product filter",
+    text(r.filters.product ? PRODUCT_LABEL[r.filters.product] ?? r.filters.product : "All products"),
+  ]);
   sheet.addRow(["Group by", text(r.filters.groupBy)]);
   const asOfRow = sheet.addRow(["As of (Lagos time)", lagosInstantDate(r.asOf)]);
   asOfRow.getCell(2).numFmt = INSTANT_NUMFMT;
@@ -560,6 +563,14 @@ class Cursor {
     this.text(text, MARGIN, size, font);
     this.y -= size + gap;
   }
+  /** Same as `line()`, but wraps at the usable content width first and emits
+   * one `line()` per wrapped line, so a long station name or a long
+   * "Excluded from totals" summary never overflows the page's right edge
+   * (WHR-239 round 2). */
+  paragraph(text: string, size = 10, bold = false, gap = 4) {
+    const font = bold ? this.bold : this.regular;
+    for (const wrapped of wrapText(text, font, size, USABLE_WIDTH)) this.line(wrapped, size, bold, gap);
+  }
   rule() {
     this.ensure(10);
     this.page.drawLine({
@@ -726,7 +737,7 @@ async function renderPdf(
   const cursor = new Cursor(doc, regular, bold);
 
   // Header
-  cursor.line(
+  cursor.paragraph(
     r.station
       ? `Whales Rewards — operational report — ${r.station.name}`
       : "Whales Rewards — operational report",
@@ -761,7 +772,7 @@ async function renderPdf(
       return `${e.records} ${e.state} (${spendText})`;
     });
   if (excludedParts.length)
-    cursor.line(`Excluded from totals: ${excludedParts.join(" · ")}`, 10);
+    cursor.paragraph(`Excluded from totals: ${excludedParts.join(" · ")}`, 10);
 
   // Daily
   if (r.daily.length) {

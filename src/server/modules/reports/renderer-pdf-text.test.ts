@@ -429,6 +429,48 @@ describe("report export renderer — PDF real text extraction (pdfjs-dist, CMap-
     20000,
   );
 
+  it("WHR-239 round 2: wraps the header line and the 'Excluded from totals' line instead of letting them overflow the page's right edge", async () => {
+    // PAGE_WIDTH/MARGIN copied from renderer.ts (same values the module
+    // asserts against internally in drawTable) so this test can check
+    // every drawn text item's x-extent independently of the renderer.
+    const PAGE_WIDTH = 595.28,
+      MARGIN = 40;
+    // Four non-zero excluded buckets, each with a large (billion-kobo /
+    // ₦5,000,000,000.00) amount — reviewers measured this combination (plus
+    // a long station name) as realistically overflowing the ~515pt usable
+    // width when drawn unwrapped at size 10/14 Noto Sans.
+    const bigAmount = "500000000000";
+    const excludedRows: ReportSource[] = (
+      ["cancelled", "held", "pending", "ineligible"] as const
+    ).map((exclusionState, i) => ({
+      ...row,
+      purchaseId: id,
+      saleCode: `X${i}`,
+      included: false,
+      exclusion: exclusionState,
+      amountKobo: bigAmount,
+    }));
+    const allRows = [row, ...excludedRows];
+    const longStation = {
+      id,
+      name: "Whales Energy Mega Filling Station And Cooking Gas Depot Limited — Lekki-Epe Expressway Branch",
+    };
+    const report = reportFromRows(filters, "2026-11-13T11:00:00Z", "5", allRows, longStation);
+    const out = await renderReportExport({ id, format: "pdf", sources: allRows, report });
+    // pdfjs-dist's Node transport detaches the passed buffer on load, so
+    // each independent load needs its own copy of the bytes.
+    const text = await extractText(new Uint8Array(out.bytes));
+    // Proves the wrap actually happened (the fix's intended behaviour),
+    // not just that nothing overflows by accident.
+    expect(text).toContain("Lekki-Epe Expressway Branch");
+    expect(text).toContain("Excluded from totals");
+    const pages = await extractItemsPerPage(new Uint8Array(out.bytes));
+    for (const items of pages)
+      for (const it of items)
+        if (it.str.trim() !== "")
+          expect(it.x + it.width).toBeLessThanOrEqual(PAGE_WIDTH - MARGIN + 0.5);
+  });
+
   it(
     "WHR-239 I-defect: never collides two text items across sections — long run-on attendant name fixture",
     async () => {
