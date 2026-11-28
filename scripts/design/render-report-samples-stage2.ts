@@ -33,6 +33,7 @@ function totals(
 
 const report: ReportSnapshot["report"] = {
   filters: { from: "2026-10-27", to: "2026-11-02", product: null, groupBy: "product" },
+  station: { id: "018f0000-0000-7000-8000-00000000c001", name: "Whales Energy — Sample Station" },
   asOf: "2026-11-02T22:59:59+01:00",
   timezone: "Africa/Lagos",
   dataVersion: "184203",

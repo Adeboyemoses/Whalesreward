@@ -58,6 +58,7 @@ export async function readReport(
       data.asOf,
       data.dataVersion,
       data.sources,
+      { id: station.id, name: station.name },
     );
     return {
       ...report,

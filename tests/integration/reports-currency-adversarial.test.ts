@@ -228,7 +228,9 @@ describe("M4 prospective currency projections on real PostgreSQL", () => {
     expect(excludedByState.get("held")).toEqual([3, 4]);
     expect(excludedByState.get("pending")).toEqual([0, 5]);
     expect(excludedByState.get("ineligible")).toEqual([0, 0]);
-    expect(groups).toEqual(["cooking_gas", "pms"]);
+    // The Groups sheet's product column renders the display label (WHR-239
+    // defect-4 fix), not the raw enum code — same order as before.
+    expect(groups).toEqual(["Cooking gas", "PMS"]);
     expect(sourceSheet.rowCount).toBe(8);
     const headers = sourceSheet.getRow(1).values as string[],
       currencyCol = headers.indexOf("Currency"),

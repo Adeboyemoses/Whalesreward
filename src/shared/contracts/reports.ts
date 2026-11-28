@@ -102,6 +102,11 @@ export const reportGroupSchema = z.strictObject({
 });
 export const reportSchema = z.strictObject({
   filters: reportFilterSchema,
+  // Optional/nullable: additive (WHR-239/WHR-240) so every pre-existing
+  // `Report` literal (test fixtures, the Stage 1 sample script) keeps
+  // compiling unchanged; only the real call sites that have a station in
+  // scope (export-service.ts, service.ts) populate it.
+  station: z.strictObject({ id: authId, name: z.string() }).nullable().optional(),
   asOf: instant,
   timezone: z.literal("Africa/Lagos"),
   dataVersion: dataVersionSchema,

@@ -77,6 +77,7 @@ export async function createReportExport(
             d.asOf,
             d.dataVersion,
             d.sources,
+            { id: station.id, name: station.name },
           ),
           id = newId(),
           actorSnapshot = await auditActor(db, actor.user_id);
