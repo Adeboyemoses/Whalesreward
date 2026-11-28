@@ -2,15 +2,15 @@
 branch: core/WHR-240-m4-station-note
 linear: WHR-240
 tier: high
-reviewed_head: efdf8a7
-rounds: 1
+reviewed_head: 9598dbe
+rounds: 2
 builder: EM (docs-only, per AGENTS.md session protocol)
 reviewers:
-  code-reviewer: PASS (round 1)
-  security-reviewer: PASS (round 1)
-  integrity-reviewer: PASS (round 1)
+  code-reviewer: PASS (round 2, confirmation at 9598dbe)
+  security-reviewer: PASS (round 2, confirmation at 9598dbe)
+  integrity-reviewer: PASS (round 2, confirmation at 9598dbe)
 blocking: {P0-OPEN: 0, SEC-HIGH-OPEN: 0, INTEGRITY-P1-OPEN: 0}
-dispatches: 3
+dispatches: 6
 plan:
   goal: document the already-merged, already-reviewed additive Report.station field (WHR-239/WHR-240 Option A) in the m4 contract spec, with no code change
   files: docs/engineering/contracts/m4.md
