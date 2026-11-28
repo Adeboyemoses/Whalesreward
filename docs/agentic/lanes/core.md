@@ -1,22 +1,22 @@
 # lane:core
-WO-core-13b (WHR-231) designed report PDF and structured Excel export: READY since 2026-11-27
+
+State: idle. Last session 2026-11-28, WO-core-13c (WHR-239).
 
 ## In flight
-- Stage 1 brief [PR #191](https://github.com/Adeboyemoses/Whalesreward/pull/191) merged to staging (approved by Earl 27 Nov). Stage 2 renderer [PR #196](https://github.com/Adeboyemoses/Whalesreward/pull/196) merged to staging at `5cbc5460e1f21dff9dc9561e23abaf17a3cdcb21`.
-- Full rewrite of `renderer.ts`: A4 PDF (500-row-capped source sales, headers repeated per page, Noto Sans for ₦/names) and 4-sheet XLSX (Summary/Daily/Groups/Source sales, real Lagos-time Date cells, ₦ numFmt). Fonts vendored at `src/server/modules/reports/fonts/`, proven to ship in the runtime image.
-- test-engineer's worst-case timing test found a real, systematic bug: XLSX render at the 100,000-row ceiling took ~10-11s against the real 5s `cardStorageDeadline` budget. Fixed (streaming WorkbookWriter + shared style objects) to ~2-3s; margin unverified on production hardware — see WHR-238.
-- Stage 2 review: high tier (`m4.md` touched), code/security/integrity. 3 rounds (cap 3): round 1 FAIL (1 P1 + 4 P2, fixed), round 2 PASS all three, round 3 (scoped to a post-review sample-regeneration commit) PASS all three.
+
+- Nothing open. WHR-239/WHR-240 merged to staging (PR #198 at `3b4a4b7`, PR #199 at `b0095be`); this close-records PR is the session's last step.
 
 ## Next
-- No next work order started. READY means stop.
-- WHR-238 (found-in:WHR-231) batches 7 non-blocking review notes: devDependencies in the prod image, a display-only date derivation, a slightly-circular PDF layout test, a misleading code comment, the 100k-row timing margin being unverified on production hardware, a plan.files gap, and a stale sample-generation credit in the Stage 1 brief.
+
+- WHR-241 (100,000-row XLSX render timing on production hardware) is approved and queued; not started this session per Earl's 27 Nov 2026 "don't do speed work here" instruction.
 
 ## Earl's gos
-- 2026-11-26: "Draft by Rook... Approved by Earl, 26 Nov 2026, brief first" — PR #191 (brief, staging).
-- 2026-11-27: Earl's approval comment on WHR-231/WHR-235 folding in the 500-row PDF cap and other Stage 2 decision items — PR #196 (staging).
+
+- 2026-11-27: "merge now" on WHR-239's timing finding (WHR-241 tracks it separately); Option A approved for WHR-240 on condition a station-less pre-change snapshot still renders (test added).
 
 ## Risks
-- Stage 1 dispatches (5, medium tier) and Stage 2 dispatches (13, high tier) both exceed their tier's dispatch flag (4 medium / 8 high) — driven by the round-1 FAIL fix cycle and the post-review sample-regeneration re-review, not scope creep; no round cap was exceeded.
-- The 100,000-row XLSX timing margin (~2-3s vs the real 5s budget) is only measured on development hardware, not the production `apps-s-1vcpu-1gb` instance — tracked in WHR-238.
 
-dispatches=18 prs=2 rounds_max=3 escalations=0 model=claude-sonnet-5
+- Local Docker Desktop was unresponsive all session (no VM process came up after a restart + extended wait); `test:integration` ran green in CI only, never locally. Needs a reboot-level fix, not another CLI retry.
+- `renderer-timing.test.ts`'s 100k-row margin assertion is flaky under machine load on both dev hardware and CI `build`; it cleared on isolated rerun each time. WHR-241 covers the real production-hardware verification.
+
+dispatches=11 prs=2 rounds_max=3 escalations=1 model=claude-sonnet-5
